@@ -6,25 +6,18 @@ import { ToolGroup } from "./ToolGroup";
 
 interface Props {
   sessionId: string;
-  modelName?: string;
-  providerName?: string;
 }
 
-interface ToolCallBlock {
+interface ContentBlock {
   type?: string;
-  id?: string;
+  text?: string;
   name?: string;
-  tool?: string;
-  toolName?: string;
-  arguments?: Record<string, unknown>;
+  id?: string;
   input?: Record<string, unknown>;
-}
-
-interface ToolResultMsg {
-  role?: string;
+  output?: string;
   toolCallId?: string;
-  toolName?: string;
   isError?: boolean;
+  toolName?: string;
   content?: unknown;
 }
 
@@ -32,52 +25,15 @@ function extractText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((block: Record<string, unknown>) => {
-        const t = block.type as string;
-        if (t === "text") return (block.text as string) ?? "";
-        if (t === "thinking" || t === "reasoning") return (block.thinking as string) ?? (block.reasoning as string) ?? "";
-        return "";
-      })
+      .map((block: ContentBlock) => (block.type === "text" ? block.text ?? "" : ""))
       .join("");
   }
   return String(content ?? "");
 }
 
-/** Extract only the final text (after the last toolCall), for display outside the trail. */
-function extractFinalText(content: unknown): string {
-  if (!Array.isArray(content)) return extractText(content);
-  const textParts: string[] = [];
-  let afterLastTool = false;
-  // Walk content blocks in reverse to find last toolCall
-  for (let i = content.length - 1; i >= 0; i--) {
-    const block = content[i] as Record<string, unknown>;
-    if ((block.type as string) === "toolCall") {
-      afterLastTool = true;
-      break; // found the last tool call — everything after this point is final text
-    }
-  }
-  if (!afterLastTool) {
-    // No tool calls — just return all text
-    return extractText(content);
-  }
-  // Collect text blocks that appear after the last toolCall
-  let foundLastTool = false;
-  for (const block of content) {
-    const b = block as Record<string, unknown>;
-    if ((b.type as string) === "toolCall") {
-      foundLastTool = true;
-      continue;
-    }
-    if (foundLastTool && (b.type as string) === "text") {
-      textParts.push((b.text as string) ?? "");
-    }
-  }
-  return textParts.join("");
-}
-
-function getToolCalls(content: unknown): ToolCallBlock[] {
+function getToolCalls(content: unknown): ContentBlock[] {
   if (!Array.isArray(content)) return [];
-  return content.filter((b: ToolCallBlock) => b.type === "tool_use" || b.type === "toolCall");
+  return content.filter((b: ContentBlock) => b.type === "tool_use" || b.type === "toolCall");
 }
 
 /** Code block component with copy button. */
@@ -211,6 +167,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
       } else if (result.length > 0) {
         result[result.length - 1].responses.push(m);
       } else {
+        // Orphan assistant/toolResult message (before any user msg)
         result.push({ userMsg: {}, responses: [m] });
       }
     }
@@ -240,134 +197,82 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
         const isLastTurn = ti === turns.length - 1;
 
         // ── Extract tools from this turn ──
-        // Map from toolCallId → tool call info (for matching results)
-        const toolCallMap = new Map<string, {
-          name: string;
-          arguments?: Record<string, unknown>;
-        }>();
-
-        // Ordered list of unique tool invocations in this turn
-        interface ToolEntry {
+        const tools: Array<{
           type: "tool_call" | "tool_result";
-          callId: string;
           name: string;
           status: "running" | "done" | "error";
           input?: unknown;
           output?: string;
           isError?: boolean;
-        }
-        const tools: ToolEntry[] = [];
+        }> = [];
 
-        // Track insertion order via callId
-        const toolOrder: string[] = [];
+        let finalText = "";
+        let hasFinalText = false;
 
         for (const resp of turn.responses) {
           const role = resp.role as string;
           const content = resp.content;
 
           if (role === "assistant") {
-            // Extract tool calls from content blocks
-            if (Array.isArray(content)) {
-              for (const block of content as ToolCallBlock[]) {
-                if (block.type === "toolCall" || block.type === "tool_use") {
-                  const callId = block.id ?? `call_${tools.length}`;
-                  const name = block.name ?? block.tool ?? block.toolName ?? "tool";
-                  const args = block.arguments ?? block.input ?? {};
-                  toolCallMap.set(callId, { name, arguments: args as Record<string, unknown> });
-                  if (!toolOrder.includes(callId)) {
-                    toolOrder.push(callId);
-                  }
-                  tools.push({
-                    type: "tool_call",
-                    callId,
-                    name,
-                    status: "done",
-                    input: args,
-                  });
-                }
-              }
+            // Extract tool calls
+            const toolCalls = getToolCalls(content);
+            for (const tc of toolCalls) {
+              tools.push({
+                type: "tool_call",
+                name: tc.name ?? tc.toolName ?? "tool",
+                status: "done",
+                input: tc.input,
+              });
+            }
+            // Accumulate text (only the last text should show)
+            const text = extractText(content);
+            if (text.length > 0) {
+              finalText = text;
+              hasFinalText = true;
             }
           }
 
           if (role === "toolResult" || role === "tool") {
-            const callId = (resp.toolCallId as string) ?? "";
             const toolName = (resp.toolName as string) ?? (resp.name as string) ?? "tool";
             const isErr = resp.isError === true;
             const output = extractText(content);
 
-            // Try to match by callId first
-            const existingByCallId = callId
-              ? tools.findIndex((t) => t.callId === callId)
-              : -1;
-
-            if (existingByCallId >= 0) {
-              tools[existingByCallId] = {
-                ...tools[existingByCallId],
+            // Match with existing tool call or add as standalone
+            const existingIdx = tools.findIndex(
+              (t) => t.type === "tool_call" && t.name === toolName,
+            );
+            if (existingIdx >= 0) {
+              // Replace the tool call entry with a result
+              tools[existingIdx] = {
                 type: "tool_result",
+                name: toolName,
                 status: isErr ? "error" : "done",
                 output,
                 isError: isErr,
               };
             } else {
-              // Fallback: match by name
-              const existingByName = tools.findIndex(
-                (t) => t.type === "tool_call" && t.name === toolName,
-              );
-              if (existingByName >= 0) {
-                tools[existingByName] = {
-                  ...tools[existingByName],
-                  type: "tool_result",
-                  status: isErr ? "error" : "done",
-                  output,
-                  isError: isErr,
-                };
-              } else {
-                // Standalone tool result with a generated callId
-                const genCallId = callId || `result_${tools.length}`;
-                if (!toolOrder.includes(genCallId)) toolOrder.push(genCallId);
-                tools.push({
-                  type: "tool_result",
-                  callId: genCallId,
-                  name: toolName,
-                  status: isErr ? "error" : "done",
-                  output,
-                  isError: isErr,
-                });
-              }
+              // Standalone tool result (no prior tool call seen)
+              tools.push({
+                type: "tool_result",
+                name: toolName,
+                status: isErr ? "error" : "done",
+                output,
+                isError: isErr,
+              });
             }
           }
         }
 
         // For the streaming turn, add active tool
         if (isLastTurn && isStreaming && activeToolName) {
-          const exists = tools.some((t) => t.callId === activeToolName || t.name === activeToolName);
-          if (!exists) {
-            const genCallId = `streaming_${activeToolName}_${Date.now()}`;
-            toolOrder.push(genCallId);
+          const streamingToolName = activeToolName;
+          if (!tools.find((t) => t.type === "tool_call" && t.name === streamingToolName)) {
             tools.push({
               type: "tool_call",
-              callId: genCallId,
-              name: activeToolName,
+              name: streamingToolName,
               status: "running",
             });
           }
-        }
-
-        // Sort tools by insertion order
-        tools.sort((a, b) => toolOrder.indexOf(a.callId) - toolOrder.indexOf(b.callId));
-
-        // ── Extract final text for this turn (text after last toolCall) ──
-        let finalText = "";
-        for (const resp of turn.responses) {
-          if (resp.role === "assistant") {
-            const t = extractFinalText(resp.content);
-            if (t.length > 0) finalText = t;
-          }
-        }
-
-        // Also include streaming text for the last turn
-        if (isLastTurn && isStreaming && streamText.length > 0) {
-          finalText = streamText;
         }
 
         return (
@@ -381,7 +286,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
               </div>
             )}
 
-            {/* Tool group (only if there are tool calls or results) */}
+            {/* Tool group */}
             {tools.length > 0 && (
               <div className="message-row assistant">
                 <div style={{ maxWidth: "80%", width: "100%" }}>
@@ -396,7 +301,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
             )}
 
             {/* Final text response (after tools) */}
-            {finalText.length > 0 && (
+            {hasFinalText && (
               <div className="message-row assistant">
                 <div className="message-bubble assistant">
                   <MarkdownContent text={finalText} />
