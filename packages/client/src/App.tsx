@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
-import { fetchAuthStatus, login, type SessionSummary } from "./lib/api-client";
+import { ThemePicker } from "./components/ThemePicker";
+import { ModelDropdown } from "./components/ModelDropdown";
+import { fetchAuthStatus, login, type SessionSummary, fetchProviders, type ProviderGroup } from "./lib/api-client";
+import { applyTheme } from "./lib/theme";
 
 export function App() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -10,11 +13,25 @@ export function App() {
   const createAndActivate = useSessionStore((s) => s.createAndActivate);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
+  const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
+
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    try {
+      return localStorage.getItem("pi-kot-theme") ?? "night";
+    } catch {
+      return "night";
+    }
+  });
+  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState("");
+  const [providers, setProviders] = useState<ProviderGroup[]>([]);
+  const [modelError, setModelError] = useState<string | undefined>();
 
-  // Bootstrap: check auth, load sessions
+  // Bootstrap: check auth, load sessions, fetch models
   useEffect(() => {
     (async () => {
       try {
@@ -34,6 +51,29 @@ export function App() {
       } catch {
         // server not reachable yet
       }
+
+      // Fetch available models
+      try {
+        const res = await fetchProviders();
+        setProviders(res.providers);
+        // Auto-select first model with auth, or first model overall
+        const allModels = res.providers.flatMap((p) => p.models);
+        const firstWithAuth = allModels.find((m) => m.hasAuth);
+        if (firstWithAuth) {
+          setSelectedModel(firstWithAuth.id);
+          setSelectedProvider(
+            res.providers.find((p) =>
+              p.models.some((m) => m.id === firstWithAuth.id)
+            )?.provider ?? "",
+          );
+        } else if (allModels.length > 0) {
+          setSelectedModel(allModels[0].id);
+          setSelectedProvider(res.providers[0]?.provider ?? "");
+        }
+      } catch {
+        // providers not available
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -48,162 +88,91 @@ export function App() {
     }
   };
 
-  // Auto-create first session if none exist
+  const handleThemeChange = (themeId: string) => {
+    applyTheme(themeId);
+    setCurrentTheme(themeId);
+  };
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((c) => !c);
+  }, []);
+
+  const handleModelSelect = useCallback(
+    (modelId: string, provider: string) => {
+      setSelectedModel(modelId);
+      setSelectedProvider(provider);
+      setModelError(undefined);
+      try {
+        localStorage.setItem("pi-kot-model", JSON.stringify({ modelId, provider }));
+      } catch {
+        // private mode
+      }
+    },
+    [],
+  );
+
+  const handleModelError = useCallback((error: string) => {
+    setModelError(error);
+  }, []);
+
+  // Auto-create first session if none exist, or auto-select the first existing one
   useEffect(() => {
-    if (!loading && !authRequired && sessions.length === 0) {
+    if (loading || authRequired) return;
+    if (sessions.length === 0) {
       createAndActivate();
+    } else if (activeSessionId === undefined) {
+      setActiveSession(sessions[0].sessionId);
     }
-  }, [loading, authRequired, sessions.length]);
+  }, [loading, authRequired, sessions, activeSessionId]);
 
   if (loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          fontFamily: "system-ui, sans-serif",
-          color: "#666",
-        }}
-      >
-        Loading...
-      </div>
-    );
+    return <div className="centered">Loading...</div>;
   }
 
   if (authRequired) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          fontFamily: "system-ui, sans-serif",
-        }}
-      >
+      <div className="centered">
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleLogin();
-          }}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            padding: "32px",
-            borderRadius: "12px",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.1)",
-            background: "#fff",
-            width: "320px",
-          }}
+          onSubmit={(e) => { e.preventDefault(); handleLogin(); }}
+          className="login-form"
         >
-          <h2 style={{ margin: 0, fontSize: "20px" }}>pi-kot Login</h2>
+          <h2 className="login-title">pi-kot</h2>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password"
             autoFocus
-            style={{
-              padding: "10px 12px",
-              borderRadius: "8px",
-              border: "1px solid #d0d0d0",
-              fontSize: "14px",
-            }}
+            className="login-input"
           />
-          <button
-            type="submit"
-            style={{
-              padding: "10px",
-              borderRadius: "8px",
-              border: "none",
-              background: "#4a90d9",
-              color: "#fff",
-              fontWeight: 600,
-              fontSize: "14px",
-              cursor: "pointer",
-            }}
-          >
-            Login
-          </button>
+          <button type="submit" className="login-btn">Login</button>
         </form>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        margin: 0,
-        padding: 0,
-        overflow: "hidden",
-      }}
-    >
-      {/* Sidebar */}
-      <div
-        style={{
-          width: "260px",
-          borderRight: "1px solid #e0e0e0",
-          display: "flex",
-          flexDirection: "column",
-          background: "#fafafa",
-        }}
-      >
-        <div
-          style={{
-            padding: "16px",
-            borderBottom: "1px solid #e0e0e0",
-            fontWeight: 700,
-            fontSize: "16px",
-            color: "#333",
-          }}
-        >
-          pi-kot
+    <div className="app-layout">
+      {/* Sidebar — collapsible */}
+      <div className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
+        <div className="sidebar-header">
+          <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent-text)" }}>
+            pi-kot
+          </span>
         </div>
 
-        <div style={{ padding: "8px" }}>
-          <button
-            onClick={createAndActivate}
-            style={{
-              width: "100%",
-              padding: "10px",
-              borderRadius: "8px",
-              border: "1px dashed #4a90d9",
-              background: "transparent",
-              color: "#4a90d9",
-              fontWeight: 600,
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-          >
+        <div className="sidebar-actions">
+          <button onClick={createAndActivate} className="new-session-btn">
             + New Session
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
+        <div className="session-list">
           {sessions.map((s: SessionSummary) => (
             <div
               key={s.sessionId}
               onClick={() => setActiveSession(s.sessionId)}
-              style={{
-                padding: "10px 12px",
-                borderRadius: "6px",
-                cursor: "pointer",
-                fontSize: "13px",
-                color: activeSessionId === s.sessionId ? "#4a90d9" : "#555",
-                background:
-                  activeSessionId === s.sessionId ? "#e3f2fd" : "transparent",
-                fontWeight: activeSessionId === s.sessionId ? 600 : 400,
-                marginBottom: "2px",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className={`session-item ${activeSessionId === s.sessionId ? "active" : ""}`}
             >
               Session {s.sessionId.slice(0, 8)}
             </div>
@@ -212,30 +181,70 @@ export function App() {
       </div>
 
       {/* Main chat area */}
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div className="main-area">
+        {/* Sticky header bar */}
+        <div className="header">
+          <div className="header-left">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="sidebar-toggle"
+              title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+            >
+              {sidebarCollapsed ? "☰" : "✕"}
+            </button>
+            {activeSessionId !== undefined && (
+              <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-secondary)" }}>
+                Session {activeSessionId.slice(0, 8)}
+              </span>
+            )}
+          </div>
+          <div className="header-right">
+            {providers.length > 0 && (
+              <ModelDropdown
+                sessionId={activeSessionId}
+                selected={selectedModel}
+                onSelect={handleModelSelect}
+                onError={handleModelError}
+              />
+            )}
+            <span
+              className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
+            />
+            <ThemePicker currentTheme={currentTheme} onChange={handleThemeChange} />
+          </div>
+        </div>
+
+        {/* Model error banner */}
+        {modelError !== undefined && (
+          <div
+            onClick={() => setModelError(undefined)}
+            className="error-banner"
+            style={{
+              position: "absolute",
+              top: "52px",
+              left: "16px",
+              right: "16px",
+              zIndex: 9,
+              cursor: "pointer",
+            }}
+          >
+            {modelError} — click to dismiss
+          </div>
+        )}
+
         {activeSessionId !== undefined ? (
           <>
             <ChatView sessionId={activeSessionId} />
             <ChatInput sessionId={activeSessionId} />
           </>
         ) : (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#999",
-              fontSize: "16px",
-            }}
-          >
-            Select or create a session to start chatting
+          <div className="centered" style={{ height: "100%" }}>
+            <div className="welcome">
+              <div className="welcome-icon">⌨️</div>
+              <div className="welcome-text">Select or create a session</div>
+              <div className="welcome-hint">to start chatting with the coding agent</div>
+            </div>
           </div>
         )}
       </div>

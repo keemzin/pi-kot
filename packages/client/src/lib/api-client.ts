@@ -195,3 +195,62 @@ export async function steerSession(
     { text, mode },
   );
 }
+
+// ---- Providers / Models ----
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  reasoning: boolean;
+  input: string[];
+  hasAuth: boolean;
+  supportedThinkingLevels: string[];
+}
+
+export interface ProviderGroup {
+  provider: string;
+  models: ModelInfo[];
+}
+
+export interface ProvidersResponse {
+  providers: ProviderGroup[];
+}
+
+export async function fetchProviders(): Promise<ProvidersResponse> {
+  return request<ProvidersResponse>("GET", "/api/v1/config/providers");
+}
+
+// ---- Model Management ----
+
+export interface SetModelResponse {
+  provider: string;
+  modelId: string;
+}
+
+export interface GetModelResponse {
+  provider: string;
+  modelId: string;
+}
+
+export async function setSessionModel(
+  sessionId: string,
+  provider: string,
+  modelId: string,
+): Promise<SetModelResponse> {
+  return request<SetModelResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/model`,
+    { provider, modelId },
+  );
+}
+
+export async function getSessionModel(
+  sessionId: string,
+): Promise<GetModelResponse> {
+  return request<GetModelResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/model`,
+  );
+}

@@ -8,6 +8,8 @@ import { healthRoutes, authRoutes } from "./routes/auth.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { promptRoutes } from "./routes/prompt.js";
 import { streamRoutes } from "./routes/stream.js";
+import { configRoutes } from "./routes/config.js";
+import { controlRoutes } from "./routes/control.js";
 import { disposeAllSessions } from "./session-registry.js";
 
 /**
@@ -109,6 +111,8 @@ export async function buildServer() {
       await api.register(sessionRoutes);
       await api.register(promptRoutes);
       await api.register(streamRoutes);
+      await api.register(configRoutes);
+      await api.register(controlRoutes);
     },
     { prefix: "/api/v1" },
   );

@@ -1,4 +1,6 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useSessionStore } from "../stores/session-store";
 
 interface Props {
@@ -28,48 +30,121 @@ function getToolCalls(content: unknown): ContentBlock[] {
   return content.filter((b: ContentBlock) => b.type === "tool_use");
 }
 
-/** Collapsible tool call chip — shows name only by default. */
+/** Code block component with copy button. */
+function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  const code = typeof children === "string" ? children : "";
+  const lang = className?.replace("language-", "") ?? "";
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }, [code]);
+
+  return (
+    <div className="code-block-wrapper" style={{
+      position: "relative",
+      margin: "8px 0",
+      borderRadius: "var(--radius)",
+      overflow: "hidden",
+      border: "1px solid var(--border)",
+      background: "rgba(0,0,0,0.25)",
+    }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "6px 12px",
+        background: "var(--bg-glass)",
+        borderBottom: "1px solid var(--border)",
+        fontSize: "11px",
+        color: "var(--text-dim)",
+        fontFamily: "'SF Mono','Menlo','Monaco',monospace",
+      }}>
+        <span>{lang || "code"}</span>
+        <button
+          onClick={handleCopy}
+          style={{
+            background: "none",
+            border: "none",
+            color: copied ? "var(--success)" : "var(--text-dim)",
+            cursor: "pointer",
+            fontSize: "11px",
+            padding: "2px 8px",
+            borderRadius: "var(--radius-sm)",
+            fontFamily: "inherit",
+            transition: "color 0.15s",
+          }}
+        >
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+      <pre style={{
+        padding: "12px",
+        overflowX: "auto",
+        fontFamily: "'SF Mono','Menlo','Monaco',monospace",
+        fontSize: "12px",
+        lineHeight: 1.6,
+        margin: 0,
+        border: "none",
+        borderRadius: 0,
+      }}>
+        <code className={className}>{children}</code>
+      </pre>
+    </div>
+  );
+}
+
+/** Render markdown text with proper components. */
+function MarkdownContent({ text }: { text: string }) {
+  return (
+    <div className="markdown-content">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ className, children, ...props }) {
+            const isInline = !className;
+            if (isInline) {
+              return (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
+            }
+            return <CodeBlock className={className}>{children}</CodeBlock>;
+          },
+          // Open links in new tab
+          a({ href, children }) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 function ToolCallChip({ name, input }: { name: string; input?: Record<string, unknown> }) {
   const inputPreview =
     input !== undefined ? JSON.stringify(input).slice(0, 300) : undefined;
 
   return (
-    <details
-      style={{
-        borderRadius: "6px",
-        background: "#e3f2fd",
-        fontSize: "12px",
-        fontFamily: "monospace",
-      }}
-    >
-      <summary
-        style={{
-          cursor: "pointer",
-          padding: "6px 10px",
-          color: "#1565c0",
-          fontWeight: 600,
-          userSelect: "none",
-        }}
-      >
-        🔧 {name}
-      </summary>
+    <details className="tool-call-chip">
+      <summary>🔧 {name}</summary>
       {inputPreview !== undefined && (
-        <div
-          style={{
-            padding: "0 10px 6px",
-            color: "#0d47a1",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
-        >
-          {inputPreview}
-        </div>
+        <div className="tool-call-input">{inputPreview}</div>
       )}
     </details>
   );
 }
 
-/** Collapsible tool result card — shows name + status by default. */
 function ToolResultCard({
   toolName,
   isError,
@@ -81,37 +156,19 @@ function ToolResultCard({
 }) {
   return (
     <details
-      style={{
-        borderRadius: "8px",
-        background: isError ? "#fff5f5" : "#f8f9fa",
-        border: `1px solid ${isError ? "#f5c6cb" : "#e0e0e0"}`,
-        fontSize: "13px",
-        fontFamily: "monospace",
-        lineHeight: "1.4",
-      }}
+      className="tool-result"
+      style={{ borderColor: isError ? "rgba(248,113,113,0.25)" : undefined }}
     >
-      <summary
-        style={{
-          cursor: "pointer",
-          padding: "8px 12px",
-          color: isError ? "#721c24" : "#555",
-          fontWeight: 600,
-          userSelect: "none",
-        }}
-      >
+      <summary style={{ color: isError ? "var(--error)" : undefined }}>
         {isError ? "⚠️" : "🔧"} {toolName}
-        <span style={{ fontWeight: 400, marginLeft: "8px", color: "#999" }}>
+        <span style={{ fontWeight: 400, marginLeft: "8px", opacity: 0.6 }}>
           {content.length > 0 ? `${content.length} chars` : "done"}
         </span>
       </summary>
       {content.length > 0 && (
         <div
-          style={{
-            padding: "0 12px 8px",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            color: isError ? "#721c24" : "#555",
-          }}
+          className="tool-result-content"
+          style={{ color: isError ? "var(--error)" : undefined }}
         >
           {content.slice(0, 2000)}
           {content.length > 2000 ? "…" : ""}
@@ -136,46 +193,20 @@ export function ChatView({ sessionId }: Props) {
   }, [messages, streamText]);
 
   return (
-    <div
-      style={{
-        flex: 1,
-        overflowY: "auto",
-        padding: "16px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "12px",
-      }}
-    >
+    <div className="messages-container">
       {/* Error banner */}
       {error !== undefined && (
-        <div
-          onClick={clearError}
-          style={{
-            padding: "8px 12px",
-            background: "#fff3cd",
-            border: "1px solid #ffc107",
-            borderRadius: "8px",
-            color: "#856404",
-            fontSize: "13px",
-            cursor: "pointer",
-          }}
-        >
+        <div onClick={clearError} className="error-banner">
           {error} — click to dismiss
         </div>
       )}
 
       {/* Empty state */}
       {messages.length === 0 && !isStreaming && (
-        <div
-          style={{
-            textAlign: "center",
-            color: "#999",
-            padding: "40px 20px",
-            fontSize: "14px",
-          }}
-        >
-          <p style={{ fontSize: "24px", margin: "0 0 8px" }}>pi-kot</p>
-          <p>Send a message to start chatting with the coding agent.</p>
+        <div className="welcome" style={{ paddingTop: "80px" }}>
+          <div className="welcome-icon">💬</div>
+          <div className="welcome-text">Send a message to start chatting</div>
+          <div className="welcome-hint">with the pi coding agent</div>
         </div>
       )}
 
@@ -185,25 +216,11 @@ export function ChatView({ sessionId }: Props) {
         const role = m.role as string;
         const content = m.content;
 
-        // ── User message ──
+        // ── User message (plain text) ──
         if (role === "user") {
           return (
-            <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
-              <div
-                style={{
-                  maxWidth: "80%",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  background: "#4a90d9",
-                  color: "#fff",
-                  fontSize: "14px",
-                  lineHeight: "1.5",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}
-              >
-                {extractText(content)}
-              </div>
+            <div key={i} className="message-row user">
+              <div className="message-bubble user">{extractText(content)}</div>
             </div>
           );
         }
@@ -215,19 +232,15 @@ export function ChatView({ sessionId }: Props) {
           const resultText = extractText(content);
 
           return (
-            <div key={i} style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div key={i} className="message-row assistant">
               <div style={{ maxWidth: "80%", width: "100%" }}>
-                <ToolResultCard
-                  toolName={toolName}
-                  isError={isError}
-                  content={resultText}
-                />
+                <ToolResultCard toolName={toolName} isError={isError} content={resultText} />
               </div>
             </div>
           );
         }
 
-        // ── Assistant message ──
+        // ── Assistant message (rendered markdown) ──
         if (role === "assistant") {
           const text = extractText(content);
           const toolCalls = getToolCalls(content);
@@ -235,26 +248,12 @@ export function ChatView({ sessionId }: Props) {
           if (text.length === 0 && toolCalls.length === 0) return null;
 
           return (
-            <div key={i} style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div key={i} className="message-row assistant">
               <div
-                style={{
-                  maxWidth: "80%",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  background: "#f0f0f0",
-                  color: "#333",
-                  fontSize: "14px",
-                  lineHeight: "1.5",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
-                }}
+                className="message-bubble assistant"
+                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
               >
-                {text.length > 0 && (
-                  <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {text}
-                  </div>
-                )}
+                {text.length > 0 && <MarkdownContent text={text} />}
                 {toolCalls.map((tc, j) => (
                   <ToolCallChip
                     key={j}
@@ -270,40 +269,20 @@ export function ChatView({ sessionId }: Props) {
         return null;
       })}
 
-      {/* Streaming message */}
+      {/* Streaming message (rendered markdown too) */}
       {isStreaming && (
-        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+        <div className="message-row assistant">
           <div
-            style={{
-              maxWidth: "80%",
-              padding: "10px 14px",
-              borderRadius: "12px",
-              background: "#f0f0f0",
-              color: "#333",
-              fontSize: "14px",
-              lineHeight: "1.5",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
+            className="message-bubble assistant"
+            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
           >
             {activeToolName !== undefined && (
-              <div
-                style={{
-                  display: "inline-block",
-                  padding: "2px 8px",
-                  marginBottom: "6px",
-                  borderRadius: "4px",
-                  background: "#e3f2fd",
-                  color: "#1565c0",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                }}
-              >
-                🔧 {activeToolName}
-              </div>
+              <div className="tool-badge">🔧 {activeToolName}</div>
             )}
-            {streamText}
-            <span style={{ animation: "blink 1s infinite" }}>▊</span>
+            {streamText.length > 0 ? (
+              <MarkdownContent text={streamText} />
+            ) : null}
+            <span className="streaming-cursor">▊</span>
           </div>
         </div>
       )}

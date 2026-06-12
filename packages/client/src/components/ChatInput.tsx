@@ -11,7 +11,6 @@ export function ChatInput({ sessionId }: Props) {
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const abort = useSessionStore((s) => s.abort);
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (el !== null) {
@@ -32,7 +31,6 @@ export function ChatInput({ sessionId }: Props) {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Ctrl/Cmd + Enter to send
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       handleSubmit(e);
@@ -40,16 +38,7 @@ export function ChatInput({ sessionId }: Props) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: "flex",
-        gap: "8px",
-        padding: "12px",
-        borderTop: "1px solid #e0e0e0",
-        background: "#fff",
-      }}
-    >
+    <form onSubmit={handleSubmit} className="input-area">
       <textarea
         ref={textareaRef}
         onKeyDown={handleKeyDown}
@@ -63,51 +52,14 @@ export function ChatInput({ sessionId }: Props) {
         placeholder="Type a message... (Ctrl+Enter to send)"
         disabled={isStreaming}
         rows={1}
-        style={{
-          flex: 1,
-          resize: "none",
-          borderRadius: "8px",
-          border: "1px solid #d0d0d0",
-          padding: "10px 12px",
-          fontSize: "14px",
-          fontFamily: "inherit",
-          lineHeight: "1.4",
-          outline: "none",
-        }}
+        className="chat-input"
       />
       {isStreaming ? (
-        <button
-          type="button"
-          onClick={abort}
-          style={{
-            padding: "8px 16px",
-            borderRadius: "8px",
-            border: "1px solid #e74c3c",
-            background: "#e74c3c",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 600,
-            fontSize: "14px",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <button type="button" onClick={abort} className="btn btn-abort">
           Abort
         </button>
       ) : (
-        <button
-          type="submit"
-          style={{
-            padding: "8px 16px",
-            borderRadius: "8px",
-            border: "1px solid #4a90d9",
-            background: "#4a90d9",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: 600,
-            fontSize: "14px",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <button type="submit" className="btn btn-send">
           Send
         </button>
       )}

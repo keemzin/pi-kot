@@ -50,3 +50,6 @@ Thumbs.db
 .cache/
 .turbo/
 .eslintcache
+
+# Tau theme reference
+tau-ref/

@@ -76,7 +76,26 @@ User can:
   ✓ See tool calls inline
   ✓ Abort a running agent
   ✓ Reconnect if the server restarts
+  ✓ Switch between 6 themes from the header bar
+  ✓ Collapse/expand the sidebar
+  ✓ See rendered markdown with compact spacing
+  ✓ Browse available models and select one from the header
 ```
+
+
+### 1c — Theme System & Model Selector
+
+**Goal:** Visual polish (tau themes) and model selection in the header bar.
+
+| # | Task | Status | Description |
+|---|---|---|---|
+| 1c.1 | CSS theme system | 🟢 | Port 6 tau themes (night, midnight, dawn, clean, terracotta, sage) with CSS variables |
+| 1c.2 | Theme picker | 🟢 | Custom dropdown in header, persisted to localStorage |
+| 1c.3 | Collapsible sidebar | 🟢 | Sidebar toggle with slide animation (matching tau) |
+| 1c.4 | Sticky header bar | 🟢 | Absolute-positioned glass header with session name, status dot, controls |
+| 1c.5 | Compact markdown spacing | 🟢 | Tight line-height, paragraph/li margins matching tau's compact rendering |
+| 1c.6 | Provider listing endpoint | 🟢 | `GET /api/v1/config/providers` — live models from SDK ModelRegistry |
+| 1c.7 | Model dropdown | 🟢 | Searchable model selector in header bar (matching tau's `.model-dropdown`) |
 
 ---
 

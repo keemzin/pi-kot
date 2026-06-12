@@ -24,6 +24,14 @@ async function preflight(
     });
     return undefined;
   }
+  // Check auth is configured for the current model
+  if (!live.session.modelRegistry.hasConfiguredAuth(model)) {
+    await reply.code(400).send({
+      error: "auth_not_configured",
+      message: `No API key configured for provider "${model.provider}". Add one via PUT /api/v1/config/auth/${model.provider}.`,
+    });
+    return undefined;
+  }
   return live;
 }
 
