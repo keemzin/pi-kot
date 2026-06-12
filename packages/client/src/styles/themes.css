@@ -1352,6 +1352,11 @@ body {
   animation: blink 1s infinite;
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.3); }
+}
+
 /* ═══ Select ═══ */
 .theme-select {
   padding: 6px 10px;

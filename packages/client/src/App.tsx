@@ -580,7 +580,7 @@ export function App() {
 
         {activeSessionId !== undefined ? (
           <>
-            <ChatView sessionId={activeSessionId} />
+            <ChatView sessionId={activeSessionId} modelName={selectedModel} providerName={selectedProvider} />
             <ChatInput sessionId={activeSessionId} />
           </>
         ) : (
