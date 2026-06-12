@@ -127,8 +127,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       if (projectId !== undefined) {
         // Unified view: live + disk sessions for this project
+        // Use the project's own path as workspacePath so disk sessions are found
         const { config } = await import("../config.js");
-        const unified = await listSessionsForProject(projectId, config.workspacePath);
+        const project = await getProject(projectId);
+        const workspacePath = project?.path ?? config.workspacePath;
+        const unified = await listSessionsForProject(projectId, workspacePath);
         return {
           sessions: unified.map((s) => ({
             sessionId: s.sessionId,
