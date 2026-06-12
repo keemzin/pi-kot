@@ -60,7 +60,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
 
   // POST /api/v1/projects — create a new project
   fastify.post<{
-    Body: { name: string; path: string };
+    Body: { name: string; path?: string };
   }>(
     "/projects",
     {
@@ -69,10 +69,10 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
         tags: ["projects"],
         body: {
           type: "object",
-          required: ["name", "path"],
+          required: ["name"],
           properties: {
             name: { type: "string", minLength: 1 },
-            path: { type: "string", minLength: 1 },
+            path: { type: "string" },
           },
         },
         response: {
@@ -95,7 +95,8 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        const project = await createProject(req.body.name, req.body.path);
+        const path = req.body.path ?? config.workspacePath;
+        const project = await createProject(req.body.name, path);
         return reply.code(201).send(project);
       } catch (err) {
         if (

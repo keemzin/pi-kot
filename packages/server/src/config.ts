@@ -31,7 +31,7 @@ if (HOME === "/" || HOME === "") {
 }
 
 const WORKSPACE_PATH = resolve(
-  readEnv("WORKSPACE_PATH") ?? resolve(HOME, "WORKING", "projects"),
+  readEnv("WORKSPACE_PATH") ?? resolve(process.cwd(), "WORKING"),
 );
 const SESSION_DIR = resolve(
   readEnv("SESSION_DIR") ?? resolve(HOME, ".pi-kot", "sessions"),
