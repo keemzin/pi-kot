@@ -182,9 +182,49 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const old = get().sseClient;
     old?.close();
 
+    // RAF-coalesced text delta buffer (like forge)
+    let pendingDelta = "";
+    let rafId: number | undefined;
+    const flushDelta = () => {
+      rafId = undefined;
+      const text = pendingDelta;
+      if (text.length === 0) return;
+      pendingDelta = "";
+      set((s) => ({
+        streamState: {
+          ...s.streamState,
+          text: s.streamState.text + text,
+        },
+      }));
+    };
+
+    // Debounced message refetch (like forge's scheduleMessagesRefetch)
+    let refetchInflight = false;
+    let refetchQueued = false;
+    const refetchMessages = () => {
+      if (refetchInflight) {
+        refetchQueued = true;
+        return;
+      }
+      refetchInflight = true;
+      getSessionMessages(sessionId)
+        .then(({ messages }) => {
+          set({ messages });
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (refetchQueued) {
+            refetchQueued = false;
+            refetchInflight = false;
+            refetchMessages();
+          } else {
+            refetchInflight = false;
+          }
+        });
+    };
+
     const client = streamSessionSSE(sessionId, {
       onEvent: (event) => {
-        const state = get();
         switch (event.type) {
           case "snapshot": {
             const msgs = (event.messages as unknown[]) ?? [];
@@ -212,32 +252,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             const assistantEvent = event.assistantMessageEvent as Record<string, unknown> | undefined;
             if (assistantEvent?.type === "text_delta") {
               const delta = assistantEvent.delta as string;
-              set((s) => ({
-                streamState: {
-                  ...s.streamState,
-                  text: s.streamState.text + delta,
-                },
-              }));
+              if (delta) {
+                // RAF-coalesce like forge: accumulate, flush once per frame
+                pendingDelta += delta;
+                if (rafId === undefined) {
+                  rafId = requestAnimationFrame(flushDelta);
+                }
+              }
             }
-            if (assistantEvent?.type === "tool_use_start") {
-              set((s) => ({
-                streamState: {
-                  ...s.streamState,
-                  activeToolName: assistantEvent?.name as string | undefined,
-                },
-              }));
-            }
-            break;
-          }
-          case "agent_end": {
-            set((s) => ({
-              messages: [...s.messages, { role: "assistant", content: s.streamState.text }],
-              streamState: { text: "", activeToolName: undefined, isStreaming: false },
-            }));
-            // Refresh message list for full state
-            getSessionMessages(sessionId)
-              .then(({ messages }) => set({ messages }))
-              .catch(() => {});
+            // tool_use_start etc are handled by refetching messages —
+            // the SDK finalizes the assistant message with toolCall
+            // blocks before emitting tool_execution_start.
             break;
           }
           case "tool_execution_start": {
@@ -247,6 +272,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 activeToolName: event.toolName as string | undefined,
               },
             }));
+            // Refetch so the toolCall block appears in messages immediately
+            refetchMessages();
             break;
           }
           case "tool_execution_end": {
@@ -256,6 +283,21 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 activeToolName: undefined,
               },
             }));
+            // Refetch so the toolResult appears in messages
+            refetchMessages();
+            break;
+          }
+          case "agent_end":
+          case "message_end":
+          case "tool_result": {
+            // Refetch to get the full final state
+            // Flush any remaining text delta first
+            if (rafId !== undefined) {
+              cancelAnimationFrame(rafId);
+              rafId = undefined;
+            }
+            flushDelta();
+            refetchMessages();
             break;
           }
         }

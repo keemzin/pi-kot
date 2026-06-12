@@ -11,8 +11,12 @@ interface ContentBlock {
   type?: string;
   text?: string;
   name?: string;
+  tool?: string;
+  toolName?: string;
   input?: Record<string, unknown>;
+  arguments?: Record<string, unknown>;
   toolCallId?: string;
+  id?: string;
 }
 
 function extractText(content: unknown): string {
@@ -27,7 +31,7 @@ function extractText(content: unknown): string {
 
 function getToolCalls(content: unknown): ContentBlock[] {
   if (!Array.isArray(content)) return [];
-  return content.filter((b: ContentBlock) => b.type === "tool_use");
+  return content.filter((b: ContentBlock) => b.type === "tool_use" || b.type === "toolCall");
 }
 
 /** Code block component with copy button. */
@@ -257,8 +261,8 @@ export function ChatView({ sessionId }: Props) {
                 {toolCalls.map((tc, j) => (
                   <ToolCallChip
                     key={j}
-                    name={tc.name ?? "tool"}
-                    input={tc.input as Record<string, unknown> | undefined}
+                    name={tc.name ?? tc.tool ?? tc.toolName ?? "tool"}
+                    input={(tc.arguments ?? tc.input) as Record<string, unknown> | undefined}
                   />
                 ))}
               </div>
