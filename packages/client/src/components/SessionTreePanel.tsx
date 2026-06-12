@@ -901,6 +901,23 @@ function buildTurns(tree: SessionTreeResponse): TurnNode[] {
     });
   }
 
+  // Update lastEntryId for each turn: walk all entries owned by the
+  // turn and keep the one with the latest timestamp. Without this
+  // pass lastEntryId stays on the anchor (the user message) so
+  // navigating/forking lands on the parent instead of the reply.
+  for (const e of tree.entries) {
+    const owner = owningTurn.get(e.id)!;
+    const turn = turnsByAnchor.get(owner);
+    if (turn === undefined) continue;
+    const currentLast = byId.get(turn.lastEntryId);
+    if (
+      currentLast === undefined ||
+      e.timestamp.localeCompare(currentLast.timestamp) >= 0
+    ) {
+      turn.lastEntryId = e.id;
+    }
+  }
+
   // Parent-link turns
   for (const turn of turnsByAnchor.values()) {
     if (turn.anchorParentId === null) continue;
