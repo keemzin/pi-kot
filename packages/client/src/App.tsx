@@ -181,7 +181,7 @@ export function App() {
 
   const handleAddProject = async () => {
     const name = newProjectName.trim();
-    const path = newProjectPath.trim() || "/home/hakeem/WORKING/pi-kot";
+    const path = newProjectPath.trim() || "/home/hakeem/WORKING/projects";
     if (!name) return;
     try {
       await createProjectAPI(name, path);

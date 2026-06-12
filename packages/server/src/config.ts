@@ -30,8 +30,12 @@ if (HOME === "/" || HOME === "") {
   );
 }
 
-const WORKSPACE_PATH = resolve(readEnv("WORKSPACE_PATH") ?? process.cwd());
-const SESSION_DIR = resolve(readEnv("SESSION_DIR") ?? join(WORKSPACE_PATH, ".pi", "sessions"));
+const WORKSPACE_PATH = resolve(
+  readEnv("WORKSPACE_PATH") ?? resolve(HOME, "WORKING", "projects"),
+);
+const SESSION_DIR = resolve(
+  readEnv("SESSION_DIR") ?? resolve(HOME, ".pi-kot", "sessions"),
+);
 const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-kot"));
 
 export const config = Object.freeze({

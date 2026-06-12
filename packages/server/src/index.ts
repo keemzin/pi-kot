@@ -132,6 +132,9 @@ export async function start(): Promise<void> {
 
   // Auto-create default project if none exist
   try {
+    const { mkdir } = await import("node:fs/promises");
+    await mkdir(config.workspacePath, { recursive: true });
+
     const { listProjects, createProject } = await import("./project-manager.js");
     const projects = await listProjects();
     if (projects.length === 0) {
