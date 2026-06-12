@@ -224,7 +224,14 @@ export function App() {
             setCloneProgress((p) => [...p, event.line]);
             break;
           case "done":
-            loadProjects();
+            loadProjects().then(() => {
+              // Auto-select the newly created project
+              const state = useSessionStore.getState();
+              const lastProj = state.projects[state.projects.length - 1];
+              if (lastProj) {
+                setActiveProject(lastProj.id);
+              }
+            });
             setCloneProgress((p) => [...p, "✓ Clone complete, project created"]);
             setTimeout(() => {
               setShowAddProject(false);

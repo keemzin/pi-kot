@@ -326,19 +326,17 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
         });
 
         for await (const event of gen) {
-          writeEvent(event);
-
+          // Skip the generator's done — we handle project creation ourselves
           if (event.type === "done") {
-            // Create the project
             try {
               const project = await createProject(projectName, targetPath);
               writeEvent({ type: "done", target: targetPath });
               writeEvent({
-                type: "project_created" as any,
+                type: "project_created" as const,
                 id: project.id,
                 name: project.name,
                 path: project.path,
-              } as any);
+              });
             } catch (err) {
               const msg = err instanceof Error ? err.message : "Failed to create project";
               writeEvent({ type: "error" as const, message: msg });
@@ -349,6 +347,9 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
           if (event.type === "error") {
             break;
           }
+
+          // Forward all other events (started, progress, stderr)
+          writeEvent(event);
         }
       } catch (err) {
         writeEvent({
