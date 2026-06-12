@@ -63,37 +63,20 @@ export interface DiscoveredSession {
 
 export async function discoverSessionsOnDisk(
   projectId: string,
+  workspacePath: string,
 ): Promise<DiscoveredSession[]> {
-  const { readdir, stat } = await import("node:fs/promises");
-  const { join } = await import("node:path");
   const dir = sessionDirFor(projectId);
 
   try {
-    const entries = await readdir(dir, { withFileTypes: true });
-    const results: DiscoveredSession[] = [];
-
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
-      const sessionId = entry.name.slice(0, -6); // remove .jsonl
-      const fullPath = join(dir, entry.name);
-      try {
-        const s = await stat(fullPath);
-        results.push({
-          sessionId,
-          path: fullPath,
-          createdAt: s.birthtime,
-          modifiedAt: s.mtime,
-          messageCount: 0,
-          name: undefined,
-        });
-      } catch {
-        // skip unreadable files
-      }
-    }
-
-    return results.sort(
-      (a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime(),
-    );
+    const infos = await SessionManager.list(workspacePath, dir);
+    return infos.map((info) => ({
+      sessionId: info.id,
+      path: info.path,
+      createdAt: info.created,
+      modifiedAt: info.modified,
+      messageCount: info.messageCount,
+      name: info.name,
+    }));
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw err;
@@ -116,6 +99,7 @@ export interface UnifiedSession {
 
 export async function listSessionsForProject(
   projectId: string,
+  workspacePath: string,
 ): Promise<UnifiedSession[]> {
   const live = listSessions(projectId);
   const liveById = new Map<string, UnifiedSession>(
@@ -133,7 +117,7 @@ export async function listSessionsForProject(
     ]),
   );
 
-  const disk = await discoverSessionsOnDisk(projectId);
+  const disk = await discoverSessionsOnDisk(projectId, workspacePath);
   for (const d of disk) {
     const merged = liveById.get(d.sessionId);
     if (merged !== undefined) {

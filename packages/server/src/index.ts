@@ -135,8 +135,23 @@ export async function start(): Promise<void> {
     const { listProjects, createProject } = await import("./project-manager.js");
     const projects = await listProjects();
     if (projects.length === 0) {
-      await createProject("Default", config.workspacePath);
+      const project = await createProject("Default", config.workspacePath);
       fastify.log.info("auto-created default project");
+
+      // Migrate old sessions from "default" literal dir to project UUID
+      const { rename, stat } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const oldDir = join(config.sessionDir, "default");
+      const newDir = join(config.sessionDir, project.id);
+      try {
+        await stat(oldDir);
+        if (oldDir !== newDir) {
+          await rename(oldDir, newDir).catch(() => {});
+          fastify.log.info("migrated sessions from default/ to project UUID");
+        }
+      } catch {
+        // oldDir doesn't exist, nothing to migrate
+      }
     }
   } catch (err) {
     fastify.log.warn({ err }, "failed to auto-create default project");

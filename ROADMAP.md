@@ -117,6 +117,19 @@ User can:
 | 2.10 | Session tree panel | 🔴 | Visual tree of session branching history |
 | 2.11 | Session naming | 🔴 | Auto-name from first prompt, manual rename |
 
+### End of Phase 2 — Milestone
+
+```
+User can:
+  ✓ Create/delete projects via sidebar
+  ✓ Expand/collapse project to see its sessions
+  ✓ Switch between projects
+  ✓ Create new sessions in any project
+  ✓ Sessions persist to disk (JSONL after first assistant response)
+  ✓ Session list shows correct message count and last activity time
+  ✓ Session discovery deduplicates (live + disk merge)
+```
+
 **Key insight from pi-forge:**
 
 > The `LiveSession` registry is in-memory. Sessions survive restart because JSONL files persist on disk; the registry is rebuilt lazily as SSE clients reconnect.
