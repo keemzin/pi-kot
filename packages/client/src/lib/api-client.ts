@@ -226,6 +226,93 @@ export async function deleteProjectAPI(
   );
 }
 
+// ---- Git Clone ----
+
+export interface CloneRepoRequest {
+  url: string;
+  folderName: string;
+  projectName: string;
+  branch?: string;
+  token?: string;
+  insecureTls?: boolean;
+}
+
+export type CloneEvent =
+  | { type: "started"; cloneUrlForDisplay: string }
+  | { type: "progress"; phase: string; percent: number | null; raw: string }
+  | { type: "stderr"; line: string }
+  | { type: "done"; target: string }
+  | { type: "project_created"; id: string; name: string; path: string }
+  | { type: "error"; message: string };
+
+/**
+ * Clone a git repo via SSE stream. Calls onEvent for each SSE event.
+ * Returns an abort function to cancel the request.
+ */
+export function cloneRepo(
+  req: CloneRepoRequest,
+  onEvent: (event: CloneEvent) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  const controller = new AbortController();
+  const token = getStoredToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token !== undefined) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  (async () => {
+    try {
+      const res = await fetch(`${BASE}/api/v1/projects/clone`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(req),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new ApiError(res.status, data.message ?? data.error ?? "Clone failed");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new ApiError(0, "No response body");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(line.slice(6)) as CloneEvent;
+              onEvent(event);
+            } catch {
+              // skip malformed events
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      onError?.(err instanceof Error ? err : new Error(String(err)));
+    }
+  })();
+
+  return () => controller.abort();
+}
+
 // ---- Providers / Models ----
 
 export interface ModelInfo {

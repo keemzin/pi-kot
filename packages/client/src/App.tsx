@@ -11,8 +11,12 @@ import {
   type Project,
   fetchProviders,
   type ProviderGroup,
+  createProjectAPI,
 } from "./lib/api-client";
 import { applyTheme } from "./lib/theme";
+
+// Module-level guard against React StrictMode double-invocation
+let _autoCreated = false;
 
 export function App() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -43,6 +47,9 @@ export function App() {
   const [providers, setProviders] = useState<ProviderGroup[]>([]);
   const [modelError, setModelError] = useState<string | undefined>();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectPath, setNewProjectPath] = useState("");
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -104,7 +111,8 @@ export function App() {
       const projectSessionsList = projectSessions[activeProjectId] ?? [];
       if (projectSessionsList.length > 0) {
         setActiveSession(projectSessionsList[0].sessionId);
-      } else {
+      } else if (!_autoCreated) {
+        _autoCreated = true;
         createAndActivate(activeProjectId);
       }
     }
@@ -157,6 +165,21 @@ export function App() {
       }
       return next;
     });
+  };
+
+  const handleAddProject = async () => {
+    const name = newProjectName.trim();
+    const path = newProjectPath.trim() || "/home/hakeem/WORKING/pi-kot";
+    if (!name) return;
+    try {
+      await createProjectAPI(name, path);
+      await loadProjects();
+      setNewProjectName("");
+      setNewProjectPath("");
+      setShowAddProject(false);
+    } catch (err) {
+      setModelError(err instanceof Error ? err.message : "Failed to create project");
+    }
   };
 
   if (loading) {
@@ -260,6 +283,56 @@ export function App() {
               </div>
             );
           })}
+        </div>
+
+        {/* Add project button / form */}
+        <div className="sidebar-footer">
+          {showAddProject ? (
+            <div className="add-project-form">
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Project name"
+                className="add-project-input"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddProject();
+                  if (e.key === "Escape") setShowAddProject(false);
+                }}
+              />
+              <input
+                type="text"
+                value={newProjectPath}
+                onChange={(e) => setNewProjectPath(e.target.value)}
+                placeholder="Path (default: workspace)"
+                className="add-project-input"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddProject();
+                  if (e.key === "Escape") setShowAddProject(false);
+                }}
+              />
+              <div className="add-project-actions">
+                <button onClick={handleAddProject} className="add-project-btn">
+                  Add
+                </button>
+                <button
+                  onClick={() => setShowAddProject(false)}
+                  className="add-project-cancel"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddProject(true)}
+              className="add-project-toggle"
+              title="Add a new project"
+            >
+              + Add Project
+            </button>
+          )}
         </div>
       </div>
 

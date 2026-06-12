@@ -520,6 +520,101 @@ body {
   display: none;
 }
 
+/* ═══ Sidebar Footer — Add Project ═══ */
+.sidebar-footer {
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.add-project-toggle {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  text-align: center;
+}
+
+.add-project-toggle:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.add-project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-project-input {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--duration) var(--ease);
+  box-sizing: border-box;
+}
+
+.add-project-input:focus {
+  border-color: var(--accent);
+}
+
+.add-project-input::placeholder {
+  color: var(--text-dim);
+}
+
+.add-project-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.add-project-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.add-project-btn:hover {
+  opacity: 0.85;
+}
+
+.add-project-cancel {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.add-project-cancel:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
 .new-session-btn {
   width: 100%;
   padding: 10px;

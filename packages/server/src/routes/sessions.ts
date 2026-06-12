@@ -39,7 +39,6 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (req, reply) => {
-      const { config } = await import("../config.js");
       let projectId = req.body.projectId ?? "default";
 
       // Backward compat: resolve "default" to the Default project's UUID
@@ -51,7 +50,14 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      const workspacePath = req.body.workspacePath ?? config.workspacePath;
+      // Resolve the project to get its path as workspacePath
+      const { getProject } = await import("../project-manager.js");
+      const project = await getProject(projectId);
+      if (project === undefined) {
+        return reply.code(404).send({ error: "project_not_found" });
+      }
+
+      const workspacePath = req.body.workspacePath ?? project.path;
       const live = await createSession(projectId, workspacePath);
       return reply.code(201).send({
         sessionId: live.sessionId,
