@@ -1156,6 +1156,11 @@ body {
   40% { opacity: 1; }
 }
 
+/* ═══ Code block copy button (hover-reveal) ═══ */
+.code-group:hover .code-copy-btn {
+  opacity: 1 !important;
+}
+
 /* ═══ Error banner ═══ */
 .error-banner {
   padding: 8px 12px;

@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
 import {
   buildToolCallPairing,
@@ -36,105 +35,45 @@ function extractText(content: unknown): string {
   return String(content ?? "");
 }
 
-/** Code block component with copy button. */
-function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
-  const [copied, setCopied] = useState(false);
-  const code = typeof children === "string" ? children : "";
-  const lang = className?.replace("language-", "") ?? "";
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }).catch(() => {});
-  }, [code]);
 
-  return (
-    <div className="code-block-wrapper" style={{
-      position: "relative",
-      margin: "8px 0",
-      borderRadius: "var(--radius)",
-      overflow: "hidden",
-      border: "1px solid var(--border)",
-      background: "rgba(0,0,0,0.25)",
-    }}>
-      <div style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "6px 12px",
-        background: "var(--bg-glass)",
-        borderBottom: "1px solid var(--border)",
-        fontSize: "11px",
-        color: "var(--text-dim)",
-        fontFamily: "'SF Mono','Menlo','Monaco',monospace",
-      }}>
-        <span>{lang || "code"}</span>
-        <button
-          onClick={handleCopy}
-          style={{
-            background: "none",
-            border: "none",
-            color: copied ? "var(--success)" : "var(--text-dim)",
-            cursor: "pointer",
-            fontSize: "11px",
-            padding: "2px 8px",
-            borderRadius: "var(--radius-sm)",
-            fontFamily: "inherit",
-            transition: "color 0.15s",
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
-        </button>
-      </div>
-      <pre style={{
-        padding: "12px",
-        overflowX: "auto",
-        fontFamily: "'SF Mono','Menlo','Monaco',monospace",
-        fontSize: "12px",
-        lineHeight: 1.6,
-        margin: 0,
-        border: "none",
-        borderRadius: 0,
-      }}>
-        <code className={className}>{children}</code>
-      </pre>
-    </div>
-  );
-}
 
-/** Render markdown text with proper components. */
-function MarkdownContent({ text }: { text: string }) {
-  return (
-    <div className="markdown-content">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          code({ className, children, ...props }) {
-            const isInline = !className;
-            if (isInline) {
-              return (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              );
-            }
-            return <CodeBlock className={className}>{children}</CodeBlock>;
-          },
-          a({ href, children }) {
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            );
-          },
-        }}
-      >
-        {text}
-      </ReactMarkdown>
-    </div>
-  );
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* ── Tool Call Components (ported from forge) ── */
 
@@ -446,7 +385,7 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 function AssistantBlock({ block }: { block: Record<string, unknown> }) {
   const type = block.type;
   if (type === "text" && typeof block.text === "string") {
-    return <MarkdownContent text={block.text} />;
+    return <ChatMarkdown text={block.text} />;
   }
   if (type === "thinking" && typeof block.thinking === "string") {
     return <ThinkingBlock text={block.thinking} />;
@@ -617,7 +556,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             out.push(
               <div key={i} className="message-row assistant">
                 <div className="message-bubble assistant">
-                  <MarkdownContent text={text} />
+                  <ChatMarkdown text={text} />
                 </div>
               </div>,
             );
@@ -650,7 +589,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 {activeToolName}
               </div>
             )}
-            <MarkdownContent text={streamText} />
+            <ChatMarkdown text={streamText} />
             <span className="streaming-cursor">▊</span>
           </div>
         </div>
