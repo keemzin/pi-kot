@@ -10,6 +10,7 @@ import { promptRoutes } from "./routes/prompt.js";
 import { streamRoutes } from "./routes/stream.js";
 import { configRoutes } from "./routes/config.js";
 import { controlRoutes } from "./routes/control.js";
+import { projectRoutes } from "./routes/projects.js";
 import { disposeAllSessions } from "./session-registry.js";
 
 /**
@@ -113,6 +114,7 @@ export async function buildServer() {
       await api.register(streamRoutes);
       await api.register(configRoutes);
       await api.register(controlRoutes);
+      await api.register(projectRoutes);
     },
     { prefix: "/api/v1" },
   );
@@ -127,6 +129,19 @@ export async function buildServer() {
 
 export async function start(): Promise<void> {
   const fastify = await buildServer();
+
+  // Auto-create default project if none exist
+  try {
+    const { listProjects, createProject } = await import("./project-manager.js");
+    const projects = await listProjects();
+    if (projects.length === 0) {
+      await createProject("Default", config.workspacePath);
+      fastify.log.info("auto-created default project");
+    }
+  } catch (err) {
+    fastify.log.warn({ err }, "failed to auto-create default project");
+  }
+
   try {
     await fastify.listen({ port: config.port, host: config.host });
     fastify.log.info(`pi-kot server listening on :${config.port}`);

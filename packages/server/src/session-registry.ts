@@ -3,6 +3,8 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import { config } from "./config.js";
 
 /**
@@ -35,15 +37,134 @@ export interface LiveSession {
 
 const registry = new Map<string, LiveSession>();
 
+function sessionDirFor(projectId: string): string {
+  return join(config.sessionDir, projectId);
+}
+
+async function ensureSessionDir(projectId: string): Promise<string> {
+  const dir = sessionDirFor(projectId);
+  await mkdir(dir, { recursive: true });
+  return dir;
+}
+
 /**
- * Create a new session. This is the core SDK integration point,
- * adapted from pi-forge's session-registry.ts.
+ * Discover session JSONL files on disk for a project.
+ * Returns basic metadata without loading the full session state.
+ */
+export interface DiscoveredSession {
+  sessionId: string;
+  path: string;
+  createdAt: Date;
+  modifiedAt: Date;
+  messageCount: number;
+  /** Session name from the SDK's session_info, if any. */
+  name?: string;
+}
+
+export async function discoverSessionsOnDisk(
+  projectId: string,
+): Promise<DiscoveredSession[]> {
+  const { readdir, stat } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  const dir = sessionDirFor(projectId);
+
+  try {
+    const entries = await readdir(dir, { withFileTypes: true });
+    const results: DiscoveredSession[] = [];
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      const sessionId = entry.name.slice(0, -6); // remove .jsonl
+      const fullPath = join(dir, entry.name);
+      try {
+        const s = await stat(fullPath);
+        results.push({
+          sessionId,
+          path: fullPath,
+          createdAt: s.birthtime,
+          modifiedAt: s.mtime,
+          messageCount: 0,
+          name: undefined,
+        });
+      } catch {
+        // skip unreadable files
+      }
+    }
+
+    return results.sort(
+      (a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime(),
+    );
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
+  }
+}
+
+/**
+ * List all known sessions (live + disk) for a project.
+ * Returns UnifiedSession view sorted by recency.
+ */
+export interface UnifiedSession {
+  sessionId: string;
+  projectId: string;
+  isLive: boolean;
+  name: string | undefined;
+  createdAt: Date;
+  lastActivityAt: Date;
+  messageCount: number;
+}
+
+export async function listSessionsForProject(
+  projectId: string,
+): Promise<UnifiedSession[]> {
+  const live = listSessions(projectId);
+  const liveById = new Map<string, UnifiedSession>(
+    live.map((l) => [
+      l.sessionId,
+      {
+        sessionId: l.sessionId,
+        projectId: l.projectId,
+        isLive: true,
+        name: (l.session as { sessionName?: string }).sessionName,
+        createdAt: l.createdAt,
+        lastActivityAt: l.lastActivityAt,
+        messageCount: l.session.messages.length,
+      },
+    ]),
+  );
+
+  const disk = await discoverSessionsOnDisk(projectId);
+  for (const d of disk) {
+    const merged = liveById.get(d.sessionId);
+    if (merged !== undefined) {
+      merged.messageCount = d.messageCount;
+      continue;
+    }
+    liveById.set(d.sessionId, {
+      sessionId: d.sessionId,
+      projectId,
+      isLive: false,
+      name: d.name,
+      createdAt: d.createdAt,
+      lastActivityAt: d.modifiedAt,
+      messageCount: d.messageCount,
+    });
+  }
+
+  return Array.from(liveById.values()).sort(
+    (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
+  );
+}
+
+/**
+ * Create a new session. Uses disk-backed SessionManager for persistence.
  */
 export async function createSession(
   projectId: string,
   workspacePath: string,
 ): Promise<LiveSession> {
-  const sessionManager = SessionManager.inMemory();
+  const dir = await ensureSessionDir(projectId);
+  const sessionManager = SessionManager.create(workspacePath, dir);
 
   const { session } = await createAgentSession({
     cwd: workspacePath,

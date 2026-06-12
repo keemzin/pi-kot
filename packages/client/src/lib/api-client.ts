@@ -112,6 +112,7 @@ export interface SessionSummary {
   sessionId: string;
   projectId: string;
   isLive: boolean;
+  name?: string;
   createdAt: string;
   lastActivityAt: string;
   messageCount: number;
@@ -193,6 +194,35 @@ export async function steerSession(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/steer`,
     { text, mode },
+  );
+}
+
+// ---- Projects ----
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
+}
+
+export async function fetchProjects(): Promise<{ projects: Project[] }> {
+  return request<{ projects: Project[] }>("GET", "/api/v1/projects");
+}
+
+export async function createProjectAPI(
+  name: string,
+  path: string,
+): Promise<Project> {
+  return request<Project>("POST", "/api/v1/projects", { name, path });
+}
+
+export async function deleteProjectAPI(
+  id: string,
+): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(
+    "DELETE",
+    `/api/v1/projects/${encodeURIComponent(id)}`,
   );
 }
 

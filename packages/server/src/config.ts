@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 function readEnv(key: string): string | undefined {
   const v = process.env[key];
@@ -30,14 +30,20 @@ if (HOME === "/" || HOME === "") {
   );
 }
 
+const WORKSPACE_PATH = resolve(readEnv("WORKSPACE_PATH") ?? process.cwd());
+const SESSION_DIR = resolve(readEnv("SESSION_DIR") ?? join(WORKSPACE_PATH, ".pi", "sessions"));
+const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-kot"));
+
 export const config = Object.freeze({
   port: readInt("PORT", 3000),
   host: readEnv("HOST") ?? "127.0.0.1",
   logLevel: readEnv("LOG_LEVEL") ?? "info",
   isTest: (readEnv("NODE_ENV") ?? "") === "test",
   trustProxy: readBool("TRUST_PROXY", false),
-  workspacePath: resolve(readEnv("WORKSPACE_PATH") ?? process.cwd()),
+  workspacePath: WORKSPACE_PATH,
   piConfigDir: resolve(readEnv("PI_CONFIG_DIR") ?? resolve(HOME, ".pi", "agent")),
+  forgeDataDir: FORGE_DATA_DIR,
+  sessionDir: SESSION_DIR,
 
   // Auth
   uiPassword: readEnv("UI_PASSWORD"),

@@ -4,12 +4,24 @@ import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
 import { ThemePicker } from "./components/ThemePicker";
 import { ModelDropdown } from "./components/ModelDropdown";
-import { fetchAuthStatus, login, type SessionSummary, fetchProviders, type ProviderGroup } from "./lib/api-client";
+import {
+  fetchAuthStatus,
+  login,
+  type SessionSummary,
+  type Project,
+  fetchProviders,
+  type ProviderGroup,
+} from "./lib/api-client";
 import { applyTheme } from "./lib/theme";
 
 export function App() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const activeProjectId = useSessionStore((s) => s.activeProjectId);
   const sessions = useSessionStore((s) => s.sessions);
+  const projects = useSessionStore((s) => s.projects);
+  const projectSessions = useSessionStore((s) => s.projectSessions);
+  const loadProjects = useSessionStore((s) => s.loadProjects);
+  const setActiveProject = useSessionStore((s) => s.setActiveProject);
   const createAndActivate = useSessionStore((s) => s.createAndActivate);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
@@ -30,8 +42,9 @@ export function App() {
   const [selectedProvider, setSelectedProvider] = useState("");
   const [providers, setProviders] = useState<ProviderGroup[]>([]);
   const [modelError, setModelError] = useState<string | undefined>();
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
-  // Bootstrap: check auth, load sessions, fetch models
+  // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
     (async () => {
       try {
@@ -47,7 +60,7 @@ export function App() {
             return;
           }
         }
-        await refreshSessions();
+        await loadProjects();
       } catch {
         // server not reachable yet
       }
@@ -56,7 +69,6 @@ export function App() {
       try {
         const res = await fetchProviders();
         setProviders(res.providers);
-        // Auto-select first model with auth, or first model overall
         const allModels = res.providers.flatMap((p) => p.models);
         const firstWithAuth = allModels.find((m) => m.hasAuth);
         if (firstWithAuth) {
@@ -78,11 +90,31 @@ export function App() {
     })();
   }, []);
 
+  // Auto-expand active project
+  useEffect(() => {
+    if (activeProjectId !== undefined) {
+      setExpandedProjects((prev) => new Set(prev).add(activeProjectId));
+    }
+  }, [activeProjectId]);
+
+  // Auto-select first session if none active, or create one if none exist
+  useEffect(() => {
+    if (loading || authRequired || projects.length === 0) return;
+    if (activeSessionId === undefined && activeProjectId !== undefined) {
+      const projectSessionsList = projectSessions[activeProjectId] ?? [];
+      if (projectSessionsList.length > 0) {
+        setActiveSession(projectSessionsList[0].sessionId);
+      } else {
+        createAndActivate(activeProjectId);
+      }
+    }
+  }, [loading, authRequired, activeProjectId, projectSessions, activeSessionId]);
+
   const handleLogin = async () => {
     try {
       await login(password);
       setAuthRequired(false);
-      await refreshSessions();
+      await loadProjects();
     } catch {
       setPassword("");
     }
@@ -115,15 +147,17 @@ export function App() {
     setModelError(error);
   }, []);
 
-  // Auto-create first session if none exist, or auto-select the first existing one
-  useEffect(() => {
-    if (loading || authRequired) return;
-    if (sessions.length === 0) {
-      createAndActivate();
-    } else if (activeSessionId === undefined) {
-      setActiveSession(sessions[0].sessionId);
-    }
-  }, [loading, authRequired, sessions, activeSessionId]);
+  const toggleProject = (projectId: string) => {
+    setExpandedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  };
 
   if (loading) {
     return <div className="centered">Loading...</div>;
@@ -156,27 +190,76 @@ export function App() {
       {/* Sidebar — collapsible */}
       <div className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
         <div className="sidebar-header">
-          <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent-text)" }}>
+          <span
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "var(--accent-text)",
+            }}
+          >
             pi-kot
           </span>
         </div>
 
-        <div className="sidebar-actions">
-          <button onClick={createAndActivate} className="new-session-btn">
-            + New Session
-          </button>
-        </div>
+        {/* Project list */}
+        <div className="project-list">
+          {projects.map((project: Project) => {
+            const isActive = project.id === activeProjectId;
+            const isExpanded = expandedProjects.has(project.id);
+            const pSessions = projectSessions[project.id] ?? [];
 
-        <div className="session-list">
-          {sessions.map((s: SessionSummary) => (
-            <div
-              key={s.sessionId}
-              onClick={() => setActiveSession(s.sessionId)}
-              className={`session-item ${activeSessionId === s.sessionId ? "active" : ""}`}
-            >
-              Session {s.sessionId.slice(0, 8)}
-            </div>
-          ))}
+            return (
+              <div key={project.id} className={`project-group${isActive ? " active" : ""}`}>
+                {/* Project header */}
+                <div
+                  className={`project-header${isActive ? " active" : ""}`}
+                  onClick={() => {
+                    if (isActive) {
+                      toggleProject(project.id);
+                    } else {
+                      setActiveProject(project.id);
+                    }
+                  }}
+                >
+                  <span className="project-chevron">{isExpanded ? "▾" : "▸"}</span>
+                  <span className="project-name">{project.name}</span>
+                  <span className="project-count">{pSessions.length}</span>
+                </div>
+
+                {/* Session list inside project */}
+                {isExpanded && (
+                  <div className="session-list project-sublist">
+                    {pSessions.map((s: SessionSummary) => (
+                      <div
+                        key={s.sessionId}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveSession(s.sessionId);
+                        }}
+                        className={`session-item ${activeSessionId === s.sessionId ? "active" : ""}`}
+                      >
+                        <span className="session-name">
+                          {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* New session button inside project */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        createAndActivate(project.id);
+                      }}
+                      className="new-session-mini"
+                      title="New session in this project"
+                    >
+                      + New Session
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -194,7 +277,14 @@ export function App() {
               {sidebarCollapsed ? "☰" : "✕"}
             </button>
             {activeSessionId !== undefined && (
-              <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-secondary)" }}>
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  marginLeft: "8px",
+                }}
+              >
                 Session {activeSessionId.slice(0, 8)}
               </span>
             )}

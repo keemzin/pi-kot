@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import {
   type SessionSummary,
+  type Project,
   createSession,
   listSessions,
   getSessionMessages,
   sendPrompt,
   abortSession,
+  fetchProjects,
 } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 
@@ -24,8 +26,14 @@ interface StreamState {
 }
 
 interface SessionState {
-  /** All known sessions (for sidebar). */
+  /** All known projects. */
+  projects: Project[];
+  /** Currently active project ID. */
+  activeProjectId: string | undefined;
+  /** All known sessions (flat, for sidebar). */
   sessions: SessionSummary[];
+  /** Sessions per project (loaded by loadProjectSessions). */
+  projectSessions: Record<string, SessionSummary[]>;
   /** Currently active session ID. */
   activeSessionId: string | undefined;
   /** Messages for the active session. */
@@ -41,7 +49,10 @@ interface SessionState {
 }
 
 interface SessionActions {
-  createAndActivate: () => Promise<string>;
+  loadProjects: () => Promise<void>;
+  setActiveProject: (id: string) => Promise<void>;
+  loadProjectSessions: (projectId: string) => Promise<void>;
+  createAndActivate: (projectId?: string) => Promise<string>;
   setActiveSession: (id: string) => Promise<void>;
   connectSSE: (sessionId: string) => void;
   sendPrompt: (text: string) => Promise<void>;
@@ -54,7 +65,10 @@ type SessionStore = SessionState & SessionActions;
 
 export const useSessionStore = create<SessionStore>((set, get) => ({
   // State
+  projects: [],
+  activeProjectId: undefined,
   sessions: [],
+  projectSessions: {},
   activeSessionId: undefined,
   messages: [],
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
@@ -63,21 +77,72 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sseClient: undefined,
 
   // Actions
-  refreshSessions: async () => {
+  loadProjects: async () => {
     try {
-      const { sessions } = await listSessions();
-      set({ sessions });
+      const { projects } = await fetchProjects();
+      set({ projects });
+      // Auto-select first project if none active and projects exist
+      const state = get();
+      if (state.activeProjectId === undefined && projects.length > 0) {
+        const firstId = projects[0].id;
+        set({ activeProjectId: firstId });
+        await get().loadProjectSessions(firstId);
+      }
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to list sessions" });
+      set({ error: err instanceof Error ? err.message : "Failed to load projects" });
     }
   },
 
-  createAndActivate: async () => {
-    set({ loading: true, error: undefined });
+  setActiveProject: async (id: string) => {
+    set({ activeProjectId: id, activeSessionId: undefined, messages: [] });
+    // Disconnect old SSE
+    const old = get().sseClient;
+    old?.close();
+    set({ sseClient: undefined });
+    await get().loadProjectSessions(id);
+  },
+
+  loadProjectSessions: async (projectId: string) => {
     try {
-      const res = await createSession({ projectId: "default" });
-      const sessions = [...get().sessions, { ...res, isLive: true, messageCount: 0, lastActivityAt: res.createdAt }];
-      set({ sessions, activeSessionId: res.sessionId, messages: [], loading: false });
+      const { sessions } = await listSessions(projectId);
+      set((s) => ({
+        projectSessions: { ...s.projectSessions, [projectId]: sessions },
+        sessions,
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to load sessions" });
+    }
+  },
+
+  refreshSessions: async () => {
+    const { activeProjectId } = get();
+    if (activeProjectId !== undefined) {
+      await get().loadProjectSessions(activeProjectId);
+    }
+  },
+
+  createAndActivate: async (projectId?: string) => {
+    set({ loading: true, error: undefined });
+    const pid = projectId ?? get().activeProjectId ?? "default";
+    try {
+      const res = await createSession({ projectId: pid });
+      const summary: SessionSummary = {
+        sessionId: res.sessionId,
+        projectId: res.projectId,
+        isLive: true,
+        messageCount: 0,
+        lastActivityAt: res.createdAt,
+        createdAt: res.createdAt,
+      };
+      set((s) => ({
+        sessions: [summary, ...s.sessions],
+        projectSessions: s.activeProjectId
+          ? { ...s.projectSessions, [s.activeProjectId]: [summary, ...(s.projectSessions[s.activeProjectId] ?? [])] }
+          : s.projectSessions,
+        activeSessionId: res.sessionId,
+        messages: [],
+        loading: false,
+      }));
       get().connectSSE(res.sessionId);
       return res.sessionId;
     } catch (err) {
@@ -94,7 +159,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const old = get().sseClient;
     old?.close();
 
-    set({ activeSessionId: id, messages: [], streamState: { text: "", activeToolName: undefined, isStreaming: false }, error: undefined });
+    set({
+      activeSessionId: id,
+      messages: [],
+      streamState: { text: "", activeToolName: undefined, isStreaming: false },
+      error: undefined,
+    });
 
     // Load messages
     try {

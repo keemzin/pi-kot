@@ -105,12 +105,12 @@ User can:
 
 | # | Task | Status | Description |
 |---|---|---|---|
-| 2.1 | Project manager | 🔴 | `project-manager.ts` — CRUD for projects, on-disk `projects.json` |
-| 2.2 | Project routes | 🔴 | `GET/POST/PATCH/DELETE /api/v1/projects` |
-| 2.3 | Project sidebar | 🔴 | Sidebar component listing projects, active state |
-| 2.4 | Session list | 🔴 | `GET /sessions?projectId=X` — list with name, message count, last activity |
-| 2.5 | Session sidebar | 🔴 | Session list within a project, create/switch/delete |
-| 2.6 | Persistent sessions | 🔴 | `SessionManager.create()` instead of in-memory, JSONL on disk |
+| 2.1 | Project manager | 🟢 | `project-manager.ts` — CRUD for projects, on-disk `projects.json` |
+| 2.2 | Project routes | 🟢 | `GET/POST/PATCH/DELETE /api/v1/projects` |
+| 2.3 | Project sidebar | 🟢 | Sidebar component listing projects, collapsible tree |
+| 2.4 | Session list | 🟢 | `GET /sessions?projectId=X` — list with name, message count, last activity |
+| 2.5 | Session sidebar | 🟢 | Session list within a project in sidebar, create/switch |
+| 2.6 | Persistent sessions | 🟢 | `SessionManager.create()` instead of in-memory, JSONL on disk |
 | 2.7 | Session resume | 🔴 | Cold session auto-resume on SSE connect (lazy) |
 | 2.8 | Session navigation | 🔴 | `POST /sessions/:id/navigate` — branch switching |
 | 2.9 | Session fork | 🔴 | `POST /sessions/:id/fork` — branch into new session |
