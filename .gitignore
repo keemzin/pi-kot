@@ -25,6 +25,10 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# Session / data dirs
+.pi/
+.pi-kot/
+
 # OS files
 .DS_Store
 Thumbs.db
