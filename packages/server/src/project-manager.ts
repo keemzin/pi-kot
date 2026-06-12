@@ -1,4 +1,4 @@
-import { readFile, rename, unlink, writeFile, mkdir } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile, mkdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
@@ -109,6 +109,22 @@ export async function createProject(
       if (resolve(p.path) === resolvedPath) {
         throw new DuplicatePathError(resolvedPath);
       }
+    }
+
+    // Verify path exists and is a directory (warn if not, but still allow)
+    try {
+      const st = await stat(resolvedPath);
+      if (!st.isDirectory()) {
+        throw new InvalidNameError(`Path exists but is not a directory: ${resolvedPath}`);
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new InvalidNameError(
+          `Directory does not exist: ${resolvedPath}. Create it first or choose an existing folder.`,
+        );
+      }
+      if (err instanceof InvalidNameError) throw err;
+      throw err;
     }
 
     const project: Project = {

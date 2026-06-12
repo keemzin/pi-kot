@@ -16,7 +16,8 @@ import {
 import { applyTheme } from "./lib/theme";
 
 // Module-level guard against React StrictMode double-invocation
-let _autoCreated = false;
+// Tracks which project IDs have had an auto-created session.
+const _autoCreatedProjects = new Set<string>();
 
 export function App() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -108,11 +109,14 @@ export function App() {
   useEffect(() => {
     if (loading || authRequired || projects.length === 0) return;
     if (activeSessionId === undefined && activeProjectId !== undefined) {
-      const projectSessionsList = projectSessions[activeProjectId] ?? [];
+      const projectSessionsList = projectSessions[activeProjectId];
+      // Wait for sessions to finish loading (undefined = still loading)
+      if (projectSessionsList === undefined) return;
+
       if (projectSessionsList.length > 0) {
         setActiveSession(projectSessionsList[0].sessionId);
-      } else if (!_autoCreated) {
-        _autoCreated = true;
+      } else if (!_autoCreatedProjects.has(activeProjectId)) {
+        _autoCreatedProjects.add(activeProjectId);
         createAndActivate(activeProjectId);
       }
     }
@@ -305,7 +309,7 @@ export function App() {
                 type="text"
                 value={newProjectPath}
                 onChange={(e) => setNewProjectPath(e.target.value)}
-                placeholder="Path (default: workspace)"
+                placeholder="Path to existing folder (e.g. ~/my-project)"
                 className="add-project-input"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAddProject();
