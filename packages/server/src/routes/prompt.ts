@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
-import { getSession } from "../session-registry.js";
+import { getSession, autoNameSession } from "../session-registry.js";
 import { config } from "../config.js";
 
 /**
@@ -97,6 +97,9 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
 
       const opts: Parameters<typeof live.session.prompt>[1] = {};
       if (streamingBehavior !== undefined) opts.streamingBehavior = streamingBehavior;
+
+      // Auto-name from the first prompt if no name is set yet
+      autoNameSession(req.params.id, text);
 
       // Synthesize a failure event if prompt() rejects without emitting agent_end.
       const synthesizeFailureEvent = (err: unknown): void => {

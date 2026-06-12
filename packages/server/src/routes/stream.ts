@@ -43,11 +43,13 @@ async function warmUpSession(
           sessionId: session.sessionId,
           projectId: dir.name,
           workspacePath: cwd,
+          sessionManager: sm,
           clients: new Set(),
           createdAt: now,
           lastActivityAt: now,
           lastAgentStartIndex: undefined,
           unsubscribe: () => undefined,
+          name: sm.getSessionName(),
         };
 
         // Wire event subscription

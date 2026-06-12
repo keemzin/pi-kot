@@ -24,47 +24,42 @@ inspired by [pi-forge](./pi-forge/).
 
 | # | Task | Status | Description |
 |---|---|---|---|
-| 1a.1 | Project scaffold | 🔴 | Root `package.json` with workspaces, TS config, npm scripts |
-| 1a.2 | HTTP server bootstrap | 🔴 | Fastify server with CORS, JSON body parser, error handler |
-| 1a.3 | Health endpoint | 🔴 | `GET /api/v1/health` — public, no auth |
-| 1a.4 | Config module | 🔴 | `packages/server/src/config.ts` — env vars, CLI flags, defaults |
-| 1a.5 | Auth module | 🔴 | JWT + password auth, login endpoint, bearer middleware |
-| 1a.6 | Session registry | 🔴 | In-memory `Map<string, LiveSession>` — single source of truth for SDK state |
-| 1a.7 | SSE bridge | 🔴 | `AgentSessionEvent` → SSE `data:` lines, client set management |
-| 1a.8 | Session CRUD routes | 🔴 | `POST /sessions` (create), `GET /sessions` (list), `DELETE /sessions/:id` (dispose) |
-| 1a.9 | Prompt route | 🔴 | `POST /sessions/:id/prompt` — fire-and-forget, returns 202 |
-| 1a.10 | Stream route | 🔴 | `GET /sessions/:id/stream` — SSE endpoint, auto-resumes cold sessions |
-| 1a.11 | Abort route | 🔴 | `POST /sessions/:id/abort` — abort current agent run |
+| 1a.1 | Project scaffold | 🟢 | Root `package.json` with workspaces, TS config, npm scripts |
+| 1a.2 | HTTP server bootstrap | 🟢 | Fastify server with CORS, JSON body parser, error handler |
+| 1a.3 | Health endpoint | 🟢 | `GET /api/v1/health` — public, no auth |
+| 1a.4 | Config module | 🟢 | `packages/server/src/config.ts` — env vars, CLI flags, defaults |
+| 1a.5 | Auth module | 🟢 | HMAC-SHA256 token auth with `signHmac`/`verifyHmac`, login endpoint, bearer middleware, API key fallback |
+| 1a.6 | Session registry | 🟢 | In-memory `Map<string, LiveSession>` — single source of truth for SDK state, disk discovery |
+| 1a.7 | SSE bridge | 🟢 | `AgentSessionEvent` → SSE `data:` lines, snapshot on connect, allowed-event filter |
+| 1a.8 | Session CRUD routes | 🟢 | `POST /sessions` (create), `GET /sessions` (list, with `?projectId` filter), `GET /sessions/:id/messages`, `DELETE /sessions/:id` (dispose) |
+| 1a.9 | Prompt route | 🟢 | `POST /sessions/:id/prompt` — fire-and-forget, returns 202 |
+| 1a.10 | Stream route | 🟢 | `GET /sessions/:id/stream` — SSE endpoint, auto-resumes cold sessions |
+| 1a.11 | Abort route | 🟢 | `POST /sessions/:id/abort` — abort current agent run |
+| 1a.12 | Steer / follow-up route | 🟢 | `POST /sessions/:id/steer` — queue steer or followUp during active streaming |
+| 1a.13 | Per-session model route | 🟢 | `POST /sessions/:id/model` + `GET /sessions/:id/model` — set/get model via SDK ModelRegistry |
 
-**Key SDK wiring to get right:**
-
-```typescript
-const { session } = await createAgentSession({
-  sessionManager: SessionManager.inMemory(),
-  // authStorage, modelRegistry, etc.
-});
-
-session.subscribe((event) => {
-  // forward to SSE clients via sse-bridge.ts
-});
-```
+**Extra routes built (not in original plan):**
+- `POST /sessions/:id/steer` — queues steer/followUp during active streaming
+- `POST /sessions/:id/model` + `GET /sessions/:id/model` — per-session model override, validated against SDK ModelRegistry
+- `PATCH /projects/:id` — rename or repath a project
+- `POST /projects/clone` — clone a git repo into workspace and auto-create a project (SSE progress streaming)
 
 ### 1b — Chat UI (Frontend)
 
 | # | Task | Status | Description |
 |---|---|---|---|
-| 1b.1 | Vite project scaffold | 🔴 | Vite + React/Preact/Svelte, TypeScript, basic entry point |
-| 1b.2 | API client layer | 🔴 | `lib/api-client.ts` — typed fetch wrappers for all routes |
-| 1b.3 | SSE client | 🔴 | `lib/sse-client.ts` — `fetch` + `ReadableStream` consumer with reconnection |
-| 1b.4 | Session store | 🔴 | Zustand store — session state, messages, streaming text, connection status |
-| 1b.5 | ChatView component | 🔴 | Message list — scrollable, user + assistant bubbles |
-| 1b.6 | ChatInput component | 🔴 | Text input + send button, disabled during streaming |
-| 1b.7 | Streaming text renderer | 🔴 | Real-time append of `text_delta` chunks as they arrive |
-| 1b.8 | Thinking indicator | 🔴 | Spinner / "Agent is thinking..." during `agent_start` → `agent_end` |
-| 1b.9 | Abort button | 🔴 | Appears during streaming, calls `POST /abort` |
-| 1b.10 | Error handling | 🔴 | Connection lost banner, reconnection with exponential backoff |
-| 1b.11 | Markdown rendering | 🔴 | Render assistant messages as formatted markdown |
-| 1b.12 | Code block display | 🔴 | Syntax-highlighted code blocks with copy button |
+| 1b.1 | Vite project scaffold | 🟢 | Vite + React, TypeScript, basic entry point |
+| 1b.2 | API client layer | 🟢 | `lib/api-client.ts` — typed fetch wrappers for all routes, auth token management |
+| 1b.3 | SSE client | 🟢 | `lib/sse-client.ts` — `fetch` + `ReadableStream` consumer with exponential backoff reconnection |
+| 1b.4 | Session store | 🟢 | Zustand store — session state, messages, streaming text, connection status, tool pairing |
+| 1b.5 | ChatView component | 🟢 | Message list — scrollable, user + assistant bubbles, tool call pairing, diff blocks, thinking blocks |
+| 1b.6 | ChatInput component | 🟢 | Text input + send button, auto-resize, disabled during streaming |
+| 1b.7 | Streaming text renderer | 🟢 | Real-time append of `text_delta` chunks via RAF-coalesced buffer |
+| 1b.8 | Thinking indicator | 🟢 | Animated dots during `agent_start` → `agent_end`, active tool name badge |
+| 1b.9 | Abort button | 🟢 | Appears during streaming, calls `POST /abort` |
+| 1b.10 | Error handling | 🟢 | Connection lost banner, reconnection with exponential backoff, terminal status handling |
+| 1b.11 | Markdown rendering | 🟢 | `react-markdown` with GFM tables, blockquotes, lists, links, inline code |
+| 1b.12 | Code block display | 🟢 | `prism-react-renderer` syntax highlighting, copy button, light/dark theme-aware |
 
 ### End of Phase 1 — Milestone
 
@@ -115,7 +110,17 @@ User can:
 | 2.8 | Session navigation | 🔴 | `POST /sessions/:id/navigate` — branch switching |
 | 2.9 | Session fork | 🔴 | `POST /sessions/:id/fork` — branch into new session |
 | 2.10 | Session tree panel | 🔴 | Visual tree of session branching history |
-| 2.11 | Session naming | 🔴 | Auto-name from first prompt, manual rename |
+| 2.11 | Session naming | 🟢 | Auto-name from first prompt via `autoNameSession()`, manual rename via `PATCH /sessions/:id/name` + double-click in sidebar |
+
+### Extra Project Features Built
+
+| # | Task | Status | Description |
+|---|---|---|---|
+| 2.12 | Git clone → project | 🟢 | `POST /projects/clone` — clone repo with SSE progress streaming, auto-create project on completion |
+| 2.13 | PATCH project route | 🟢 | `PATCH /projects/:id` — update project name or path with validation |
+| 2.14 | Project session unified listing | 🟢 | `GET /sessions?projectId=X` merges live + disk sessions with dedup, sorted by recency |
+
+---
 
 ### End of Phase 2 — Milestone
 
@@ -183,7 +188,7 @@ User can:
 | # | Task | Status | Description |
 |---|---|---|---|
 | 5.1 | Config manager | 🔴 | `config-manager.ts` — read/write auth.json, settings.json, models.json |
-| 5.2 | Provider list endpoint | 🔴 | `GET /api/v1/config/providers` — presence only, no secrets |
+| 5.2 | Provider list endpoint | 🟢 | `GET /api/v1/config/providers` — live models from SDK ModelRegistry, presence only, no secrets |
 | 5.3 | API key endpoints | 🔴 | `PUT/DELETE /api/v1/config/auth/:provider` |
 | 5.4 | Settings endpoints | 🔴 | `GET/PUT /api/v1/config/settings` — shallow merge |
 | 5.5 | Models endpoints | 🔴 | `GET/PUT /api/v1/config/models` — keys redacted on GET |
@@ -217,7 +222,7 @@ User can:
 | 7.2 | Authentication hardening | 🔴 | Token refresh, session expiry, CORS hardening |
 | 7.3 | Error boundaries | 🔴 | React error boundaries, graceful degradation |
 | 7.4 | Loading skeletons | 🔴 | Placeholder UI while data loads |
-| 7.5 | Keyboard shortcuts | 🔴 | `Ctrl+Enter` send, `Ctrl+P` model cycle, etc. |
+| 7.5 | Keyboard shortcuts | 🟡 | `Ctrl+Enter` send is done; `Ctrl+P` model cycle and other shortcuts still needed |
 | 7.6 | Mobile responsive | 🔴 | Works on phone/tablet browsers |
 | 7.7 | PWA support | 🔴 | Service worker, manifest, install prompt |
 | 7.8 | Dark/light theme | 🔴 | Theme toggle, persistence |
@@ -235,7 +240,7 @@ User can:
 | 8.1 | Turn diff panel | 🔴 | Show file changes from the last completed agent turn |
 | 8.2 | Context inspector | 🔴 | Token usage, cost breakdown, context window pressure |
 | 8.3 | Image attachments | 🔴 | Send images with prompts (base64), display in chat |
-| 8.4 | Model switching | 🔴 | Cycle models mid-session, per-session model override |
+| 8.4 | Model switching | 🟡 | Per-session model override via `POST /sessions/:id/model` is done; mid-session cycling UI (dropdown during streaming) is still needed |
 | 8.5 | Compaction awareness | 🔴 | UI indicator when compaction runs, summary display |
 | 8.6 | Auto-retry UI | 🔴 | Countdown banner during rate-limit backoff |
 | 8.7 | Quick actions | 🔴 | Pre-built prompts (fix lint, add tests, etc.) |
@@ -270,36 +275,40 @@ Phases are intentionally ordered so each one:
 
 ```
 /api/v1/
-├── health          (Phase 1a)
+├── health          ✅ (Phase 1a — done)
 ├── auth/
-│   ├── status      (Phase 1a)
-│   ├── login       (Phase 1a)
-│   └── logout      (Phase 1a)
-├── ui-config       (Phase 1a)
-├── projects/       (Phase 2)
+│   ├── status      ✅ (Phase 1a — done)
+│   ├── login       ✅ (Phase 1a — done)
+│   └── logout      🔴 (Phase 1a — not started)
+├── ui-config       🔴 (Phase 1a — not started)
+├── projects/       ✅ (Phase 2 — done)
+│   └── clone       ✅ (Phase 2 — done, extra)
 ├── sessions/       (Phase 1a → Phase 2)
-│   ├── POST /                    — create
-│   ├── GET /                     — list
-│   ├── GET /:id/messages         — history
-│   ├── GET /:id/context          — token telemetry
-│   ├── GET /:id/tree             — branch tree
-│   ├── POST /:id/prompt          — send prompt (Phase 1a)
-│   ├── GET /:id/stream           — SSE stream (Phase 1a)
-│   ├── POST /:id/abort           — abort (Phase 1a)
-│   ├── POST /:id/steer           — steer (Phase 1a)
-│   ├── POST /:id/navigate        — branch switch (Phase 2)
-│   ├── POST /:id/fork            — fork (Phase 2)
-│   ├── POST /:id/model           — set model (Phase 8)
-│   ├── DELETE /:id               — dispose (Phase 2)
-│   └── GET /:id/turn-diff        — turn diff (Phase 8)
-├── files/          (Phase 3)
+│   ├── POST /                    ✅ create
+│   ├── GET /                     ✅ list (supports ?projectId filter)
+│   ├── GET /:id/messages         ✅ history
+│   ├── GET /:id/context          🔴 token telemetry
+│   ├── GET /:id/tree             🔴 branch tree
+│   ├── POST /:id/prompt          ✅ send prompt
+│   ├── GET /:id/stream           ✅ SSE stream (cold resume)
+│   ├── POST /:id/abort           ✅ abort
+│   ├── POST /:id/steer           ✅ steer / follow-up
+│   ├── POST /:id/navigate        🔴 branch switch
+│   ├── POST /:id/fork            🔴 fork
+│   ├── POST /:id/model           ✅ set model (extra)
+│   ├── GET /:id/model            ✅ get model (extra)
+│   ├── POST /:id/archive         ✅ archive (Phase 2)
+│   ├── POST /:id/unarchive       ✅ restore from archive (Phase 2)
+│   ├── DELETE /:id               ✅ dispose
+│   └── GET /:id/turn-diff        🔴 turn diff (Phase 8)
+├── files/          🔴 (Phase 3 — not started)
 │   ├── tree
 │   ├── read
 │   ├── write
 │   ├── search
 │   ├── upload
 │   └── download
-├── git/            (Phase 4)
+├── git/            🔴 (Phase 4 — not started)
 │   ├── status
 │   ├── diff
 │   ├── log
@@ -310,12 +319,12 @@ Phases are intentionally ordered so each one:
 │   ├── pull
 │   └── branches
 ├── config/         (Phase 5)
-│   ├── providers
-│   ├── auth/:provider
-│   ├── settings
-│   ├── models
-│   └── skills/...
-└── terminal        (Phase 6) — WebSocket
+│   ├── providers   ✅ done
+│   ├── auth/:provider  🔴 not started
+│   ├── settings         🔴 not started
+│   ├── models          🔴 not started
+│   └── skills/...       🔴 not started
+└── terminal        🔴 (Phase 6 — WebSocket, not started)
 ```
 
 ---

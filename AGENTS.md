@@ -325,6 +325,8 @@ pi-kot/
 
 ## Critical Conventions
 
+0. **Never commit unless explicitly told to.** Do not stage, commit, push, or otherwise version-control changes unless the user says "commit" or "push". Staging/committing is a user-only decision.
+
 1. **Named exports only.** No default exports.
 2. **All AgentSession interactions go through `session-registry.ts`.**
 3. **All filesystem operations go through `file-manager.ts` or `git-runner.ts`.**

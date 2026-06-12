@@ -3,8 +3,8 @@ import {
   createAgentSession,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import { mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
+import { join, basename } from "node:path";
 import { config } from "./config.js";
 
 /**
@@ -26,6 +26,8 @@ export interface LiveSession {
   sessionId: string;
   projectId: string;
   workspacePath: string;
+  /** The SDK SessionManager for this session (exposed for rename, fork, etc.). */
+  sessionManager: import("@earendil-works/pi-coding-agent").SessionManager;
   clients: Set<SSEClient>;
   createdAt: Date;
   lastActivityAt: Date;
@@ -33,6 +35,8 @@ export interface LiveSession {
   lastAgentStartIndex: number | undefined;
   /** Internal — call to detach the registry's own subscription on dispose. */
   unsubscribe: () => void;
+  /** The session name set via appendSessionInfo, if any. */
+  name: string | undefined;
 }
 
 const registry = new Map<string, LiveSession>();
@@ -109,7 +113,7 @@ export async function listSessionsForProject(
         sessionId: l.sessionId,
         projectId: l.projectId,
         isLive: true,
-        name: (l.session as { sessionName?: string }).sessionName,
+        name: l.name ?? (l.session as { sessionName?: string }).sessionName,
         createdAt: l.createdAt,
         lastActivityAt: l.lastActivityAt,
         messageCount: l.session.messages.length,
@@ -162,11 +166,13 @@ export async function createSession(
     sessionId: session.sessionId,
     projectId,
     workspacePath,
+    sessionManager,
     clients: new Set(),
     createdAt: now,
     lastActivityAt: now,
     lastAgentStartIndex: undefined,
     unsubscribe: () => undefined,
+    name: sessionManager.getSessionName(),
   };
 
   // Wire the registry's event subscription
@@ -210,6 +216,154 @@ export function sessionCount(): number {
 /** Register a session in the registry (used by session resume). */
 export function registerSession(live: LiveSession): void {
   registry.set(live.sessionId, live);
+}
+
+/* ── Archive / Unarchive ── */
+
+function archivedDirFor(projectId: string): string {
+  return join(config.sessionDir, projectId, "_archived");
+}
+
+/**
+ * Archive a session: move JSONL to _archived/ subfolder, remove from live registry.
+ * Works for both live and disk-only sessions.
+ * Returns true if archived, false if not found on disk or in registry.
+ */
+export async function archiveSession(sessionId: string, projectId?: string): Promise<boolean> {
+  // Always check registry first — live session takes precedence
+  const live = registry.get(sessionId);
+  const resolvedProjectId = live?.projectId ?? projectId;
+  if (resolvedProjectId === undefined) return false;
+  const pid = resolvedProjectId;
+
+  const srcDir = join(config.sessionDir, pid);
+  let fileMoved = false;
+
+  // Find and move the JSONL file
+  try {
+    const files = await readdir(srcDir);
+    const match = files.find((f) => f.endsWith(".jsonl") && f.includes(sessionId));
+    if (match) {
+      const archiveDir = archivedDirFor(pid);
+      await mkdir(archiveDir, { recursive: true });
+      await rename(join(srcDir, match), join(archiveDir, match));
+      fileMoved = true;
+    }
+  } catch {
+    // best-effort file move
+  }
+
+  // Remove from live registry if present
+  if (live !== undefined) {
+    try { await live.session.abort(); } catch {}
+    try { live.unsubscribe(); } catch {}
+    for (const client of live.clients) {
+      try { client.close(); } catch {}
+    }
+    live.clients.clear();
+    try { live.session.dispose(); } catch {}
+    registry.delete(sessionId);
+  }
+
+  return fileMoved || live !== undefined;
+}
+
+/**
+ * Unarchive a session: move JSONL back from _archived/ to main dir.
+ * Does NOT warm it back into the live registry — that happens on SSE connect.
+ * Returns true if restored, false if no archive file found.
+ */
+export async function unarchiveSession(sessionId: string, projectId: string): Promise<boolean> {
+  const archiveDir = archivedDirFor(projectId);
+  try {
+    const files = await readdir(archiveDir);
+    const match = files.find((f) => f.endsWith(".jsonl") && f.includes(sessionId));
+    if (!match) return false;
+    const srcDir = join(config.sessionDir, projectId);
+    await rename(join(archiveDir, match), join(srcDir, match));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * List archived sessions for a project.
+ */
+export async function listArchivedSessions(
+  projectId: string,
+  workspacePath: string,
+): Promise<UnifiedSession[]> {
+  const archiveDir = archivedDirFor(projectId);
+  try {
+    await stat(archiveDir);
+  } catch {
+    return []; // archive dir doesn't exist
+  }
+
+  try {
+    const files = await readdir(archiveDir);
+    const jsonls = files.filter((f) => f.endsWith(".jsonl"));
+    const results: UnifiedSession[] = [];
+
+    for (const file of jsonls) {
+      try {
+        const sessionPath = join(archiveDir, file);
+        const sm = SessionManager.open(sessionPath);
+        // Derive sessionId from the filename (UUID after timestamp prefix)
+        const base = basename(file, ".jsonl");
+        const underscoreIdx = base.indexOf("_");
+        const sessionId = underscoreIdx !== -1 ? base.slice(underscoreIdx + 1) : base;
+        const ctx = sm.buildSessionContext();
+        const info = SessionManager.list(workspacePath, archiveDir);
+        const match = (await info).find((i) => i.id === sessionId);
+        results.push({
+          sessionId,
+          projectId,
+          isLive: false,
+          name: match?.name ?? sm.getSessionName(),
+          createdAt: match?.created ?? new Date(0),
+          lastActivityAt: match?.modified ?? new Date(0),
+          messageCount: ctx.messages.length,
+        });
+      } catch {
+        // skip corrupt files
+      }
+    }
+
+    return results.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rename a live session. Persists via SessionManager.appendSessionInfo.
+ * Returns true if renamed, false if session not live.
+ */
+export function renameSession(sessionId: string, name: string): boolean {
+  const live = registry.get(sessionId);
+  if (live === undefined) return false;
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return false;
+  live.sessionManager.appendSessionInfo(trimmed);
+  live.name = trimmed;
+  return true;
+}
+
+/**
+ * Auto-name a session from the first user prompt text.
+ * Called when the first prompt is sent. Truncates to 60 chars.
+ */
+export function autoNameSession(sessionId: string, promptText: string): void {
+  const live = registry.get(sessionId);
+  if (live === undefined) return;
+  // Only auto-name if no name is already set
+  if (live.name !== undefined) return;
+  const name = promptText.trim().slice(0, 60).replace(/\n/g, " ");
+  if (name.length === 0) return;
+  live.sessionManager.appendSessionInfo(name);
+  live.name = name;
 }
 
 /** Dispose a live session — abort, unsubscribe, close clients, remove from registry. */

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
@@ -59,6 +59,10 @@ export function App() {
   const [cloneToken, setCloneToken] = useState("");
   const [cloning, setCloning] = useState(false);
   const [cloneProgress, setCloneProgress] = useState<string[]>([]);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | undefined>();
+  const [renameValue, setRenameValue] = useState("");
+  const [showArchived, setShowArchived] = useState<string | undefined>();
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -335,14 +339,59 @@ export function App() {
                       <div
                         key={s.sessionId}
                         onClick={(e) => {
+                          if (renamingSessionId === s.sessionId) return;
                           e.stopPropagation();
                           setActiveSession(s.sessionId);
                         }}
                         className={`session-item ${activeSessionId === s.sessionId ? "active" : ""}`}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setRenamingSessionId(s.sessionId);
+                          setRenameValue(s.name ?? `Session ${s.sessionId.slice(0, 8)}`);
+                          setTimeout(() => renameInputRef.current?.focus(), 50);
+                        }}
                       >
-                        <span className="session-name">
-                          {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
-                        </span>
+                        {renamingSessionId === s.sessionId ? (
+                          <input
+                            ref={renameInputRef}
+                            className="session-rename-input"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onBlur={() => {
+                              const trimmed = renameValue.trim();
+                              if (trimmed.length > 0 && trimmed !== (s.name ?? `Session ${s.sessionId.slice(0, 8)}`)) {
+                                useSessionStore.getState().renameSession(s.sessionId, trimmed);
+                              }
+                              setRenamingSessionId(undefined);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.currentTarget.blur();
+                              } else if (e.key === "Escape") {
+                                setRenamingSessionId(undefined);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <>
+                            <span className="session-name">
+                              {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
+                            </span>
+                            <button
+                              className="session-archive-btn"
+                              title="Archive session"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Archive session "${s.name ?? s.sessionId.slice(0, 8)}"?`)) {
+                                  useSessionStore.getState().archiveSession(s.sessionId);
+                                }
+                              }}
+                            >
+                              🗑
+                            </button>
+                          </>
+                        )}
                       </div>
                     ))}
 
@@ -363,6 +412,53 @@ export function App() {
             );
           })}
         </div>
+
+        {/* Archived sessions section */}
+        {activeProjectId !== undefined && (
+          <>
+            <div
+              className="archived-toggle"
+              onClick={() => {
+                const next = showArchived === activeProjectId ? undefined : activeProjectId;
+                if (next !== undefined) {
+                  useSessionStore.getState().loadArchivedSessions(activeProjectId);
+                }
+                setShowArchived(next);
+              }}
+            >
+              <span className="project-chevron">{showArchived === activeProjectId ? "▾" : "▸"}</span>
+              <span className="project-name" style={{ fontSize: "12px" }}>
+                Archived
+              </span>
+            </div>
+            {showArchived === activeProjectId && (() => {
+              const archived = useSessionStore.getState().archivedSessions[activeProjectId];
+              if (archived === undefined) return <div className="archived-status">Loading...</div>;
+              if (archived.length === 0) return <div className="archived-status">No archived sessions</div>;
+              return (
+                <div className="session-list project-sublist archived-list">
+                  {archived.map((s: SessionSummary) => (
+                    <div key={s.sessionId} className="session-item archived">
+                      <span className="session-name">
+                        {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
+                      </span>
+                      <button
+                        className="session-restore-btn"
+                        title="Restore session"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useSessionStore.getState().unarchiveSession(s.sessionId, activeProjectId);
+                        }}
+                      >
+                        ↻
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </>
+        )}
 
         {/* Add project button / form */}
         <div className="sidebar-footer">

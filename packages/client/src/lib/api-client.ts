@@ -197,6 +197,52 @@ export async function steerSession(
   );
 }
 
+// ---- Session Naming ----
+
+export async function renameSession(
+  sessionId: string,
+  name: string,
+): Promise<{ renamed: boolean }> {
+  return request<{ renamed: boolean }>(
+    "PATCH",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/name`,
+    { name },
+  );
+}
+
+// ---- Archive ----
+
+export async function archiveSession(
+  sessionId: string,
+  projectId?: string,
+): Promise<{ archived: boolean }> {
+  return request<{ archived: boolean }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/archive`,
+    projectId !== undefined ? { projectId } : undefined,
+  );
+}
+
+export async function unarchiveSession(
+  sessionId: string,
+  projectId: string,
+): Promise<{ unarchived: boolean }> {
+  return request<{ unarchived: boolean }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/unarchive`,
+    { projectId },
+  );
+}
+
+export async function listArchivedSessions(
+  projectId: string,
+): Promise<{ sessions: SessionSummary[] }> {
+  return request<{ sessions: SessionSummary[] }>(
+    "GET",
+    `/api/v1/sessions?projectId=${encodeURIComponent(projectId)}&archived=true`,
+  );
+}
+
 // ---- Projects ----
 
 export interface Project {

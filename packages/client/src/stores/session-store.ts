@@ -8,6 +8,9 @@ import {
   sendPrompt,
   abortSession,
   fetchProjects,
+  renameSession as renameSessionAPI,
+  archiveSession as archiveSessionAPI,
+  unarchiveSession as unarchiveSessionAPI,
 } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 
@@ -34,6 +37,8 @@ interface SessionState {
   sessions: SessionSummary[];
   /** Sessions per project (loaded by loadProjectSessions). */
   projectSessions: Record<string, SessionSummary[]>;
+  /** Archived sessions per project. */
+  archivedSessions: Record<string, SessionSummary[]>;
   /** Currently active session ID. */
   activeSessionId: string | undefined;
   /** Messages for the active session. */
@@ -58,6 +63,10 @@ interface SessionActions {
   sendPrompt: (text: string) => Promise<void>;
   abort: () => Promise<void>;
   refreshSessions: () => Promise<void>;
+  renameSession: (sessionId: string, name: string) => Promise<void>;
+  archiveSession: (sessionId: string) => Promise<void>;
+  unarchiveSession: (sessionId: string, projectId: string) => Promise<void>;
+  loadArchivedSessions: (projectId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -69,6 +78,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   activeProjectId: undefined,
   sessions: [],
   projectSessions: {},
+  archivedSessions: {},
   activeSessionId: undefined,
   messages: [],
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
@@ -356,6 +366,77 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       await abortSession(activeSessionId);
     } catch {
       // best-effort
+    }
+  },
+
+  renameSession: async (sessionId: string, name: string) => {
+    try {
+      await renameSessionAPI(sessionId, name);
+      // Update local state
+      set((s) => ({
+        sessions: s.sessions.map((sess) =>
+          sess.sessionId === sessionId ? { ...sess, name } : sess,
+        ),
+        projectSessions: Object.fromEntries(
+          Object.entries(s.projectSessions).map(([pid, sessions]) => [
+            pid,
+            sessions.map((sess) =>
+              sess.sessionId === sessionId ? { ...sess, name } : sess,
+            ),
+          ]),
+        ),
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to rename session" });
+    }
+  },
+
+  archiveSession: async (sessionId: string) => {
+    // Find the projectId from local state
+    const state = get();
+    const session = state.sessions.find((s) => s.sessionId === sessionId);
+    const projectId = session?.projectId ?? state.activeProjectId;
+    try {
+      await archiveSessionAPI(sessionId, projectId);
+      // Remove from local state
+      set((s) => ({
+        sessions: s.sessions.filter((sess) => sess.sessionId !== sessionId),
+        projectSessions: projectId
+          ? {
+              ...s.projectSessions,
+              [projectId]: (s.projectSessions[projectId] ?? []).filter(
+                (sess) => sess.sessionId !== sessionId,
+              ),
+            }
+          : s.projectSessions,
+        activeSessionId:
+          s.activeSessionId === sessionId ? undefined : s.activeSessionId,
+      }));
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to archive session" });
+    }
+  },
+
+  unarchiveSession: async (sessionId: string, projectId: string) => {
+    try {
+      await unarchiveSessionAPI(sessionId, projectId);
+      // Reload both active and archived sessions
+      await get().loadProjectSessions(projectId);
+      await get().loadArchivedSessions(projectId);
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to restore session" });
+    }
+  },
+
+  loadArchivedSessions: async (projectId: string) => {
+    try {
+      const { listArchivedSessions } = await import("../lib/api-client");
+      const { sessions } = await listArchivedSessions(projectId);
+      set((s) => ({
+        archivedSessions: { ...s.archivedSessions, [projectId]: sessions },
+      }));
+    } catch {
+      // silently fail
     }
   },
 

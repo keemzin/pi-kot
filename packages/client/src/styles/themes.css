@@ -369,7 +369,7 @@ body {
   overflow: hidden;
 }
 
-/* ═══ Sidebar ═══ */
+/* ═══ Sidebar — overlay ═══ */
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -379,14 +379,19 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: margin-left 0.3s var(--ease);
+  transition: left 0.3s var(--ease);
   z-index: 100;
-  position: relative;
-  overflow: hidden;
+  position: fixed;
+  top: 44px;
+  left: 0;
+  bottom: 0;
+  overflow-y: auto;
+  box-shadow: 4px 0 32px rgba(0,0,0,0.18);
 }
 
 .sidebar.collapsed {
-  margin-left: calc(var(--sidebar-width) * -1);
+  left: calc(var(--sidebar-width) * -1);
+  box-shadow: none;
 }
 
 .sidebar-header {
@@ -490,6 +495,107 @@ body {
 .session-name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.session-rename-input {
+  width: 100%;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.session-rename-input:focus {
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+/* Archive button on session items (hidden by default, shown on hover) */
+.session-item {
+  position: relative;
+}
+
+.session-archive-btn {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  line-height: 1;
+  transition: color var(--duration) var(--ease);
+}
+
+.session-archive-btn:hover {
+  color: var(--error);
+}
+
+.session-item:hover .session-archive-btn {
+  display: inline-block;
+}
+
+/* Restore button on archived session items */
+.session-restore-btn {
+  display: none;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  line-height: 1;
+}
+
+.session-item.archived:hover .session-restore-btn {
+  display: inline-block;
+}
+
+/* Archived section toggle */
+.archived-toggle {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  margin: 4px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  transition: all var(--duration) var(--ease);
+  user-select: none;
+}
+
+.archived-toggle:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-secondary);
+}
+
+.archived-list {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.archived-status {
+  padding: 6px 10px 6px 24px;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .new-session-mini {
@@ -743,7 +849,7 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 10;
+  z-index: 200;
 }
 
 .header-left,

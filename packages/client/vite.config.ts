@@ -9,6 +9,7 @@ export default defineConfig({
   root: resolve(__dirname),
   plugins: [react()],
   server: {
+    host: process.env.HOST || "127.0.0.1",
     port: 5173,
     strictPort: true,
     proxy: {
