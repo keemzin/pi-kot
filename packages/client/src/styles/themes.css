@@ -1009,7 +1009,14 @@ body {
   padding: 60px 20px 80px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+}
+
+.messages-container > * {
+  max-width: 760px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .message-row {
@@ -1152,13 +1159,17 @@ body {
   font-style: italic;
 }
 
+.markdown-content .table-wrapper {
+  overflow-x: auto;
+  margin: 6px 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
 .markdown-content table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  margin: 2px 0;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
 }
 
 .markdown-content th {
@@ -1168,13 +1179,13 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--text-secondary);
-  padding: 4px 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border-hover);
   white-space: nowrap;
 }
 
 .markdown-content td {
-  padding: 3px 8px;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
 }

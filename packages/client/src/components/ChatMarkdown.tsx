@@ -101,13 +101,7 @@ const CodeRenderer: Exclude<Components["code"], undefined> = ({
     return (
       <code
         style={{
-          background: "var(--bg-glass)",
-          borderRadius: "var(--radius-xs)",
-          padding: "1px 5px",
-          fontFamily: "'SF Mono','Menlo','Monaco',monospace",
-          fontSize: "0.9em",
-          color: "var(--text-primary)",
-          whiteSpace: "nowrap",
+          overflowWrap: "anywhere",
         }}
         {...rest}
       >
@@ -160,87 +154,30 @@ const CodeRenderer: Exclude<Components["code"], undefined> = ({
 
 
 const components: Components = {
-  h1: ({ children }) => (
-    <h1 style={{ margin: "16px 0 6px", fontSize: "1rem", fontWeight: 600 }}>
-      {children}
-    </h1>
-  ),
-  h2: ({ children }) => (
-    <h2 style={{ margin: "14px 0 5px", fontSize: "0.9rem", fontWeight: 600 }}>
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3 style={{ margin: "12px 0 4px", fontSize: "0.85rem", fontWeight: 600 }}>
-      {children}
-    </h3>
-  ),
+  h1: ({ children }) => <h1>{children}</h1>,
+  h2: ({ children }) => <h2>{children}</h2>,
+  h3: ({ children }) => <h3>{children}</h3>,
+  h4: ({ children }) => <h4>{children}</h4>,
 
-  p: ({ children }) => (
-    <p style={{ margin: "8px 0", lineHeight: 1.5 }}>{children}</p>
-  ),
-  ul: ({ children }) => (
-    <ul style={{ margin: "6px 0", paddingLeft: 20, listStyle: "disc" }}>{children}</ul>
-  ),
-  ol: ({ children }) => (
-    <ol style={{ margin: "6px 0", paddingLeft: 20, listStyle: "decimal" }}>{children}</ol>
-  ),
-  li: ({ children }) => <li style={{ lineHeight: 1.5 }}>{children}</li>,
+  p: ({ children }) => <p>{children}</p>,
+  ul: ({ children }) => <ul>{children}</ul>,
+  ol: ({ children }) => <ol>{children}</ol>,
+  li: ({ children }) => <li>{children}</li>,
 
-  blockquote: ({ children }) => (
-    <blockquote
-      style={{
-        margin: "10px 0",
-        borderLeft: "3px solid var(--border)",
-        paddingLeft: 12,
-        color: "var(--text-secondary)",
-      }}
-    >
-      {children}
-    </blockquote>
-  ),
+  blockquote: ({ children }) => <blockquote>{children}</blockquote>,
+  hr: () => <hr />,
+  a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+  strong: ({ children }) => <strong>{children}</strong>,
+  em: ({ children }) => <em>{children}</em>,
 
   table: ({ children }) => (
-    <div style={{ margin: "8px 0", overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", fontSize: "0.8rem", minWidth: "100%" }}>
-        {children}
-      </table>
+    <div className="table-wrapper">
+      <table>{children}</table>
     </div>
   ),
-  th: ({ children }) => (
-    <th
-      style={{
-        border: "1px solid var(--border)",
-        padding: "4px 8px",
-        textAlign: "left",
-        fontWeight: 600,
-        background: "var(--bg-glass)",
-      }}
-    >
-      {children}
-    </th>
-  ),
-  td: ({ children }) => (
-    <td style={{ border: "1px solid var(--border)", padding: "4px 8px", verticalAlign: "top" }}>
-      {children}
-    </td>
-  ),
-
-  a: ({ children, href }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ color: "var(--accent)", textDecoration: "underline" }}
-    >
-      {children}
-    </a>
-  ),
-
-  hr: () => <hr style={{ margin: "12px 0", border: "none", borderTop: "1px solid var(--border)" }} />,
-
-  strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
-  em: ({ children }) => <em style={{ fontStyle: "italic" }}>{children}</em>,
+  th: ({ children }) => <th>{children}</th>,
+  td: ({ children }) => <td>{children}</td>,
+  tr: ({ children }) => <tr>{children}</tr>,
 
   code: CodeRenderer,
   // Unwrap react-markdown's bare <pre> — CodeRenderer owns the <pre>
@@ -249,7 +186,7 @@ const components: Components = {
 
 export function ChatMarkdown({ text }: Props) {
   return (
-    <div style={{ wordBreak: "break-word", overflowWrap: "anywhere", fontSize: "0.875rem" }}>
+    <div className="markdown-content" style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {text}
       </ReactMarkdown>
