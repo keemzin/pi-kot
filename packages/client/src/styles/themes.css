@@ -953,6 +953,7 @@ body {
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   line-height: 1.4;
   overflow: hidden;
+  animation: toolFadeIn 0.25s ease-out;
 }
 
 .tool-result summary {
@@ -1113,6 +1114,7 @@ body {
   font-size: 12px;
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   overflow: hidden;
+  animation: toolFadeIn 0.25s ease-out;
 }
 
 .tool-call-chip summary {
@@ -1133,6 +1135,11 @@ body {
   color: var(--tool-accent-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+@keyframes toolFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ═══ Error banner ═══ */
@@ -1331,6 +1338,7 @@ body {
   font-size: 12px;
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   font-weight: 600;
+  animation: toolFadeIn 0.2s ease-out;
 }
 
 /* ═══ Status indicator ═══ */

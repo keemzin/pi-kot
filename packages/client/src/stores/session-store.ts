@@ -287,11 +287,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             refetchMessages();
             break;
           }
-          case "agent_end":
+          case "agent_end": {
+            // Flush any remaining text delta
+            if (rafId !== undefined) {
+              cancelAnimationFrame(rafId);
+              rafId = undefined;
+            }
+            flushDelta();
+            // Stop streaming and refetch the final message state
+            set({
+              streamState: {
+                text: "",
+                activeToolName: undefined,
+                isStreaming: false,
+              },
+            });
+            refetchMessages();
+            break;
+          }
           case "message_end":
           case "tool_result": {
-            // Refetch to get the full final state
-            // Flush any remaining text delta first
+            // Refetch to get the latest message state (toolResult blocks,
+            // updated assistant message). Don't stop streaming — the agent
+            // may still be running.
             if (rafId !== undefined) {
               cancelAnimationFrame(rafId);
               rafId = undefined;
