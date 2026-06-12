@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useSessionStore } from "../stores/session-store";
+import { ToolGroup } from "./ToolGroup";
 
 interface Props {
   sessionId: string;
@@ -11,8 +12,13 @@ interface ContentBlock {
   type?: string;
   text?: string;
   name?: string;
+  id?: string;
   input?: Record<string, unknown>;
+  output?: string;
   toolCallId?: string;
+  isError?: boolean;
+  toolName?: string;
+  content?: unknown;
 }
 
 function extractText(content: unknown): string {
@@ -27,7 +33,7 @@ function extractText(content: unknown): string {
 
 function getToolCalls(content: unknown): ContentBlock[] {
   if (!Array.isArray(content)) return [];
-  return content.filter((b: ContentBlock) => b.type === "tool_use");
+  return content.filter((b: ContentBlock) => b.type === "tool_use" || b.type === "toolCall");
 }
 
 /** Code block component with copy button. */
@@ -115,7 +121,6 @@ function MarkdownContent({ text }: { text: string }) {
             }
             return <CodeBlock className={className}>{children}</CodeBlock>;
           },
-          // Open links in new tab
           a({ href, children }) {
             return (
               <a href={href} target="_blank" rel="noopener noreferrer">
@@ -131,51 +136,10 @@ function MarkdownContent({ text }: { text: string }) {
   );
 }
 
-function ToolCallChip({ name, input }: { name: string; input?: Record<string, unknown> }) {
-  const inputPreview =
-    input !== undefined ? JSON.stringify(input).slice(0, 300) : undefined;
-
-  return (
-    <details className="tool-call-chip">
-      <summary>🔧 {name}</summary>
-      {inputPreview !== undefined && (
-        <div className="tool-call-input">{inputPreview}</div>
-      )}
-    </details>
-  );
-}
-
-function ToolResultCard({
-  toolName,
-  isError,
-  content,
-}: {
-  toolName: string;
-  isError: boolean;
-  content: string;
-}) {
-  return (
-    <details
-      className="tool-result"
-      style={{ borderColor: isError ? "rgba(248,113,113,0.25)" : undefined }}
-    >
-      <summary style={{ color: isError ? "var(--error)" : undefined }}>
-        {isError ? "⚠️" : "🔧"} {toolName}
-        <span style={{ fontWeight: 400, marginLeft: "8px", opacity: 0.6 }}>
-          {content.length > 0 ? `${content.length} chars` : "done"}
-        </span>
-      </summary>
-      {content.length > 0 && (
-        <div
-          className="tool-result-content"
-          style={{ color: isError ? "var(--error)" : undefined }}
-        >
-          {content.slice(0, 2000)}
-          {content.length > 2000 ? "…" : ""}
-        </div>
-      )}
-    </details>
-  );
+/** A turn is: user message → 0+ assistant/toolResult messages */
+interface Turn {
+  userMsg: Record<string, unknown>;
+  responses: Record<string, unknown>[];
 }
 
 export function ChatView({ sessionId }: Props) {
@@ -191,6 +155,24 @@ export function ChatView({ sessionId }: Props) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamText]);
+
+  // Group messages into turns (user → assistant/toolResult)
+  const turns: Turn[] = useMemo(() => {
+    const result: Turn[] = [];
+    for (const msg of messages) {
+      const m = msg as Record<string, unknown>;
+      const role = m.role as string;
+      if (role === "user") {
+        result.push({ userMsg: m, responses: [] });
+      } else if (result.length > 0) {
+        result[result.length - 1].responses.push(m);
+      } else {
+        // Orphan assistant/toolResult message (before any user msg)
+        result.push({ userMsg: {}, responses: [m] });
+      }
+    }
+    return result;
+  }, [messages]);
 
   return (
     <div className="messages-container">
@@ -210,78 +192,132 @@ export function ChatView({ sessionId }: Props) {
         </div>
       )}
 
-      {/* Message list */}
-      {messages.map((msg, i) => {
-        const m = msg as Record<string, unknown>;
-        const role = m.role as string;
-        const content = m.content;
+      {/* Turns */}
+      {turns.map((turn, ti) => {
+        const isLastTurn = ti === turns.length - 1;
 
-        // ── User message (plain text) ──
-        if (role === "user") {
-          return (
-            <div key={i} className="message-row user">
-              <div className="message-bubble user">{extractText(content)}</div>
-            </div>
-          );
+        // ── Extract tools from this turn ──
+        const tools: Array<{
+          type: "tool_call" | "tool_result";
+          name: string;
+          status: "running" | "done" | "error";
+          input?: unknown;
+          output?: string;
+          isError?: boolean;
+        }> = [];
+
+        let finalText = "";
+        let hasFinalText = false;
+
+        for (const resp of turn.responses) {
+          const role = resp.role as string;
+          const content = resp.content;
+
+          if (role === "assistant") {
+            // Extract tool calls
+            const toolCalls = getToolCalls(content);
+            for (const tc of toolCalls) {
+              tools.push({
+                type: "tool_call",
+                name: tc.name ?? tc.toolName ?? "tool",
+                status: "done",
+                input: tc.input,
+              });
+            }
+            // Accumulate text (only the last text should show)
+            const text = extractText(content);
+            if (text.length > 0) {
+              finalText = text;
+              hasFinalText = true;
+            }
+          }
+
+          if (role === "toolResult" || role === "tool") {
+            const toolName = (resp.toolName as string) ?? (resp.name as string) ?? "tool";
+            const isErr = resp.isError === true;
+            const output = extractText(content);
+
+            // Match with existing tool call or add as standalone
+            const existingIdx = tools.findIndex(
+              (t) => t.type === "tool_call" && t.name === toolName,
+            );
+            if (existingIdx >= 0) {
+              // Replace the tool call entry with a result
+              tools[existingIdx] = {
+                type: "tool_result",
+                name: toolName,
+                status: isErr ? "error" : "done",
+                output,
+                isError: isErr,
+              };
+            } else {
+              // Standalone tool result (no prior tool call seen)
+              tools.push({
+                type: "tool_result",
+                name: toolName,
+                status: isErr ? "error" : "done",
+                output,
+                isError: isErr,
+              });
+            }
+          }
         }
 
-        // ── Tool result (collapsible) ──
-        if (role === "toolResult" || role === "tool") {
-          const toolName = (m.toolName as string) ?? (m.name as string) ?? "tool";
-          const isError = m.isError === true;
-          const resultText = extractText(content);
+        // For the streaming turn, add active tool
+        if (isLastTurn && isStreaming && activeToolName) {
+          const streamingToolName = activeToolName;
+          if (!tools.find((t) => t.type === "tool_call" && t.name === streamingToolName)) {
+            tools.push({
+              type: "tool_call",
+              name: streamingToolName,
+              status: "running",
+            });
+          }
+        }
 
-          return (
-            <div key={i} className="message-row assistant">
-              <div style={{ maxWidth: "80%", width: "100%" }}>
-                <ToolResultCard toolName={toolName} isError={isError} content={resultText} />
+        return (
+          <div key={ti} style={{ marginBottom: 12 }}>
+            {/* User message */}
+            {turn.userMsg.role === "user" && (
+              <div className="message-row user">
+                <div className="message-bubble user">
+                  {extractText(turn.userMsg.content)}
+                </div>
               </div>
-            </div>
-          );
-        }
+            )}
 
-        // ── Assistant message (rendered markdown) ──
-        if (role === "assistant") {
-          const text = extractText(content);
-          const toolCalls = getToolCalls(content);
-
-          if (text.length === 0 && toolCalls.length === 0) return null;
-
-          return (
-            <div key={i} className="message-row assistant">
-              <div
-                className="message-bubble assistant"
-                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
-              >
-                {text.length > 0 && <MarkdownContent text={text} />}
-                {toolCalls.map((tc, j) => (
-                  <ToolCallChip
-                    key={j}
-                    name={tc.name ?? "tool"}
-                    input={tc.input as Record<string, unknown> | undefined}
+            {/* Tool group */}
+            {tools.length > 0 && (
+              <div className="message-row assistant">
+                <div style={{ maxWidth: "80%", width: "100%" }}>
+                  <ToolGroup
+                    tools={tools}
+                    isStreaming={isLastTurn && isStreaming}
                   />
-                ))}
+                </div>
               </div>
-            </div>
-          );
-        }
+            )}
 
-        return null;
+            {/* Final text response (after tools) */}
+            {hasFinalText && (
+              <div className="message-row assistant">
+                <div className="message-bubble assistant">
+                  <MarkdownContent text={finalText} />
+                </div>
+              </div>
+            )}
+          </div>
+        );
       })}
 
-      {/* Streaming message (rendered markdown too) */}
-      {isStreaming && (
+      {/* Streaming message (when no turns built yet or text-only response) */}
+      {isStreaming && streamText.length > 0 && (
         <div className="message-row assistant">
           <div
             className="message-bubble assistant"
             style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
           >
-            {activeToolName !== undefined && (
-              <div className="tool-badge">🔧 {activeToolName}</div>
-            )}
-            {streamText.length > 0 ? (
-              <MarkdownContent text={streamText} />
-            ) : null}
+            <MarkdownContent text={streamText} />
             <span className="streaming-cursor">▊</span>
           </div>
         </div>
