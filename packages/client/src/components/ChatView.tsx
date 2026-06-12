@@ -142,7 +142,7 @@ interface Turn {
   responses: Record<string, unknown>[];
 }
 
-export function ChatView({ sessionId, modelName, providerName }: Props & { modelName?: string; providerName?: string }) {
+export function ChatView({ sessionId }: Props) {
   const messages = useSessionStore((s) => s.messages);
   const streamText = useSessionStore((s) => s.streamState.text);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
@@ -293,8 +293,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
                   <ToolGroup
                     tools={tools}
                     isStreaming={isLastTurn && isStreaming}
-                    modelName={modelName}
-                    providerName={providerName}
                   />
                 </div>
               </div>
@@ -317,23 +315,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props & { model
         <div className="message-row assistant">
           <div
             className="message-bubble assistant"
-            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", display: "flex", flexDirection: "column", gap: 6 }}
+            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}
           >
-            {activeToolName && (
-              <div className="tool-badge" style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: "0.75rem", color: "var(--accent)",
-                background: "rgba(237,180,73,0.12)",
-                border: "1px solid rgba(237,180,73,0.25)",
-                borderRadius: 4, padding: "2px 8px", alignSelf: "flex-start",
-              }}>
-                <span style={{
-                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                  background: "var(--accent)", animation: "pulse 1s ease-in-out infinite",
-                }} />
-                {activeToolName}
-              </div>
-            )}
             <MarkdownContent text={streamText} />
             <span className="streaming-cursor">▊</span>
           </div>
