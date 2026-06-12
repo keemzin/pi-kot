@@ -12,6 +12,7 @@ import {
   fetchProviders,
   type ProviderGroup,
   createProjectAPI,
+  cloneRepo,
 } from "./lib/api-client";
 import { applyTheme } from "./lib/theme";
 
@@ -49,8 +50,15 @@ export function App() {
   const [modelError, setModelError] = useState<string | undefined>();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [showAddProject, setShowAddProject] = useState(false);
+  const [cloneMode, setCloneMode] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectPath, setNewProjectPath] = useState("");
+  const [cloneUrl, setCloneUrl] = useState("");
+  const [cloneFolder, setCloneFolder] = useState("");
+  const [cloneBranch, setCloneBranch] = useState("");
+  const [cloneToken, setCloneToken] = useState("");
+  const [cloning, setCloning] = useState(false);
+  const [cloneProgress, setCloneProgress] = useState<string[]>([]);
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -186,6 +194,66 @@ export function App() {
     }
   };
 
+  const handleCloneRepo = () => {
+    const name = (cloneFolder || newProjectName).trim();
+    if (!cloneUrl.trim() || !name) return;
+    setCloning(true);
+    setCloneProgress([]);
+
+    const abort = cloneRepo(
+      {
+        url: cloneUrl.trim(),
+        folderName: name,
+        projectName: newProjectName.trim() || name,
+        branch: cloneBranch.trim() || undefined,
+        token: cloneToken.trim() || undefined,
+      },
+      (event) => {
+        switch (event.type) {
+          case "started":
+            setCloneProgress((p) => [...p, `Cloning ${event.cloneUrlForDisplay}...`]);
+            break;
+          case "progress":
+            if (event.percent !== null) {
+              setCloneProgress((p) => [...p, `${event.phase}: ${event.percent}%`]);
+            } else {
+              setCloneProgress((p) => [...p, `${event.phase}...`]);
+            }
+            break;
+          case "stderr":
+            setCloneProgress((p) => [...p, event.line]);
+            break;
+          case "done":
+            loadProjects();
+            setCloneProgress((p) => [...p, "✓ Clone complete, project created"]);
+            setTimeout(() => {
+              setShowAddProject(false);
+              setCloneMode(false);
+              setCloning(false);
+              setCloneProgress([]);
+              setCloneUrl("");
+              setCloneFolder("");
+              setCloneBranch("");
+              setCloneToken("");
+              setNewProjectName("");
+            }, 1500);
+            break;
+          case "error":
+            setCloneProgress((p) => [...p, `✗ Error: ${event.message}`]);
+            setCloning(false);
+            break;
+        }
+      },
+      (err) => {
+        setCloneProgress((p) => [...p, `✗ ${err.message}`]);
+        setCloning(false);
+      },
+    );
+
+    // Store abort function for cancellation
+    (window as any).__cloneAbort = abort;
+  };
+
   if (loading) {
     return <div className="centered">Loading...</div>;
   }
@@ -293,40 +361,143 @@ export function App() {
         <div className="sidebar-footer">
           {showAddProject ? (
             <div className="add-project-form">
-              <input
-                type="text"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Project name"
-                className="add-project-input"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddProject();
-                  if (e.key === "Escape") setShowAddProject(false);
-                }}
-              />
-              <input
-                type="text"
-                value={newProjectPath}
-                onChange={(e) => setNewProjectPath(e.target.value)}
-                placeholder="Path to existing folder (e.g. ~/my-project)"
-                className="add-project-input"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddProject();
-                  if (e.key === "Escape") setShowAddProject(false);
-                }}
-              />
-              <div className="add-project-actions">
-                <button onClick={handleAddProject} className="add-project-btn">
-                  Add
+              {/* Mode toggle */}
+              <div className="clone-mode-toggle">
+                <button
+                  className={`clone-mode-btn${!cloneMode ? " active" : ""}`}
+                  onClick={() => setCloneMode(false)}
+                >
+                  Existing Folder
                 </button>
                 <button
-                  onClick={() => setShowAddProject(false)}
-                  className="add-project-cancel"
+                  className={`clone-mode-btn${cloneMode ? " active" : ""}`}
+                  onClick={() => setCloneMode(true)}
                 >
-                  Cancel
+                  Clone Repo
                 </button>
               </div>
+
+              {cloneMode ? (
+                <>
+                  <input
+                    type="text"
+                    value={cloneUrl}
+                    onChange={(e) => setCloneUrl(e.target.value)}
+                    placeholder="Git URL (https://...)"
+                    className="add-project-input"
+                    autoFocus
+                    disabled={cloning}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCloneRepo();
+                      if (e.key === "Escape") setShowAddProject(false);
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Project name"
+                    className="add-project-input"
+                    disabled={cloning}
+                  />
+                  <input
+                    type="text"
+                    value={cloneFolder}
+                    onChange={(e) => setCloneFolder(e.target.value)}
+                    placeholder="Folder name (under workspace)"
+                    className="add-project-input"
+                    disabled={cloning}
+                  />
+                  <input
+                    type="text"
+                    value={cloneBranch}
+                    onChange={(e) => setCloneBranch(e.target.value)}
+                    placeholder="Branch (optional)"
+                    className="add-project-input"
+                    disabled={cloning}
+                  />
+                  <input
+                    type="password"
+                    value={cloneToken}
+                    onChange={(e) => setCloneToken(e.target.value)}
+                    placeholder="Access token (optional)"
+                    className="add-project-input"
+                    disabled={cloning}
+                  />
+                  {cloneProgress.length > 0 && (
+                    <div className="clone-progress">
+                      {cloneProgress.map((line, i) => (
+                        <div key={i} className="clone-progress-line">
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="add-project-actions">
+                    {cloning ? (
+                      <button
+                        onClick={() => {
+                          ((window as any).__cloneAbort as (() => void) | undefined)?.();
+                          setCloning(false);
+                        }}
+                        className="add-project-cancel"
+                        style={{ flex: 1, textAlign: "center" }}
+                      >
+                        Cancel
+                      </button>
+                    ) : (
+                      <>
+                        <button onClick={handleCloneRepo} className="add-project-btn">
+                          Clone
+                        </button>
+                        <button
+                          onClick={() => setShowAddProject(false)}
+                          className="add-project-cancel"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    placeholder="Project name"
+                    className="add-project-input"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddProject();
+                      if (e.key === "Escape") setShowAddProject(false);
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newProjectPath}
+                    onChange={(e) => setNewProjectPath(e.target.value)}
+                    placeholder="Path to existing folder (e.g. ~/my-project)"
+                    className="add-project-input"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddProject();
+                      if (e.key === "Escape") setShowAddProject(false);
+                    }}
+                  />
+                  <div className="add-project-actions">
+                    <button onClick={handleAddProject} className="add-project-btn">
+                      Add
+                    </button>
+                    <button
+                      onClick={() => setShowAddProject(false)}
+                      className="add-project-cancel"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <button
