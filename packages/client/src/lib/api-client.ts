@@ -385,6 +385,42 @@ export async function fetchProviders(): Promise<ProvidersResponse> {
   return request<ProvidersResponse>("GET", "/api/v1/config/providers");
 }
 
+export interface AuthSummaryResponse {
+  providers: Record<string, { configured: boolean; source?: string; label?: string }>;
+}
+
+export async function getAuthSummary(): Promise<AuthSummaryResponse> {
+  return request<AuthSummaryResponse>("GET", "/api/v1/config/auth");
+}
+
+export async function setApiKey(provider: string, apiKey: string): Promise<{ provider: string; configured: boolean }> {
+  return request("PUT", `/api/v1/config/auth/${encodeURIComponent(provider)}`, { apiKey });
+}
+
+export async function removeApiKey(provider: string): Promise<void> {
+  await request("DELETE", `/api/v1/config/auth/${encodeURIComponent(provider)}`);
+}
+
+export async function getSettings(): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>("GET", "/api/v1/config/settings");
+}
+
+export async function updateSettings(
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>("PUT", "/api/v1/config/settings", patch);
+}
+
+export async function getModelsJson(): Promise<{ providers: Record<string, unknown> }> {
+  return request("GET", "/api/v1/config/models");
+}
+
+export async function putModelsJson(
+  data: { providers: Record<string, unknown> },
+): Promise<{ providers: Record<string, unknown> }> {
+  return request("PUT", "/api/v1/config/models", data);
+}
+
 // ---- Model Management ----
 
 export interface SetModelResponse {

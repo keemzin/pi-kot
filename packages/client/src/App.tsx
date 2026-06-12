@@ -5,6 +5,7 @@ import { ChatInput } from "./components/ChatInput";
 import { ThemePicker } from "./components/ThemePicker";
 import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import {
   fetchAuthStatus,
   login,
@@ -64,6 +65,7 @@ export function App() {
   const [renamingSessionId, setRenamingSessionId] = useState<string | undefined>();
   const [renameValue, setRenameValue] = useState("");
   const [showArchived, setShowArchived] = useState<string | undefined>();
+  const [showSettings, setShowSettings] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Bootstrap: check auth, load projects, fetch models
@@ -674,6 +676,23 @@ export function App() {
               className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
             />
             <ThemePicker currentTheme={currentTheme} onChange={handleThemeChange} />
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-dim)",
+                fontSize: "14px",
+                cursor: "pointer",
+                padding: "4px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              ⚙
+            </button>
           </div>
         </div>
 
@@ -717,6 +736,13 @@ export function App() {
           sessionId={activeSessionId}
           projectId={activeProjectId}
           onClose={() => setShowTreePanel(false)}
+        />
+      )}
+
+      {/* Settings Panel overlay */}
+      {showSettings && (
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
