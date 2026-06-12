@@ -207,6 +207,11 @@ export function sessionCount(): number {
   return registry.size;
 }
 
+/** Register a session in the registry (used by session resume). */
+export function registerSession(live: LiveSession): void {
+  registry.set(live.sessionId, live);
+}
+
 /** Dispose a live session — abort, unsubscribe, close clients, remove from registry. */
 export async function disposeSession(sessionId: string): Promise<boolean> {
   const live = registry.get(sessionId);

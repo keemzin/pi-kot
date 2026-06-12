@@ -182,11 +182,40 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (req, reply) => {
+      const { SessionManager } = await import("@earendil-works/pi-coding-agent");
+
+      // Try live registry first
       const live = getSession(req.params.id);
-      if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+      if (live !== undefined) {
+        return { messages: live.session.messages };
       }
-      return { messages: live.session.messages };
+
+      // Search for the session file on disk across all projects
+      const { readdir } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const { config } = await import("../config.js");
+
+      try {
+        const projectDirs = await readdir(config.sessionDir, { withFileTypes: true });
+        for (const dir of projectDirs) {
+          if (!dir.isDirectory()) continue;
+          const projectDir = join(config.sessionDir, dir.name);
+          const files = await readdir(projectDir);
+          const matchFile = files.find(
+            (f) => f.endsWith(".jsonl") && f.includes(req.params.id),
+          );
+          if (matchFile) {
+            const sessionPath = join(projectDir, matchFile);
+            const sm = SessionManager.open(sessionPath);
+            const ctx = sm.buildSessionContext();
+            return { messages: ctx.messages };
+          }
+        }
+      } catch {
+        // Session not found on disk either
+      }
+
+      return reply.code(404).send({ error: "session_not_found" });
     },
   );
 

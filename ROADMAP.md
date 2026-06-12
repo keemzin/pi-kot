@@ -111,7 +111,7 @@ User can:
 | 2.4 | Session list | 🟢 | `GET /sessions?projectId=X` — list with name, message count, last activity |
 | 2.5 | Session sidebar | 🟢 | Session list within a project in sidebar, create/switch |
 | 2.6 | Persistent sessions | 🟢 | `SessionManager.create()` instead of in-memory, JSONL on disk |
-| 2.7 | Session resume | 🔴 | Cold session auto-resume on SSE connect (lazy) |
+| 2.7 | Session resume | 🟢 | Cold session auto-resume on SSE connect (lazy) |
 | 2.8 | Session navigation | 🔴 | `POST /sessions/:id/navigate` — branch switching |
 | 2.9 | Session fork | 🔴 | `POST /sessions/:id/fork` — branch into new session |
 | 2.10 | Session tree panel | 🔴 | Visual tree of session branching history |
@@ -128,6 +128,8 @@ User can:
   ✓ Sessions persist to disk (JSONL after first assistant response)
   ✓ Session list shows correct message count and last activity time
   ✓ Session discovery deduplicates (live + disk merge)
+  ✓ Previous sessions resume on SSE connect (cold → live)
+  ✓ View message history from disk sessions
 ```
 
 **Key insight from pi-forge:**
