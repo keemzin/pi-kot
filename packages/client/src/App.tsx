@@ -4,6 +4,7 @@ import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
 import { ThemePicker } from "./components/ThemePicker";
 import { ModelDropdown } from "./components/ModelDropdown";
+import { SessionTreePanel } from "./components/SessionTreePanel";
 import {
   fetchAuthStatus,
   login,
@@ -50,6 +51,7 @@ export function App() {
   const [modelError, setModelError] = useState<string | undefined>();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [showAddProject, setShowAddProject] = useState(false);
+  const [showTreePanel, setShowTreePanel] = useState(false);
   const [cloneMode, setCloneMode] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectPath, setNewProjectPath] = useState("");
@@ -628,16 +630,35 @@ export function App() {
               {sidebarCollapsed ? "☰" : "✕"}
             </button>
             {activeSessionId !== undefined && (
-              <span
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  color: "var(--text-secondary)",
-                  marginLeft: "8px",
-                }}
-              >
-                Session {activeSessionId.slice(0, 8)}
-              </span>
+              <>
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--text-secondary)",
+                    marginLeft: "8px",
+                  }}
+                >
+                  Session {activeSessionId.slice(0, 8)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowTreePanel(true)}
+                  title="Session tree (branching history)"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-dim)",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    padding: "3px 6px",
+                    borderRadius: "var(--radius-sm)",
+                    lineHeight: 1,
+                  }}
+                >
+                  🌿
+                </button>
+              </>
             )}
           </div>
           <div className="header-right">
@@ -689,6 +710,15 @@ export function App() {
           </div>
         )}
       </div>
+
+      {/* Session Tree Panel overlay */}
+      {activeSessionId !== undefined && activeProjectId !== undefined && showTreePanel && (
+        <SessionTreePanel
+          sessionId={activeSessionId}
+          projectId={activeProjectId}
+          onClose={() => setShowTreePanel(false)}
+        />
+      )}
     </div>
   );
 }

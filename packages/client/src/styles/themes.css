@@ -1026,7 +1026,6 @@ body {
 }
 
 .message-bubble {
-  max-width: 80%;
   font-size: 14px;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -1034,6 +1033,7 @@ body {
 }
 
 .message-bubble.user {
+  max-width: 80%;
   padding: 6px 14px;
   border-radius: var(--radius-lg);
   background: var(--user-bubble);
@@ -1044,6 +1044,7 @@ body {
 }
 
 .message-bubble.assistant {
+  max-width: 95%;
   background: none;
   border: none;
   padding: 0;

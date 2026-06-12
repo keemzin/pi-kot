@@ -417,3 +417,64 @@ export async function getSessionModel(
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/model`,
   );
 }
+
+// ---- Session Tree / Navigate / Fork ----
+
+export interface SessionTreeEntry {
+  id: string;
+  parentId: string | null;
+  type: string;
+  timestamp: string;
+  role?: string;
+  preview?: string;
+  label?: string;
+}
+
+export interface SessionTreeResponse {
+  leafId: string | null;
+  branchIds: string[];
+  entries: SessionTreeEntry[];
+}
+
+export async function getSessionTree(
+  sessionId: string,
+): Promise<SessionTreeResponse> {
+  return request<SessionTreeResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/tree`,
+  );
+}
+
+export interface NavigateSessionResponse {
+  cancelled: boolean;
+  aborted?: boolean;
+  editorText?: string;
+}
+
+export async function navigateSession(
+  sessionId: string,
+  entryId: string,
+  opts?: { summarize?: boolean; customInstructions?: string; label?: string },
+): Promise<NavigateSessionResponse> {
+  return request<NavigateSessionResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/navigate`,
+    { entryId, ...opts },
+  );
+}
+
+export interface ForkSessionResponse {
+  sessionId: string;
+  projectId: string;
+}
+
+export async function forkSession(
+  sessionId: string,
+  entryId: string,
+): Promise<ForkSessionResponse> {
+  return request<ForkSessionResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/fork`,
+    { entryId },
+  );
+}

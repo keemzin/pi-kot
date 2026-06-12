@@ -407,3 +407,172 @@ export async function disposeAllSessions(): Promise<void> {
   const ids = Array.from(registry.keys());
   await Promise.all(ids.map((id) => disposeSession(id)));
 }
+
+/**
+ * Find a session's location on disk. Returns projectId and workspacePath
+ * by scanning all project session dirs.
+ */
+export async function findSessionLocation(
+  sessionId: string,
+): Promise<{ projectId: string; workspacePath: string } | undefined> {
+  // Check all project directories
+  const { readProjects } = await import("./project-manager.js");
+  try {
+    const projects = await readProjects();
+    for (const project of projects) {
+      const dir = join(config.sessionDir, project.id);
+      try {
+        const files = await readdir(dir);
+        if (files.some((f) => f.includes(sessionId))) {
+          return { projectId: project.id, workspacePath: project.path };
+        }
+      } catch {
+        // dir doesn't exist, skip
+      }
+    }
+  } catch {
+    // can't read projects
+  }
+  return undefined;
+}
+
+/**
+ * Resume a cold session from disk. Opens the JSONL, creates an AgentSession,
+ * registers it in the registry, and returns the LiveSession.
+ */
+export async function resumeSessionById(
+  sessionId: string,
+): Promise<LiveSession> {
+  const loc = await findSessionLocation(sessionId);
+  if (loc === undefined) {
+    throw new Error(`session_not_found: ${sessionId}`);
+  }
+
+  const dir = join(config.sessionDir, loc.projectId);
+  const files = await readdir(dir);
+  const match = files.find((f) => f.endsWith(".jsonl") && f.includes(sessionId));
+  if (match === undefined) {
+    throw new Error(`session_not_found: ${sessionId}`);
+  }
+
+  const sessionPath = join(dir, match);
+  const sessionManager = SessionManager.open(sessionPath);
+
+  const { session } = await createAgentSession({
+    cwd: loc.workspacePath,
+    sessionManager,
+    agentDir: config.piConfigDir,
+  });
+
+  const now = new Date();
+  const live: LiveSession = {
+    session,
+    sessionId,
+    projectId: loc.projectId,
+    workspacePath: loc.workspacePath,
+    sessionManager,
+    clients: new Set(),
+    createdAt: now,
+    lastActivityAt: now,
+    lastAgentStartIndex: undefined,
+    unsubscribe: () => undefined,
+    name: sessionManager.getSessionName(),
+  };
+
+  live.unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+    live.lastActivityAt = new Date();
+    if (event.type === "agent_start") {
+      live.lastAgentStartIndex = live.session.messages.length;
+    }
+    for (const client of live.clients) {
+      try {
+        client.send(event);
+      } catch {
+        live.clients.delete(client);
+      }
+    }
+  });
+
+  registry.set(live.sessionId, live);
+  return live;
+}
+
+/**
+ * Fork a session at a given entry. Creates a new JSONL file containing
+ * the path-to-leaf from root to the given entry, registers the new
+ * session, and returns it.
+ *
+ * NOTE: `createBranchedSession` mutates the source session's in-memory
+ * file reference to point at the new fork (SDK behavior). We handle this
+ * by capturing the source file before and re-opening the source after.
+ */
+export async function forkSession(
+  sessionId: string,
+  entryId: string,
+): Promise<LiveSession> {
+  const sourceLive = registry.get(sessionId);
+  if (sourceLive === undefined) {
+    // Try to resume cold first, then fork
+    const resumed = await resumeSessionById(sessionId);
+    return forkSession(resumed.sessionId, entryId);
+  }
+
+  // Capture the source file path BEFORE createBranchedSession mutates it
+  const sourceSessionFile = sourceLive.sessionManager.getSessionFile();
+  if (sourceSessionFile === undefined) {
+    throw new Error("fork_failed: source session has no file (in-memory only)");
+  }
+  const sourceDir = join(config.sessionDir, sourceLive.projectId);
+
+  // Create the branched session file
+  const newPath = sourceLive.sessionManager.createBranchedSession(entryId);
+  if (newPath === undefined) {
+    throw new Error("fork_failed: createBranchedSession returned undefined");
+  }
+
+  // Re-open the SOURCE session from the original file to undo SDK mutation
+  const restoredSourceSM = SessionManager.open(sourceSessionFile, sourceDir, sourceLive.workspacePath);
+  sourceLive.sessionManager = restoredSourceSM;
+
+  // Open the new fork as a SessionManager
+  const dir = join(config.sessionDir, sourceLive.projectId);
+  const forkedSM = SessionManager.open(newPath, dir, sourceLive.workspacePath);
+
+  const { session } = await createAgentSession({
+    cwd: sourceLive.workspacePath,
+    sessionManager: forkedSM,
+    agentDir: config.piConfigDir,
+  });
+
+  const now = new Date();
+  const forkedLive: LiveSession = {
+    session,
+    sessionId: session.sessionId,
+    projectId: sourceLive.projectId,
+    workspacePath: sourceLive.workspacePath,
+    sessionManager: forkedSM,
+    clients: new Set(),
+    createdAt: now,
+    lastActivityAt: now,
+    lastAgentStartIndex: undefined,
+    unsubscribe: () => undefined,
+    name: forkedSM.getSessionName(),
+  };
+
+  forkedLive.unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+    forkedLive.lastActivityAt = new Date();
+    if (event.type === "agent_start") {
+      forkedLive.lastAgentStartIndex = forkedLive.session.messages.length;
+    }
+    for (const client of forkedLive.clients) {
+      try {
+        client.send(event);
+      } catch {
+        forkedLive.clients.delete(client);
+      }
+    }
+  });
+
+  registry.set(forkedLive.sessionId, forkedLive);
+  return forkedLive;
+}

@@ -107,6 +107,7 @@ const CodeRenderer: Exclude<Components["code"], undefined> = ({
           fontFamily: "'SF Mono','Menlo','Monaco',monospace",
           fontSize: "0.9em",
           color: "var(--text-primary)",
+          whiteSpace: "nowrap",
         }}
         {...rest}
       >
@@ -160,23 +161,23 @@ const CodeRenderer: Exclude<Components["code"], undefined> = ({
 
 const components: Components = {
   h1: ({ children }) => (
-    <h1 style={{ margin: "8px 0 4px", fontSize: "1rem", fontWeight: 600, marginTop: 0 }}>
+    <h1 style={{ margin: "16px 0 6px", fontSize: "1rem", fontWeight: 600 }}>
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 style={{ margin: "8px 0 4px", fontSize: "0.9rem", fontWeight: 600, marginTop: 0 }}>
+    <h2 style={{ margin: "14px 0 5px", fontSize: "0.9rem", fontWeight: 600 }}>
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 style={{ margin: "6px 0 3px", fontSize: "0.85rem", fontWeight: 600, marginTop: 0 }}>
+    <h3 style={{ margin: "12px 0 4px", fontSize: "0.85rem", fontWeight: 600 }}>
       {children}
     </h3>
   ),
 
   p: ({ children }) => (
-    <p style={{ margin: "6px 0", lineHeight: 1.6 }}>{children}</p>
+    <p style={{ margin: "8px 0", lineHeight: 1.5 }}>{children}</p>
   ),
   ul: ({ children }) => (
     <ul style={{ margin: "6px 0", paddingLeft: 20, listStyle: "disc" }}>{children}</ul>
@@ -184,12 +185,12 @@ const components: Components = {
   ol: ({ children }) => (
     <ol style={{ margin: "6px 0", paddingLeft: 20, listStyle: "decimal" }}>{children}</ol>
   ),
-  li: ({ children }) => <li style={{ lineHeight: 1.6 }}>{children}</li>,
+  li: ({ children }) => <li style={{ lineHeight: 1.5 }}>{children}</li>,
 
   blockquote: ({ children }) => (
     <blockquote
       style={{
-        margin: "8px 0",
+        margin: "10px 0",
         borderLeft: "3px solid var(--border)",
         paddingLeft: 12,
         color: "var(--text-secondary)",

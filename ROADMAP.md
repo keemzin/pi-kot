@@ -107,9 +107,9 @@ User can:
 | 2.5 | Session sidebar | 🟢 | Session list within a project in sidebar, create/switch |
 | 2.6 | Persistent sessions | 🟢 | `SessionManager.create()` instead of in-memory, JSONL on disk |
 | 2.7 | Session resume | 🟢 | Cold session auto-resume on SSE connect (lazy) |
-| 2.8 | Session navigation | 🔴 | `POST /sessions/:id/navigate` — branch switching |
-| 2.9 | Session fork | 🔴 | `POST /sessions/:id/fork` — branch into new session |
-| 2.10 | Session tree panel | 🔴 | Visual tree of session branching history |
+| 2.8 | Session navigation | 🟢 | `POST /sessions/:id/navigate` — branch switching |
+| 2.9 | Session fork | 🟢 | `POST /sessions/:id/fork` — branch into new session |
+| 2.10 | Session tree panel | 🟢 | Visual tree of session branching history (🌿 button in header) |
 | 2.11 | Session naming | 🟢 | Auto-name from first prompt via `autoNameSession()`, manual rename via `PATCH /sessions/:id/name` + double-click in sidebar |
 
 ### Extra Project Features Built
@@ -288,13 +288,13 @@ Phases are intentionally ordered so each one:
 │   ├── GET /                     ✅ list (supports ?projectId filter)
 │   ├── GET /:id/messages         ✅ history
 │   ├── GET /:id/context          🔴 token telemetry
-│   ├── GET /:id/tree             🔴 branch tree
+│   ├── GET /:id/tree             ✅ session tree (Phase 2)
 │   ├── POST /:id/prompt          ✅ send prompt
 │   ├── GET /:id/stream           ✅ SSE stream (cold resume)
 │   ├── POST /:id/abort           ✅ abort
 │   ├── POST /:id/steer           ✅ steer / follow-up
-│   ├── POST /:id/navigate        🔴 branch switch
-│   ├── POST /:id/fork            🔴 fork
+│   ├── POST /:id/navigate        ✅ branch switch (Phase 2)
+│   ├── POST /:id/fork            ✅ fork (Phase 2)
 │   ├── POST /:id/model           ✅ set model (extra)
 │   ├── GET /:id/model            ✅ get model (extra)
 │   ├── POST /:id/archive         ✅ archive (Phase 2)

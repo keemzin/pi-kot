@@ -67,6 +67,7 @@ interface SessionActions {
   archiveSession: (sessionId: string) => Promise<void>;
   unarchiveSession: (sessionId: string, projectId: string) => Promise<void>;
   loadArchivedSessions: (projectId: string) => Promise<void>;
+  reloadMessages: (sessionId: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -440,5 +441,36 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
+  reloadMessages: async (sessionId: string) => {
+    try {
+      const { getSessionMessages } = await import("../lib/api-client");
+      const { messages } = await getSessionMessages(sessionId);
+      set({ messages });
+    } catch {
+      // silently fail — next SSE snapshot will fix it
+    }
+  },
+
   clearError: () => set({ error: undefined }),
+
+  // ── Session Tree / Navigate / Fork ──
+
+  getSessionTree: async (sessionId: string) => {
+    const { getSessionTree: api } = await import("../lib/api-client");
+    return api(sessionId);
+  },
+
+  navigateSession: async (
+    sessionId: string,
+    entryId: string,
+    opts?: { summarize?: boolean; customInstructions?: string; label?: string },
+  ) => {
+    const { navigateSession: api } = await import("../lib/api-client");
+    return api(sessionId, entryId, opts);
+  },
+
+  forkSession: async (sessionId: string, entryId: string) => {
+    const { forkSession: api } = await import("../lib/api-client");
+    return api(sessionId, entryId);
+  },
 }));

@@ -9,6 +9,9 @@ import {
   archiveSession,
   unarchiveSession,
   listArchivedSessions,
+  resumeSessionById,
+  forkSession,
+  findSessionLocation,
 } from "../session-registry.js";
 import { getProject } from "../project-manager.js";
 
@@ -412,4 +415,239 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       return { disposed };
     },
   );
+
+  // ── Session Tree ──
+  // GET /sessions/:id/tree — branching history, lazy-resumes cold sessions
+  fastify.get<{ Params: { id: string } }>(
+    "/sessions/:id/tree",
+    {
+      schema: {
+        description:
+          "Branching history of the session. Returns every entry on the " +
+          "tree (across all branches) plus the current leaf id and the " +
+          "set of entry ids on the active branch path. Lazy-resumes cold " +
+          "sessions on demand.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["leafId", "branchIds", "entries"],
+            properties: {
+              leafId: { type: ["string", "null"] },
+              branchIds: { type: "array", items: { type: "string" } },
+              entries: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "parentId", "type", "timestamp"],
+                  properties: {
+                    id: { type: "string" },
+                    parentId: { type: ["string", "null"] },
+                    type: { type: "string" },
+                    timestamp: { type: "string" },
+                    role: { type: "string" },
+                    preview: { type: "string" },
+                    label: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      let live = getSession(req.params.id);
+      if (live === undefined) {
+        try {
+          live = await resumeSessionById(req.params.id);
+        } catch {
+          return reply.code(404).send({ error: "session_not_found" });
+        }
+      }
+      const sm = live.sessionManager;
+      const all = sm.getEntries();
+      const leafId = sm.getLeafId();
+      const branchIds = sm.getBranch().map((e: { id: string }) => e.id);
+      const entries = all.map((e: {
+        id: string;
+        parentId: string | null;
+        type: string;
+        timestamp: string;
+        message?: { role?: string; content?: unknown };
+      }) => {
+        const out: Record<string, unknown> = {
+          id: e.id,
+          parentId: e.parentId,
+          type: e.type,
+          timestamp: e.timestamp,
+        };
+        const label = sm.getLabel(e.id);
+        if (label !== undefined) out.label = label;
+        if (e.type === "message" && e.message !== undefined) {
+          const m = e.message as { role?: string; content?: unknown };
+          if (typeof m.role === "string") out.role = m.role;
+          const preview = previewOfMessageContent(m.content);
+          if (preview !== undefined) out.preview = preview;
+        }
+        return out;
+      });
+      return { leafId, branchIds, entries };
+    },
+  );
+
+  // ── Session Navigate ──
+  // POST /sessions/:id/navigate — navigate to a different tree leaf
+  fastify.post<{ Params: { id: string }; Body: { entryId: string; summarize?: boolean; customInstructions?: string; label?: string } }>(
+    "/sessions/:id/navigate",
+    {
+      schema: {
+        description:
+          "Navigate the session leaf to a different entry on its tree. " +
+          "Operates IN-PLACE on the same session file (unlike fork which " +
+          "creates a new file). Session must be live.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          required: ["entryId"],
+          properties: {
+            entryId: { type: "string" },
+            summarize: { type: "boolean" },
+            customInstructions: { type: "string" },
+            label: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["cancelled"],
+            properties: {
+              cancelled: { type: "boolean" },
+              aborted: { type: "boolean" },
+              editorText: { type: "string" },
+            },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      const opts: Parameters<typeof live.session.navigateTree>[1] = {};
+      if (req.body.summarize !== undefined) opts.summarize = req.body.summarize;
+      if (req.body.customInstructions !== undefined) opts.customInstructions = req.body.customInstructions;
+      if (req.body.label !== undefined) opts.label = req.body.label;
+      try {
+        const result = await live.session.navigateTree(req.body.entryId, opts);
+        const out: Record<string, unknown> = { cancelled: result.cancelled };
+        if (result.aborted !== undefined) out.aborted = result.aborted;
+        if (result.editorText !== undefined) out.editorText = result.editorText;
+        return out;
+      } catch (err) {
+        return reply.code(400).send({ error: "navigate_failed", message: err instanceof Error ? err.message : String(err) });
+      }
+    },
+  );
+
+  // ── Session Fork ──
+  // POST /sessions/:id/fork — fork into a new session
+  fastify.post<{ Params: { id: string }; Body: { entryId: string } }>(
+    "/sessions/:id/fork",
+    {
+      schema: {
+        description:
+          "Create a new session from an entry on the current session's " +
+          "tree. Writes a new .jsonl file containing the path-to-leaf and " +
+          "registers it as a fresh live session in the same project. The " +
+          "source session is left live and untouched.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          required: ["entryId"],
+          properties: { entryId: { type: "string" } },
+        },
+        response: {
+          201: {
+            type: "object",
+            required: ["sessionId", "projectId"],
+            properties: {
+              sessionId: { type: "string" },
+              projectId: { type: "string" },
+            },
+          },
+          400: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const forked = await forkSession(req.params.id, req.body.entryId);
+        return reply.code(201).send({
+          sessionId: forked.sessionId,
+          projectId: forked.projectId,
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message?.startsWith("session_not_found")) {
+          return reply.code(404).send({ error: "session_not_found" });
+        }
+        return reply.code(400).send({ error: "fork_failed", message: err instanceof Error ? err.message : String(err) });
+      }
+    },
+  );
 };
+
+/**
+ * Truncated text preview of a message's content for the session tree.
+ */
+const PREVIEW_MAX_CHARS = 200;
+function previewOfMessageContent(content: unknown): string | undefined {
+  let text: string;
+  if (typeof content === "string") {
+    text = content;
+  } else if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const c of content) {
+      const o = c as { type?: unknown; text?: unknown };
+      if (o.type === "text" && typeof o.text === "string") parts.push(o.text);
+    }
+    text = parts.join("\n");
+  } else {
+    return undefined;
+  }
+  text = text.trim();
+  if (text.length === 0) return undefined;
+  if (text.length <= PREVIEW_MAX_CHARS) return text;
+  return text.slice(0, PREVIEW_MAX_CHARS - 1) + "…";
+}
