@@ -1061,23 +1061,6 @@ body {
   width: 100%;
 }
 
-@media (min-width: 641px) {
-  .messages-container > * {
-    max-width: 95%;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
-@media (max-width: 640px) {
-  .messages-container {
-    padding: 56px 8px 72px;
-  }
-  .messages-container > * {
-    max-width: 100%;
-  }
-}
-
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -1093,7 +1076,11 @@ body {
 
 .message-row.user {
   flex-direction: row-reverse;
-  justify-content: flex-end;
+  align-self: flex-end;
+}
+
+.message-row.assistant {
+  align-self: flex-start;
 }
 
 .message-bubble {
