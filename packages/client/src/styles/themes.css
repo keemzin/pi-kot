@@ -2102,8 +2102,8 @@ body {
 /* ══ Tool call chips (chat, theme-backed) ══ */
 .tool-call-chip {
   border-radius: var(--radius-sm);
-  background: var(--tool-bg);
-  border: 1px solid var(--tool-border);
+  background: transparent;
+  border: 1px solid var(--border);
   font-family: 'SF Mono','Menlo','Monaco',monospace;
   font-size: 12px;
   line-height: 1.4;
@@ -2113,7 +2113,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   cursor: default;
   user-select: none;
 }
@@ -2124,7 +2124,7 @@ body {
   flex-shrink: 0;
   background: var(--text-dim);
 }
-.tool-name { font-weight: 600; color: var(--tool-accent-text); }
+.tool-name { font-weight: 600; color: var(--text-secondary); }
 .tool-preview {
   flex: 1;
   min-width: 0;
@@ -2137,26 +2137,36 @@ body {
 .tool-input-area,
 .tool-output-area { padding: 0 10px; }
 .tool-toggle {
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
   cursor: pointer;
   user-select: none;
-  padding: 2px 0;
+  padding: 0;
   font-size: 11px;
+  font-family: inherit;
   color: var(--text-dim);
 }
 .tool-args,
 .tool-output-text {
-  margin: 0;
-  padding: 4px 0 6px;
+  margin: 4px 0 0;
+  padding: 6px 8px;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   font-size: 11px;
-  color: var(--tool-accent-text);
+  color: var(--text-secondary);
+  background: var(--bg-glass);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }
-.tool-output-text { max-height: 200px; overflow: auto; }
+.tool-output-text { max-height: 140px; overflow: auto; }
 
-.tool-batch {}
+.tool-batch { margin-top: 4px; }
+.tool-batch summary { list-style: none; }
+.tool-batch summary::-webkit-details-marker { display: none; }
 .tool-batch-summary { cursor: pointer; }
-.tool-batch-header-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; padding: 6px 10px; }
+.tool-batch-header-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; padding: 4px 10px; }
 .tool-batch-count {
   flex: 1;
   min-width: 0;
@@ -2164,14 +2174,14 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: 10px;
 }
 .tool-badge {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--accent);
   background: var(--bg-glass);
   border-radius: var(--radius-sm);
-  padding: 1px 6px;
+  padding: 1px 5px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -2185,14 +2195,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0 10px 4px;
+  padding: 0 10px 3px;
 }
 .tool-batch-body {
   border-top: 1px solid var(--border);
-  padding: 8px 10px;
+  padding: 4px 10px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .thinking-block {

@@ -109,7 +109,7 @@ function ToolCallEntry({
           {inputOpen ? "▾" : "▸"} Input
         </button>
         {inputOpen && (
-          <pre className="tool-args">{argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}</pre>
+          <div className="tool-args">{argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}</div>
         )}
       </div>
       {result !== undefined && outputText.length > 0 && (
@@ -122,9 +122,7 @@ function ToolCallEntry({
             {outputOpen ? "▾" : "▸"} {isError ? "Error" : "Output"}
           </button>
           {outputOpen && (
-            <pre className="tool-output-text">
-              {outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}
-            </pre>
+            <div className="tool-output-text">{outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}</div>
           )}
         </div>
       )}
