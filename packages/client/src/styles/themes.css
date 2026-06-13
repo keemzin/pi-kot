@@ -1058,15 +1058,20 @@ body {
 }
 
 .messages-container > * {
-  max-width: 960px;
   width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+}
+
+@media (min-width: 641px) {
+  .messages-container > * {
+    max-width: 95%;
+    margin-left: auto;
+    margin-right: auto;
+  }
 }
 
 @media (max-width: 640px) {
   .messages-container {
-    padding: 56px 4px 72px;
+    padding: 56px 8px 72px;
   }
   .messages-container > * {
     max-width: 100%;
@@ -1082,13 +1087,13 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  max-width: 85%;
+  width: 100%;
   animation: msgIn 0.25s var(--ease);
 }
 
 .message-row.user {
   flex-direction: row-reverse;
-  margin-left: auto;
+  justify-content: flex-end;
 }
 
 .message-bubble {
@@ -1402,10 +1407,11 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center;
   width: 100%;
   padding: 10px 24px 12px;
   border-top: none;
-  background: var(--header-bg);
+  background: transparent;
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
 }
@@ -1442,7 +1448,7 @@ body {
 
 .btn {
   padding: 10px 18px;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   border: none;
   font-weight: 600;
   font-size: 14px;
@@ -1457,12 +1463,45 @@ body {
 }
 
 .btn-send {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--accent);
   color: var(--bg-solid);
+  box-shadow: 0 2px 10px var(--accent-glow);
 }
 
-.btn-send:hover {
-  opacity: 0.9;
+.settings-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: all var(--duration) var(--ease);
+  animation: fadeIn 0.2s var(--ease);
+}
+.settings-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.btn-send:active:not(:disabled) {
+  transform: scale(0.88);
+  transition: transform 0.1s var(--ease);
+}
+
+.btn-send:hover:not(:disabled) {
+  transform: scale(1.1);
+  filter: brightness(1.15);
+  box-shadow: 0 6px 18px var(--accent-glow);
 }
 
 .btn-abort {
