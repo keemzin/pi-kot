@@ -1061,6 +1061,12 @@ body {
   width: 100%;
 }
 
+@media (max-width: 640px) {
+  .messages-container {
+    padding: 8px 0 72px;
+  }
+}
+
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
