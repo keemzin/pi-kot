@@ -40,7 +40,7 @@ const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-k
 
 export const config = Object.freeze({
   port: readInt("PORT", 3000),
-  host: readEnv("HOST") ?? "127.0.0.1",
+  host: readEnv("HOST") ?? "0.0.0.0",
   logLevel: readEnv("LOG_LEVEL") ?? "info",
   isTest: (readEnv("NODE_ENV") ?? "") === "test",
   trustProxy: readBool("TRUST_PROXY", false),

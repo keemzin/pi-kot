@@ -1,15 +1,43 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getSavedTheme, themes } from "../lib/theme";
 
 type Props = { text: string };
 
-function isLightTheme(): boolean {
-  const t = themes.find((x) => x.id === getSavedTheme());
-  return t !== undefined && !t.dark;
+function CodeBlock({ language, code }: { language: string; code: string }) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code).catch(() => {});
+  };
+
+  return (
+    <div className="code-block-wrap">
+      <div className="code-block-header">
+        <span className="code-block-lang">{language}</span>
+        <button type="button" className="code-copy-btn" onClick={handleCopy}>
+          <span className="code-copy-label">Copy</span>
+        </button>
+      </div>
+      <pre className="code-block">
+        {code.split("\n").map((line, i) => (
+          <div key={i} className="code-line">{line || " "}</div>
+        ))}
+      </pre>
+    </div>
+  );
 }
 
 const components: Components = {
+  code: ({ className, children, ...rest }) => {
+    const langMatch = /language-([\w-]+)/.exec(className ?? "");
+    const code = String(children ?? "").replace(/\n$/, "");
+    const isBlock = langMatch !== null || code.includes("\n");
+    if (!isBlock) {
+      return <code className="inline-code" {...rest}>{children}</code>;
+    }
+    const language = langMatch?.[1] ?? "text";
+    return <CodeBlock language={language} code={code} />;
+  },
+  pre: ({ children }) => <>{children}</>,
+
   h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
   h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
   h3: ({ children }) => <h3 className="md-h3">{children}</h3>,
@@ -33,33 +61,6 @@ const components: Components = {
   ),
   th: ({ children }) => <th className="md-th">{children}</th>,
   td: ({ children }) => <td className="md-td">{children}</td>,
-
-  code: ({ className, children, ...rest }) => {
-    const light = isLightTheme();
-    const langMatch = /language-([\w-]+)/.exec(className ?? "");
-    const code = String(children ?? "").replace(/\n$/, "");
-    const isBlock = langMatch !== null || code.includes("\n");
-    if (!isBlock) {
-      return <code className="inline-code" {...rest}>{children}</code>;
-    }
-    const language = langMatch?.[1] ?? "text";
-    const langClass = `language-${language}`;
-    const codeBg = light ? "#f5f5f5" : "var(--bg-elevated)";
-
-    return (
-      <div className="code-block-wrap">
-        <pre
-          className={`code-block ${langClass}`}
-          style={{ background: codeBg }}
-        >
-          {code.split("\n").map((line, i) => (
-            <div key={i} className="code-line">{line || " "}</div>
-          ))}
-        </pre>
-      </div>
-    );
-  },
-  pre: ({ children }) => <>{children}</>,
 };
 
 export function ChatMarkdown({ text }: Props) {
