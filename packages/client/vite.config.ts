@@ -9,13 +9,13 @@ export default defineConfig({
   root: resolve(__dirname),
   plugins: [react()],
   server: {
-    host: process.env.HOST || "127.0.0.1",
+    host: process.env.HOST || "0.0.0.0",
     port: 5173,
     strictPort: true,
     proxy: {
       "/api": {
         // Proxy API/SSE/WS requests to the pi-kot backend
-        target: `http://localhost:${process.env.VITE_API_PORT ?? "3000"}`,
+        target: `http://localhost:${process.env.VITE_API_PORT ?? "3333"}`,
         changeOrigin: true,
       },
     },

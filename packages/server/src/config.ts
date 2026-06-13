@@ -39,7 +39,7 @@ const SESSION_DIR = resolve(
 const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-kot"));
 
 export const config = Object.freeze({
-  port: readInt("PORT", 3000),
+  port: readInt("PORT", 3333),
   host: readEnv("HOST") ?? "0.0.0.0",
   logLevel: readEnv("LOG_LEVEL") ?? "info",
   isTest: (readEnv("NODE_ENV") ?? "") === "test",

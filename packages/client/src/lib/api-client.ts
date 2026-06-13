@@ -1,7 +1,6 @@
 /**
  * Typed API client for pi-kot's REST API.
  *
- * Inspired by pi-forge's packages/client/src/lib/api-client/index.ts.
  * All HTTP calls go through this module — components never call fetch() directly.
  */
 
@@ -27,7 +26,6 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  // Attach auth token if available
   const token = getStoredToken();
   if (token !== undefined) {
     headers["Authorization"] = `Bearer ${token}`;
@@ -201,8 +199,6 @@ export async function steerSession(
   );
 }
 
-// ---- Session Naming ----
-
 export async function renameSession(
   sessionId: string,
   name: string,
@@ -213,8 +209,6 @@ export async function renameSession(
     { name },
   );
 }
-
-// ---- Archive ----
 
 export async function archiveSession(
   sessionId: string,
@@ -276,6 +270,75 @@ export async function deleteProjectAPI(
   );
 }
 
+// ---- Files ----
+
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  children?: FileTreeNode[];
+  truncated?: boolean;
+}
+
+export interface FileReadResponse {
+  path: string;
+  content: string;
+  size: number;
+  language: string;
+  binary: boolean;
+}
+
+export async function filesTree(
+  projectId: string,
+  maxDepth?: number,
+): Promise<FileTreeNode> {
+  const qs = new URLSearchParams({ projectId });
+  if (maxDepth !== undefined) qs.set("maxDepth", String(maxDepth));
+  return request<FileTreeNode>("GET", `/api/v1/files/tree?${qs.toString()}`);
+}
+
+export async function filesRead(
+  projectId: string,
+  path: string,
+): Promise<FileReadResponse> {
+  const qs = new URLSearchParams({ projectId, path });
+  return request<FileReadResponse>("GET", `/api/v1/files/read?${qs.toString()}`);
+}
+
+export async function filesWrite(
+  projectId: string,
+  path: string,
+  content: string,
+): Promise<{ path: string }> {
+  return request("PUT", `/api/v1/files/write`, { projectId, path, content });
+}
+
+export async function filesDelete(
+  projectId: string,
+  path: string,
+  opts?: { recursive?: boolean },
+): Promise<void> {
+  const qs = new URLSearchParams({ projectId, path });
+  if (opts?.recursive === true) qs.set("recursive", "true");
+  return request("DELETE", `/api/v1/files/delete?${qs.toString()}`);
+}
+
+export async function filesSearch(
+  projectId: string,
+  q: string,
+  opts?: { limit?: number; regex?: boolean; caseSensitive?: boolean },
+): Promise<{
+  engine: "ripgrep" | "node";
+  matches: Array<{ path: string; line: number; column: number; length: number; lineSnippet: string }>;
+  truncated: boolean;
+}> {
+  const qs = new URLSearchParams({ projectId, q });
+  if (opts?.limit !== undefined) qs.set("limit", String(opts.limit));
+  if (opts?.regex) qs.set("regex", "1");
+  if (opts?.caseSensitive) qs.set("caseSensitive", "1");
+  return request("GET", `/api/v1/files/search?${qs.toString()}`);
+}
+
 // ---- Git Clone ----
 
 export interface CloneRepoRequest {
@@ -295,10 +358,6 @@ export type CloneEvent =
   | { type: "project_created"; id: string; name: string; path: string }
   | { type: "error"; message: string };
 
-/**
- * Clone a git repo via SSE stream. Calls onEvent for each SSE event.
- * Returns an abort function to cancel the request.
- */
 export function cloneRepo(
   req: CloneRepoRequest,
   onEvent: (event: CloneEvent) => void,
@@ -422,7 +481,7 @@ export async function getModelsJson(): Promise<{ providers: Record<string, unkno
 export async function putModelsJson(
   data: { providers: Record<string, unknown> },
 ): Promise<{ providers: Record<string, unknown> }> {
-  return request("PUT", "/api/v1/config/models", data);
+  return request("PUT", `/api/v1/config/models`, data);
 }
 
 // ---- Model Management ----

@@ -6,6 +6,7 @@ import { ChatInput } from "./components/ChatInput";
 import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { FileExplorer } from "./components/FileExplorer";
 import {
   fetchAuthStatus,
   login,
@@ -16,7 +17,6 @@ import {
   createProjectAPI,
   cloneRepo,
 } from "./lib/api-client";
-
 
 // Module-level guard against React StrictMode double-invocation
 // Tracks which project IDs have had an auto-created session.
@@ -60,6 +60,7 @@ export function App() {
   const [renameValue, setRenameValue] = useState("");
   const [showArchived, setShowArchived] = useState<string | undefined>();
   const [showSettings, setShowSettings] = useState(false);
+  const [showExplorer, setShowExplorer] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Bootstrap: check auth, load projects, fetch models
@@ -141,8 +142,6 @@ export function App() {
       setPassword("");
     }
   };
-
-
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((c) => !c);
@@ -300,6 +299,23 @@ export function App() {
           >
             pi-kot
           </span>
+          <button
+            type="button"
+            onClick={() => setShowSettings(true)}
+            title="Settings"
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--text-dim)",
+              fontSize: "14px",
+              cursor: "pointer",
+              padding: "4px 4px",
+              borderRadius: "var(--radius-sm)",
+              lineHeight: 1,
+            }}
+          >
+            ⚙
+          </button>
         </div>
 
         {/* Project list */}
@@ -669,20 +685,20 @@ export function App() {
 
             <button
               type="button"
-              onClick={() => setShowSettings(true)}
-              title="Settings"
+              onClick={() => setShowExplorer((v) => !v)}
+              title="File explorer"
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--text-dim)",
-                fontSize: "14px",
+                color: showExplorer ? "var(--accent-text)" : "var(--text-dim)",
+                fontSize: "12px",
                 cursor: "pointer",
-                padding: "4px 6px",
+                padding: "3px 6px",
                 borderRadius: "var(--radius-sm)",
                 lineHeight: 1,
               }}
             >
-              ⚙
+              📂
             </button>
           </div>
         </div>
@@ -727,6 +743,14 @@ export function App() {
           sessionId={activeSessionId}
           projectId={activeProjectId}
           onClose={() => setShowTreePanel(false)}
+        />
+      )}
+
+      {/* File Explorer panel */}
+      {showExplorer && activeProjectId !== undefined && (
+        <FileExplorer
+          projectId={activeProjectId}
+          onClose={() => setShowExplorer(false)}
         />
       )}
 

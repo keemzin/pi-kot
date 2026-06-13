@@ -11,6 +11,7 @@ import { streamRoutes } from "./routes/stream.js";
 import { configRoutes } from "./routes/config.js";
 import { controlRoutes } from "./routes/control.js";
 import { projectRoutes } from "./routes/projects.js";
+import { fileRoutes } from "./routes/files.js";
 import { disposeAllSessions } from "./session-registry.js";
 
 /**
@@ -114,6 +115,7 @@ export async function buildServer() {
       await api.register(streamRoutes);
       await api.register(configRoutes);
       await api.register(controlRoutes);
+      await api.register(fileRoutes);
       await api.register(projectRoutes);
     },
     { prefix: "/api/v1" },
