@@ -1401,31 +1401,35 @@ body {
 .input-area {
   display: flex;
   gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
+  align-items: center;
+  width: 100%;
+  padding: 10px 24px 12px;
+  border-top: none;
   background: var(--header-bg);
-  backdrop-filter: blur(var(--blur)) saturate(1.5);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.5);
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
 }
 
 .chat-input {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   resize: none;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--input-border);
-  background: var(--input-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
   color: var(--text-primary);
-  padding: 10px 12px;
+  padding: 12px 18px;
   font-size: 14px;
   font-family: inherit;
-  line-height: 1.4;
+  line-height: 1.5;
   outline: none;
   transition: all var(--duration) var(--ease);
 }
 
 .chat-input:focus {
-  border-color: var(--input-focus-border);
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--bg-glass-hover);
 }
 
 .chat-input::placeholder {
