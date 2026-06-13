@@ -7,6 +7,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: resolve(__dirname),
+  resolve: {
+    dedupe: [
+      "@codemirror/state",
+      "@codemirror/view",
+      "@codemirror/language",
+      "@codemirror/commands",
+      "@codemirror/search",
+      "@codemirror/lint",
+      "@codemirror/autocomplete",
+    ],
+  },
   plugins: [react()],
   server: {
     host: process.env.HOST || "0.0.0.0",

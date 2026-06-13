@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CodeMirrorEditor } from "./CodeMirrorEditor";
+import { RenderedView } from "./RenderedView";
 
 interface TreeNode {
   name: string;
@@ -39,8 +41,10 @@ export function FileExplorer({ projectId, onClose }: Props) {
   const [openFiles, setOpenFiles] = useState<OpenFileState[]>([]);
   const [activePath, setActivePath] = useState<string | undefined>();
   const [view, setView] = useState<View>("tree");
+  const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [panelWidth, setPanelWidth] = useState(520);
   const [resizing, setResizing] = useState(false);
+  const [wordWrap, setWordWrap] = useState(true);
   const renameRef = useRef<HTMLInputElement>(null);
   const createRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +93,69 @@ export function FileExplorer({ projectId, onClose }: Props) {
   useEffect(() => {
     if (showCreate) createRef.current?.focus();
   }, [showCreate]);
+
+  // ── Persist open tabs across explorer open/close ──
+  const TABS_KEY = `pi-kot/explorer-tabs:${projectId}`;
+
+  // Restore tabs from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(TABS_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw) as { paths: string[]; activePath: string | null };
+      if (!Array.isArray(data.paths) || data.paths.length === 0) return;
+      // Open each saved path
+      const openAll = async () => {
+        // Open the first one immediately to set up tabs
+        for (const p of data.paths) {
+          const existing = openFiles.find((f) => f.path === p);
+          if (existing) continue;
+          const placeholder: OpenFileState = {
+            path: p, content: "", saved: "", dirty: false,
+            language: "", saving: false,
+          };
+          setOpenFiles((prev) => [...prev, placeholder]);
+          // Fetch content
+          try {
+            const res = await fetch(
+              `/api/v1/files/read?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(p)}`,
+            );
+            if (!res.ok) throw new Error(`read ${res.status}`);
+            const d = (await res.json()) as { content: string; language: string; binary: boolean };
+            const content = d.binary ? "(binary file)" : d.content ?? "";
+            setOpenFiles((prev) =>
+              prev.map((f) =>
+                f.path === p ? { ...f, content, saved: content, language: d.language, dirty: false } : f,
+              ),
+            );
+          } catch {
+            setOpenFiles((prev) => prev.filter((f) => f.path !== p));
+          }
+        }
+        // Restore active path
+        if (data.activePath && data.paths.includes(data.activePath)) {
+          setActivePath(data.activePath);
+        }
+      };
+      openAll();
+    } catch {
+      // ignore corrupt storage
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Save tabs to sessionStorage whenever they change
+  useEffect(() => {
+    try {
+      const paths = openFiles.map((f) => f.path);
+      sessionStorage.setItem(
+        TABS_KEY,
+        JSON.stringify({ paths, activePath: activePath ?? null }),
+      );
+    } catch {
+      // storage full or private mode
+    }
+  }, [openFiles, activePath, TABS_KEY]);
 
   const openFile = useCallback(async (path: string) => {
     const existing = openFiles.find((f) => f.path === path);
@@ -600,13 +667,66 @@ export function FileExplorer({ projectId, onClose }: Props) {
               <>
                 {/* Editor toolbar */}
                 <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "4px 10px", fontSize: "10px", color: "var(--text-dim)",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px",
+                  padding: "3px 10px", fontSize: "10px", color: "var(--text-dim)",
                   borderBottom: "1px solid var(--border)",
                 }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                     {activeFile.path}
                   </span>
+
+                  {/* Raw / Rendered toggle */}
+                  <div style={{
+                    display: "flex", gap: "1px",
+                    background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
+                    padding: "1px", flexShrink: 0,
+                  }}>
+                    <button
+                      onClick={() => setEditorMode("raw")}
+                      style={{
+                        background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
+                        border: "none", cursor: "pointer",
+                        color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
+                        fontSize: "10px", fontWeight: 600,
+                        padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                      }}
+                      type="button"
+                    >
+                      Raw
+                    </button>
+                    <button
+                      onClick={() => setEditorMode("rendered")}
+                      style={{
+                        background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
+                        border: "none", cursor: "pointer",
+                        color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
+                        fontSize: "10px", fontWeight: 600,
+                        padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                      }}
+                      type="button"
+                    >
+                      Rendered
+                    </button>
+                  </div>
+
+                  {/* Word wrap toggle */}
+                  {editorMode === "raw" && (
+                    <button
+                      onClick={() => setWordWrap((w) => !w)}
+                      title="Toggle word wrap"
+                      style={{
+                        padding: "2px 6px", fontSize: "9px", fontWeight: 600,
+                        border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+                        background: wordWrap ? "var(--accent-bg)" : "transparent",
+                        color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
+                        cursor: "pointer", flexShrink: 0,
+                      }}
+                      type="button"
+                    >
+                      WRAP
+                    </button>
+                  )}
+
                   <button
                     onClick={handleSave}
                     disabled={!activeFile.dirty || activeFile.saving}
@@ -622,18 +742,22 @@ export function FileExplorer({ projectId, onClose }: Props) {
                     {activeFile.saving ? "Saving…" : activeFile.dirty ? "Save" : "Saved"}
                   </button>
                 </div>
-                <textarea
-                  value={activeFile.content}
-                  onChange={(e) => handleContentChange(e.target.value)}
-                  spellCheck={false}
-                  style={{
-                    flex: 1, width: "100%", resize: "none",
-                    background: "var(--bg-solid)", padding: "10px",
-                    fontSize: "13px", fontFamily: "var(--font-mono)",
-                    color: "var(--text-primary)", border: "none", outline: "none",
-                    lineHeight: 1.5, minHeight: 0,
-                  }}
-                />
+
+                {editorMode === "raw" ? (
+                  <CodeMirrorEditor
+                    key={`editor-${activeFile.path}`}
+                    value={activeFile.content}
+                    onChange={(val) => handleContentChange(val)}
+                    onSave={handleSave}
+                    fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+                    wordWrap={wordWrap}
+                  />
+                ) : (
+                  <RenderedView
+                    content={activeFile.content}
+                    fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+                  />
+                )}
               </>
             ) : (
               <div style={{
