@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
-import { ThemePicker } from "./components/ThemePicker";
+
 import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -16,7 +16,7 @@ import {
   createProjectAPI,
   cloneRepo,
 } from "./lib/api-client";
-import { applyTheme } from "./lib/theme";
+
 
 // Module-level guard against React StrictMode double-invocation
 // Tracks which project IDs have had an auto-created session.
@@ -39,13 +39,7 @@ export function App() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    try {
-      return localStorage.getItem("pi-kot-theme") ?? "night";
-    } catch {
-      return "night";
-    }
-  });
+
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("");
   const [providers, setProviders] = useState<ProviderGroup[]>([]);
@@ -148,10 +142,7 @@ export function App() {
     }
   };
 
-  const handleThemeChange = (themeId: string) => {
-    applyTheme(themeId);
-    setCurrentTheme(themeId);
-  };
+
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((c) => !c);
@@ -675,7 +666,7 @@ export function App() {
             <span
               className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
             />
-            <ThemePicker currentTheme={currentTheme} onChange={handleThemeChange} />
+
             <button
               type="button"
               onClick={() => setShowSettings(true)}

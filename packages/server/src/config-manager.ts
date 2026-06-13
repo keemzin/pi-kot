@@ -45,7 +45,10 @@ export function readAuthSummary(): AuthSummary {
   const store = AuthStorage.create(AUTH_PATH);
   const providers: Record<string, AuthPresence> = {};
   for (const name of store.list()) {
-    providers[name] = store.getAuthStatus(name);
+    providers[name] = {
+      configured: store.has(name),
+      source: "stored",
+    };
   }
   return { providers };
 }

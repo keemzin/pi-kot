@@ -35,57 +35,7 @@ function extractText(content: unknown): string {
   return String(content ?? "");
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ── Tool Call Components (ported from forge) ── */
-
-/** Extract filename from a toolResult message's details. */
-function extractFilename(result: PairableMessage): string | undefined {
-  if (typeof result.details === "object" && result.details !== null) {
-    const d = result.details as Record<string, unknown>;
-    if (typeof d.filename === "string") return d.filename;
-    if (typeof d.filePath === "string") return d.filePath;
-  }
-  return undefined;
-}
+/* ── Tool Call Components (ported from forge, styled with theme vars) ── */
 
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
@@ -93,49 +43,16 @@ function ThinkingBlock({ text }: { text: string }) {
   return (
     <details
       open={open}
-      style={{
-        borderRadius: "var(--radius-sm)",
-        border: "1px solid var(--border)",
-        padding: "4px 10px",
-        fontSize: "12px",
-        color: "var(--text-dim)",
-      }}
+      className="thinking-block"
     >
       <summary
         onClick={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-        style={{ cursor: "pointer", userSelect: "none", color: "var(--text-secondary)" }}
       >
         {open ? "▾" : "▸"} Thinking…
       </summary>
       {open && (
-        <pre style={{
-          marginTop: 4, whiteSpace: "pre-wrap", wordBreak: "break-word",
-          fontFamily: "inherit", fontSize: "12px", color: "var(--text-dim)",
-        }}>
-          {text}
-        </pre>
+        <pre className="thinking-content">{text}</pre>
       )}
-    </details>
-  );
-}
-
-/** Render a diff block. */
-function DiffBlock({ diff, filename, adds, dels }: {
-  diff: string; filename?: string; adds: number; dels: number;
-}) {
-  return (
-    <details className="tool-result" style={{ animation: "toolFadeIn 0.25s ease-out" }}>
-      <summary>
-        <span style={{ fontWeight: 400, opacity: 0.6 }}>edit</span>
-        {filename && <span style={{ marginLeft: 6, fontFamily: "'SF Mono','Menlo','Monaco',monospace" }}>{filename}</span>}
-        <span style={{ marginLeft: 8, color: "var(--success)" }}>+{adds}</span>
-        <span style={{ marginLeft: 4, color: "var(--error)" }}>−{dels}</span>
-      </summary>
-      <div className="tool-result-content">
-        <pre style={{ fontSize: "11px", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-          {diff}
-        </pre>
-      </div>
     </details>
   );
 }
@@ -164,112 +81,48 @@ function ToolCallEntry({
     .map((c) => c.text)
     .join("\n");
 
-  // Edit tool renders as a diff
-  const editDiff =
-    name === "edit" && result !== undefined
-      ? (() => {
-          const d = (result.details as { diff?: unknown } | undefined)?.diff;
-          return typeof d === "string" ? d : outputText;
-        })()
-      : undefined;
-  const editFn = name === "edit" && result !== undefined ? extractFilename(result) : undefined;
-  const editStats = editDiff !== undefined ? countDiffLines(editDiff) : undefined;
-
   const preview = toolPreviewFromArgs(name, args);
-
-  // Single-line header appearance
   const borderColor = result === undefined
     ? "var(--accent)"
     : isError
-    ? "var(--error)"
-    : "var(--border)";
-
-  if (name === "edit" && editDiff !== undefined) {
-    return (
-      <DiffBlock
-        diff={editDiff}
-        filename={editFn ?? extractFilename(result!)}
-        adds={editStats?.adds ?? 0}
-        dels={editStats?.dels ?? 0}
-      />
-    );
-  }
+      ? "var(--error)"
+      : "var(--border)";
 
   return (
-    <div className="tool-call-chip" style={{
-      borderColor,
-      animation: "toolFadeIn 0.25s ease-out",
-    }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "6px 10px",
-          cursor: "default", userSelect: "none",
-          fontSize: "12px",
-        }}
-      >
-        <span style={{
-          width: 5, height: 5, borderRadius: "50%", flexShrink: 0,
-          background: result === undefined ? "var(--accent)" : isError ? "var(--error)" : "var(--text-dim)",
-          animation: result === undefined ? "pulse 1s ease-in-out infinite" : undefined,
-        }} />
-        <span style={{ fontWeight: 600, color: "var(--tool-accent-text)" }}>{name}</span>
+    <div className="tool-call-chip" style={{ borderColor }}>
+      <div className="tool-call-header">
+        <span className="tool-dot" />
+        <span className="tool-name">{name}</span>
         {preview && (
-          <span style={{
-            color: "var(--text-dim)", overflow: "hidden",
-            textOverflow: "ellipsis", whiteSpace: "nowrap",
-            flex: 1, minWidth: 0,
-          }} title={preview}>
-            {preview}
-          </span>
+          <span className="tool-preview" title={preview}>{preview}</span>
         )}
         {result === undefined && (
-          <span style={{ fontSize: "10px", color: "var(--accent)" }}>running…</span>
+          <span className="tool-running">running…</span>
         )}
       </div>
-
-      {/* Input (collapsible) */}
-      <div style={{ padding: "0 10px" }}>
-        <div
-          role="button"
-          tabIndex={0}
+      <div className="tool-input-area">
+        <button
+          type="button"
           onClick={() => setInputOpen((o) => !o)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setInputOpen((o) => !o); }}
-          style={{ cursor: "pointer", userSelect: "none", padding: "2px 0", fontSize: "11px", color: "var(--text-dim)" }}
+          className="tool-toggle"
         >
           {inputOpen ? "▾" : "▸"} Input
-        </div>
+        </button>
         {inputOpen && (
-          <pre style={{
-            fontSize: "11px", margin: 0, padding: "4px 0 6px",
-            whiteSpace: "pre-wrap", wordBreak: "break-all",
-            color: "var(--tool-accent-text)",
-          }}>
-            {argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}
-          </pre>
+          <pre className="tool-args">{argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}</pre>
         )}
       </div>
-
-      {/* Output (collapsible) */}
       {result !== undefined && outputText.length > 0 && (
-        <div style={{ padding: "0 10px 6px" }}>
-          <div
-            role="button"
-            tabIndex={0}
+        <div className="tool-output-area">
+          <button
+            type="button"
             onClick={() => setOutputOpen((o) => !o)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setOutputOpen((o) => !o); }}
-            style={{ cursor: "pointer", userSelect: "none", padding: "2px 0", fontSize: "11px", color: isError ? "var(--error)" : "var(--text-dim)" }}
+            className="tool-toggle"
           >
             {outputOpen ? "▾" : "▸"} {isError ? "Error" : "Output"}
-          </div>
+          </button>
           {outputOpen && (
-            <pre style={{
-              fontSize: "11px", margin: 0, padding: "4px 0 0",
-              whiteSpace: "pre-wrap", wordBreak: "break-all",
-              maxHeight: 200, overflow: "auto",
-              color: isError ? "var(--error)" : "var(--tool-accent-text)",
-            }}>
+            <pre className="tool-output-text">
               {outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}
             </pre>
           )}
@@ -287,88 +140,54 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
   const inFlight = toolEntries.filter((e) => e.result === undefined).length;
   const errored = toolEntries.some((e) => e.result?.isError === true);
 
-  // Summary: "bash ×2 · read ×1"
   const counts = new Map<string, number>();
   for (const e of toolEntries) {
-    const name = String(e.block.name ?? "tool");
-    counts.set(name, (counts.get(name) ?? 0) + 1);
+    const n = String(e.block.name ?? "tool");
+    counts.set(n, (counts.get(n) ?? 0) + 1);
   }
-  const countSummary = [...counts].map(([name, count]) => `${name} ×${count}`).join(" · ");
+  const countSummary = [...counts].map(([n, c]) => `${n} ×${c}`).join(" · ");
 
-  // Preview first 3 tools
   const previews = toolEntries
     .map((e) => {
-      const name = String(e.block.name ?? "tool");
+      const n = String(e.block.name ?? "tool");
       const args = e.block.arguments ?? e.block.input ?? {};
-      const preview = toolPreviewFromArgs(name, args);
-      return preview === undefined ? name : `${name}: ${preview}`;
+      const p = toolPreviewFromArgs(n, args);
+      return p === undefined ? n : `${n}: ${p}`;
     })
     .slice(0, 3);
 
   return (
     <details
       open={open}
-      className="tool-call-chip"
-      style={{ animation: "toolFadeIn 0.25s ease-out" }}
+      className="tool-call-chip tool-batch"
     >
       <summary
         onClick={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-        style={{ cursor: "pointer" }}
+        className="tool-batch-summary"
       >
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          flexWrap: "wrap", width: "100%",
-        }}>
+        <div className="tool-batch-header-row">
           <span style={{ color: "var(--text-dim)" }}>→</span>
-          <span style={{ fontWeight: 600, color: "var(--tool-accent-text)" }}>tools</span>
+          <span className="tool-name">tools</span>
           <span style={{ color: "var(--text-dim)", fontSize: "11px" }}>
             ×{toolCount} {toolCount === 1 ? "call" : "calls"}
           </span>
           {countSummary && (
-            <span style={{
-              color: "var(--text-dim)", fontSize: "11px",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              flex: 1, minWidth: 0,
-            }} title={countSummary}>
-              {countSummary}
-            </span>
+            <span className="tool-batch-count" title={countSummary}>{countSummary}</span>
           )}
           {inFlight > 0 && (
-            <span style={{
-              fontSize: "10px", color: "var(--accent)",
-              background: "var(--bg-glass)",
-              borderRadius: "var(--radius-sm)", padding: "1px 6px",
-              textTransform: "uppercase", letterSpacing: "0.5px",
-            }}>
-              {inFlight} running…
-            </span>
+            <span className="tool-badge">{inFlight} running…</span>
           )}
           {errored && (
-            <span style={{
-              fontSize: "10px", color: "var(--error)",
-              background: "rgba(248,113,113,0.1)",
-              borderRadius: "var(--radius-sm)", padding: "1px 6px",
-              textTransform: "uppercase", letterSpacing: "0.5px",
-            }}>
-              error
-            </span>
+            <span className="tool-badge tool-badge-error">error</span>
           )}
         </div>
         {previews.length > 0 && (
-          <div style={{
-            fontSize: "10px", color: "var(--text-dim)", marginTop: 2,
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            fontFamily: "'SF Mono','Menlo','Monaco',monospace",
-          }}>
-            {previews.join(" · ")}
-            {toolCount > previews.length && " · …"}
+          <div className="tool-batch-previews">
+            {previews.join(" · ")}{toolCount > previews.length && " · …"}
           </div>
         )}
       </summary>
-      <div style={{
-        borderTop: "1px solid var(--border)", padding: "8px 10px",
-        display: "flex", flexDirection: "column", gap: 6,
-      }}>
+      <div className="tool-batch-body">
         {entries.map((entry, j) =>
           entry.kind === "thinking" ? (
             <ThinkingBlock key={j} text={entry.block.thinking as string ?? ""} />
@@ -402,7 +221,7 @@ function AssistantRenderSegmentView({
   if (segment.kind === "assistant" && segment.content !== undefined) {
     const blocks = segment.content;
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div className="assistant-blocks">
         {blocks.map((block: Record<string, unknown>, i: number) => (
           <AssistantBlock key={i} block={block} />
         ))}
@@ -410,23 +229,21 @@ function AssistantRenderSegmentView({
     );
   }
 
-  // Tools segment
   const entries = segment.entries;
   if (!entries) return null;
   const toolEntry = entries.find((entry: ToolBatchEntry) => entry.kind === "tool");
   const hasThinking = entries.some((entry: ToolBatchEntry) => entry.kind === "thinking");
   const toolCount = entries.filter((e: ToolBatchEntry) => e.kind === "tool").length;
 
-  // Single tool without thinking → use ToolCallEntry directly
   if (toolCount === 1 && !hasThinking && toolEntry !== undefined) {
     return <ToolCallEntry block={toolEntry.block} result={toolEntry.result} />;
   }
-
-  // Multiple tools or tool + thinking → use batch card
   return <ToolCallBatchCard entries={entries} />;
 }
 
 /* ── Main ChatView ── */
+
+const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
   const messages = useSessionStore((s) => s.messages);
@@ -436,199 +253,175 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const error = useSessionStore((s) => s.error);
   const clearError = useSessionStore((s) => s.clearError);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isFollowingBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
+  const NEAR_BOTTOM_PX = 24;
+
+  const onScroll = (): void => {
+    const el = scrollRef.current;
+    if (el === null) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const scrolledUp = el.scrollTop < lastScrollTopRef.current - 1;
+    isFollowingBottomRef.current = !scrolledUp && distance <= NEAR_BOTTOM_PX;
+    lastScrollTopRef.current = el.scrollTop;
+  };
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el === null || !isFollowingBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
+    lastScrollTopRef.current = el.scrollTop;
   }, [messages, streamText]);
 
   // Build tool pairing once per render cycle
   const pairing = useMemo(() => buildToolCallPairing(messages as PairableMessage[]), [messages]);
 
+  // Render loop with proper batch accumulation (same behavior as forge)
+  const renderedRows = useMemo(() => {
+    const { toolResultsById } = pairing;
+    const out: React.ReactNode[] = [];
+    const pendingBatch: ToolBatchEntry[] = [];
+    let pendingBatchStartIndex = 0;
+    let renderedBatchSerial = 0;
+
+    const flushPendingBatch = (): void => {
+      if (pendingBatch.length === 0) return;
+      let chunk: ToolBatchEntry[] = [];
+      const pushChunk = (): void => {
+        if (chunk.length === 0) return;
+        const batchKey = `tool-batch-${renderedBatchSerial}`;
+        out.push(
+          <div key={batchKey}>
+            <ToolCallBatchCard key={`${batchKey}-card`} entries={chunk} />
+          </div>,
+        );
+        chunk = [];
+        renderedBatchSerial += 1;
+      };
+      for (const entry of pendingBatch) {
+        if (
+          entry.kind === "tool" &&
+          chunk.filter((e) => e.kind === "tool").length >= MAX_TOOL_BATCH_TOOLS
+        ) {
+          pushChunk();
+        }
+        chunk.push(entry);
+      }
+      pushChunk();
+      pendingBatch.length = 0;
+    };
+
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i] as PairableMessage;
+      if (isPairedToolResult(pairing, m)) continue;
+
+      if (m.role === "user") {
+        flushPendingBatch();
+        out.push(
+          <div key={`msg-${i}`} className="message-row user" data-message-index={i}>
+            <div className="message-bubble user">{extractText(m.content)}</div>
+          </div>,
+        );
+        continue;
+      }
+
+      if (m.role === "assistant" && Array.isArray(m.content)) {
+        const segments = splitAssistantToolSegments(
+          m.content as Record<string, unknown>[],
+          toolResultsById,
+        );
+        if (segments !== undefined) {
+          for (const seg of segments) {
+            if (seg.kind === "tools" && seg.entries) {
+              if (pendingBatch.length === 0) pendingBatchStartIndex = i;
+              pendingBatch.push(...seg.entries);
+              continue;
+            }
+            flushPendingBatch();
+            out.push(
+              <div key={`${i}-seg`} className="message-row assistant" data-message-index={i}>
+                <div className="message-bubble assistant">
+                  <AssistantRenderSegmentView segment={seg} />
+                </div>
+              </div>,
+            );
+          }
+          continue;
+        }
+      }
+
+      flushPendingBatch();
+      const text = extractText(m.content);
+      if (text.length > 0) {
+        out.push(
+          <div key={`msg-${i}`} className="message-row assistant" data-message-index={i}>
+            <div className="message-bubble assistant">
+              <ChatMarkdown text={text} />
+            </div>
+          </div>,
+        );
+      }
+    }
+    flushPendingBatch();
+    return out;
+  }, [messages, pairing]);
+
   return (
     <div className="messages-container">
-      {/* Error banner */}
       {error !== undefined && (
         <div onClick={clearError} className="error-banner">
           {error} — click to dismiss
         </div>
       )}
 
-      {/* Empty state */}
-      {messages.length === 0 && !isStreaming && (
-        <div className="welcome" style={{ paddingTop: "80px" }}>
+      {messages.length === 0 && !isStreaming ? (
+        <div className="welcome">
           <div className="welcome-icon">💬</div>
           <div className="welcome-text">Send a message to start chatting</div>
           <div className="welcome-hint">with the pi coding agent</div>
         </div>
-      )}
+      ) : (
+        <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
+          <div className="chat-message-list">
+            {renderedRows}
 
-      {/* Message list */}
-      {(() => {
-        const { toolResultsById } = pairing;
-        const out: React.ReactNode[] = [];
-        let pendingBatch: ToolBatchEntry[] = [];
-        let pendingBatchStartIndex = 0;
-        let renderedBatchSerial = 0;
-
-        const renderToolEntries = (entries: ToolBatchEntry[], key: string): React.ReactNode => {
-          const toolCount = entries.filter((e) => e.kind === "tool").length;
-          const toolEntry = entries.find((entry) => entry.kind === "tool");
-          const hasThinking = entries.some((entry) => entry.kind === "thinking");
-          if (toolCount === 1 && !hasThinking && toolEntry !== undefined) {
-            return <ToolCallEntry key={key} block={toolEntry.block} result={toolEntry.result} />;
-          }
-          return <ToolCallBatchCard key={key} entries={entries} />;
-        };
-
-        const flushPendingBatch = (): void => {
-          if (pendingBatch.length === 0) return;
-          let chunk: ToolBatchEntry[] = [];
-          const pushChunk = (): void => {
-            if (chunk.length === 0) return;
-            const batchKey = `tool-batch-${renderedBatchSerial}`;
-            out.push(
-              <div key={batchKey}>
-                {renderToolEntries(chunk, `${batchKey}-card`)}
-              </div>,
-            );
-            chunk = [];
-            renderedBatchSerial += 1;
-          };
-          for (const entry of pendingBatch) {
-            if (entry.kind === "tool" && chunk.filter((e) => e.kind === "tool").length >= 100) {
-              pushChunk();
-            }
-            chunk.push(entry);
-          }
-          pushChunk();
-          pendingBatch = [];
-        };
-
-        for (let i = 0; i < messages.length; i++) {
-          const m = messages[i] as PairableMessage;
-
-          // Skip tool result messages that are paired with a tool call
-          // (they render inline inside the tool card)
-          if (isPairedToolResult(pairing, m)) continue;
-
-          // User message
-          if (m.role === "user") {
-            flushPendingBatch();
-            out.push(
-              <div key={i} className="message-row user">
-                <div className="message-bubble user">{extractText(m.content)}</div>
-              </div>,
-            );
-            continue;
-          }
-
-          // Assistant message — segment into prose + tool batches
-          if (m.role === "assistant" && Array.isArray(m.content)) {
-            const segments = splitAssistantToolSegments(
-              m.content as Record<string, unknown>[],
-              toolResultsById,
-            );
-            if (segments !== undefined) {
-              for (const seg of segments) {
-                if (seg.kind === "tools" && seg.entries) {
-                  if (pendingBatch.length === 0) pendingBatchStartIndex = i;
-                  pendingBatch.push(...seg.entries);
-                  continue;
-                }
-                flushPendingBatch();
-                out.push(
-                  <div key={`${i}-seg`} className="message-row assistant">
-                    <div className="message-bubble assistant">
-                      <AssistantRenderSegmentView segment={seg} />
+            {isStreaming && streamText.length > 0 && (
+              <div className="message-row assistant streaming-row">
+                <div className="message-bubble assistant streaming-bubble">
+                  {activeToolName && (
+                    <div className="tool-badge">
+                      <span className="tool-badge-dot" />
+                      {activeToolName}
                     </div>
-                  </div>,
-                );
-              }
-              continue;
-            }
-          }
-
-          // Default: render as simple bubble
-          flushPendingBatch();
-          const text = extractText(m.content);
-          if (text.length > 0) {
-            out.push(
-              <div key={i} className="message-row assistant">
-                <div className="message-bubble assistant">
-                  <ChatMarkdown text={text} />
+                  )}
+                  <div className="streaming-text">
+                    <ChatMarkdown text={streamText} />
+                    <span className="streaming-cursor">▊</span>
+                  </div>
                 </div>
-              </div>,
-            );
-          }
-        }
-
-        flushPendingBatch();
-        return out;
-      })()}
-
-      {/* Streaming bubble */}
-      {isStreaming && streamText.length > 0 && (
-        <div className="message-row assistant">
-          <div
-            className="message-bubble assistant"
-            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", display: "flex", flexDirection: "column", gap: 6 }}
-          >
-            {activeToolName && (
-              <div className="tool-badge" style={{
-                display: "inline-flex", alignItems: "center", gap: 4,
-                fontSize: "0.75rem", color: "var(--accent)",
-                background: "rgba(237,180,73,0.12)",
-                border: "1px solid rgba(237,180,73,0.25)",
-                borderRadius: 4, padding: "2px 8px", alignSelf: "flex-start",
-              }}>
-                <span style={{
-                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                  background: "var(--accent)", animation: "pulse 1s ease-in-out infinite",
-                }} />
-                {activeToolName}
               </div>
             )}
-            <ChatMarkdown text={streamText} />
-            <span className="streaming-cursor">▊</span>
-          </div>
-        </div>
-      )}
 
-      {/* Thinking indicator (streaming, no text yet) */}
-      {isStreaming && streamText.length === 0 && (
-        <div className="message-row assistant">
-          <div
-            className="message-bubble assistant"
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              fontSize: "13px", color: "var(--text-dim)", fontStyle: "italic", padding: "12px 16px",
-            }}
-          >
-            {activeToolName ? (
-              <>
-                <span style={{
-                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                  background: "var(--accent)", animation: "pulse 1s ease-in-out infinite",
-                }} />
-                running <code style={{
-                  background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
-                  padding: "1px 6px", fontFamily: "'SF Mono','Menlo','Monaco',monospace",
-                  fontSize: "11px",
-                }}>{activeToolName}</code>
-              </>
-            ) : (
-              <>
-                <span className="pi-thinking-dots" aria-hidden="true">
-                  <span>.</span><span>.</span><span>.</span>
-                </span>
-              </>
+            {isStreaming && streamText.length === 0 && (
+              <div className="message-row assistant streaming-row">
+                <div className="message-bubble assistant thinking-bubble">
+                  {activeToolName ? (
+                    <span className="thinking-running">
+                      <span className="tool-badge-dot" />
+                      running <code className="thinking-code">{activeToolName}</code>
+                    </span>
+                  ) : (
+                    <span className="pi-thinking-dots" aria-hidden="true">
+                      <span>.</span><span>.</span><span>.</span>
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
       )}
-
-      <div ref={bottomRef} />
     </div>
   );
 }
