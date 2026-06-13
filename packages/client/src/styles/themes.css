@@ -1400,10 +1400,11 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center;
   width: 100%;
-  padding: 10px 20px 12px;
+  padding: 10px 24px 12px;
   border-top: none;
-  background: var(--header-bg);
+  background: transparent;
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
 }
@@ -1417,11 +1418,10 @@ body {
   background: var(--bg-glass);
   color: var(--text-primary);
   padding: 12px 18px;
-  font-size: 16px;
+  font-size: 14px;
   font-family: inherit;
-  line-height: 1.45;
+  line-height: 1.5;
   outline: none;
-  box-shadow: var(--shadow-sm), var(--shadow-inset);
   transition: all var(--duration) var(--ease);
 }
 
