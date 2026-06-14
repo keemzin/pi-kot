@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { type FastifyPluginAsync } from "fastify";
 import {
   AuthStorage,
@@ -5,9 +6,18 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { getSession } from "../session-registry.js";
 import { config } from "../config.js";
+import { readSettings, writeSettings } from "../config-manager.js";
 
+/**
+ * Auth storage backed by ~/.pi/agent/auth.json.
+ * ⚠️ AuthStorage.create() expects a FILE path, not a directory.
+ *    Passing a directory causes the ReadFileSync to fail silently,
+ *    leaving authStorage.data empty and hasAuth() always returning false.
+ *    This was the root cause of the "No API key configured" error.
+ *    Pattern from pi-forge's config-manager.ts: AUTH_FILE path.
+ */
 function authStorage() {
-  return AuthStorage.create(config.piConfigDir);
+  return AuthStorage.create(join(config.piConfigDir, "auth.json"));
 }
 
 export const controlRoutes: FastifyPluginAsync = async (fastify) => {
@@ -101,20 +111,66 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Set the model on the live session
-      try {
-        live.session.modelRegistry.authStorage.reload();
-        live.session.modelRegistry.refresh();
+      // Set the model on the live session.
+      //
+      // ⚠️ Pi SDK side effect: session.setModel() calls
+      // settingsManager.setDefaultModelAndProvider() which writes to
+      // settings.json — picking a model for ONE session would otherwise
+      // mutate the global default for EVERY new session.
+      //
+      // We snapshot settings.json BEFORE the call and restore it AFTER,
+      // so the per-session change doesn't leak. Pattern from pi-forge's
+      // control.ts setModel handler.
+      //
+      // The snapshot is best-effort: if settings.json doesn't exist
+      // (first launch) we skip the restore.
+      type SetModelResult =
+        | { ok: true }
+        | { ok: false; status: number; body: { error: string; message?: string } };
 
-        await live.session.setModel({
-          provider: model.provider,
-          id: model.id,
-        } as Parameters<typeof live.session.setModel>[0]);
-      } catch (err) {
-        return reply.code(400).send({
-          error: "set_model_failed",
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const result = await (async (): Promise<SetModelResult> => {
+        let priorSettings: Record<string, unknown> | undefined;
+        try {
+          priorSettings = readSettings();
+        } catch {
+          // settings.json missing / unreadable — skip restore
+        }
+
+        try {
+          // Refresh the session's internal ModelRegistry so it picks up
+          // any API keys added after session creation.
+          live.session.modelRegistry.authStorage.reload();
+          live.session.modelRegistry.refresh();
+
+          await live.session.setModel({
+            provider: model.provider,
+            id: model.id,
+          } as Parameters<typeof live.session.setModel>[0]);
+        } catch (err) {
+          return {
+            ok: false,
+            status: 400,
+            body: {
+              error: "set_model_failed",
+              message: err instanceof Error ? err.message : String(err),
+            },
+          };
+        }
+
+        // Restore prior settings to undo setModel's side effect
+        if (priorSettings !== undefined) {
+          try {
+            await writeSettings(priorSettings);
+          } catch (err) {
+            req.log.warn({ err }, "failed to restore settings after per-session setModel");
+          }
+        }
+
+        return { ok: true };
+      })();
+
+      if (!result.ok) {
+        return reply.code(result.status).send(result.body);
       }
 
       return { provider, modelId };

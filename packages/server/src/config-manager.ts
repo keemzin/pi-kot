@@ -4,8 +4,9 @@
  * Ported from pi-forge/packages/server/src/config-manager.ts
  * Simplified for pi-kot: no prompt/skill/tool overrides, no export/import.
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
+import { randomUUID } from "node:crypto";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import {
   AuthStorage,
@@ -140,6 +141,33 @@ export async function readModelsJsonRedacted(): Promise<ModelsJson> {
 export async function writeModelsJson(data: ModelsJson): Promise<void> {
   await mkdir(dirname(MODELS_PATH), { recursive: true });
   await writeFile(MODELS_PATH, JSON.stringify(data, null, 2), "utf-8");
+}
+
+/**
+ * Atomic JSON write (tmp + rename) for config files.
+ * Pattern from pi-forge's config-manager.ts — crash-safe, no partial writes.
+ */
+async function atomicWriteJson(path: string, data: unknown): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  const tmp = `${path}.${randomUUID()}.tmp`;
+  await writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
+  try {
+    await rename(tmp, path);
+  } catch (err) {
+    await unlink(tmp).catch(() => undefined);
+    throw err;
+  }
+}
+
+/**
+ * Write settings.json atomically. Used by the per-session setModel route
+ * to restore the global default after the SDK mutates it as a side effect
+ * of session.setModel().
+ * Pattern from pi-forge's config-manager.ts writeSettings().
+ */
+export async function writeSettings(settings: Record<string, unknown>): Promise<void> {
+  const SETTINGS_FILE = join(PI_CONFIG_DIR, "settings.json");
+  await atomicWriteJson(SETTINGS_FILE, settings);
 }
 
 // ── Live providers listing (from SDK ModelRegistry) ──────────────────────
