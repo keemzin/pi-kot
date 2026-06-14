@@ -485,7 +485,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           <div className="welcome-hint">with the pi coding agent</div>
         </div>
       ) : (
-        <div ref={scrollRef} onScroll={onScroll} className="chat-scroll">
+        <div ref={scrollRef} onScroll={onScroll} style={{ overflow: "visible", padding: stickyUserHeader ? "0 16px 80px" : "8px 16px 80px", flex: 1 }} className="chat-scroll">
           <div className="chat-message-list">
             {renderedRows}
 
