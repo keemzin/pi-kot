@@ -471,7 +471,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   }, [messages, pairing, stickyUserHeader]);
 
   return (
-    <div className="messages-container" style={stickyUserHeader ? { paddingTop: 44 } : undefined}>
+    <div className="messages-container" style={stickyUserHeader ? { paddingTop: 55 } : undefined}>
       {error !== undefined && (
         <div onClick={clearError} className="error-banner">
           {error} — click to dismiss
