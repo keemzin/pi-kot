@@ -3,6 +3,7 @@ import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
 import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
+import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
 import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
@@ -62,6 +63,8 @@ export function App() {
   const [showArchived, setShowArchived] = useState<string | undefined>();
   const [showSettings, setShowSettings] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
+  const [showOrch, setShowOrch] = useState(false);
+  const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Bootstrap: check auth, load projects, fetch models
@@ -133,6 +136,14 @@ export function App() {
       }
     }
   }, [loading, authRequired, activeProjectId, projectSessions, activeSessionId]);
+
+  // Auto-expand worker groups when any worker in any project is live
+  useEffect(() => {
+    const allSessions = Object.values(projectSessions).flat();
+    const toExpand = new Set(expandedWorkerGroups);
+    allSessions.filter((s) => s.supervisorId && s.isLive).forEach((s) => toExpand.add(s.supervisorId!));
+    setExpandedWorkerGroups(toExpand);
+  }, [projectSessions]);
 
   const handleLogin = async () => {
     try {
@@ -355,71 +366,151 @@ export function App() {
                 </div>
 
                 {/* Session list inside project */}
-                {isExpanded && (
-                  <div className="session-list project-sublist">
-                    {pSessions.map((s: SessionSummary) => (
-                      <div
-                        key={s.sessionId}
-                        onClick={(e) => {
-                          if (renamingSessionId === s.sessionId) return;
-                          e.stopPropagation();
-                          setActiveSession(s.sessionId);
-                        }}
-                        className={`session-item ${activeSessionId === s.sessionId ? "active" : ""}`}
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setRenamingSessionId(s.sessionId);
-                          setRenameValue(s.name ?? `Session ${s.sessionId.slice(0, 8)}`);
-                          setTimeout(() => renameInputRef.current?.focus(), 50);
-                        }}
-                      >
-                        {renamingSessionId === s.sessionId ? (
-                          <input
-                            ref={renameInputRef}
-                            className="session-rename-input"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onBlur={() => {
-                              const trimmed = renameValue.trim();
-                              if (trimmed.length > 0 && trimmed !== (s.name ?? `Session ${s.sessionId.slice(0, 8)}`)) {
-                                useSessionStore.getState().renameSession(s.sessionId, trimmed);
-                              }
-                              setRenamingSessionId(undefined);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.currentTarget.blur();
-                              } else if (e.key === "Escape") {
-                                setRenamingSessionId(undefined);
-                              }
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <>
-                            <span className="session-name">
-                              {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
-                            </span>
-                            <button
-                              className="session-archive-btn"
-                              title="Archive session"
+                {isExpanded && (() => {
+                  const supervisors = pSessions.filter((s) => !s.supervisorId);
+                  const workers = pSessions.filter((s) => s.supervisorId);
+                  return (
+                    <div className="session-list project-sublist">
+                      {supervisors.map((supervisor: SessionSummary) => {
+                        const childWorkers = workers.filter((w) => w.supervisorId === supervisor.sessionId);
+                        const isExpandedGroup = expandedWorkerGroups.has(supervisor.sessionId);
+                        return (
+                          <div key={supervisor.sessionId}>
+                            {/* Supervisor session item */}
+                            <div
                               onClick={(e) => {
+                                if (renamingSessionId === supervisor.sessionId) return;
                                 e.stopPropagation();
-                                if (confirm(`Archive session "${s.name ?? s.sessionId.slice(0, 8)}"?`)) {
-                                  useSessionStore.getState().archiveSession(s.sessionId);
-                                }
+                                setActiveSession(supervisor.sessionId);
+                              }}
+                              className={`session-item ${activeSessionId === supervisor.sessionId ? "active" : ""}`}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                setRenamingSessionId(supervisor.sessionId);
+                                setRenameValue(supervisor.name ?? `Session ${supervisor.sessionId.slice(0, 8)}`);
+                                setTimeout(() => renameInputRef.current?.focus(), 50);
                               }}
                             >
-                              🗑
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-
-
-                  </div>
-                )}
+                              {/* Toggle chevron for workers */}
+                              {childWorkers.length > 0 && (
+                                <span
+                                  className="project-chevron"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedWorkerGroups((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(supervisor.sessionId)) next.delete(supervisor.sessionId);
+                                      else next.add(supervisor.sessionId);
+                                      return next;
+                                    });
+                                  }}
+                                  style={{ cursor: "pointer", marginRight: "4px" }}
+                                >
+                                  {isExpandedGroup ? "▾" : "▶"}
+                                </span>
+                              )}
+                              {renamingSessionId === supervisor.sessionId ? (
+                                <input
+                                  ref={renameInputRef}
+                                  className="session-rename-input"
+                                  value={renameValue}
+                                  onChange={(e) => setRenameValue(e.target.value)}
+                                  onBlur={() => {
+                                    const trimmed = renameValue.trim();
+                                    if (trimmed.length > 0 && trimmed !== (supervisor.name ?? `Session ${supervisor.sessionId.slice(0, 8)}`)) {
+                                      useSessionStore.getState().renameSession(supervisor.sessionId, trimmed);
+                                    }
+                                    setRenamingSessionId(undefined);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.currentTarget.blur();
+                                    } else if (e.key === "Escape") {
+                                      setRenamingSessionId(undefined);
+                                    }
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <>
+                                  <span className="session-name">
+                                    {supervisor.name ?? `Session ${supervisor.sessionId.slice(0, 8)}`}
+                                  </span>
+                                  <button
+                                    className="session-archive-btn"
+                                    title="Archive session"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm(`Archive session "${supervisor.name ?? supervisor.sessionId.slice(0, 8)}"?`)) {
+                                        useSessionStore.getState().archiveSession(supervisor.sessionId);
+                                      }
+                                    }}
+                                  >
+                                    🗑
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            {/* Worker children */}
+                            {childWorkers.length > 0 && isExpandedGroup && (
+                              <div className="session-children">
+                                {childWorkers.map((worker: SessionSummary) => (
+                                  <div
+                                    key={worker.sessionId}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveSession(worker.sessionId);
+                                    }}
+                                    className={`session-item session-worker-item ${activeSessionId === worker.sessionId ? "active" : ""}`}
+                                  >
+                                    <span
+                                      className={`session-worker-dot ${worker.sessionId === activeSessionId && isStreaming ? "active" : ""}`}
+                                      style={{
+                                        background: worker.isLive && !(worker.sessionId === activeSessionId && isStreaming)
+                                          ? "#98c379"
+                                          : !worker.isLive
+                                            ? "#56b6c2"
+                                            : undefined,
+                                      }}
+                                    />
+                                    <span className="session-worker-name">
+                                      {worker.name ?? `Session ${worker.sessionId.slice(0, 8)}`}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {/* Unattached workers (no matching supervisor found) */}
+                      {workers.filter((w) => !supervisors.some((s) => s.sessionId === w.supervisorId)).map((worker: SessionSummary) => (
+                        <div
+                          key={worker.sessionId}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveSession(worker.sessionId);
+                          }}
+                          className={`session-item session-worker-item ${activeSessionId === worker.sessionId ? "active" : ""}`}
+                        >
+                          <span
+                            className={`session-worker-dot ${worker.sessionId === activeSessionId && isStreaming ? "active" : ""}`}
+                            style={{
+                              background: worker.isLive && !(worker.sessionId === activeSessionId && isStreaming)
+                                ? "#98c379"
+                                : !worker.isLive
+                                  ? "#56b6c2"
+                                  : undefined,
+                            }}
+                          />
+                          <span className="session-worker-name">
+                            {worker.name ?? `Session ${worker.sessionId.slice(0, 8)}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}
@@ -725,7 +816,42 @@ export function App() {
         {activeSessionId !== undefined ? (
           <>
             <ChatView sessionId={activeSessionId} />
+            <OrchestrationPanel
+              sessionId={activeSessionId}
+              open={showOrch}
+              onClose={() => setShowOrch(false)}
+            />
             <AskUserQuestionPanel sessionId={activeSessionId} />
+            {!showOrch && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  padding: "2px 12px",
+                  fontSize: "11px",
+                  gap: "6px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowOrch(true)}
+                  title="Orchestration (supervisor mode)"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-dim)",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    padding: "2px 4px",
+                    lineHeight: 1,
+                    opacity: 0.6,
+                  }}
+                >
+                  ⚡
+                </button>
+              </div>
+            )}
             <ChatInput sessionId={activeSessionId} />
           </>
         ) : (

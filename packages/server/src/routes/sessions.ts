@@ -14,6 +14,8 @@ import {
   findSessionLocation,
 } from "../session-registry.js";
 import { getProject } from "../project-manager.js";
+import { bridgeWorkerDeleted } from "../orchestration/event-bridge.js";
+import { getSupervisorIdForWorker } from "../orchestration/store.js";
 
 export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // POST /api/v1/sessions — create a new session
@@ -115,6 +117,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
                     createdAt: { type: "string" },
                     lastActivityAt: { type: "string" },
                     messageCount: { type: "integer" },
+                    supervisorId: { type: "string" },
                   },
                 },
               },
@@ -143,8 +146,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         // If archived=true, list archived sessions
         if (archived === "true") {
           const archivedSessions = await listArchivedSessions(projectId, workspacePath);
-          return {
-            sessions: archivedSessions.map((s) => ({
+          const sessions = await Promise.all(
+            archivedSessions.map(async (s) => ({
               sessionId: s.sessionId,
               projectId: s.projectId,
               isLive: s.isLive,
@@ -152,14 +155,16 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               createdAt: s.createdAt.toISOString(),
               lastActivityAt: s.lastActivityAt.toISOString(),
               messageCount: s.messageCount,
+              supervisorId: (await getSupervisorIdForWorker(s.sessionId)) ?? undefined,
             })),
-          };
+          );
+          return { sessions };
         }
 
         // Unified view: live + disk sessions for this project
         const unified = await listSessionsForProject(projectId, workspacePath);
-        return {
-          sessions: unified.map((s) => ({
+        const unifiedSessions = await Promise.all(
+          unified.map(async (s) => ({
             sessionId: s.sessionId,
             projectId: s.projectId,
             isLive: s.isLive,
@@ -167,14 +172,16 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             createdAt: s.createdAt.toISOString(),
             lastActivityAt: s.lastActivityAt.toISOString(),
             messageCount: s.messageCount,
+            supervisorId: (await getSupervisorIdForWorker(s.sessionId)) ?? undefined,
           })),
-        };
+        );
+        return { sessions: unifiedSessions };
       }
 
       // Backward compat: only live sessions
-      const sessions = listSessions();
-      return {
-        sessions: sessions.map((s) => ({
+      const liveSessions = listSessions();
+      const liveWithSupervisors = await Promise.all(
+        liveSessions.map(async (s) => ({
           sessionId: s.sessionId,
           projectId: s.projectId,
           isLive: true,
@@ -182,8 +189,10 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           createdAt: s.createdAt.toISOString(),
           lastActivityAt: s.lastActivityAt.toISOString(),
           messageCount: s.session.messages.length,
+          supervisorId: (await getSupervisorIdForWorker(s.sessionId)) ?? undefined,
         })),
-      };
+      );
+      return { sessions: liveWithSupervisors };
     },
   );
 
@@ -411,7 +420,10 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (req) => {
-      const disposed = await disposeSession(req.params.id);
+      const sessionId = req.params.id;
+      const disposed = await disposeSession(sessionId);
+      // Fire worker.deleted if this session was an orchestration worker
+      void bridgeWorkerDeleted(sessionId, { wasLive: disposed }).catch(() => undefined);
       return { disposed };
     },
   );

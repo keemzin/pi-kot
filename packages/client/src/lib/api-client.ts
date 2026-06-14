@@ -118,6 +118,7 @@ export interface SessionSummary {
   createdAt: string;
   lastActivityAt: string;
   messageCount: number;
+  supervisorId?: string;
 }
 
 export interface CreateSessionRequest {
@@ -617,5 +618,127 @@ export async function answerAskQuestion(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/ask-user-question/answer`,
     { requestId, answers, cancelled },
+  );
+}
+
+// ── Orchestration ──
+
+export interface OrchestrationConfig {
+  available?: boolean;
+  disabled?: boolean;
+  disabledReason?: string;
+  maxWorkersPerSupervisor?: number;
+  tools?: string[];
+}
+
+export interface SessionOrchestrationRole {
+  sessionId: string;
+  role: "supervisor" | "worker" | "standalone";
+  supervisorId?: string;
+}
+
+export interface WorkerListItem {
+  workerId: string;
+  state: string;
+  isLive: boolean;
+  name: string | null;
+  messageCount: number | null;
+  lastStateAt: string | null;
+}
+
+export interface InboxItem {
+  id: string;
+  type: string;
+  workerId: string;
+  occurredAt: string;
+  data: Record<string, unknown>;
+  delivered: boolean;
+}
+
+export async function fetchOrchestrationConfig(): Promise<OrchestrationConfig> {
+  return request("GET", "/api/v1/orchestration/config");
+}
+
+export async function getSessionOrchestrationRole(
+  sessionId: string,
+): Promise<SessionOrchestrationRole> {
+  return request(
+    "GET",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}`,
+  );
+}
+
+export async function enableSupervisorUI(
+  sessionId: string,
+): Promise<{ enabled: boolean; sessionId: string }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}/enable`,
+  );
+}
+
+export async function disableSupervisorUI(
+  sessionId: string,
+): Promise<{ disabled: boolean; sessionId: string }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}/disable`,
+  );
+}
+
+export async function listWorkers(
+  sessionId: string,
+): Promise<{ workers: WorkerListItem[] }> {
+  return request(
+    "GET",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}/workers`,
+  );
+}
+
+export async function fetchInbox(
+  sessionId: string,
+): Promise<{ items: InboxItem[]; count: number }> {
+  return request(
+    "GET",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}/inbox`,
+  );
+}
+
+export async function clearInboxUI(
+  sessionId: string,
+): Promise<{ cleared: boolean }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(sessionId)}/inbox/clear`,
+  );
+}
+
+export async function detachWorkerUI(
+  supervisorId: string,
+  workerId: string,
+): Promise<{ detached: boolean; workerId: string }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(supervisorId)}/workers/${encodeURIComponent(workerId)}/detach`,
+  );
+}
+
+export async function killWorkerUI(
+  supervisorId: string,
+  workerId: string,
+): Promise<{ killed: boolean; workerId: string }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(supervisorId)}/workers/${encodeURIComponent(workerId)}/kill`,
+  );
+}
+
+export async function resumeWorkerUI(
+  supervisorId: string,
+  workerId: string,
+): Promise<{ resumed: boolean; workerId: string; wasCold: boolean }> {
+  return request(
+    "POST",
+    `/api/v1/orchestration/sessions/${encodeURIComponent(supervisorId)}/workers/${encodeURIComponent(workerId)}/resume`,
   );
 }

@@ -2703,3 +2703,68 @@ body {
   font-size: 12px;
   color: var(--text-dim);
 }
+
+/* Worker session nesting & pulsating dot */
+.session-children {
+  padding-left: 16px;
+  border-left: 1px solid var(--border-color);
+  margin-left: 8px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+.session-worker-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 4px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  position: relative;
+}
+
+.session-worker-item:hover {
+  background: var(--hover-bg);
+}
+
+.session-worker-item.active {
+  background: var(--active-bg);
+  color: var(--accent-text);
+}
+
+.session-worker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.session-worker-dot.active {
+  animation: pulsate-dot 1.5s ease-in-out infinite;
+}
+
+.session-worker-dot.idle {
+  background: #56b6c2;
+}
+
+.session-worker-dot.streaming {
+  background: #98c379;
+}
+
+@keyframes pulsate-dot {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(152, 195, 121, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(152, 195, 121, 0);
+  }
+}
+
+.session-worker-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}

@@ -247,7 +247,7 @@ User can:
 || 8.8 | Webhooks | 🔴 | Outbound webhooks on session events |
 || 8.9 | Baked-in ask_user_question tool | 🟢 | Native tool + SSE events + REST endpoints + UI panel — agent can present structured questions with single/multi-select/custom options, user answers via panel above chat input |
 || 8.10 | MCP support | 🔴 | MCP server registry, translate MCP tools → SDK customTools |
-|| 8.11 | Orchestration | 🔴 | Multi-agent workflows, sub-agent management |
+|| 8.11 | Orchestration | 🟢 | Multi-agent workflows, sub-agent management — 8 `orchestrate_*` tools: spawn, list, read, send, interrupt, kill, detach, read_inbox. REST endpoints for enable/disable/inbox/workers/mgmt. Orch toggle (⚡) + enable/disable panel in UI. Workers nest under supervisor in sidebar, collapsed by default, auto-expand + pulsating dot when streaming |
 
 ---
 
@@ -342,7 +342,7 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-**Total: ~40/70 tasks completed (~57% of roadmap)**
+**Total: ~41/71 tasks completed (~58% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **92% done** (15/16 routes)
@@ -352,7 +352,7 @@ Phases are intentionally ordered so each one:
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
 - **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
-- **Phase 8 (Advanced):** ✅ **18% done** (2/11 tasks, model switching + ask_user_question)
+- **Phase 8 (Advanced):** ✅ **25% done** (3/12 tasks, model switching + ask_user_question + orchestration)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
@@ -361,6 +361,7 @@ Phases are intentionally ordered so each one:
 - ✅ File browser (tree, read, write, search, download)
 - ✅ `ask_user_question` tool with UI panel
 - ✅ Per-session model override
+- ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
 
 ### **Remaining Work:**
 - Git integration (status, diff, commit, etc.)

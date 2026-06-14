@@ -55,4 +55,9 @@ export const config = Object.freeze({
 
   // CORS
   corsOrigin: readEnv("CORS_ORIGIN") ?? true,
+
+  // Orchestration
+  orchestrationEnabled: readBool("ORCHESTRATION_ENABLED", true),
+  orchestrationMaxWorkersPerSupervisor: readInt("ORCHESTRATION_MAX_WORKERS", 8),
+  minimalUi: readBool("MINIMAL_UI", false),
 } as const);

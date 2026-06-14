@@ -8,6 +8,11 @@ import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
+import { isOrchestrationEnabled } from "./orchestration/config.js";
+import { isSupervisor } from "./orchestration/store.js";
+import { createOrchestrationTools } from "./orchestration/tools.js";
+import { bridgeWorkerAgentEvent } from "./orchestration/event-bridge.js";
+import { notifySupervisorDisposed, notifySupervisorIdle } from "./orchestration/inbox.js";
 
 /**
  * Minimal SSE client contract — the concrete implementation lives in
@@ -155,12 +160,11 @@ export async function createSession(
 ): Promise<LiveSession> {
   const dir = await ensureSessionDir(projectId);
   const sessionManager = SessionManager.create(workspacePath, dir);
-
-  // Get sessionId synchronously before createAgentSession so the
-  // ask_user_question tool can capture it in its execute() closure.
   const sessionId = sessionManager.getSessionId();
+  const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
     createAskUserQuestionTool(sessionId),
+    ...orchestrationTools,
   ];
 
   const { session } = await createAgentSession({
@@ -191,6 +195,17 @@ export async function createSession(
 
     if (event.type === "agent_start") {
       live.lastAgentStartIndex = live.session.messages.length;
+    }
+    // Bridge orchestration lifecycle events (fire-and-forget)
+    if (event.type === "agent_start" || event.type === "agent_end") {
+      void bridgeWorkerAgentEvent(
+        { sessionId: live.sessionId, session: live.session },
+        event as import("@earendil-works/pi-coding-agent").AgentSessionEvent,
+      );
+    }
+    // Notify supervisor idle — compatibility recovery for undelivered items
+    if (event.type === "agent_end") {
+      void notifySupervisorIdle(live.sessionId);
     }
 
     // Fan out to all connected SSE clients
@@ -376,6 +391,102 @@ export function autoNameSession(sessionId: string, promptText: string): void {
   live.name = name;
 }
 
+/**
+ * Resolve orchestration tools for a session, if supervisor mode is active.
+ * Returns empty array when orchestration is disabled or the session isn't
+ * a registered supervisor.
+ */
+async function resolveOrchestrationTools(
+  sessionId: string,
+): Promise<import("@earendil-works/pi-coding-agent").ToolDefinition[]> {
+  if (!isOrchestrationEnabled()) return [];
+  try {
+    if (!(await isSupervisor(sessionId))) return [];
+    return createOrchestrationTools(sessionId);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rebuild a live session's AgentSession with updated custom tools.
+ * Preserves the SessionManager (messages intact), SSE clients stay
+ * attached, and the old session is disposed cleanly.
+ */
+export async function rebuildSessionTools(
+  sessionId: string,
+): Promise<void> {
+  const live = registry.get(sessionId);
+  if (live === undefined) return;
+
+  const orchestrationTools = await resolveOrchestrationTools(sessionId);
+  const customTools: ToolDefinition[] = [
+    createAskUserQuestionTool(sessionId),
+    ...orchestrationTools,
+  ];
+
+  // Unsubscribe old subscription, abort any in-flight turn
+  try {
+    live.unsubscribe();
+  } catch { /* ignore */ }
+  try {
+    await live.session.abort();
+  } catch { /* ignore */ }
+
+  // Create new AgentSession with same SessionManager but updated tools
+  const { session } = await createAgentSession({
+    cwd: live.workspacePath,
+    sessionManager: live.sessionManager,
+    agentDir: config.piConfigDir,
+    customTools,
+  });
+
+  // Dispose old session
+  try {
+    live.session.dispose();
+  } catch { /* ignore */ }
+
+  // Swap in new session
+  live.session = session;
+
+  // Re-subscribe
+  live.unsubscribe = session.subscribe((event: AgentSessionEvent) => {
+    live.lastActivityAt = new Date();
+    if (event.type === "agent_start") {
+      live.lastAgentStartIndex = live.session.messages.length;
+    }
+    if (event.type === "agent_start" || event.type === "agent_end") {
+      void bridgeWorkerAgentEvent(
+        { sessionId: live.sessionId, session: live.session },
+        event as import("@earendil-works/pi-coding-agent").AgentSessionEvent,
+      );
+    }
+    if (event.type === "agent_end") {
+      void notifySupervisorIdle(live.sessionId);
+    }
+    for (const client of live.clients) {
+      try {
+        client.send(event);
+      } catch {
+        live.clients.delete(client);
+      }
+    }
+  });
+
+  // Notify SSE clients about the rebuild
+  for (const client of live.clients) {
+    try {
+      client.send({
+        type: "custom_tools_changed",
+        sessionId: live.sessionId,
+        toolCount: customTools.length,
+      } as unknown as { type: string; [k: string]: unknown });
+    } catch {
+      live.clients.delete(client);
+    }
+  }
+}
+
 /** Dispose a live session — abort, unsubscribe, close clients, remove from registry. */
 export async function disposeSession(sessionId: string): Promise<boolean> {
   const live = registry.get(sessionId);
@@ -408,7 +519,10 @@ export async function disposeSession(sessionId: string): Promise<boolean> {
     // ignore
   }
 
-  registry.delete(sessionId);
+  registry.delete(live.sessionId);
+  // Clean up orchestration dedupe state for this session
+  notifySupervisorDisposed(live.sessionId);
+
   return true;
 }
 
@@ -467,8 +581,10 @@ export async function resumeSessionById(
 
   const sessionPath = join(dir, match);
   const sessionManager = SessionManager.open(sessionPath);
+  const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
     createAskUserQuestionTool(sessionId),
+    ...orchestrationTools,
   ];
 
   const { session } = await createAgentSession({
@@ -497,6 +613,17 @@ export async function resumeSessionById(
     live.lastActivityAt = new Date();
     if (event.type === "agent_start") {
       live.lastAgentStartIndex = live.session.messages.length;
+    }
+    // Bridge orchestration lifecycle events (fire-and-forget)
+    if (event.type === "agent_start" || event.type === "agent_end") {
+      void bridgeWorkerAgentEvent(
+        { sessionId: live.sessionId, session: live.session },
+        event as import("@earendil-works/pi-coding-agent").AgentSessionEvent,
+      );
+    }
+    // Notify supervisor idle on agent_end
+    if (event.type === "agent_end") {
+      void notifySupervisorIdle(live.sessionId);
     }
     for (const client of live.clients) {
       try {
@@ -552,8 +679,10 @@ export async function forkSession(
   const dir = join(config.sessionDir, sourceLive.projectId);
   const forkedSM = SessionManager.open(newPath, dir, sourceLive.workspacePath);
   const forkedId = forkedSM.getSessionId();
+  const orchestrationTools = await resolveOrchestrationTools(forkedId);
   const customTools: ToolDefinition[] = [
     createAskUserQuestionTool(forkedId),
+    ...orchestrationTools,
   ];
 
   const { session } = await createAgentSession({
@@ -582,6 +711,17 @@ export async function forkSession(
     forkedLive.lastActivityAt = new Date();
     if (event.type === "agent_start") {
       forkedLive.lastAgentStartIndex = forkedLive.session.messages.length;
+    }
+    // Bridge orchestration lifecycle events (fire-and-forget)
+    if (event.type === "agent_start" || event.type === "agent_end") {
+      void bridgeWorkerAgentEvent(
+        { sessionId: forkedLive.sessionId, session: forkedLive.session },
+        event as import("@earendil-works/pi-coding-agent").AgentSessionEvent,
+      );
+    }
+    // Notify supervisor idle on agent_end
+    if (event.type === "agent_end") {
+      void notifySupervisorIdle(forkedLive.sessionId);
     }
     for (const client of forkedLive.clients) {
       try {
