@@ -405,12 +405,21 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
 
 function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
   const [settings, setSettings] = useState<Record<string, unknown> | undefined>(undefined);
+  const [providers, setProviders] = useState<ProvidersResponse | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
 
   const refresh = async (): Promise<void> => {
     onError(undefined);
     try {
-      setSettings(await getSettings());
+      const [s, p] = await Promise.all([getSettings(), fetchProviders()]);
+      setSettings(s);
+      setProviders(p);
+      const sp = typeof s.defaultProvider === "string" ? s.defaultProvider : "";
+      const sm = typeof s.defaultModel === "string" ? s.defaultModel : "";
+      setSelectedProvider(sp);
+      setSelectedModel(sm);
     } catch (err) {
       onError(`Failed to load settings: ${errorMsg(err)}`);
     }
@@ -420,12 +429,6 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const get = (key: string): string => {
-    if (settings === undefined) return "";
-    const v = settings[key];
-    return typeof v === "string" ? v : "";
-  };
 
   const save = async (patch: Record<string, unknown>): Promise<void> => {
     setBusy(true);
@@ -439,29 +442,72 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
     }
   };
 
+  // Build provider/model options
+  const providerOptions = providers
+    ? providers.providers.map((p) => ({ value: p.provider, label: p.provider }))
+    : [];
+
+  // Models for the currently selected provider
+  const currentGroup = providers?.providers.find((p) => p.provider === selectedProvider);
+  const modelOptions = currentGroup
+    ? currentGroup.models.map((m) => ({ value: m.id, label: m.name }))
+    : [];
+
+  const handleProviderChange = (v: string) => {
+    setSelectedProvider(v);
+    // If the current model isn't available under the new provider, clear it
+    const group = providers?.providers.find((p) => p.provider === v);
+    const modelAvailable = group?.models.some((m) => m.id === selectedModel);
+    if (!modelAvailable) {
+      setSelectedModel("");
+    }
+    void save({ defaultProvider: v.length === 0 ? null : v });
+  };
+
+  const handleModelChange = (v: string) => {
+    setSelectedModel(v);
+    void save({ defaultModel: v.length === 0 ? null : v });
+  };
+
   if (settings === undefined) {
     return <p className="settings-hint">Loading settings…</p>;
   }
 
   return (
     <div className="settings-fields">
-      <Field label="Default provider" hint="e.g. anthropic, openai, google">
-        <TextSetting
-          value={get("defaultProvider")}
-          onSave={(v) => save({ defaultProvider: v.length === 0 ? null : v })}
+      <Field label="Default provider" hint="Select an LLM provider">
+        <select
+          value={selectedProvider}
           disabled={busy}
-        />
+          onChange={(e) => handleProviderChange(e.target.value)}
+          className="settings-select"
+        >
+          <option value="">(none)</option>
+          {providerOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </Field>
-      <Field label="Default model" hint="model id from the chosen provider">
-        <TextSetting
-          value={get("defaultModel")}
-          onSave={(v) => save({ defaultModel: v.length === 0 ? null : v })}
-          disabled={busy}
-        />
+      <Field label="Default model" hint="Model from the selected provider">
+        <select
+          value={selectedModel}
+          disabled={busy || selectedProvider.length === 0}
+          onChange={(e) => handleModelChange(e.target.value)}
+          className="settings-select"
+        >
+          <option value="">(none)</option>
+          {modelOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </Field>
       <Field label="Thinking level" hint="off, minimal, low, medium, high, xhigh">
         <SelectSetting
-          value={get("defaultThinkingLevel")}
+          value={
+            settings && typeof settings.defaultThinkingLevel === "string"
+              ? settings.defaultThinkingLevel
+              : ""
+          }
           options={["", "off", "minimal", "low", "medium", "high", "xhigh"]}
           onSave={(v) => save({ defaultThinkingLevel: v.length === 0 ? null : v })}
           disabled={busy}
