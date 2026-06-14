@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
+import { usePreferencesStore } from "../stores/preferences-store";
 import {
   buildToolCallPairing,
   splitAssistantToolSegments,
@@ -239,6 +240,66 @@ function AssistantRenderSegmentView({
   return <ToolCallBatchCard entries={entries} />;
 }
 
+/* ── Sticky user message component ── */
+
+function UserMessageBubble({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [isLong, setIsLong] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const check = () => {
+      if (!expanded) {
+        setIsLong(el.scrollHeight > el.clientHeight);
+      }
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, expanded]);
+
+  return (
+    <div className="message-row user">
+      <div className="message-bubble user">
+        <div
+          ref={textRef}
+          style={{
+            overflow: "hidden",
+            transition: "max-height 0.25s ease",
+            maxHeight: !expanded ? "3.2em" : "2000px",
+            ...(!expanded
+              ? {
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                }
+              : {}),
+          } as React.CSSProperties}
+        >
+          {text}
+        </div>
+        {isLong && (
+          <div
+            onClick={() => setExpanded((e) => !e)}
+            style={{
+              marginTop: 6,
+              fontSize: 12,
+              color: "var(--accent-text)",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            {expanded ? "▲ Show less" : "▼ Show more"}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Main ChatView ── */
 
 const MAX_TOOL_BATCH_TOOLS = 100;
@@ -250,6 +311,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const error = useSessionStore((s) => s.error);
   const clearError = useSessionStore((s) => s.clearError);
+
+  const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
@@ -275,95 +338,137 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   // Build tool pairing once per render cycle
   const pairing = useMemo(() => buildToolCallPairing(messages as PairableMessage[]), [messages]);
 
-  // Render loop with proper batch accumulation (same behavior as forge)
+  // Render loop: group messages into turns (user + following assistant),
+  // support sticky user header (pins user msg at top while scrolling reply)
   const renderedRows = useMemo(() => {
     const { toolResultsById } = pairing;
     const out: React.ReactNode[] = [];
-    const pendingBatch: ToolBatchEntry[] = [];
-    let pendingBatchStartIndex = 0;
-    let renderedBatchSerial = 0;
 
-    const flushPendingBatch = (): void => {
-      if (pendingBatch.length === 0) return;
-      let chunk: ToolBatchEntry[] = [];
-      const pushChunk = (): void => {
-        if (chunk.length === 0) return;
-        const batchKey = `tool-batch-${renderedBatchSerial}`;
-        out.push(
-          <div key={batchKey}>
-            <ToolCallBatchCard key={`${batchKey}-card`} entries={chunk} />
-          </div>,
-        );
-        chunk = [];
-        renderedBatchSerial += 1;
-      };
-      for (const entry of pendingBatch) {
-        if (
-          entry.kind === "tool" &&
-          chunk.filter((e) => e.kind === "tool").length >= MAX_TOOL_BATCH_TOOLS
-        ) {
-          pushChunk();
-        }
-        chunk.push(entry);
-      }
-      pushChunk();
-      pendingBatch.length = 0;
-    };
-
+    // Build turns from messages
+    type Turn = { userIdx: number; userMsg: PairableMessage; assistantMsgs: PairableMessage[] };
+    const turns: Turn[] = [];
     for (let i = 0; i < messages.length; i++) {
       const m = messages[i] as PairableMessage;
       if (isPairedToolResult(pairing, m)) continue;
-
       if (m.role === "user") {
-        flushPendingBatch();
-        out.push(
-          <div key={`msg-${i}`} className="message-row user" data-message-index={i}>
-            <div className="message-bubble user">{extractText(m.content)}</div>
-          </div>,
-        );
-        continue;
-      }
-
-      if (m.role === "assistant" && Array.isArray(m.content)) {
-        const segments = splitAssistantToolSegments(
-          m.content as Record<string, unknown>[],
-          toolResultsById,
-        );
-        if (segments !== undefined) {
-          for (const seg of segments) {
-            if (seg.kind === "tools" && seg.entries) {
-              if (pendingBatch.length === 0) pendingBatchStartIndex = i;
-              pendingBatch.push(...seg.entries);
-              continue;
-            }
-            flushPendingBatch();
-            out.push(
-              <div key={`${i}-seg`} className="message-row assistant" data-message-index={i}>
-                <div className="message-bubble assistant">
-                  <AssistantRenderSegmentView segment={seg} />
-                </div>
-              </div>,
-            );
-          }
-          continue;
-        }
-      }
-
-      flushPendingBatch();
-      const text = extractText(m.content);
-      if (text.length > 0) {
-        out.push(
-          <div key={`msg-${i}`} className="message-row assistant" data-message-index={i}>
-            <div className="message-bubble assistant">
-              <ChatMarkdown text={text} />
-            </div>
-          </div>,
-        );
+        turns.push({ userIdx: i, userMsg: m, assistantMsgs: [] });
+      } else if (m.role === "assistant" && turns.length > 0) {
+        turns[turns.length - 1].assistantMsgs.push(m);
       }
     }
-    flushPendingBatch();
+
+    // Common helper: render all assistant messages in a turn
+    const renderAssistantMsgs = (msgs: PairableMessage[], turnIdx: number) => {
+      const elements: React.ReactNode[] = [];
+      const pendingBatch: ToolBatchEntry[] = [];
+      let renderedBatchSerial = 0;
+
+      const flushPendingBatch = () => {
+        if (pendingBatch.length === 0) return;
+        const chunk = [...pendingBatch];
+        pendingBatch.length = 0;
+        const batchKey = `turn-${turnIdx}-batch-${renderedBatchSerial}`;
+        elements.push(
+          <div key={batchKey}>
+            <ToolCallBatchCard entries={chunk} />
+          </div>,
+        );
+        renderedBatchSerial += 1;
+      };
+
+      for (const m of msgs) {
+        if (Array.isArray(m.content)) {
+          const segments = splitAssistantToolSegments(
+            m.content as Record<string, unknown>[],
+            toolResultsById,
+          );
+          if (segments !== undefined) {
+            for (const seg of segments) {
+              if (seg.kind === "tools" && seg.entries) {
+                pendingBatch.push(...seg.entries);
+                continue;
+              }
+              flushPendingBatch();
+              elements.push(
+                <div key={`turn-${turnIdx}-seg-${elements.length}`} className="message-row assistant">
+                  <div className="message-bubble assistant">
+                    <AssistantRenderSegmentView segment={seg} />
+                  </div>
+                </div>,
+              );
+            }
+            continue;
+          }
+        }
+
+        flushPendingBatch();
+        const text = extractText(m.content);
+        if (text.length > 0) {
+          elements.push(
+            <div key={`turn-${turnIdx}-text-${elements.length}`} className="message-row assistant">
+              <div className="message-bubble assistant">
+                <ChatMarkdown text={text} />
+              </div>
+            </div>,
+          );
+        }
+      }
+      flushPendingBatch();
+      return elements;
+    };
+
+    for (let ti = 0; ti < turns.length; ti++) {
+      const { userIdx, userMsg, assistantMsgs } = turns[ti];
+      const isLastTurn = ti === turns.length - 1;
+      const text = extractText(userMsg.content);
+
+      if (stickyUserHeader && text.length > 0) {
+        // Sticky mode: wrap user message in a sticky container
+        out.push(
+          <div key={`turn-${ti}`} style={{ position: "relative" }}>
+            <div
+              style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                background: "var(--bg-solid)",
+                overflowAnchor: "none",
+              }}
+            >
+              <UserMessageBubble text={text} />
+              <div
+                aria-hidden="true"
+                style={{
+                  pointerEvents: "none",
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: "100%",
+                  zIndex: 0,
+                  height: 12,
+                  background:
+                    "linear-gradient(to bottom, var(--bg-solid), transparent)",
+                }}
+              />
+            </div>
+            {assistantMsgs.length > 0 && renderAssistantMsgs(assistantMsgs, ti)}
+          </div>,
+        );
+      } else {
+        // Non-sticky mode: render user message normally
+        out.push(
+          <div key={`user-${userIdx}`} className="message-row user" data-message-index={userIdx}>
+            <div className="message-bubble user">{text}</div>
+          </div>,
+        );
+        if (assistantMsgs.length > 0) {
+          out.push(...renderAssistantMsgs(assistantMsgs, ti));
+        }
+      }
+    }
+
     return out;
-  }, [messages, pairing]);
+  }, [messages, pairing, stickyUserHeader]);
 
   return (
     <div className="messages-container">

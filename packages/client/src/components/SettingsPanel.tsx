@@ -18,6 +18,7 @@ import {
   type AuthSummaryResponse,
 } from "../lib/api-client";
 import { getSavedTheme, applyTheme, themes } from "../lib/theme";
+import { usePreferencesStore } from "../stores/preferences-store";
 
 type Tab = "appearance" | "providers" | "agent" | "general";
 
@@ -119,6 +120,8 @@ function errorMsg(err: unknown): string {
 
 function AppearanceTab() {
   const [current, setCurrent] = useState(() => getSavedTheme());
+  const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
+  const setStickyUserHeader = usePreferencesStore((s) => s.setStickyUserHeader);
 
   const select = (id: string) => {
     setCurrent(id);
@@ -138,6 +141,35 @@ function AppearanceTab() {
             {t.name}
           </button>
         ))}
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            userSelect: "none",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={stickyUserHeader}
+            onChange={(e) => setStickyUserHeader(e.target.checked)}
+            style={{
+              width: 16,
+              height: 16,
+              accentColor: "var(--accent-text)",
+              cursor: "pointer",
+            }}
+          />
+          Sticky user header — pin your message at the top while scrolling
+          through the assistant&rsquo;s reply
+        </label>
       </div>
     </div>
   );

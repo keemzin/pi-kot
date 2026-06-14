@@ -60,3 +60,6 @@ Thumbs.db
 tau-ref/
 *.bak
 tau-ref/
+
+# OpenKot reference (explored for UX patterns)
+openkot-ref/
