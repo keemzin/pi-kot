@@ -142,10 +142,14 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
           live.session.modelRegistry.authStorage.reload();
           live.session.modelRegistry.refresh();
 
-          await live.session.setModel({
-            provider: model.provider,
-            id: model.id,
-          } as Parameters<typeof live.session.setModel>[0]);
+          // Pass the full model object from the registry, not a {provider, id} stub.
+          // ⚠️ The SDK's setModel() stores the model object in agent.state.model, and
+          //    the agent later reads fields like `api`, `baseUrl`, `contextWindow`,
+          //    `maxTokens` from it to route LLM requests. Passing a stub with only
+          //    `provider` + `id` leaves those fields as undefined, which silently
+          //    breaks every subsequent prompt — the session appears "dead."
+          //    Pattern from pi-forge: pass the full model from registry.find().
+          await live.session.setModel(model as Parameters<typeof live.session.setModel>[0]);
         } catch (err) {
           return {
             ok: false,
