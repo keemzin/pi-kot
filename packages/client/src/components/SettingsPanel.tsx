@@ -52,7 +52,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="settings-panel"
-        style={{ width: 720, maxWidth: "92vw", maxHeight: "82vh" }}
+        style={{ width: 720, maxWidth: "92vw", height: "520px" }}
       >
         <header className="settings-header">
           <div className="settings-tabs" style={{ display: "flex", gap: 2 }}>
