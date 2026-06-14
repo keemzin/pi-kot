@@ -181,6 +181,105 @@
   --success: #34d399;
 }
 
+/* ═══ Flexoki Dark — inky warm dark (from OpenChamber) ═══ */
+:root[data-theme="flexoki-dark"] {
+  color-scheme: dark;
+
+  --bg-solid: #171515;
+  --header-bg: rgba(23, 21, 21, 0.75);
+  --sidebar-bg: rgba(28, 27, 26, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(23, 21, 21, 0.82);
+
+  --text-primary: rgba(206, 205, 195, 0.92);
+  --text-secondary: rgba(128, 126, 121, 0.85);
+  --text-dim: rgba(128, 126, 121, 0.50);
+  --text-ghost: rgba(128, 126, 121, 0.20);
+
+  --accent: #da702c;
+  --accent-glow: rgba(218, 112, 44, 0.18);
+  --accent-subtle: rgba(218, 112, 44, 0.08);
+  --accent-text: #f9ae77;
+
+  --user-bubble: #f7f4ec;
+  --user-bubble-text: #171515;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #4385be;
+  --tool-accent-text: #6aa4d4;
+  --tool-bg: rgba(67, 133, 190, 0.10);
+  --tool-border: rgba(67, 133, 190, 0.20);
+
+  --thinking-accent: #a0af54;
+  --thinking-accent-text: #bccc6a;
+  --thinking-bg: rgba(160, 175, 84, 0.08);
+
+  --border: rgba(52, 51, 49, 0.80);
+  --border-hover: rgba(64, 62, 60, 0.90);
+  --border-bright: rgba(206, 205, 195, 0.12);
+
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --input-border: rgba(206, 205, 195, 0.06);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(206, 205, 195, 0.08);
+  --scrollbar-thumb-hover: rgba(206, 205, 195, 0.14);
+
+  --success: #a0af54;
+}
+
+/* ═══ Flexoki Light — inky warm light (from OpenChamber) ═══ */
+:root[data-theme="flexoki-light"] {
+  color-scheme: light;
+
+  --bg-solid: #fffdf4;
+  --header-bg: rgba(255, 253, 244, 0.65);
+  --sidebar-bg: rgba(246, 245, 238, 0.95);
+  --bg-glass: rgba(0, 0, 0, 0.03);
+  --bg-glass-hover: rgba(0, 0, 0, 0.06);
+  --bg-glass-active: rgba(0, 0, 0, 0.09);
+  --bg-glass-strong: rgba(0, 0, 0, 0.04);
+  --bg-frosted: rgba(255, 253, 244, 0.82);
+
+  --text-primary: rgba(16, 15, 15, 0.90);
+  --text-secondary: rgba(104, 102, 99, 0.85);
+  --text-dim: rgba(104, 102, 99, 0.45);
+
+  --accent: #bc5215;
+  --accent-glow: rgba(188, 82, 21, 0.15);
+  --accent-subtle: rgba(188, 82, 21, 0.06);
+  --accent-text: #da702c;
+
+  --user-bubble: #f7f4ec;
+  --user-bubble-text: #100f0f;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #205ea6;
+  --tool-accent-text: #4385be;
+  --tool-bg: rgba(32, 94, 166, 0.07);
+  --tool-border: rgba(32, 94, 166, 0.14);
+
+  --thinking-accent: #66800b;
+  --thinking-accent-text: #879a39;
+  --thinking-bg: rgba(102, 128, 11, 0.07);
+
+  --border: rgba(218, 216, 206, 0.80);
+  --border-hover: rgba(206, 205, 195, 0.90);
+  --border-bright: rgba(16, 15, 15, 0.12);
+
+  --input-bg: rgba(0, 0, 0, 0.03);
+  --input-border: rgba(16, 15, 15, 0.08);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(16, 15, 15, 0.10);
+  --scrollbar-thumb-hover: rgba(16, 15, 15, 0.16);
+
+  --success: #879a39;
+}
+
 /* ═══ Clean — Apple-style light ═══ */
 :root[data-theme="clean"] {
   color-scheme: light;
@@ -326,6 +425,255 @@
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.16);
 
   --success: #2a8a52;
+}
+
+/* ═══ Monokai — classic vibrant dark ═══ */
+:root[data-theme="monokai"] {
+  color-scheme: dark;
+
+  --bg-solid: #272822;
+  --header-bg: rgba(39, 40, 34, 0.75);
+  --sidebar-bg: rgba(30, 31, 28, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(39, 40, 34, 0.82);
+
+  --text-primary: rgba(248, 248, 242, 0.92);
+  --text-secondary: rgba(248, 248, 242, 0.55);
+  --text-dim: rgba(248, 248, 242, 0.32);
+  --text-ghost: rgba(248, 248, 242, 0.10);
+
+  --accent: #ae81ff;
+  --accent-glow: rgba(174, 129, 255, 0.15);
+  --accent-subtle: rgba(174, 129, 255, 0.08);
+  --accent-text: #c6a8ff;
+
+  --user-bubble: #ae81ff;
+  --user-bubble-text: #ffffff;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #f92672;
+  --tool-accent-text: #ff6b9d;
+  --tool-bg: rgba(249, 38, 114, 0.08);
+  --tool-border: rgba(249, 38, 114, 0.15);
+
+  --thinking-accent: #a6e22e;
+  --thinking-accent-text: #c4f066;
+  --thinking-bg: rgba(166, 226, 46, 0.08);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.11);
+  --border-bright: rgba(255, 255, 255, 0.16);
+
+  --input-bg: rgba(0, 0, 0, 0.15);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.13);
+
+  --success: #a6e22e;
+}
+
+/* ═══ Dracula — popular dark with purple accents ═══ */
+:root[data-theme="dracula"] {
+  color-scheme: dark;
+
+  --bg-solid: #282a36;
+  --header-bg: rgba(40, 42, 54, 0.72);
+  --sidebar-bg: rgba(30, 32, 44, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(40, 42, 54, 0.82);
+
+  --text-primary: rgba(248, 248, 242, 0.92);
+  --text-secondary: rgba(248, 248, 242, 0.55);
+  --text-dim: rgba(248, 248, 242, 0.32);
+  --text-ghost: rgba(248, 248, 242, 0.10);
+
+  --accent: #bd93f9;
+  --accent-glow: rgba(189, 147, 249, 0.15);
+  --accent-subtle: rgba(189, 147, 249, 0.08);
+  --accent-text: #d4b8ff;
+
+  --user-bubble: #bd93f9;
+  --user-bubble-text: #ffffff;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #ff79c6;
+  --tool-accent-text: #ffa8da;
+  --tool-bg: rgba(255, 121, 198, 0.08);
+  --tool-border: rgba(255, 121, 198, 0.15);
+
+  --thinking-accent: #50fa7b;
+  --thinking-accent-text: #7fffa2;
+  --thinking-bg: rgba(80, 250, 123, 0.08);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.11);
+  --border-bright: rgba(255, 255, 255, 0.16);
+
+  --input-bg: rgba(0, 0, 0, 0.15);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.13);
+
+  --success: #50fa7b;
+}
+
+/* ═══ Nord — cool arctic dark ═══ */
+:root[data-theme="nord"] {
+  color-scheme: dark;
+
+  --bg-solid: #2e3440;
+  --header-bg: rgba(46, 52, 64, 0.72);
+  --sidebar-bg: rgba(36, 42, 54, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(46, 52, 64, 0.82);
+
+  --text-primary: rgba(236, 239, 244, 0.92);
+  --text-secondary: rgba(236, 239, 244, 0.55);
+  --text-dim: rgba(236, 239, 244, 0.32);
+  --text-ghost: rgba(236, 239, 244, 0.10);
+
+  --accent: #88c0d0;
+  --accent-glow: rgba(136, 192, 208, 0.15);
+  --accent-subtle: rgba(136, 192, 208, 0.08);
+  --accent-text: #a6d5e0;
+
+  --user-bubble: #88c0d0;
+  --user-bubble-text: #2e3440;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #81a1c1;
+  --tool-accent-text: #a5bfda;
+  --tool-bg: rgba(129, 161, 193, 0.08);
+  --tool-border: rgba(129, 161, 193, 0.14);
+
+  --thinking-accent: #5e81ac;
+  --thinking-accent-text: #7ea0c8;
+  --thinking-bg: rgba(94, 129, 172, 0.10);
+
+  --border: rgba(255, 255, 255, 0.05);
+  --border-hover: rgba(255, 255, 255, 0.09);
+  --border-bright: rgba(255, 255, 255, 0.13);
+
+  --input-bg: rgba(0, 0, 0, 0.12);
+  --input-border: rgba(255, 255, 255, 0.07);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.07);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.11);
+
+  --success: #a3be8c;
+}
+
+/* ═══ Solarized Dark — muted cyan dark (from OpenChamber) ═══ */
+:root[data-theme="solarized-dark"] {
+  color-scheme: dark;
+
+  --bg-solid: #001e25;
+  --header-bg: rgba(0, 30, 37, 0.75);
+  --sidebar-bg: rgba(2, 35, 46, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.07);
+  --bg-glass-active: rgba(255, 255, 255, 0.10);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(0, 30, 37, 0.82);
+
+  --text-primary: rgba(147, 161, 161, 0.92);
+  --text-secondary: rgba(111, 116, 117, 0.85);
+  --text-dim: rgba(111, 116, 117, 0.50);
+  --text-ghost: rgba(111, 116, 117, 0.20);
+
+  --accent: #278bd2;
+  --accent-glow: rgba(39, 139, 210, 0.18);
+  --accent-subtle: rgba(39, 139, 210, 0.08);
+  --accent-text: #51a0d5;
+
+  --user-bubble: #073642;
+  --user-bubble-text: #93a1a1;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #2aa198;
+  --tool-accent-text: #30b8ad;
+  --tool-bg: rgba(42, 161, 152, 0.10);
+  --tool-border: rgba(42, 161, 152, 0.20);
+
+  --thinking-accent: #b58900;
+  --thinking-accent-text: #d4a800;
+  --thinking-bg: rgba(181, 137, 0, 0.08);
+
+  --border: rgba(37, 63, 71, 0.80);
+  --border-hover: rgba(58, 90, 107, 0.90);
+  --border-bright: rgba(147, 161, 161, 0.12);
+
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --input-border: rgba(147, 161, 161, 0.06);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(147, 161, 161, 0.08);
+  --scrollbar-thumb-hover: rgba(147, 161, 161, 0.14);
+
+  --success: #859900;
+}
+
+/* ═══ Solarized Light — warm paper light (from OpenChamber) ═══ */
+:root[data-theme="solarized"] {
+  color-scheme: light;
+
+  --bg-solid: #fdf6e3;
+  --header-bg: rgba(253, 246, 227, 0.65);
+  --sidebar-bg: rgba(246, 239, 218, 0.95);
+  --bg-glass: rgba(0, 0, 0, 0.03);
+  --bg-glass-hover: rgba(0, 0, 0, 0.06);
+  --bg-glass-active: rgba(0, 0, 0, 0.10);
+  --bg-glass-strong: rgba(0, 0, 0, 0.04);
+  --bg-frosted: rgba(253, 246, 227, 0.82);
+
+  --text-primary: rgba(88, 110, 117, 0.92);
+  --text-secondary: rgba(122, 133, 135, 0.85);
+  --text-dim: rgba(122, 133, 135, 0.45);
+
+  --accent: #268bd2;
+  --accent-glow: rgba(38, 139, 210, 0.15);
+  --accent-subtle: rgba(38, 139, 210, 0.06);
+  --accent-text: #217ebc;
+
+  --user-bubble: #073642;
+  --user-bubble-text: #fdf6e3;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #2aa198;
+  --tool-accent-text: #248f87;
+  --tool-bg: rgba(42, 161, 152, 0.07);
+  --tool-border: rgba(42, 161, 152, 0.14);
+
+  --thinking-accent: #6c71c4;
+  --thinking-accent-text: #8086d2;
+  --thinking-bg: rgba(108, 113, 196, 0.06);
+
+  --border: rgba(224, 222, 204, 0.80);
+  --border-hover: rgba(217, 212, 194, 0.90);
+  --border-bright: rgba(7, 54, 66, 0.12);
+
+  --input-bg: rgba(0, 0, 0, 0.03);
+  --input-border: rgba(7, 54, 66, 0.08);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(7, 54, 66, 0.10);
+  --scrollbar-thumb-hover: rgba(7, 54, 66, 0.16);
+
+  --success: #859900;
 }
 
 /* ═══ Base Body ═══ */
