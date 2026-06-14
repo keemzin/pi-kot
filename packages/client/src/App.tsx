@@ -822,37 +822,7 @@ export function App() {
               onClose={() => setShowOrch(false)}
             />
             <AskUserQuestionPanel sessionId={activeSessionId} />
-            {!showOrch && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  padding: "2px 12px",
-                  fontSize: "11px",
-                  gap: "6px",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowOrch(true)}
-                  title="Orchestration (supervisor mode)"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    fontSize: "13px",
-                    padding: "2px 4px",
-                    lineHeight: 1,
-                    opacity: 0.6,
-                  }}
-                >
-                  ⚡
-                </button>
-              </div>
-            )}
-            <ChatInput sessionId={activeSessionId} />
+            <ChatInput sessionId={activeSessionId} showOrch={showOrch} setShowOrch={setShowOrch} />
           </>
         ) : (
           <div className="centered" style={{ height: "100%" }}>

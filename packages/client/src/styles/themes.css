@@ -1481,6 +1481,7 @@ body {
   -webkit-backdrop-filter: blur(12px);
   font-weight: 500;
   white-space: pre-wrap;
+  max-width: 80%;
 }
 
 .message-bubble.assistant {
@@ -1809,76 +1810,156 @@ body {
 }
 
 /* ═══ Input Area ═══ */
-.input-area {
+/* ═══ Tau-inspired chat input ═══ */
+
+.ti-area {
   display: flex;
   gap: 8px;
   align-items: center;
-  justify-content: center;
   width: 100%;
-  padding: 10px 24px 12px;
-  border-top: none;
-  background: transparent;
+  padding: 10px 20px 12px;
+  background: var(--header-bg);
   backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  border-top: none;
 }
 
-.chat-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  resize: none;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
+.ti-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: center;
+}
+
+.ti-icon-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration) var(--ease);
+  flex-shrink: 0;
+}
+
+.ti-icon-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-glass-hover);
+}
+
+.ti-icon-btn:active {
+  opacity: 0.7;
+}
+
+.ti-bubble {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.ti-input {
+  flex: 1;
+  padding: 12px 16px;
   background: var(--bg-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   color: var(--text-primary);
-  padding: 12px 18px;
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
-  line-height: 1.5;
   outline: none;
+  resize: none;
+  max-height: 160px;
+  line-height: 1.45;
+  overflow-y: auto;
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
   transition: all var(--duration) var(--ease);
 }
 
-.chat-input:focus {
+.ti-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
   background: var(--bg-glass-hover);
 }
 
-.chat-input::placeholder {
+.ti-input::placeholder {
   color: var(--text-dim);
 }
 
-.chat-input:disabled {
-  opacity: 0.5;
+.ti-input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
-.btn {
-  padding: 10px 18px;
-  border-radius: var(--radius-pill);
-  border: none;
-  font-weight: 600;
-  font-size: 14px;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--duration) var(--ease);
+.ti-actions {
+  display: flex;
+  gap: 4px;
+  align-self: center;
 }
 
-.btn:active {
-  transform: scale(0.97);
-}
-
-.btn-send {
+.ti-send-btn {
   width: 36px;
   height: 36px;
   padding: 0;
   border-radius: 50%;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: var(--accent);
-  color: var(--bg-solid);
-  box-shadow: 0 2px 10px var(--accent-glow);
+  border: none;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+  box-shadow: 3px 3px 10px var(--accent-glow), -2px -2px 6px rgba(255, 255, 255, 0.15), inset 0 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+.ti-send-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  filter: brightness(1.15);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.ti-send-btn:active:not(:disabled) {
+  transform: scale(0.88);
+  transition: transform 0.1s var(--ease);
+}
+
+.ti-send-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.ti-abort-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(248, 113, 113, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.25);
+  cursor: pointer;
+  color: var(--error);
+  transition: all var(--duration) var(--ease);
+}
+
+.ti-abort-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  background: rgba(248, 113, 113, 0.25);
+}
+
+.ti-abort-btn:active:not(:disabled) {
+  transform: scale(0.88);
+  transition: transform 0.1s var(--ease);
 }
 
 .settings-btn {
@@ -1897,27 +1978,6 @@ body {
 .settings-btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px var(--accent-glow);
-}
-
-.btn-send:active:not(:disabled) {
-  transform: scale(0.88);
-  transition: transform 0.1s var(--ease);
-}
-
-.btn-send:hover:not(:disabled) {
-  transform: scale(1.1);
-  filter: brightness(1.15);
-  box-shadow: 0 6px 18px var(--accent-glow);
-}
-
-.btn-abort {
-  background: rgba(248, 113, 113, 0.15);
-  color: var(--error);
-  border: 1px solid rgba(248, 113, 113, 0.25);
-}
-
-.btn-abort:hover {
-  background: rgba(248, 113, 113, 0.25);
 }
 
 /* ═══ Loading / Login ═══ */
