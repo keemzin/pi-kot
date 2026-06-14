@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { Check, Copy } from "lucide-react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -300,6 +301,59 @@ function UserMessageBubble({ text }: { text: string }) {
   );
 }
 
+/* ── Copy button for assistant messages ── */
+
+function CopyMsgButton({ getText }: { getText: () => string }) {
+  const [copied, setCopied] = useState(false);
+  const onClick = (): void => {
+    const text = getText();
+    if (text.length === 0) return;
+    const writeAsync = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    if (writeAsync !== undefined) {
+      void writeAsync(text)
+        .then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        })
+        .catch(() => fallback(text));
+    } else {
+      fallback(text);
+    }
+  };
+  const fallback = (text: string): void => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard unavailable — user can still select + Ctrl+C.
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick();
+      }}
+      className="copy-msg-btn"
+      title="Copy message"
+      aria-label="Copy message"
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+    </button>
+  );
+}
+
 /* ── Main ChatView ── */
 
 const MAX_TOOL_BATCH_TOOLS = 100;
@@ -422,6 +476,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       const isLastTurn = ti === turns.length - 1;
       const text = extractText(userMsg.content);
 
+      // Combined assistant text for the copy button (once per turn)
+      const combinedAssistantText = assistantMsgs
+        .map(m => extractText(m.content))
+        .filter(t => t.length > 0)
+        .join("\n\n");
+
       if (stickyUserHeader && text.length > 0) {
         // Sticky mode: wrap user message in a sticky container
         out.push(
@@ -452,6 +512,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               />
             </div>
             {assistantMsgs.length > 0 && renderAssistantMsgs(assistantMsgs, ti)}
+            {combinedAssistantText.length > 0 && (
+              <div className="assistant-msg-footer">
+                <CopyMsgButton getText={() => combinedAssistantText} />
+              </div>
+            )}
           </div>,
         );
       } else {
@@ -463,6 +528,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         );
         if (assistantMsgs.length > 0) {
           out.push(...renderAssistantMsgs(assistantMsgs, ti));
+        }
+        // Copy button below the entire assistant response for this turn
+        if (combinedAssistantText.length > 0) {
+          out.push(
+            <div key={`turn-${ti}-copy`} className="assistant-msg-footer">
+              <CopyMsgButton getText={() => combinedAssistantText} />
+            </div>,
+          );
         }
       }
     }

@@ -1511,6 +1511,42 @@ body {
 .message-bubble.assistant .table-wrapper { margin: 8px 0; }
 .message-bubble.assistant .md-table { font-size: 13px; }
 
+/* ═══ Copy button on assistant messages ═══ */
+
+.assistant-msg-footer {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0;
+  margin-top: 2px;
+  margin-bottom: 8px;
+}
+
+.copy-msg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--text-dim);
+  background: none;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+  line-height: 1.5;
+}
+
+.copy-msg-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+.copy-msg-btn:active {
+  color: var(--accent-text);
+}
+
 /* ═══ Tool results ═══ */
 .tool-result {
   border-radius: var(--radius);
