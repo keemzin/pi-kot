@@ -2114,9 +2114,8 @@ body {
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(16px);
   padding: 20px;
-  animation: fadeIn 0.15s var(--ease);
 }
 
 .settings-panel {
@@ -2125,11 +2124,19 @@ body {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-solid);
+  background: var(--bg-frosted);
+  backdrop-filter: blur(40px) saturate(1.6);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgba(0,0,0,0.4);
   overflow: hidden;
+  animation: sheetIn 0.25s var(--ease);
+}
+
+@keyframes sheetIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .settings-header {
@@ -2258,6 +2265,21 @@ body {
 .settings-select:focus,
 .settings-textarea:focus {
   border-color: var(--accent);
+}
+
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.settings-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 8px;
 }
 
 .settings-textarea {

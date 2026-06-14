@@ -409,6 +409,8 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
   const [busy, setBusy] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
+  const [orchProvider, setOrchProvider] = useState<string>("");
+  const [orchModel, setOrchModel] = useState<string>("");
 
   const refresh = async (): Promise<void> => {
     onError(undefined);
@@ -420,6 +422,8 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
       const sm = typeof s.defaultModel === "string" ? s.defaultModel : "";
       setSelectedProvider(sp);
       setSelectedModel(sm);
+      setOrchProvider(typeof s.orchProvider === "string" ? s.orchProvider : "");
+      setOrchModel(typeof s.orchModel === "string" ? s.orchModel : "");
     } catch (err) {
       onError(`Failed to load settings: ${errorMsg(err)}`);
     }
@@ -447,15 +451,20 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
     ? providers.providers.map((p) => ({ value: p.provider, label: p.provider }))
     : [];
 
-  // Models for the currently selected provider
+  // Models for the currently selected default provider
   const currentGroup = providers?.providers.find((p) => p.provider === selectedProvider);
   const modelOptions = currentGroup
     ? currentGroup.models.map((m) => ({ value: m.id, label: m.name }))
     : [];
 
+  // Models for the currently selected orch provider
+  const orchGroup = providers?.providers.find((p) => p.provider === orchProvider);
+  const orchModelOptions = orchGroup
+    ? orchGroup.models.map((m) => ({ value: m.id, label: m.name }))
+    : [];
+
   const handleProviderChange = (v: string) => {
     setSelectedProvider(v);
-    // If the current model isn't available under the new provider, clear it
     const group = providers?.providers.find((p) => p.provider === v);
     const modelAvailable = group?.models.some((m) => m.id === selectedModel);
     if (!modelAvailable) {
@@ -467,6 +476,21 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
   const handleModelChange = (v: string) => {
     setSelectedModel(v);
     void save({ defaultModel: v.length === 0 ? null : v });
+  };
+
+  const handleOrchProviderChange = (v: string) => {
+    setOrchProvider(v);
+    const group = providers?.providers.find((p) => p.provider === v);
+    const modelAvailable = group?.models.some((m) => m.id === orchModel);
+    if (!modelAvailable) {
+      setOrchModel("");
+    }
+    void save({ orchProvider: v.length === 0 ? null : v });
+  };
+
+  const handleOrchModelChange = (v: string) => {
+    setOrchModel(v);
+    void save({ orchModel: v.length === 0 ? null : v });
   };
 
   if (settings === undefined) {
@@ -512,6 +536,36 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
           onSave={(v) => save({ defaultThinkingLevel: v.length === 0 ? null : v })}
           disabled={busy}
         />
+      </Field>
+
+      <hr className="settings-divider" />
+
+      <p className="settings-section-title">Orchestrator</p>
+      <Field label="Orch provider" hint="Model for supervisor/worker sessions (leave empty to use default)">
+        <select
+          value={orchProvider}
+          disabled={busy}
+          onChange={(e) => handleOrchProviderChange(e.target.value)}
+          className="settings-select"
+        >
+          <option value="">(use default)</option>
+          {providerOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Orch model" hint="Model for supervisor/worker sessions">
+        <select
+          value={orchModel}
+          disabled={busy || orchProvider.length === 0}
+          onChange={(e) => handleOrchModelChange(e.target.value)}
+          className="settings-select"
+        >
+          <option value="">(use default)</option>
+          {orchModelOptions.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </Field>
     </div>
   );

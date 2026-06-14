@@ -27,6 +27,7 @@ import {
   unregisterWorker,
 } from "./store.js";
 import { killWorkerAndArchive } from "./worker-lifecycle.js";
+import { readSettings } from "../config-manager.js";
 
 // ---- result shape helpers ----
 
@@ -261,6 +262,26 @@ function createSpawnWorker(supervisorId: string): ToolDefinition {
           "spawn_failed",
           `createSession threw: ${e instanceof Error ? e.message : String(e)}`,
         );
+      }
+
+      // Apply orchestrator model override if configured
+      try {
+        const settings = readSettings();
+        const orchProvider = settings.orchProvider as string | undefined;
+        const orchModel = settings.orchModel as string | undefined;
+        if (orchProvider !== undefined && orchModel !== undefined && orchProvider.length > 0 && orchModel.length > 0) {
+          const { AuthStorage, ModelRegistry } = await import("@earendil-works/pi-coding-agent");
+          const { config } = await import("../config.js");
+          const store = AuthStorage.create(config.piConfigDir);
+          const registry = ModelRegistry.create(store);
+          registry.refresh();
+          const fullModel = registry.find(orchProvider, orchModel);
+          if (fullModel !== undefined) {
+            worker.session.setModel(fullModel);
+          }
+        }
+      } catch {
+        // Non-fatal — worker runs with default model
       }
       try {
         await registerWorker({

@@ -95,7 +95,19 @@ export function updateSettings(patch: Record<string, unknown>): Record<string, u
     mgr.setEnableSkillCommands(patch.enableSkillCommands === null ? false : Boolean(patch.enableSkillCommands));
   }
   mgr.flush();
-  return mgr.getGlobalSettings() as unknown as Record<string, unknown>;
+
+  // Handle orchestrator model fields (not managed by SDK SettingsManager)
+  const raw = mgr.getGlobalSettings() as Record<string, unknown>;
+  if (patch.orchProvider !== undefined) {
+    raw.orchProvider = patch.orchProvider === null ? undefined : String(patch.orchProvider);
+  }
+  if (patch.orchModel !== undefined) {
+    raw.orchModel = patch.orchModel === null ? undefined : String(patch.orchModel);
+  }
+  // Write back to persist the extra fields
+  writeSettings(raw).catch(() => undefined);
+
+  return raw;
 }
 
 // ── Models (models.json) ──────────────────────────────────────────────────
