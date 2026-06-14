@@ -496,6 +496,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               }}
             >
               <UserMessageBubble text={text} />
+              {text.length > 0 && (
+                <div className="assistant-msg-footer">
+                  <CopyMsgButton getText={() => text} />
+                </div>
+              )}
               <div
                 aria-hidden="true"
                 style={{
@@ -526,6 +531,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             <div className="message-bubble user">{text}</div>
           </div>,
         );
+        // Copy button below the user message
+        if (text.length > 0) {
+          out.push(
+            <div key={`user-${userIdx}-copy`} className="assistant-msg-footer">
+              <CopyMsgButton getText={() => text} />
+            </div>,
+          );
+        }
         if (assistantMsgs.length > 0) {
           out.push(...renderAssistantMsgs(assistantMsgs, ti));
         }
