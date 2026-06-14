@@ -269,7 +269,7 @@ function UserMessageBubble({ text }: { text: string }) {
           style={{
             overflow: "hidden",
             transition: "max-height 0.25s ease",
-            maxHeight: !expanded ? "3.2em" : "2000px",
+            maxHeight: !expanded ? "4em" : "2000px",
             ...(!expanded
               ? {
                   display: "-webkit-box",
