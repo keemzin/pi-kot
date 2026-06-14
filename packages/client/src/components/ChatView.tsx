@@ -21,6 +21,67 @@ interface Props {
   providerName?: string;
 }
 
+/* ── Copy-to-clipboard button ── */
+
+function CopyButton({ getText, style }: { getText: () => string; style?: React.CSSProperties }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    const text = getText();
+    if (text.length === 0) return;
+    const api = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    if (api !== undefined) {
+      void api(text)
+        .then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        })
+        .catch(() => fallback(text));
+    } else {
+      fallback(text);
+    }
+  };
+
+  const fallback = (t: string) => {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = t;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch { /* clipboard unavailable */ }
+  };
+
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); copy(); }}
+      title="Copy message text"
+      style={{
+        background: "var(--bg-glass)",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 12,
+        lineHeight: 1,
+        padding: "2px 5px",
+        color: copied ? "var(--success)" : "var(--text-tertiary)",
+        transition: "color 0.15s",
+        opacity: 0.5,
+        ...style,
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+      onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+    >
+      {copied ? "✓" : "📋"}
+    </button>
+  );
+}
+
 function extractText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -406,7 +467,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         if (text.length > 0) {
           elements.push(
             <div key={`turn-${turnIdx}-text-${elements.length}`} className="message-row assistant">
-              <div className="message-bubble assistant">
+              <div className="message-bubble assistant" style={{ position: "relative" }}>
+                <CopyButton
+                  getText={() => text}
+                  style={{ position: "absolute", top: 0, right: 0 }}
+                />
                 <ChatMarkdown text={text} />
               </div>
             </div>,
