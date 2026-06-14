@@ -2,9 +2,9 @@
  * Settings Panel — modal overlay with config tabs.
  *
  * Ported from pi-forge/packages/client/src/components/SettingsPanel.tsx
- * Simplified for pi-kot: Providers, Agent, Appearance, General tabs.
+ * Simplified for pi-kot: Appearance, Providers, Agent, General tabs.
  */
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   fetchProviders,
   getAuthSummary,
@@ -19,7 +19,7 @@ import {
 } from "../lib/api-client";
 import { getSavedTheme, applyTheme, themes } from "../lib/theme";
 
-type Tab = "providers" | "agent" | "appearance" | "general";
+type Tab = "appearance" | "providers" | "agent" | "general";
 
 interface Props {
   onClose: () => void;
@@ -27,18 +27,20 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose, initialTab }: Props) {
-  const visibleTabs: Tab[] = ["providers", "agent", "appearance", "general"];
+  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general"];
 
-  const [tab, setTab] = useState<Tab>(initialTab ?? "providers");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
   const [error, setError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!visibleTabs.includes(tab)) setTab("providers");
+    if (!visibleTabs.includes(tab)) setTab("appearance");
   }, [tab]);
 
   useEffect(() => {
     if (initialTab !== undefined && visibleTabs.includes(initialTab)) {
       setTab(initialTab);
+    } else if (initialTab === undefined || !visibleTabs.includes(initialTab)) {
+      setTab("appearance");
     }
   }, [initialTab]);
 
@@ -50,6 +52,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       <div
         onClick={(e) => e.stopPropagation()}
         className="settings-panel"
+        style={{ width: 720, maxWidth: "92vw", maxHeight: "82vh" }}
       >
         <header className="settings-header">
           <div className="settings-tabs" style={{ display: "flex", gap: 2 }}>
@@ -59,12 +62,12 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
                 onClick={() => setTab(t)}
                 className={`settings-tab ${tab === t ? "settings-tab-active" : ""}`}
               >
-                {t === "providers"
-                  ? "Providers"
-                  : t === "agent"
-                    ? "Agent"
-                    : t === "appearance"
-                      ? "Appearance"
+                {t === "appearance"
+                  ? "Appearance"
+                  : t === "providers"
+                    ? "Providers"
+                    : t === "agent"
+                      ? "Agent"
                       : "General"}
               </button>
             ))}
@@ -85,9 +88,9 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
         )}
 
         <div className="settings-body">
+          {tab === "appearance" && <AppearanceTab />}
           {tab === "providers" && <ProvidersTab onError={setError} />}
           {tab === "agent" && <AgentTab onError={setError} />}
-          {tab === "appearance" && <AppearanceTab />}
           {tab === "general" && <GeneralTab />}
         </div>
       </div>
@@ -110,6 +113,34 @@ function useSavedFlash(
 
 function errorMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+// ---------------- Appearance tab ----------------
+
+function AppearanceTab() {
+  const [current, setCurrent] = useState(() => getSavedTheme());
+
+  const select = (id: string) => {
+    setCurrent(id);
+    applyTheme(id);
+  };
+
+  return (
+    <div className="settings-fields">
+      <p className="settings-hint">Choose a theme. Saved to localStorage.</p>
+      <div className="settings-theme-grid">
+        {themes.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => select(t.id)}
+            className={`settings-theme-swatch ${current === t.id ? "settings-theme-active" : ""}`}
+          >
+            {t.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 // ---------------- Providers tab ----------------
@@ -314,7 +345,7 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
             />
             <div className="settings-json-actions">
               {jsonSavedAt !== undefined && (
-                <span className="text-green">Saved</span>
+                <span className="settings-json-flash">Saved</span>
               )}
               <button
                 onClick={() => void loadModelsJson()}
@@ -404,34 +435,6 @@ function AgentTab({ onError }: { onError: (msg: string | undefined) => void }) {
           disabled={busy}
         />
       </Field>
-    </div>
-  );
-}
-
-// ---------------- Appearance tab ----------------
-
-function AppearanceTab() {
-  const [current, setCurrent] = useState(() => getSavedTheme());
-
-  const select = (id: string) => {
-    setCurrent(id);
-    applyTheme(id);
-  };
-
-  return (
-    <div className="settings-fields">
-      <p className="settings-hint">Choose a theme. Saved to localStorage.</p>
-      <div className="settings-theme-grid">
-        {themes.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => select(t.id)}
-            className={`settings-theme-swatch ${current === t.id ? "settings-theme-active" : ""}`}
-          >
-            {t.name}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

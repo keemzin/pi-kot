@@ -24,6 +24,7 @@ import { useSessionStore } from "../stores/session-store";
 interface Props {
   sessionId: string;
   projectId: string;
+  open: boolean;
   onClose: () => void;
 }
 
@@ -38,7 +39,7 @@ interface NodeView extends SessionTreeEntry {
 
 const MODEL_KEY_PREFIX = "pi-kot/model/";
 
-export function SessionTreePanel({ sessionId, projectId, onClose }: Props) {
+export function SessionTreePanel({ sessionId, projectId, open, onClose }: Props) {
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const loadProjectSessions = useSessionStore((s) => s.loadProjectSessions);
@@ -153,26 +154,33 @@ export function SessionTreePanel({ sessionId, projectId, onClose }: Props) {
         position: "fixed",
         inset: 0,
         zIndex: 1000,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         background: "rgba(0,0,0,0.6)",
-        padding: "16px",
+        pointerEvents: open ? "auto" : "none",
+        transition: "opacity 0.18s ease",
+        opacity: open ? 1 : 0,
       }}
-      onClick={onClose}
+      onClick={open ? onClose : undefined}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
+          position: "absolute",
+          top: 52,
+          right: 0,
+          bottom: 0,
+          width: 420,
+          maxWidth: "92vw",
           display: "flex",
           flexDirection: "column",
-          width: "min(95vw, 1200px)",
-          height: "min(90vh, 700px)",
-          borderRadius: "var(--radius)",
-          border: "1px solid var(--tool-border)",
+          borderRadius: "var(--radius) 0 0 var(--radius)",
+          borderLeft: "1px solid var(--tool-border)",
           background: "var(--bg-frosted)",
           backdropFilter: "blur(var(--blur-heavy))",
           overflow: "hidden",
+          transform: open ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.18s ease",
+          willChange: "transform",
+          boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
         }}
       >
         {/* Header */}

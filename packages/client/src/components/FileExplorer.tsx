@@ -11,6 +11,7 @@ interface TreeNode {
 
 interface Props {
   projectId: string;
+  open: boolean;
   onClose: () => void;
 }
 
@@ -24,9 +25,11 @@ interface OpenFileState {
   loadingError?: string;
 }
 
-type View = "tree" | "editor";
+type PaneView = "tree" | "editor";
 
-export function FileExplorer({ projectId, onClose }: Props) {
+const EXPLORER_WIDTH = 360;
+
+export function FileExplorer({ projectId, open, onClose }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -40,38 +43,11 @@ export function FileExplorer({ projectId, onClose }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>();
   const [openFiles, setOpenFiles] = useState<OpenFileState[]>([]);
   const [activePath, setActivePath] = useState<string | undefined>();
-  const [view, setView] = useState<View>("tree");
+  const [view, setView] = useState<PaneView>("tree");
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
-  const [panelWidth, setPanelWidth] = useState(520);
-  const [resizing, setResizing] = useState(false);
   const [wordWrap, setWordWrap] = useState(true);
   const renameRef = useRef<HTMLInputElement>(null);
   const createRef = useRef<HTMLInputElement>(null);
-
-  // Resize logic
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setResizing(true);
-    const startX = e.clientX;
-    const startW = panelWidth;
-
-    const onMouseMove = (ev: MouseEvent) => {
-      const delta = startX - ev.clientX;
-      const newW = Math.min(Math.max(startW + delta, 280), window.innerWidth * 0.85);
-      setPanelWidth(newW);
-    };
-    const onMouseUp = () => {
-      setResizing(false);
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    document.body.style.cursor = "ew-resize";
-    document.body.style.userSelect = "none";
-  }, [panelWidth]);
 
   const loadTree = useCallback(async () => {
     setLoading(true);
@@ -93,69 +69,9 @@ export function FileExplorer({ projectId, onClose }: Props) {
   useEffect(() => {
     if (showCreate) createRef.current?.focus();
   }, [showCreate]);
-
-  // ── Persist open tabs across explorer open/close ──
-  const TABS_KEY = `pi-kot/explorer-tabs:${projectId}`;
-
-  // Restore tabs from sessionStorage on mount
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem(TABS_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw) as { paths: string[]; activePath: string | null };
-      if (!Array.isArray(data.paths) || data.paths.length === 0) return;
-      // Open each saved path
-      const openAll = async () => {
-        // Open the first one immediately to set up tabs
-        for (const p of data.paths) {
-          const existing = openFiles.find((f) => f.path === p);
-          if (existing) continue;
-          const placeholder: OpenFileState = {
-            path: p, content: "", saved: "", dirty: false,
-            language: "", saving: false,
-          };
-          setOpenFiles((prev) => [...prev, placeholder]);
-          // Fetch content
-          try {
-            const res = await fetch(
-              `/api/v1/files/read?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(p)}`,
-            );
-            if (!res.ok) throw new Error(`read ${res.status}`);
-            const d = (await res.json()) as { content: string; language: string; binary: boolean };
-            const content = d.binary ? "(binary file)" : d.content ?? "";
-            setOpenFiles((prev) =>
-              prev.map((f) =>
-                f.path === p ? { ...f, content, saved: content, language: d.language, dirty: false } : f,
-              ),
-            );
-          } catch {
-            setOpenFiles((prev) => prev.filter((f) => f.path !== p));
-          }
-        }
-        // Restore active path
-        if (data.activePath && data.paths.includes(data.activePath)) {
-          setActivePath(data.activePath);
-        }
-      };
-      openAll();
-    } catch {
-      // ignore corrupt storage
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Save tabs to sessionStorage whenever they change
-  useEffect(() => {
-    try {
-      const paths = openFiles.map((f) => f.path);
-      sessionStorage.setItem(
-        TABS_KEY,
-        JSON.stringify({ paths, activePath: activePath ?? null }),
-      );
-    } catch {
-      // storage full or private mode
-    }
-  }, [openFiles, activePath, TABS_KEY]);
+    if (renaming !== undefined) renameRef.current?.focus();
+  }, [renaming]);
 
   const openFile = useCallback(async (path: string) => {
     const existing = openFiles.find((f) => f.path === path);
@@ -182,29 +98,23 @@ export function FileExplorer({ projectId, onClose }: Props) {
       const content = data.binary ? "(binary file)" : data.content ?? "";
       setOpenFiles((prev) =>
         prev.map((f) =>
-          f.path === path
-            ? { ...f, content, saved: content, language: data.language, dirty: false }
-            : f,
+          f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
         ),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "read failed");
       setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-      if (activePath === path) setActivePath(undefined);
+      setActivePath((prev) => (prev === path ? undefined : prev));
       setView("tree");
     }
   }, [openFiles, activePath, projectId]);
 
   const handleTabClose = useCallback((path: string) => {
-    setOpenFiles((prev) => {
-      const remaining = prev.filter((f) => f.path !== path);
-      return remaining;
-    });
+    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
     setActivePath((prev) => {
       if (prev !== path) return prev;
       const remaining = openFiles.filter((f) => f.path !== path);
-      if (remaining.length > 0) return remaining[remaining.length - 1].path;
-      return undefined;
+      return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
     });
   }, [openFiles]);
 
@@ -227,7 +137,7 @@ export function FileExplorer({ projectId, onClose }: Props) {
       }
       setOpenFiles((prev) =>
         prev.map((f) =>
-          f.path === activePath ? { ...f, dirty: false, saved: f.content, saving: false } : f,
+          f.path === activePath ? { ...f, dirty: false, saved: file.content, saving: false } : f,
         ),
       );
     } catch (err) {
@@ -416,7 +326,7 @@ export function FileExplorer({ projectId, onClose }: Props) {
           )}
 
           {!isRenaming && (
-            <div style={{ display: "flex", gap: "1px", opacity: 0, flexShrink: 0 }} className="file-row-actions">
+            <div style={{ display: "flex", gap: "1px", opacity: 0.7, flexShrink: 0 }} className="file-row-actions">
               {isDir && (
                 <button
                   onClick={() => { setCreateParent(node.path); setShowCreate("file"); setCreateName(""); }}
@@ -446,330 +356,313 @@ export function FileExplorer({ projectId, onClose }: Props) {
 
   const activeFile = openFiles.find((f) => f.path === activePath);
 
-  const baseOverlayStyle: React.CSSProperties = {
-    position: "fixed",
-    top: 52,
-    bottom: 0,
-    right: 0,
-    zIndex: 100,
-    width: Math.min(panelWidth, window.innerWidth * 0.85),
-    background: "var(--bg-solid)",
-    borderLeft: "1px solid var(--border)",
-    display: "flex",
-    flexDirection: "column",
-    boxShadow: "-4px 0 24px rgba(0,0,0,0.3)",
-    transition: resizing ? "none" : "width 0.15s ease",
-  };
-
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 99 }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{
+        position: "fixed",
+        top: 52,
+        right: 0,
+        bottom: 0,
+        width: EXPLORER_WIDTH,
+        zIndex: 120,
+        background: "var(--bg-solid)",
+        borderLeft: "1px solid var(--border)",
+        boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
+        display: "flex",
+        flexDirection: "column",
+        transform: open ? "translateX(0)" : "translateX(100%)",
+        transition: "transform 0.18s ease",
+        willChange: "transform",
+      }}
+      onClick={(e) => e.stopPropagation()}
     >
-      {/* Backdrop */}
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)" }} />
-
-      {/* Overlay panel */}
-      <div style={baseOverlayStyle}>
-        {/* Resize handle */}
-        <div
-          onMouseDown={startResize}
-          style={{
-            position: "absolute", left: 0, top: 0, bottom: 0, width: "5px",
-            cursor: "ew-resize", zIndex: 10,
-          }}
-          title="Drag to resize"
-        />
-
-        {/* ── VIEW: Tree ── */}
-        {view === "tree" && (
-          <>
-            {/* Header */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "10px 14px", borderBottom: "1px solid var(--border)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-                  Files
-                </span>
-                {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading...</span>}
-              </div>
-              <div style={{ display: "flex", gap: "2px" }}>
-                <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📄</button>
-                <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📁</button>
-                <button onClick={loadTree} title="Refresh" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "14px", borderRadius: "var(--radius-sm)" }} type="button">↻</button>
-                <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "2px 5px", fontSize: "15px", borderRadius: "var(--radius-sm)" }} type="button">✕</button>
-              </div>
+      {/* ── VIEW: Tree ── */}
+      {view === "tree" && (
+        <>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "10px 12px", borderBottom: "1px solid var(--border)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                Files
+              </span>
+              {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading...</span>}
             </div>
+            <div style={{ display: "flex", gap: "2px" }}>
+              <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📄</button>
+              <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📁</button>
+              <button onClick={loadTree} title="Refresh" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "14px", borderRadius: "var(--radius-sm)" }} type="button">↻</button>
+              <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "2px 5px", fontSize: "15px", borderRadius: "var(--radius-sm)" }} type="button">✕</button>
+            </div>
+          </div>
 
-            {/* Error */}
-            {error && (
-              <div style={{ padding: "4px 14px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
-                {error}
-              </div>
-            )}
+          {/* Error */}
+          {error && (
+            <div style={{ padding: "4px 12px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
+              {error}
+            </div>
+          )}
 
-            {/* Search */}
-            <div style={{ padding: "6px 10px" }}>
+          {/* Search */}
+          <div style={{ padding: "6px 10px" }}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search files..."
+              style={{
+                width: "100%", background: "var(--bg-glass)", border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px",
+                color: "var(--text-primary)", outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Create dialog */}
+          {showCreate && (
+            <div style={{ padding: "4px 10px 6px", borderBottom: "1px solid var(--border)", display: "flex", gap: "4px", alignItems: "center", fontSize: "11px" }}>
+              <span style={{ color: "var(--text-dim)", flexShrink: 0 }}>
+                {showCreate === "file" ? "📄" : "📁"}:
+              </span>
               <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search files..."
+                ref={createRef}
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowCreate(undefined); }}
+                placeholder={showCreate === "file" ? "name.ts" : "folder-name"}
                 style={{
-                  width: "100%", background: "var(--bg-glass)", border: "1px solid var(--border)",
-                  borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px",
+                  flex: 1, background: "var(--bg-solid)", border: "1px solid var(--border-bright)",
+                  borderRadius: "var(--radius-sm)", padding: "2px 5px", fontSize: "11px",
                   color: "var(--text-primary)", outline: "none",
                 }}
               />
+              <button onClick={handleCreate} style={{ padding: "2px 6px", fontSize: "10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer" }} type="button">Create</button>
+              <button onClick={() => setShowCreate(undefined)} style={{ padding: "2px 6px", fontSize: "10px", border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer" }} type="button">Cancel</button>
             </div>
+          )}
 
-            {/* Create dialog */}
-            {showCreate && (
-              <div style={{ padding: "4px 10px 6px", borderBottom: "1px solid var(--border)", display: "flex", gap: "4px", alignItems: "center", fontSize: "11px" }}>
-                <span style={{ color: "var(--text-dim)", flexShrink: 0 }}>
-                  {showCreate === "file" ? "📄" : "📁"}:
-                </span>
-                <input
-                  ref={createRef}
-                  value={createName}
-                  onChange={(e) => setCreateName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setShowCreate(undefined); }}
-                  placeholder={showCreate === "file" ? "name.ts" : "folder-name"}
-                  style={{
-                    flex: 1, background: "var(--bg-solid)", border: "1px solid var(--border-bright)",
-                    borderRadius: "var(--radius-sm)", padding: "2px 5px", fontSize: "11px",
-                    color: "var(--text-primary)", outline: "none",
-                  }}
-                />
-                <button onClick={handleCreate} style={{ padding: "2px 6px", fontSize: "10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer" }} type="button">Create</button>
-                <button onClick={() => setShowCreate(undefined)} style={{ padding: "2px 6px", fontSize: "10px", border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer" }} type="button">Cancel</button>
+          {/* Delete confirmation */}
+          {confirmDelete && (
+            <div style={{ padding: "4px 10px", borderBottom: "1px solid var(--border)", display: "flex", gap: "6px", alignItems: "center", fontSize: "11px", background: "rgba(248,113,113,0.06)" }}>
+              <span style={{ color: "var(--error)" }}>Delete {confirmDelete.split("/").pop()}?</span>
+              <button onClick={() => handleDelete(confirmDelete)} style={{ padding: "2px 6px", fontSize: "10px", border: "1px solid var(--error)", borderRadius: "var(--radius-sm)", background: "transparent", color: "var(--error)", cursor: "pointer" }} type="button">Delete</button>
+              <button onClick={() => setConfirmDelete(undefined)} style={{ padding: "2px 6px", fontSize: "10px", border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer" }} type="button">Cancel</button>
+            </div>
+          )}
+
+          {/* Tree */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", fontSize: "12px" }}>
+            {loading && tree.length === 0 && (
+              <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>Loading...</div>
+            )}
+            {!loading && filteredTree.length === 0 && (
+              <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
+                {search ? "No files match search" : "No files"}
               </div>
             )}
+            {filteredTree.map((node) => renderNode(node, 0))}
+          </div>
+        </>
+      )}
 
-            {/* Delete confirmation */}
-            {confirmDelete && (
-              <div style={{ padding: "4px 10px", borderBottom: "1px solid var(--border)", display: "flex", gap: "6px", alignItems: "center", fontSize: "11px", background: "rgba(248,113,113,0.06)" }}>
-                <span style={{ color: "var(--error)" }}>Delete {confirmDelete.split("/").pop()}?</span>
-                <button onClick={() => handleDelete(confirmDelete)} style={{ padding: "2px 6px", fontSize: "10px", border: "1px solid var(--error)", borderRadius: "var(--radius-sm)", background: "transparent", color: "var(--error)", cursor: "pointer" }} type="button">Delete</button>
-                <button onClick={() => setConfirmDelete(undefined)} style={{ padding: "2px 6px", fontSize: "10px", border: "none", background: "none", color: "var(--text-dim)", cursor: "pointer" }} type="button">Cancel</button>
-              </div>
-            )}
+      {/* ── VIEW: Editor ── */}
+      {view === "editor" && (
+        <>
+          {/* Editor header with back button + tabs */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "4px",
+            padding: "6px 10px", borderBottom: "1px solid var(--border)",
+            background: "var(--bg-glass)",
+          }}>
+            <button
+              onClick={() => setView("tree")}
+              title="Back to file tree"
+              style={{
+                background: "none", border: "none", color: "var(--text-secondary)",
+                cursor: "pointer", padding: "4px 8px", fontSize: "14px",
+                borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
+              }}
+              type="button"
+            >
+              ←
+            </button>
 
-            {/* Tree */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", fontSize: "12px" }}>
-              {loading && tree.length === 0 && (
-                <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>Loading...</div>
-              )}
-              {!loading && filteredTree.length === 0 && (
-                <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
-                  {search ? "No files match search" : "No files"}
-                </div>
-              )}
-              {filteredTree.map((node) => renderNode(node, 0))}
-            </div>
-          </>
-        )}
-
-        {/* ── VIEW: Editor ── */}
-        {view === "editor" && (
-          <>
-            {/* Editor header with back button + tabs */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "4px",
-              padding: "6px 10px", borderBottom: "1px solid var(--border)",
-              background: "var(--bg-glass)",
-            }}>
-              <button
-                onClick={() => setView("tree")}
-                title="Back to file tree"
-                style={{
-                  background: "none", border: "none", color: "var(--text-secondary)",
-                  cursor: "pointer", padding: "4px 8px", fontSize: "14px",
-                  borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
-                }}
-                type="button"
-              >
-                ←
-              </button>
-
-              {/* Tab strip */}
-              <div style={{ display: "flex", flex: 1, overflowX: "auto", gap: "2px" }}>
-                {openFiles.map((f) => {
-                  const isActive = f.path === activePath;
-                  return (
-                    <div
-                      key={f.path}
-                      style={{
-                        display: "flex", alignItems: "center", gap: "3px",
-                        padding: "3px 8px", fontSize: "11px", whiteSpace: "nowrap",
-                        borderRadius: "var(--radius-sm)",
-                        background: isActive ? "var(--accent-subtle)" : "transparent",
-                        color: isActive ? "var(--accent-text)" : "var(--text-dim)",
-                        cursor: "default", minWidth: 0,
-                      }}
-                    >
-                      <button
-                        onClick={() => setActivePath(f.path)}
-                        style={{
-                          background: "none", border: "none", color: "inherit",
-                          cursor: "pointer", padding: 0, fontSize: "11px",
-                          overflow: "hidden", textOverflow: "ellipsis",
-                        }}
-                        type="button"
-                      >
-                        {f.dirty && (
-                          <span style={{ color: "var(--accent-bg)", marginRight: "2px" }}>●</span>
-                        )}
-                        {f.path.split("/").pop()}
-                      </button>
-                      <button
-                        onClick={() => handleTabClose(f.path)}
-                        title="Close tab"
-                        style={{
-                          background: "none", border: "none", color: "var(--text-dim)",
-                          cursor: "pointer", padding: "1px", fontSize: "10px",
-                          opacity: 0.5, lineHeight: 1, flexShrink: 0,
-                        }}
-                        type="button"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Close button */}
-              <button
-                onClick={onClose}
-                title="Close"
-                style={{
-                  background: "none", border: "none", color: "var(--text-secondary)",
-                  cursor: "pointer", padding: "2px 5px", fontSize: "15px",
-                  borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
-                }}
-                type="button"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div style={{ padding: "4px 14px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
-                {error}
-              </div>
-            )}
-
-            {/* Active editor */}
-            {activeFile ? (
-              <>
-                {/* Editor toolbar */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px",
-                  padding: "3px 10px", fontSize: "10px", color: "var(--text-dim)",
-                  borderBottom: "1px solid var(--border)",
-                }}>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                    {activeFile.path}
-                  </span>
-
-                  {/* Raw / Rendered toggle */}
-                  <div style={{
-                    display: "flex", gap: "1px",
-                    background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
-                    padding: "1px", flexShrink: 0,
-                  }}>
+            {/* Tab strip */}
+            <div style={{ display: "flex", flex: 1, overflowX: "auto", gap: "2px" }}>
+              {openFiles.map((f) => {
+                const isActive = f.path === activePath;
+                return (
+                  <div
+                    key={f.path}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "3px",
+                      padding: "3px 8px", fontSize: "11px", whiteSpace: "nowrap",
+                      borderRadius: "var(--radius-sm)",
+                      background: isActive ? "var(--accent-subtle)" : "transparent",
+                      color: isActive ? "var(--accent-text)" : "var(--text-dim)",
+                      cursor: "default", minWidth: 0,
+                    }}
+                  >
                     <button
-                      onClick={() => setEditorMode("raw")}
+                      onClick={() => setActivePath(f.path)}
                       style={{
-                        background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                        border: "none", cursor: "pointer",
-                        color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                        fontSize: "10px", fontWeight: 600,
-                        padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                        background: "none", border: "none", color: "inherit",
+                        cursor: "pointer", padding: 0, fontSize: "11px",
+                        overflow: "hidden", textOverflow: "ellipsis",
                       }}
                       type="button"
                     >
-                      Raw
+                      {f.dirty && (
+                        <span style={{ color: "var(--accent-bg)", marginRight: "2px" }}>●</span>
+                      )}
+                      {f.path.split("/").pop()}
                     </button>
                     <button
-                      onClick={() => setEditorMode("rendered")}
+                      onClick={() => handleTabClose(f.path)}
+                      title="Close tab"
                       style={{
-                        background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                        border: "none", cursor: "pointer",
-                        color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                        fontSize: "10px", fontWeight: 600,
-                        padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                        background: "none", border: "none", color: "var(--text-dim)",
+                        cursor: "pointer", padding: "1px", fontSize: "10px",
+                        opacity: 0.5, lineHeight: 1, flexShrink: 0,
                       }}
-                      type="button"
                     >
-                      Rendered
+                      ✕
                     </button>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Word wrap toggle */}
-                  {editorMode === "raw" && (
-                    <button
-                      onClick={() => setWordWrap((w) => !w)}
-                      title="Toggle word wrap"
-                      style={{
-                        padding: "2px 6px", fontSize: "9px", fontWeight: 600,
-                        border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                        background: wordWrap ? "var(--accent-bg)" : "transparent",
-                        color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
-                        cursor: "pointer", flexShrink: 0,
-                      }}
-                      type="button"
-                    >
-                      WRAP
-                    </button>
-                  )}
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              title="Close"
+              style={{
+                background: "none", border: "none", color: "var(--text-secondary)",
+                cursor: "pointer", padding: "2px 5px", fontSize: "15px",
+                borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
+              }}
+              type="button"
+            >
+              ✕
+            </button>
+          </div>
 
+          {/* Error */}
+          {error && (
+            <div style={{ padding: "4px 14px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
+              {error}
+            </div>
+          )}
+
+          {/* Active editor */}
+          {activeFile ? (
+            <>
+              {/* Editor toolbar */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px",
+                padding: "3px 10px", fontSize: "10px", color: "var(--text-dim)",
+                borderBottom: "1px solid var(--border)",
+              }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  {activeFile.path}
+                </span>
+
+                {/* Raw / Rendered toggle */}
+                <div style={{
+                  display: "flex", gap: "1px",
+                  background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
+                  padding: "1px", flexShrink: 0,
+                }}>
                   <button
-                    onClick={handleSave}
-                    disabled={!activeFile.dirty || activeFile.saving}
+                    onClick={() => setEditorMode("raw")}
                     style={{
-                      padding: "2px 8px", fontSize: "10px", fontWeight: 600, flexShrink: 0,
-                      border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                      background: activeFile.dirty ? "var(--accent-bg)" : "transparent",
-                      color: activeFile.dirty ? "var(--accent-text)" : "var(--text-dim)",
-                      cursor: activeFile.dirty && !activeFile.saving ? "pointer" : "default",
+                      background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
+                      border: "none", cursor: "pointer",
+                      color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
+                      fontSize: "10px", fontWeight: 600,
+                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
                     }}
                     type="button"
                   >
-                    {activeFile.saving ? "Saving…" : activeFile.dirty ? "Save" : "Saved"}
+                    Raw
+                  </button>
+                  <button
+                    onClick={() => setEditorMode("rendered")}
+                    style={{
+                      background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
+                      border: "none", cursor: "pointer",
+                      color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
+                      fontSize: "10px", fontWeight: 600,
+                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
+                    }}
+                    type="button"
+                  >
+                    Rendered
                   </button>
                 </div>
 
-                {editorMode === "raw" ? (
-                  <CodeMirrorEditor
-                    key={`editor-${activeFile.path}`}
-                    value={activeFile.content}
-                    onChange={(val) => handleContentChange(val)}
-                    onSave={handleSave}
-                    fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                    wordWrap={wordWrap}
-                  />
-                ) : (
-                  <RenderedView
-                    content={activeFile.content}
-                    fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                  />
+                {/* Word wrap toggle */}
+                {editorMode === "raw" && (
+                  <button
+                    onClick={() => setWordWrap((w) => !w)}
+                    title="Toggle word wrap"
+                    style={{
+                      padding: "2px 6px", fontSize: "9px", fontWeight: 600,
+                      border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+                      background: wordWrap ? "var(--accent-bg)" : "transparent",
+                      color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
+                      cursor: "pointer", flexShrink: 0,
+                    }}
+                    type="button"
+                  >
+                    WRAP
+                  </button>
                 )}
-              </>
-            ) : (
-              <div style={{
-                flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "12px", color: "var(--text-dim)",
-              }}>
-                No file selected
+
+                <button
+                  onClick={handleSave}
+                  disabled={!activeFile.dirty || activeFile.saving}
+                  style={{
+                    padding: "2px 8px", fontSize: "10px", fontWeight: 600, flexShrink: 0,
+                    border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+                    background: activeFile.dirty ? "var(--accent-bg)" : "transparent",
+                    color: activeFile.dirty ? "var(--accent-text)" : "var(--text-dim)",
+                    cursor: activeFile.dirty && !activeFile.saving ? "pointer" : "default",
+                  }}
+                  type="button"
+                >
+                  {activeFile.saving ? "Saving…" : activeFile.dirty ? "Save" : "Saved"}
+                </button>
               </div>
-            )}
-          </>
-        )}
-      </div>
+
+              {editorMode === "raw" ? (
+                <CodeMirrorEditor
+                  key={`editor-${activeFile.path}`}
+                  value={activeFile.content}
+                  onChange={(val) => handleContentChange(val)}
+                  onSave={handleSave}
+                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+                  wordWrap={wordWrap}
+                />
+              ) : (
+                <RenderedView
+                  content={activeFile.content}
+                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+                />
+              )}
+            </>
+          ) : (
+            <div style={{
+              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "12px", color: "var(--text-dim)",
+            }}>
+              No file selected
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

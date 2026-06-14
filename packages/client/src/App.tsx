@@ -738,18 +738,20 @@ export function App() {
       </div>
 
       {/* Session Tree Panel overlay */}
-      {activeSessionId !== undefined && activeProjectId !== undefined && showTreePanel && (
+      {activeSessionId !== undefined && activeProjectId !== undefined && (
         <SessionTreePanel
           sessionId={activeSessionId}
           projectId={activeProjectId}
+          open={showTreePanel}
           onClose={() => setShowTreePanel(false)}
         />
       )}
 
       {/* File Explorer panel */}
-      {showExplorer && activeProjectId !== undefined && (
+      {activeProjectId !== undefined && (
         <FileExplorer
           projectId={activeProjectId}
+          open={showExplorer}
           onClose={() => setShowExplorer(false)}
         />
       )}

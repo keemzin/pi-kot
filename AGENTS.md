@@ -327,14 +327,16 @@ pi-kot/
 
 0. **Never commit unless explicitly told to.** Do not stage, commit, push, or otherwise version-control changes unless the user says "commit" or "push". Staging/committing is a user-only decision.
 
-1. **Named exports only.** No default exports.
-2. **All AgentSession interactions go through `session-registry.ts`.**
-3. **All filesystem operations go through `file-manager.ts` or `git-runner.ts`.**
-4. **Route files export plugin functions; they do not register themselves.**
-5. **Traversal attempts return 403, not 500.**
-6. **Config/data writes are atomic** (tmp file + rename).
-7. **SSE clients must handle `snapshot` first** and silently ignore unknown event types.
-8. **Prefixed project references** — always use `pi-forge` not "the reference project" when referring to pi-forge in this directory.
+1. **Never start or stop the server/processes unless explicitly told to.** Do not run npm scripts, restart processes, or manage running services. Leave process lifecycle to the user.
+
+2. **Named exports only.** No default exports.
+3. **All AgentSession interactions go through `session-registry.ts`.**
+4. **All filesystem operations go through `file-manager.ts` or `git-runner.ts`.**
+5. **Route files export plugin functions; they do not register themselves.**
+6. **Traversal attempts return 403, not 500.**
+7. **Config/data writes are atomic** (tmp file + rename).
+8. **SSE clients must handle `snapshot` first** and silently ignore unknown event types.
+9. **Prefixed project references** — always use `pi-forge` not "the reference project" when referring to pi-forge in this directory.
 
 ---
 
