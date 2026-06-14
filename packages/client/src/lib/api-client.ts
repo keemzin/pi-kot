@@ -577,3 +577,45 @@ export async function forkSession(
     { entryId },
   );
 }
+
+// ---- Ask User Question ----
+
+export interface AskQuestion {
+  question: string;
+  header: string;
+  options: { label: string; description: string; preview?: string }[];
+  multiSelect?: boolean;
+}
+
+export interface AskUserQuestionAnswer {
+  questionIndex: number;
+  question: string;
+  kind: "option" | "custom" | "chat" | "multi";
+  answer: string | null;
+  selected?: string[];
+  notes?: string;
+  preview?: string;
+}
+
+export async function getPendingAskQuestions(
+  sessionId: string,
+): Promise<{ requestId: string; questions: AskQuestion[] }[]> {
+  const res = await request<{ pending: { requestId: string; questions: AskQuestion[] }[] }>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/ask-user-question/pending`,
+  );
+  return res.pending;
+}
+
+export async function answerAskQuestion(
+  sessionId: string,
+  requestId: string,
+  answers: AskUserQuestionAnswer[],
+  cancelled = false,
+): Promise<void> {
+  await request(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/ask-user-question/answer`,
+    { requestId, answers, cancelled },
+  );
+}

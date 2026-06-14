@@ -245,8 +245,9 @@ User can:
 | 8.6 | Auto-retry UI | 🔴 | Countdown banner during rate-limit backoff |
 | 8.7 | Quick actions | 🔴 | Pre-built prompts (fix lint, add tests, etc.) |
 | 8.8 | Webhooks | 🔴 | Outbound webhooks on session events |
-| 8.9 | MCP support | 🔴 | MCP server registry, translate MCP tools → SDK customTools |
-| 8.10 | Orchestration | 🔴 | Multi-agent workflows, sub-agent management |
+| 8.9 | Baked-in ask_user_question tool | 🟢 | Native tool + SSE events + REST endpoints + UI panel — agent can present structured questions with single/multi-select/custom options, user answers via panel above chat input |
+| 8.10 | MCP support | 🔴 | MCP server registry, translate MCP tools → SDK customTools |
+| 8.11 | Orchestration | 🔴 | Multi-agent workflows, sub-agent management |
 
 ---
 
@@ -297,6 +298,8 @@ Phases are intentionally ordered so each one:
 │   ├── POST /:id/fork            ✅ fork (Phase 2)
 │   ├── POST /:id/model           ✅ set model (extra)
 │   ├── GET /:id/model            ✅ get model (extra)
+│   ├── GET /:id/ask-user-question/pending   ✅ pending questions
+│   ├── POST /:id/ask-user-question/answer   ✅ answer questions
 │   ├── POST /:id/archive         ✅ archive (Phase 2)
 │   ├── POST /:id/unarchive       ✅ restore from archive (Phase 2)
 │   ├── DELETE /:id               ✅ dispose

@@ -63,3 +63,6 @@ tau-ref/
 
 # OpenKot reference (explored for UX patterns)
 openkot-ref/
+
+# Pi SDK reference (full repo clone for SDK examples/docs)
+pi-ref/

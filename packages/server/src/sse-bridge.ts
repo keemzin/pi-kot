@@ -34,6 +34,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "auto_retry_start",
   "auto_retry_end",
   "snapshot",
+  "ask_user_question",
+  "ask_user_question_cancelled",
 ]);
 
 function isAllowedEvent(event: { type: string }): boolean {

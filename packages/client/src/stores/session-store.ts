@@ -13,6 +13,7 @@ import {
   unarchiveSession as unarchiveSessionAPI,
 } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
+import { useAskUserQuestionStore } from "./ask-user-question-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 
@@ -296,6 +297,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             }));
             // Refetch so the toolResult appears in messages
             refetchMessages();
+            break;
+          }
+          case "ask_user_question": {
+            const { requestId, questions } = event as unknown as {
+              requestId: string;
+              questions: import("../lib/api-client").AskQuestion[];
+            };
+            useAskUserQuestionStore.getState().setPending({
+              requestId,
+              sessionId,
+              questions,
+            });
+            break;
+          }
+          case "ask_user_question_cancelled": {
+            const { requestId: cancelledId } = event as unknown as {
+              requestId: string;
+            };
+            useAskUserQuestionStore.getState().clearPending(sessionId, cancelledId);
             break;
           }
           case "agent_end": {

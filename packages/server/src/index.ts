@@ -5,6 +5,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import { config } from "./config.js";
 import { authEnabled, extractBearer, verifyHmac } from "./routes/auth.js";
 import { healthRoutes, authRoutes } from "./routes/auth.js";
+import { askUserQuestionRoutes } from "./routes/ask-user-question.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { promptRoutes } from "./routes/prompt.js";
 import { streamRoutes } from "./routes/stream.js";
@@ -12,7 +13,8 @@ import { configRoutes } from "./routes/config.js";
 import { controlRoutes } from "./routes/control.js";
 import { projectRoutes } from "./routes/projects.js";
 import { fileRoutes } from "./routes/files.js";
-import { disposeAllSessions } from "./session-registry.js";
+import { disposeAllSessions, getSession } from "./session-registry.js";
+import { subscribe as subscribeAskUserQuestion } from "./ask-user-question/registry.js";
 
 /**
  * Per-route auth metadata. Routes that should skip the auth preHandler
@@ -111,6 +113,7 @@ export async function buildServer() {
       await api.register(healthRoutes);
       await api.register(authRoutes);
       await api.register(sessionRoutes);
+      await api.register(askUserQuestionRoutes);
       await api.register(promptRoutes);
       await api.register(streamRoutes);
       await api.register(configRoutes);
@@ -120,6 +123,19 @@ export async function buildServer() {
     },
     { prefix: "/api/v1" },
   );
+
+  // Wire ask_user_question registry events into SSE fanout
+  subscribeAskUserQuestion((event) => {
+    const live = getSession(event.sessionId);
+    if (live === undefined) return;
+    for (const client of live.clients) {
+      try {
+        client.send(event as unknown as { type: string; [k: string]: unknown });
+      } catch {
+        live.clients.delete(client);
+      }
+    }
+  });
 
   // Clean teardown on close
   fastify.addHook("onClose", async () => {

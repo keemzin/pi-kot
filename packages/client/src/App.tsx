@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
+import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
 
 import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
@@ -724,6 +725,7 @@ export function App() {
         {activeSessionId !== undefined ? (
           <>
             <ChatView sessionId={activeSessionId} />
+            <AskUserQuestionPanel sessionId={activeSessionId} />
             <ChatInput sessionId={activeSessionId} />
           </>
         ) : (

@@ -340,8 +340,64 @@ pi-kot/
 
 ---
 
+## Recent UI Decisions (May–Jun 2026)
+
+### Sticky User Header (toggleable)
+- **Opt-in** via Settings → Appearance → "Sticky user header"
+- Pins the user message at the top of the chat while scrolling through the assistant's reply
+- Long messages auto-collapse to 2 lines with "Show more/less" toggle
+- Uses `ResizeObserver` for overflow detection
+- `paddingTop: 55px` on messages-container to clear the absolute-positioned app header
+- `chat-scroll` has `overflow: visible` to make `messages-container` the single scroll container for reliable sticky positioning
+- Stored in `preferences-store.ts` (Zustand + localStorage)
+
+### New Session Button
+- Compact `+` button on the project header row, hidden by default, appears on hover
+- Replaced the full-width `+ New Session` button that sat under the session list
+- CSS: `.new-session-inline` with `margin-left: auto` for right-alignment
+
+### Agent Settings: Dynamic Provider/Model Dropdowns
+- Replaced manual text inputs with `<select>` dropdowns populated from `/api/v1/config/providers`
+- Provider dropdown lists all available LLM providers
+- Model dropdown filters to only models for the selected provider
+- Switching provider auto-clears model if incompatible
+- Both save immediately on change (no separate Save button)
+- Model dropdown is disabled until a provider is chosen
+
+### Copy Button (attempted, reverted)
+- Attempted to add a copy-to-clipboard button on assistant message bubbles
+- First placed at top-right, then bottom-right, then bottom of bubble
+- Reworked to appear below each assistant message (not just string-content ones)
+- Reverted — needs a cleaner implementation
+
+## Key Bugfixes (in history)
+
+| Commit | Fix |
+|---|---|
+| `fea8a84` | AuthStorage: was receiving dir path instead of file path → `hasAuth()` silently returned false for all providers |
+| `36df437` | Model stub bug: `setModel()` received `{provider, id}` instead of full model object — agent needs `api`, `baseUrl`, contextWindow, etc. |
+| `525f605` | Settings panel height: `maxHeight: 82vh` → fixed `height: 520px` to prevent resizing when switching tabs |
+| `8f0245a` | Sticky user header with collapse/expand (ported from openkot) |
+| `52eddd7` | Fixed sticky header hidden behind absolute header bar (nested scroll containers) |
+| `9f8757f` | Aligned sticky header with sidebar file explorer position (44px → 55px settled) |
+| `4c40a25` | Moved new-session button to project header row |
+| `1e4e2b5` | Dynamic provider/model dropdowns in Agent settings |
+
+## Current Working State
+
+- All core chat, session, and project features functional
+- Settings panel: Appearance (theme + sticky header toggle), Providers (API keys + models.json), Agent (dynamic provider/model/thinking), General
+- Sticky user header is opt-in, defaults to off
+- Session archiving is per-project (`_archived/` subfolder in session dir)
+
 ## References
 
 - **pi SDK docs**: https://pi.dev/docs/latest/sdk
 - **pi-forge** (inspiration): `./pi-forge/` in this directory
+- **SDK source + examples** (full repo clone): `./pi-ref/`
+  - SDK examples: `./pi-ref/packages/coding-agent/examples/`
+  - SDK source: `./pi-ref/packages/coding-agent/src/`
+  - Author: Mario Zechner (@earendil-works)
+  - GitHub: https://github.com/earendil-works/pi
 - **SDK package**: `@earendil-works/pi-coding-agent` on npm
+- **OpenKot** (UX pattern reference): `./openkot-ref/`

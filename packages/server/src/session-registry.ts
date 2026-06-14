@@ -2,8 +2,10 @@ import {
   type AgentSessionEvent,
   createAgentSession,
   SessionManager,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
+import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 
@@ -154,10 +156,18 @@ export async function createSession(
   const dir = await ensureSessionDir(projectId);
   const sessionManager = SessionManager.create(workspacePath, dir);
 
+  // Get sessionId synchronously before createAgentSession so the
+  // ask_user_question tool can capture it in its execute() closure.
+  const sessionId = sessionManager.getSessionId();
+  const customTools: ToolDefinition[] = [
+    createAskUserQuestionTool(sessionId),
+  ];
+
   const { session } = await createAgentSession({
     cwd: workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
+    customTools,
   });
 
   const now = new Date();
@@ -457,11 +467,15 @@ export async function resumeSessionById(
 
   const sessionPath = join(dir, match);
   const sessionManager = SessionManager.open(sessionPath);
+  const customTools: ToolDefinition[] = [
+    createAskUserQuestionTool(sessionId),
+  ];
 
   const { session } = await createAgentSession({
     cwd: loc.workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
+    customTools,
   });
 
   const now = new Date();
@@ -537,11 +551,16 @@ export async function forkSession(
   // Open the new fork as a SessionManager
   const dir = join(config.sessionDir, sourceLive.projectId);
   const forkedSM = SessionManager.open(newPath, dir, sourceLive.workspacePath);
+  const forkedId = forkedSM.getSessionId();
+  const customTools: ToolDefinition[] = [
+    createAskUserQuestionTool(forkedId),
+  ];
 
   const { session } = await createAgentSession({
     cwd: sourceLive.workspacePath,
     sessionManager: forkedSM,
     agentDir: config.piConfigDir,
+    customTools,
   });
 
   const now = new Date();
