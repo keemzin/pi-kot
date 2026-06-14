@@ -341,6 +341,16 @@ export function App() {
                   <span className="project-chevron">{isExpanded ? "▾" : "▸"}</span>
                   <span className="project-name">{project.name}</span>
                   <span className="project-count">{pSessions.length}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      createAndActivate(project.id);
+                    }}
+                    className="new-session-inline"
+                    title="New session"
+                  >
+                    +
+                  </button>
                 </div>
 
                 {/* Session list inside project */}
@@ -406,17 +416,7 @@ export function App() {
                       </div>
                     ))}
 
-                    {/* New session button inside project */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        createAndActivate(project.id);
-                      }}
-                      className="new-session-mini"
-                      title="New session in this project"
-                    >
-                      + New Session
-                    </button>
+
                   </div>
                 )}
               </div>

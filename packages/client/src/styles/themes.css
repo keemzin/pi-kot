@@ -621,6 +621,31 @@ body {
   color: var(--accent-text);
 }
 
+/* Inline + button on project header row */
+.new-session-inline {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0 4px;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration) var(--ease);
+  opacity: 0;
+}
+
+.project-header:hover .new-session-inline {
+  opacity: 1;
+}
+
+.new-session-inline:hover {
+  color: var(--accent-text);
+  background: var(--bg-glass-hover);
+}
+
 /* Sidebar actions — kept for backward compat but unused in new layout */
 .sidebar-actions {
   display: none;
