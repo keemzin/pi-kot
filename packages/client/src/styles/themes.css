@@ -1521,6 +1521,10 @@ body {
   margin-bottom: 8px;
 }
 
+.assistant-msg-footer.user {
+  justify-content: flex-end;
+}
+
 .copy-msg-btn {
   display: inline-flex;
   align-items: center;

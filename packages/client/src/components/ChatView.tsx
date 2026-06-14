@@ -497,7 +497,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             >
               <UserMessageBubble text={text} />
               {text.length > 0 && (
-                <div className="assistant-msg-footer">
+                <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
                 </div>
               )}
@@ -534,7 +534,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         // Copy button below the user message
         if (text.length > 0) {
           out.push(
-            <div key={`user-${userIdx}-copy`} className="assistant-msg-footer">
+            <div key={`user-${userIdx}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
             </div>,
           );

@@ -338,6 +338,8 @@ pi-kot/
 8. **SSE clients must handle `snapshot` first** and silently ignore unknown event types.
 9. **Prefixed project references** — always use `pi-forge` not "the reference project" when referring to pi-forge in this directory.
 
+10. **Actively update ROADMAP.md** — After completing a task or feature, update the corresponding phase table in `ROADMAP.md` to reflect the new status (🔴 → 🟢 or 🟡). Also update the Quick Reference: Route Map and Current Implementation Summary sections. Keep the roadmap in sync with the codebase so it remains an accurate progress indicator.
+
 ---
 
 ## Recent UI Decisions (May–Jun 2026)
