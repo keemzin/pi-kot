@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function readEnv(key: string): string | undefined {
   const v = process.env[key];
@@ -38,6 +39,12 @@ const SESSION_DIR = resolve(
 );
 const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-kot"));
 
+/** Path to built client dist (Vite output). Resolved relative to server dist/ */
+const CLIENT_DIST_PATH = resolve(
+  readEnv("CLIENT_DIST_PATH") ??
+    join(dirname(fileURLToPath(import.meta.url)), "..", "..", "client", "dist"),
+);
+
 export const config = Object.freeze({
   port: readInt("PORT", 3333),
   host: readEnv("HOST") ?? "0.0.0.0",
@@ -52,6 +59,10 @@ export const config = Object.freeze({
   // Auth
   uiPassword: readEnv("UI_PASSWORD"),
   apiKey: readEnv("API_KEY"),
+
+  // Static client (production)
+  clientDistPath: CLIENT_DIST_PATH,
+  serveClient: readBool("SERVE_CLIENT", true),
 
   // CORS
   corsOrigin: readEnv("CORS_ORIGIN") ?? true,

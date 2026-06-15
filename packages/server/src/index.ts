@@ -2,6 +2,8 @@ import Fastify, { type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import fastifyStatic from "@fastify/static";
+import { existsSync } from "node:fs";
 import { config } from "./config.js";
 import { authEnabled, extractBearer, verifyHmac } from "./routes/auth.js";
 import { healthRoutes, authRoutes } from "./routes/auth.js";
@@ -146,6 +148,23 @@ export async function buildServer() {
 
   // Wire orchestration ask-user-question bridge
   initOrchestrationAskUserQuestionBridge();
+
+  // ---- static client (production) ----
+  // After `npm run build`, Fastify serves the Vite build directly.
+  // In dev mode, Vite owns :5173 and proxies to us.
+  if (config.serveClient && existsSync(config.clientDistPath)) {
+    await fastify.register(fastifyStatic, {
+      root: config.clientDistPath,
+      wildcard: false,
+    });
+    // SPA fallback: non-/api/* GETs → index.html
+    fastify.setNotFoundHandler((req, reply) => {
+      if (req.url.startsWith("/api/")) {
+        return reply.status(404).send({ error: "not_found" });
+      }
+      return reply.sendFile("index.html");
+    });
+  }
 
   // Clean teardown on close
   fastify.addHook("onClose", async () => {

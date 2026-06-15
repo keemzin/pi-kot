@@ -9,6 +9,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "concurrently \"npm run dev -w packages/server\" \"npm run dev -w packages/client\"",
+    "start": "node packages/server/dist/index.js",
     "dev:server": "npm run dev -w packages/server",
     "dev:client": "npm run dev -w packages/client",
     "typecheck": "npm run check --workspaces --if-present",
