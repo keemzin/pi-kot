@@ -111,18 +111,17 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
         const { homedir } = await import("node:os");
         targetPath = resolve(join(homedir(), query.slice(2)));
       } else if (query.startsWith("/")) {
-        // / means "inside workspace". /foo means "inside workspace/foo"
-        // Only treat as literal absolute path if it clearly goes beyond workspace
+        // Try workspace-relative first: /foo → workspace/foo
+        // If that doesn't exist as a directory, fall back to filesystem root
         const sub = query.slice(1);
         if (sub.length === 0) {
           targetPath = ws;
         } else {
-          const candidate = resolve(join(ws, sub));
-          // If the resolved path is inside the workspace, use it
-          if (candidate.startsWith(ws)) {
-            targetPath = candidate;
-          } else {
-            // User explicitly navigated outside workspace (/home, /tmp etc)
+          const wsPath = resolve(join(ws, sub));
+          try {
+            const st = await stat(wsPath);
+            targetPath = st.isDirectory() ? wsPath : resolve(query);
+          } catch {
             targetPath = resolve(query);
           }
         }
