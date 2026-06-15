@@ -11,6 +11,7 @@ import {
   renameSession as renameSessionAPI,
   archiveSession as archiveSessionAPI,
   unarchiveSession as unarchiveSessionAPI,
+  deleteProjectAPI,
 } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 import { useAskUserQuestionStore } from "./ask-user-question-store";
@@ -70,6 +71,7 @@ interface SessionActions {
   loadArchivedSessions: (projectId: string) => Promise<void>;
   reloadMessages: (sessionId: string) => Promise<void>;
   clearError: () => void;
+  deleteProject: (id: string) => Promise<void>;
 }
 
 type SessionStore = SessionState & SessionActions;
@@ -472,6 +474,42 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   clearError: () => set({ error: undefined }),
+
+  deleteProject: async (id: string) => {
+    try {
+      await deleteProjectAPI(id);
+      const state = get();
+      let nextActiveProjectId: string | undefined = state.activeProjectId;
+      let nextSessions: SessionSummary[] = state.sessions;
+      if (state.activeProjectId === id) {
+        nextActiveProjectId = undefined;
+        nextSessions = [];
+      }
+      const old = get().sseClient;
+      old?.close();
+      const { projects } = await fetchProjects();
+      if (nextActiveProjectId === undefined && projects.length > 0) {
+        nextActiveProjectId = projects[0].id;
+        const { sessions } = await listSessions(nextActiveProjectId);
+        nextSessions = sessions;
+      }
+      set({
+        projects,
+        activeProjectId: nextActiveProjectId,
+        activeSessionId: undefined,
+        messages: [],
+        sessions: nextSessions,
+        projectSessions: nextActiveProjectId
+          ? { [nextActiveProjectId]: nextSessions }
+          : {},
+        sseClient: undefined,
+        streamState: { text: "", activeToolName: undefined, isStreaming: false },
+        error: undefined,
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to delete project" });
+    }
+  },
 
   // ── Session Tree / Navigate / Fork ──
 

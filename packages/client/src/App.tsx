@@ -9,6 +9,7 @@ import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
+
 import {
   fetchAuthStatus,
   login,
@@ -62,6 +63,7 @@ export function App() {
   const [renamingSessionId, setRenamingSessionId] = useState<string | undefined>();
   const [renameValue, setRenameValue] = useState("");
   const [showArchived, setShowArchived] = useState<string | undefined>();
+  const [projectToDelete, setProjectToDelete] = useState<string | undefined>();
   const [showSettings, setShowSettings] = useState(false);
   const [showExplorer, setShowExplorer] = useState(false);
   const [showOrch, setShowOrch] = useState(false);
@@ -448,6 +450,18 @@ export function App() {
                   >
                     +
                   </button>
+                  {project.name !== "Default" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete(project.id);
+                      }}
+                      className="project-remove-btn"
+                      title="Remove project from list"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
 
                 {/* Session list inside project */}
@@ -961,6 +975,52 @@ export function App() {
       )}
 
       {/* Settings Panel overlay */}
+      {/* Confirm project delete — matches settings/rewind modal animation */}
+      {projectToDelete !== undefined && (
+        <div className="settings-overlay" onClick={() => setProjectToDelete(undefined)}>
+          <div
+            className="settings-panel rewind-panel"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: 420, maxWidth: "90vw", height: "auto", minHeight: 0 }}
+          >
+            <header className="settings-header">
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Remove project?</span>
+              <button
+                onClick={() => setProjectToDelete(undefined)}
+                className="settings-close"
+                title="Close"
+              >
+                ✕
+              </button>
+            </header>
+            <div className="settings-body" style={{ padding: "16px" }}>
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
+                This removes <strong>{projects.find(p => p.id === projectToDelete)?.name ?? projectToDelete}</strong> from the sidebar — all sessions stay safely on disk. You can add it back anytime.
+              </p>
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setProjectToDelete(undefined)}
+                  className="settings-tab"
+                  style={{ padding: "6px 14px", fontSize: 12 }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    useSessionStore.getState().deleteProject(projectToDelete);
+                    setProjectToDelete(undefined);
+                  }}
+                  className="settings-tab settings-tab-active"
+                  style={{ padding: "6px 14px", fontSize: 12, background: "var(--accent-red, #e06c75)", color: "#fff", border: "none" }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSettings && (
         <SettingsPanel
           onClose={() => setShowSettings(false)}

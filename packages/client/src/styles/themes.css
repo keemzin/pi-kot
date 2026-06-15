@@ -994,6 +994,31 @@ body {
   background: var(--bg-glass-hover);
 }
 
+/* Remove/delete project button on project header row */
+.project-remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 0 4px;
+  margin-left: 2px;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration) var(--ease);
+  opacity: 0;
+}
+
+.project-header:hover .project-remove-btn {
+  opacity: 1;
+}
+
+.project-remove-btn:hover {
+  color: #e06c75;
+  background: var(--bg-glass-hover);
+}
+
 /* Sidebar actions — kept for backward compat but unused in new layout */
 .sidebar-actions {
   display: none;
