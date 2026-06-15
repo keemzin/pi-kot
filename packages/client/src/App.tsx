@@ -209,9 +209,9 @@ export function App() {
     }
   };
 
-  const fetchPathSuggestions = useCallback(async (query: string) => {
+  const fetchPathSuggestions = useCallback(async (query: string, immediate?: boolean) => {
     if (pathDebounceRef.current) clearTimeout(pathDebounceRef.current);
-    pathDebounceRef.current = setTimeout(async () => {
+    const doFetch = async () => {
       try {
         const { suggestions } = await browseDirectories(query);
         setPathSuggestions(suggestions);
@@ -220,18 +220,33 @@ export function App() {
       } catch {
         setShowPathSuggestions(false);
       }
-    }, 200);
+    };
+    if (immediate) {
+      await doFetch();
+    } else {
+      pathDebounceRef.current = setTimeout(doFetch, 150);
+    }
   }, []);
 
   const handlePathInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setNewProjectPath(val);
-    setShowPathSuggestions(false);
     if (val.trim().length > 0) {
       fetchPathSuggestions(val.trim());
     } else {
       setPathSuggestions([]);
+      setShowPathSuggestions(false);
     }
+  };
+
+  const handlePathFocus = () => {
+    const q = newProjectPath.trim();
+    fetchPathSuggestions(q || "/", true);
+  };
+
+  const handlePathBlur = () => {
+    // Delay hiding so click on suggestion registers
+    setTimeout(() => setShowPathSuggestions(false), 200);
   };
 
   const selectPathSuggestion = (path: string) => {
@@ -755,13 +770,8 @@ export function App() {
                       type="text"
                       value={newProjectPath}
                       onChange={handlePathInputChange}
-                      onFocus={() => {
-                        if (pathSuggestions.length > 0) setShowPathSuggestions(true);
-                      }}
-                      onBlur={() => {
-                        // Delay hiding so click on suggestion registers
-                        setTimeout(() => setShowPathSuggestions(false), 200);
-                      }}
+                      onFocus={handlePathFocus}
+                      onBlur={handlePathBlur}
                       onKeyDown={handlePathKeyDown}
                       placeholder="/home or ~/ or folder name → auto-suggest"
                       className="add-project-input"

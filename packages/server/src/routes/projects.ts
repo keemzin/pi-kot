@@ -93,69 +93,74 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (req, reply) => {
-      const { readdir } = await import("node:fs/promises");
+      const { readdir, stat } = await import("node:fs/promises");
       const query = (req.query.q ?? "").trim();
       const suggestions: string[] = [];
       const ws = config.workspacePath;
 
-      // Determine search base and prefix
-      let searchBase: string;
-      let searchPrefix: string;
+      // Resolve the query to a filesystem path
+      let targetPath: string;
 
       if (query.length === 0) {
-        // No query — just show the workspace dir itself
+        // No query — show workspace dir itself
         suggestions.push(ws);
         return reply.send({ suggestions });
       }
 
       if (query.startsWith("~/")) {
-        // Tilde — expand home
         const { homedir } = await import("node:os");
-        searchBase = join(homedir(), query.slice(2));
-        searchPrefix = searchBase;
+        targetPath = resolve(join(homedir(), query.slice(2)));
       } else if (query.startsWith("/")) {
-        // User typed a slash — treat as workspace root, not filesystem root.
-        // Prepend workspace path so "/pi-rewind" searches workspace/pi-rewind
-        const sub = query.slice(1); // remove leading /
-        searchBase = sub.length > 0 ? join(ws, sub) : ws;
-        searchPrefix = searchBase;
-      } else {
-        // Relative query — search from workspace root
-        searchBase = join(ws, query);
-        searchPrefix = searchBase;
-      }
-
-      // Find parent dir, list its subdirectories
-      try {
-        const parent = resolve(searchBase, "..");
-        const dirName = resolve(searchBase);
-        const entries = await readdir(parent, { withFileTypes: true });
-
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          // Skip hidden dirs unless query starts with .
-          if (entry.name.startsWith(".") && !query.startsWith(".")) continue;
-
-          const fullPath = join(parent, entry.name);
-          // Include if it starts with the prefix, or prefix starts with it
-          if (fullPath.startsWith(searchPrefix) || dirName.startsWith(fullPath)) {
-            suggestions.push(fullPath);
+        // / means "inside workspace". /foo means "inside workspace/foo"
+        // Only treat as literal absolute path if it clearly goes beyond workspace
+        const sub = query.slice(1);
+        if (sub.length === 0) {
+          targetPath = ws;
+        } else {
+          const candidate = resolve(join(ws, sub));
+          // If the resolved path is inside the workspace, use it
+          if (candidate.startsWith(ws)) {
+            targetPath = candidate;
+          } else {
+            // User explicitly navigated outside workspace (/home, /tmp etc)
+            targetPath = resolve(query);
           }
         }
+      } else {
+        // Relative — search from workspace root
+        targetPath = resolve(join(ws, query));
+      }
+
+      // Try to list children of targetPath (directory browsing mode)
+      // If targetPath doesn't exist, list siblings that match (autocomplete mode)
+      let listedChildren = false;
+      try {
+        const st = await stat(targetPath);
+        if (st.isDirectory()) {
+          const entries = await readdir(targetPath, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith(".")) continue;
+            suggestions.push(join(targetPath, entry.name));
+          }
+          listedChildren = suggestions.length > 0;
+        }
       } catch {
-        // Dir doesn't exist — try query as a literal filesystem path
-        // (user typed something like /home/hakeem explictly)
+        // targetPath doesn't exist — fall through to prefix matching
+      }
+
+      if (!listedChildren) {
+        // Prefix/autocomplete mode: list siblings and filter
         try {
-          if (query.startsWith("/")) {
-            const parent = resolve(query, "..");
-            const entries = await readdir(parent, { withFileTypes: true });
-            for (const entry of entries) {
-              if (!entry.isDirectory()) continue;
-              if (entry.name.startsWith(".")) continue;
-              const fullPath = join(parent, entry.name);
-              if (fullPath.startsWith(query)) {
-                suggestions.push(fullPath);
-              }
+          const parent = resolve(targetPath, "..");
+          const baseName = resolve(targetPath);
+          const entries = await readdir(parent, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith(".")) continue;
+            const fullPath = join(parent, entry.name);
+            if (fullPath.startsWith(baseName) || baseName.startsWith(fullPath)) {
+              suggestions.push(fullPath);
             }
           }
         } catch {
@@ -165,8 +170,8 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
 
       // Sort: closest match first, then alphabetical
       suggestions.sort((a, b) => {
-        const aMatch = a.startsWith(searchPrefix) ? 0 : 1;
-        const bMatch = b.startsWith(searchPrefix) ? 0 : 1;
+        const aMatch = a.startsWith(targetPath) ? 0 : 1;
+        const bMatch = b.startsWith(targetPath) ? 0 : 1;
         if (aMatch !== bMatch) return aMatch - bMatch;
         return a.localeCompare(b);
       });
