@@ -83,8 +83,10 @@ async function findSessionFile(sessionId: string): Promise<string | undefined> {
   // Search pi-kot session dir: ~/.pi-kot/sessions/<project>/<sessionId>.jsonl
   const dirs = new Set<string>([config.sessionDir]);
 
-  // Also search pi agent session dir: ~/.pi/agent/sessions/<project>/<sessionId>.jsonl
-  dirs.add(join(homedir(), ".pi", "agent", "sessions"));
+  // Also search pi agent session dir: ~/.pi/agent/sessions/
+  // Files here are named timestamp_UUID.jsonl
+  const piAgentDir = join(homedir(), ".pi", "agent", "sessions");
+  dirs.add(piAgentDir);
 
   for (const parentDir of dirs) {
     try {
@@ -94,12 +96,27 @@ async function findSessionFile(sessionId: string): Promise<string | undefined> {
 
       for (const dir of projectDirs) {
         if (!dir.isDirectory()) continue;
+
+        // pi-kot format: <project>/<sessionId>.jsonl
         const candidate = join(parentDir, dir.name, `${sessionId}.jsonl`);
         if (existsSync(candidate)) return candidate;
 
-        // Also try exact match without .jsonl — sessionId might be the full filename
+        // pi agent format: <project>/<timestamp>_<sessionId>.jsonl or <project>/<sessionId>.jsonl
         const candidateExact = join(parentDir, dir.name, sessionId);
         if (existsSync(candidateExact)) return candidateExact;
+
+        // Also try matching filenames that contain the sessionId
+        // (pi agent uses: "2026-06-15T10-18-42-943Z_019edc7a-21c3-7fd5-8e02-59ae8251cdee.jsonl")
+        try {
+          const files = await readdir(join(parentDir, dir.name));
+          for (const f of files) {
+            if (f.endsWith(".jsonl") && f.includes(sessionId)) {
+              return join(parentDir, dir.name, f);
+            }
+          }
+        } catch {
+          // couldn't list dir
+        }
       }
     } catch {
       // Skip inaccessible dirs

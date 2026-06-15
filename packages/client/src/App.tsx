@@ -771,16 +771,17 @@ export function App() {
                       <div
                         style={{
                           position: "absolute",
-                          top: "100%",
+                          bottom: "100%",
                           left: 0,
                           right: 0,
+                          marginBottom: 4,
                           zIndex: 100,
                           background: "var(--bg-surface, #1a1a2e)",
                           border: "1px solid var(--border-color, #333)",
                           borderRadius: 6,
                           maxHeight: 240,
                           overflowY: "auto",
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                          boxShadow: "0 -4px 12px rgba(0,0,0,0.3)",
                         }}
                       >
                         {pathSuggestions.slice(0, 20).map((s, i) => {
