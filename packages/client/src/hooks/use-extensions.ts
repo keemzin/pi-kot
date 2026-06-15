@@ -52,9 +52,9 @@ export function useExtensions(): ExtensionState {
               d.name.includes("@ayulab/pi-rewind"),
           );
 
-          // Check recommended list too (already installed)
+          // Check recommended list too — must be marked as installed
           const rewindRecommended = res.recommended.some(
-            (r) => r.id === "pi-rewind" || r.name === "@ayulab/pi-rewind" && r.installed,
+            (r) => r.installed && (r.id === "pi-rewind" || r.name === "@ayulab/pi-rewind"),
           );
 
           const subagentsInstalled =
