@@ -236,6 +236,16 @@ async function restoreConversation(
   try {
     // Navigate to the checkpoint's user entry
     await live.session.navigateTree(userEntryId);
+
+    // Persist the new leaf position to the JSONL file by appending a custom
+    // marker entry. Without this, branch() only sets leafId in memory — on
+    // server restart, _buildIndex sets leafId to the LAST entry in the file,
+    // which is the pre-rewind state, losing the navigation.
+    live.sessionManager.appendCustomEntry("pi-kot:rewind", {
+      userEntryId,
+      timestamp: Date.now(),
+    });
+
     return { success: true };
   } catch (err) {
     return {
