@@ -67,6 +67,7 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
                     package: { type: "string" },
                     category: { type: "string" },
                     installed: { type: "boolean" },
+                    verified: { type: "boolean" },
                     providesAgentTypes: {
                       type: "array",
                       items: { type: "string" },

@@ -43,6 +43,8 @@ export interface RecommendedExtension {
   category: "orchestration" | "tools" | "ui" | "integration" | "productivity";
   /** Whether this extension is already installed */
   installed: boolean;
+  /** True when this extension has been tested and verified to work with pi-kot */
+  verified?: boolean;
   /** What agent types this extension provides */
   providesAgentTypes?: string[];
   /** What UI features this enables */
@@ -164,6 +166,7 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
       "Session history navigation — checkpoint, rewind, and branch from any prior state. Like undo for your agent.",
     package: "npm:@ayulab/pi-rewind",
     category: "productivity",
+    verified: true,
     enablesFeatures: ["Checkpoint/rewind in session history"],
     icon: "⏪",
   },

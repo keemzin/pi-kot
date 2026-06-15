@@ -776,6 +776,7 @@ export interface RecommendedExtension {
   package: string;
   category: "orchestration" | "tools" | "ui" | "integration" | "productivity";
   installed: boolean;
+  verified?: boolean;
   providesAgentTypes?: string[];
   enablesFeatures?: string[];
   icon: string;

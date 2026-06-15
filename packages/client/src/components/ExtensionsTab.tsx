@@ -484,7 +484,26 @@ function RecommendedCard({
     >
       <span style={s.cardIcon}>{ext.icon}</span>
       <div style={s.cardBody}>
-        <div style={s.cardTitle}>{ext.name}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={s.cardTitle}>{ext.name}</div>
+          {ext.verified && (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "1px 7px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 600,
+                background: "rgba(34, 197, 94, 0.15)",
+                color: "#22c55e",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                lineHeight: "18px",
+              }}
+            >
+              ✓ Verified
+            </span>
+          )}
+        </div>
         <div style={s.cardDesc}>{ext.description}</div>
         <div style={s.cardMeta}>
           {ext.providesAgentTypes && ext.providesAgentTypes.length > 0 && (
