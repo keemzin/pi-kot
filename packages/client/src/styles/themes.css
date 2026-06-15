@@ -1054,6 +1054,36 @@ body {
   color: var(--text-dim);
 }
 
+/* ── Path autocomplete dropdown ── */
+.path-suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  z-index: 100;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  padding: 4px 0;
+}
+.path-suggestion-item {
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+.path-suggestion-item:hover,
+.path-suggestion-item.highlighted {
+  background: var(--bg-glass-active);
+  color: var(--text-primary);
+}
+
 .add-project-actions {
   display: flex;
   gap: 6px;
