@@ -1,3 +1,6 @@
+# Npm artifacts
+*.tgz
+
 # Pi-forge output directory (reference project)
 pi-forge/
 
