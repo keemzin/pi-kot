@@ -669,7 +669,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         <RewindModal
           sessionId={sessionId}
           onClose={() => setShowRewindModal(false)}
-          onRewindComplete={() => setShowRewindModal(false)}
+          onRewindComplete={(checkpointId) => {
+            setShowRewindModal(false);
+            // Reload messages so the UI reflects the rewound conversation state
+            useSessionStore.getState().reloadMessages(sessionId);
+          }}
         />
       )}
     </div>

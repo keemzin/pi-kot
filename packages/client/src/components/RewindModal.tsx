@@ -106,78 +106,66 @@ export function RewindModal({ sessionId, onClose, onRewindComplete }: Props) {
 
           {step === "confirm" && selected && (
             <>
+              {/* Warning card */}
               <div
                 style={{
-                  fontSize: 11,
-                  color: "var(--text-dim)",
-                  marginBottom: 8,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                  background: "rgba(224, 108, 117, 0.1)",
+                  borderRadius: 8,
+                  border: "1px solid rgba(224, 108, 117, 0.3)",
+                  padding: "14px",
+                  marginBottom: 14,
                 }}
               >
-                <span
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: "var(--accent-subtle)",
-                    color: "var(--accent-text)",
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
-                >
-                  {checkpoints.indexOf(selected) + 1}
-                </span>
-                <span style={{ fontWeight: 600, flex: 1 }}>
-                  {truncatePrompt(selected.prompt)}
-                </span>
-                <button
-                  onClick={() => { setSelected(null); setStep("pick"); }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-dim)",
-                    fontSize: 11,
-                    textDecoration: "underline",
-                  }}
-                >
-                  Change
-                </button>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 6 }}>
+                      Rewind to &ldquo;{truncatePrompt(selected.prompt, 60)}&rdquo;?
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                      {selected.fileCount > 0
+                        ? `This will undo changes to ${selected.fileCount} file(s) and roll back the conversation to this point.`
+                        : "This will roll back the conversation to this point (no file changes)."}
+                    </div>
+                    <button
+                      onClick={() => { setSelected(null); setStep("pick"); }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--accent-text)",
+                        fontSize: 11,
+                        textDecoration: "underline",
+                        marginTop: 6,
+                        padding: 0,
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Pick a different checkpoint
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "var(--text-dim)",
-                  marginBottom: 12,
-                  fontFamily: "monospace",
-                }}
-              >
-                {selected.fileCount > 0
-                  ? `${selected.fileCount} file(s) changed - ${selected.beforeCommit.slice(0, 8)}`
-                  : "No file changes (conversation only)"}
-              </div>
-
+              {/* File changes summary */}
               {selected.fileChanges.length > 0 && (
                 <div
                   style={{
                     background: "var(--bg-glass)",
                     borderRadius: 6,
                     padding: "6px 8px",
-                    marginBottom: 12,
-                    maxHeight: 120,
+                    marginBottom: 14,
+                    maxHeight: 100,
                     overflowY: "auto",
                     fontSize: 10,
                     fontFamily: "monospace",
                   }}
                 >
+                  <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
+                    {selected.beforeCommit.slice(0, 8)} → {selected.afterCommit.slice(0, 8)}
+                  </div>
                   {selected.fileChanges.map((fc, i) => (
-                    <div key={i} style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                    <div key={i} style={{ color: "var(--text-secondary)", lineHeight: 1.8 }}>
                       <span style={{ color: "var(--accent-grn, #22c55e)" }}>+{fc.added}</span>
                       {" "}
                       <span style={{ color: "var(--accent-red, #ef4444)" }}>-{fc.removed}</span>
@@ -188,6 +176,7 @@ export function RewindModal({ sessionId, onClose, onRewindComplete }: Props) {
                 </div>
               )}
 
+              {/* Restore mode */}
               <div style={{ fontSize: 11, color: "var(--text-dim)", marginBottom: 6 }}>
                 Restore mode:
               </div>
@@ -195,7 +184,7 @@ export function RewindModal({ sessionId, onClose, onRewindComplete }: Props) {
                 style={{
                   display: "flex",
                   gap: 6,
-                  marginBottom: 12,
+                  marginBottom: 16,
                   flexWrap: "wrap",
                 }}
               >
@@ -232,7 +221,13 @@ export function RewindModal({ sessionId, onClose, onRewindComplete }: Props) {
                 <button
                   onClick={handleRewind}
                   className="settings-tab settings-tab-active"
-                  style={{ padding: "6px 14px", fontSize: 12 }}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: 12,
+                    background: "var(--accent-red, #e06c75)",
+                    color: "#fff",
+                    border: "none",
+                  }}
                 >
                   ↩️ Rewind
                 </button>

@@ -174,6 +174,12 @@ export async function createSession(
     customTools,
   });
 
+  // Trigger session_start event so extensions (pi-rewind, etc.) initialize
+  await session.bindExtensions({}).catch(() => {
+    // Extension bindings are best-effort — some extensions (e.g. pi-rewind)
+    // may not have handlers for session_start, which is fine.
+  });
+
   const now = new Date();
   const live: LiveSession = {
     session,
@@ -441,6 +447,11 @@ export async function rebuildSessionTools(
     customTools,
   });
 
+  // Trigger session_start event so extensions initialize
+  await session.bindExtensions({}).catch(() => {
+    // best-effort
+  });
+
   // Dispose old session
   try {
     live.session.dispose();
@@ -594,6 +605,11 @@ export async function resumeSessionById(
     customTools,
   });
 
+  // Trigger session_start event so extensions initialize
+  await session.bindExtensions({}).catch(() => {
+    // best-effort
+  });
+
   const now = new Date();
   const live: LiveSession = {
     session,
@@ -690,6 +706,11 @@ export async function forkSession(
     sessionManager: forkedSM,
     agentDir: config.piConfigDir,
     customTools,
+  });
+
+  // Trigger session_start event so extensions initialize
+  await session.bindExtensions({}).catch(() => {
+    // best-effort
   });
 
   const now = new Date();
