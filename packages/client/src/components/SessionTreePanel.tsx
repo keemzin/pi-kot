@@ -373,8 +373,8 @@ function NavigateConfirmDialog({
               padding: "6px 10px",
               fontSize: "11px",
               borderRadius: "var(--radius-sm)",
-              background: "rgba(251,191,36,0.1)",
-              border: "1px solid rgba(251,191,36,0.3)",
+              background: "color-mix(in srgb, var(--warning, #fbbf24) 10%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--warning, #fbbf24) 30%, transparent)",
               color: "var(--warning)",
             }}
           >
@@ -496,7 +496,7 @@ function NavigateConfirmDialog({
               fontWeight: 600,
               borderRadius: "var(--radius-sm)",
               border: "none",
-              background: state.streaming ? "#d97706" : "var(--text-primary)",
+              background: state.streaming ? "var(--warning, #d97706)" : "var(--text-primary)",
               color: state.streaming ? "#fff" : "var(--bg-solid)",
               cursor: "pointer",
             }}
@@ -516,7 +516,14 @@ const INDENT_PX = 18;
 const BRANCH_OFFSET_PX = 10;
 const MAX_BRANCH_LEVEL = 8;
 
-const BRANCH_PALETTE = ["#f59e0b", "#0ea5e9", "#ec4899", "#10b981", "#8b5cf6", "#f97316"];
+const BRANCH_PALETTE = [
+  "var(--accent-orng, #f59e0b)",
+  "var(--accent-blue, #0ea5e9)",
+  "var(--accent-pink, #ec4899)",
+  "var(--accent-grn, #10b981)",
+  "var(--accent-purp, #8b5cf6)",
+  "var(--accent-orng2, #f97316)",
+];
 
 function branchAccent(level: number): string {
   if (level <= 0) return "transparent";
@@ -537,10 +544,10 @@ function entryTypeLabel(node: SessionTreeEntry): string {
 }
 
 function roleBadgeColor(role?: string, type?: string): React.CSSProperties {
-  if (role === "user") return { background: "rgba(14,165,233,0.15)", color: "#38bdf8" };
-  if (role === "assistant") return { background: "rgba(139,92,246,0.15)", color: "#a78bfa" };
-  if (type === "branch_summary") return { background: "rgba(251,191,36,0.15)", color: "#fbbf24" };
-  if (type === "compaction") return { background: "rgba(236,72,153,0.15)", color: "#f472b6" };
+  if (role === "user") return { background: "color-mix(in srgb, var(--accent-blue, #38bdf8) 15%, transparent)", color: "var(--accent-blue, #38bdf8)" };
+  if (role === "assistant") return { background: "color-mix(in srgb, var(--accent-purp, #a78bfa) 15%, transparent)", color: "var(--accent-purp, #a78bfa)" };
+  if (type === "branch_summary") return { background: "color-mix(in srgb, var(--warning, #fbbf24) 15%, transparent)", color: "var(--warning, #fbbf24)" };
+  if (type === "compaction") return { background: "color-mix(in srgb, var(--accent-pink, #f472b6) 15%, transparent)", color: "var(--accent-pink, #f472b6)" };
   return { background: "rgba(255,255,255,0.04)", color: "var(--text-dim)" };
 }
 
@@ -570,7 +577,7 @@ function TreeRow({
     border: "1px solid",
     padding: "6px 8px",
     ...(node.isLeaf
-      ? { borderColor: "rgba(52,211,153,0.4)", background: "rgba(52,211,153,0.06)" }
+      ? { borderColor: "color-mix(in srgb, var(--success, #34d399) 40%, transparent)", background: "color-mix(in srgb, var(--success, #34d399) 6%, transparent)" }
       : node.onActivePath
         ? { borderColor: "var(--tool-border)", background: "var(--bg-glass)" }
         : { borderColor: "var(--tool-border)", background: "transparent" }),
@@ -694,8 +701,8 @@ function TreeRow({
                   padding: "1px 6px",
                   fontSize: "9px",
                   borderRadius: "3px",
-                  background: "rgba(52,211,153,0.15)",
-                  color: "#34d399",
+                  background: "color-mix(in srgb, var(--success, #34d399) 15%, transparent)",
+                  color: "var(--success, #34d399)",
                 }}
               >
                 leaf
@@ -1066,7 +1073,7 @@ function GraphNode({
 }) {
   const dim = !turn.isOnActivePath;
   const borderColor = turn.isLeafTurn
-    ? "rgba(52,211,153,0.5)"
+    ? "color-mix(in srgb, var(--success, #34d399) 50%, transparent)"
     : turn.isOnActivePath
       ? "var(--tool-border)"
       : "var(--tool-border)";
@@ -1083,7 +1090,7 @@ function GraphNode({
         border: "1px solid",
         borderColor,
         background: turn.isLeafTurn
-          ? "rgba(52,211,153,0.06)"
+          ? "color-mix(in srgb, var(--success, #34d399) 6%, transparent)"
           : turn.isOnActivePath
             ? "var(--bg-glass)"
             : "var(--bg-solid)",
@@ -1129,7 +1136,7 @@ function GraphNode({
             {turn.roleLabel}
           </span>
           {turn.isLeafTurn && (
-            <span style={{ fontSize: "8px", color: "#34d399" }}>leaf</span>
+            <span style={{ fontSize: "8px", color: "var(--success, #34d399)" }}>leaf</span>
           )}
         </div>
         {turn.preview.length > 0 && (
