@@ -8,6 +8,7 @@ import { type FastifyPluginAsync } from "fastify";
 import {
   discoverExtensions,
   installExtension,
+  uninstallExtension,
 } from "../extension-manager.js";
 
 // ── Schemas ─────────────────────────────────────────────────────────
@@ -143,6 +144,46 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         req.log.error(err, "Failed to install extension");
+        return reply.status(500).send({ error: message });
+      }
+    },
+  );
+
+  // ── POST /api/v1/extensions/uninstall ────────────────────────────────
+
+  fastify.post(
+    "/extensions/uninstall",
+    {
+      schema: {
+        description: "Uninstall a pi extension package",
+        tags: ["extensions"],
+        body: {
+          type: "object",
+          required: ["package"],
+          properties: {
+            package: { type: "string", description: "Package name (npm: prefix or bare)" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              error: { type: "string" },
+            },
+          },
+          ...autoError,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const { package: pkg } = req.body as { package: string };
+        const result = await uninstallExtension(pkg);
+        return reply.send(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        req.log.error(err, "Failed to uninstall extension");
         return reply.status(500).send({ error: message });
       }
     },

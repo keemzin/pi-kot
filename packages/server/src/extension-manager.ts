@@ -384,6 +384,46 @@ export async function discoverExtensions(): Promise<ExtensionsResponse> {
   };
 }
 
+export async function uninstallExtension(
+  packageName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const npmName = packageName.replace(/^npm:/, "");
+    const pkgEntry = packageName.startsWith("npm:") ? packageName : `npm:${npmName}`;
+
+    // Remove from settings.json packages array
+    const settingsRaw = await readFile(settingsPath(), "utf-8");
+    const settings = JSON.parse(settingsRaw);
+    if (settings.packages) {
+      settings.packages = settings.packages.filter((p: string) => p !== pkgEntry);
+    }
+
+    // Write settings back atomically
+    const tmpPath = settingsPath() + ".tmp";
+    const { writeFile, rename } = await import("node:fs/promises");
+    await writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
+    await rename(tmpPath, settingsPath());
+
+    // Uninstall via npm in the agent dir (keep settings clean even if npm uninstall fails)
+    const npmDir = join(piAgentDir(), "npm");
+    try {
+      execSync(`npm uninstall ${npmName}`, {
+        cwd: npmDir,
+        stdio: "pipe",
+        timeout: 60_000,
+      });
+    } catch {
+      // npm uninstall may fail if the package isn't actually installed
+      // but we already cleaned the settings — best effort
+    }
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
 export async function installExtension(
   packageName: string,
 ): Promise<{ success: boolean; error?: string }> {

@@ -803,6 +803,12 @@ export async function installExtension(
   return request("POST", "/api/v1/extensions/install", { package: packageName });
 }
 
+export async function uninstallExtension(
+  packageName: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request("POST", "/api/v1/extensions/uninstall", { package: packageName });
+}
+
 // ---- Checkpoints (pi-rewind baked-in support) ----
 
 export interface CheckpointFileChange {

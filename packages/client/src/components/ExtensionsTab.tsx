@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   fetchExtensions,
   installExtension as installExtApi,
+  uninstallExtension as uninstallExtApi,
   type ExtensionsResponse,
   type RecommendedExtension,
   type DiscoveredExtension,
@@ -139,6 +140,7 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [data, setData] = useState<ExtensionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
+  const [uninstalling, setUninstalling] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(0);
 
   const load = useCallback(async () => {
@@ -156,6 +158,22 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   useEffect(() => {
     load();
   }, [load, refreshing]);
+
+  const handleUninstall = async (ext: DiscoveredExtension) => {
+    if (!confirm(`Uninstall "${ext.name}"? It will be removed from the packages list and can be reinstalled from recommendations.`)) return;
+    setUninstalling(ext.name);
+    try {
+      const result = await uninstallExtApi(ext.name.startsWith("npm:") ? ext.name : `npm:${ext.name}`);
+      if (!result.success) {
+        onError(result.error ?? "Uninstall failed");
+      }
+      setRefreshing((n) => n + 1);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUninstalling(null);
+    }
+  };
 
   const handleInstall = async (ext: RecommendedExtension) => {
     setInstalling(ext.id);
@@ -298,7 +316,11 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
         ) : (
           data.detected.map((ext, i) => (
             <div key={`det-${i}`}>
-              <InstalledCard ext={ext} />
+              <InstalledCard
+                ext={ext}
+                uninstalling={uninstalling === ext.name}
+                onUninstall={handleUninstall}
+              />
             </div>
           ))
         )}
@@ -370,7 +392,15 @@ function renderAgentRow(
   );
 }
 
-function InstalledCard({ ext }: { ext: DiscoveredExtension }) {
+function InstalledCard({
+  ext,
+  uninstalling,
+  onUninstall,
+}: {
+  ext: DiscoveredExtension;
+  uninstalling: boolean;
+  onUninstall: (ext: DiscoveredExtension) => void;
+}) {
   return (
     <div style={s.card}>
       <span style={s.cardIcon}>
@@ -402,6 +432,25 @@ function InstalledCard({ ext }: { ext: DiscoveredExtension }) {
           )}
         </div>
       </div>
+      {ext.source === "package" && (
+        <button
+          onClick={() => onUninstall(ext)}
+          disabled={uninstalling}
+          style={{
+            padding: "4px 10px",
+            fontSize: 11,
+            fontWeight: 600,
+            borderRadius: 6,
+            cursor: "pointer",
+            border: "1px solid rgba(224, 108, 117, 0.4)",
+            background: uninstalling ? "var(--bg-glass)" : "rgba(224, 108, 117, 0.1)",
+            color: "var(--accent-red, #e06c75)",
+            whiteSpace: "nowrap" as const,
+          }}
+        >
+          {uninstalling ? "…" : "Uninstall"}
+        </button>
+      )}
     </div>
   );
 }
