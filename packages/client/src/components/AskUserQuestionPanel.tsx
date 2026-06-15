@@ -108,7 +108,10 @@ function PanelBody({ pending }: { pending: PendingAskQuestion }) {
         borderRadius: 12,
         background: "var(--bg-glass-strong)",
         padding: 16,
-        margin: "8px 0",
+        margin: "8px auto",
+        maxWidth: 800,
+        width: "100%",
+        boxSizing: "border-box",
       }}
     >
       {/* Header */}

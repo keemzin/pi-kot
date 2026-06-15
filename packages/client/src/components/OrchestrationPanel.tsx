@@ -143,6 +143,10 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
         display: "flex",
         flexDirection: "column",
         gap: "8px",
+        maxWidth: 800,
+        margin: "0 auto",
+        width: "100%",
+        boxSizing: "border-box",
       }}
     >
       <div

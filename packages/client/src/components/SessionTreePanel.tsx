@@ -150,49 +150,21 @@ export function SessionTreePanel({ sessionId, projectId, open, onClose }: Props)
 
   return (
     <div
+      className="settings-overlay"
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1000,
-        background: "rgba(0,0,0,0.6)",
         pointerEvents: open ? "auto" : "none",
-        transition: "opacity 0.18s ease",
         opacity: open ? 1 : 0,
+        transition: "opacity 0.18s ease",
       }}
       onClick={open ? onClose : undefined}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "absolute",
-          top: 52,
-          right: 0,
-          bottom: 0,
-          width: 420,
-          maxWidth: "92vw",
-          display: "flex",
-          flexDirection: "column",
-          borderRadius: "var(--radius) 0 0 var(--radius)",
-          borderLeft: "1px solid var(--tool-border)",
-          background: "var(--bg-frosted)",
-          backdropFilter: "blur(var(--blur-heavy))",
-          overflow: "hidden",
-          transform: open ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.18s ease",
-          willChange: "transform",
-          boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
-        }}
+        className="settings-panel"
+        style={{ width: 640, maxWidth: "92vw", maxHeight: "80vh" }}
       >
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
+        <header className="settings-header">
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "13px", color: "var(--text-dim)" }}>🌿</span>
             <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -245,54 +217,31 @@ export function SessionTreePanel({ sessionId, projectId, open, onClose }: Props)
             <button
               onClick={() => void refresh()}
               disabled={loading || busy}
-              style={{
-                padding: "4px 8px",
-                fontSize: "13px",
-                border: "none",
-                background: "transparent",
-                color: "var(--text-dim)",
-                cursor: "pointer",
-                borderRadius: "var(--radius-sm)",
-              }}
+              className="settings-close"
               title="Refresh"
+              style={{ fontSize: "13px" }}
             >
               ↻
             </button>
             <button
               onClick={onClose}
-              style={{
-                padding: "4px 8px",
-                fontSize: "16px",
-                border: "none",
-                background: "transparent",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
-                borderRadius: "var(--radius-sm)",
-              }}
+              className="settings-close"
               title="Close"
             >
               ✕
             </button>
           </div>
-        </div>
+        </header>
 
         {/* Error */}
         {error !== undefined && (
-          <div
-            style={{
-              padding: "8px 16px",
-              fontSize: "12px",
-              color: "var(--error)",
-              background: "rgba(248,113,113,0.08)",
-              borderBottom: "1px solid var(--tool-border)",
-            }}
-          >
+          <div className="settings-error">
             {error}
           </div>
         )}
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+        <div className="settings-body" style={{ padding: "12px" }}>
           {loading && tree === undefined && (
             <div style={{ textAlign: "center", padding: "24px", color: "var(--text-dim)", fontSize: "12px" }}>
               Loading tree…

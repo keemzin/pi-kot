@@ -360,7 +360,7 @@ export function FileExplorer({ projectId, open, onClose }: Props) {
     <div
       style={{
         position: "fixed",
-        top: 52,
+        top: 50,
         right: 0,
         bottom: 0,
         width: EXPLORER_WIDTH,

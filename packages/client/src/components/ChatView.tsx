@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Check, Copy } from "lucide-react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
@@ -369,12 +369,38 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const NEAR_BOTTOM_PX = 24;
+  const prevSessionRef = useRef<string | null>(null);
+
+  // Helper: get the actual scroll container (messages-container, not chat-scroll
+  // which has overflow: visible)
+  const getScrollEl = (): HTMLElement | null => {
+    // Try containerRef first (the messages-container element)
+    if (containerRef.current !== null && containerRef.current.scrollHeight > containerRef.current.clientHeight + 1) {
+      return containerRef.current;
+    }
+    // Fallback to scrollRef (chat-scroll — may not scroll due to overflow:visible)
+    return scrollRef.current;
+  };
+
+  // Scroll to bottom immediately when switching to a new session with messages
+  useLayoutEffect(() => {
+    if (messages.length === 0) return;
+    if (sessionId === prevSessionRef.current && prevSessionRef.current !== undefined) return;
+    prevSessionRef.current = sessionId;
+    const el = getScrollEl();
+    if (el === null) return;
+    const target = Math.max(0, el.scrollHeight - el.clientHeight);
+    el.scrollTop = target;
+    lastScrollTopRef.current = el.scrollTop;
+    isFollowingBottomRef.current = true;
+  }, [sessionId, messages.length]);
 
   const onScroll = (): void => {
-    const el = scrollRef.current;
+    const el = containerRef.current;
     if (el === null) return;
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
     const scrolledUp = el.scrollTop < lastScrollTopRef.current - 1;
@@ -383,7 +409,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   };
 
   useEffect(() => {
-    const el = scrollRef.current;
+    const el = getScrollEl();
     if (el === null || !isFollowingBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
     lastScrollTopRef.current = el.scrollTop;
@@ -557,7 +583,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   }, [messages, pairing, stickyUserHeader]);
 
   return (
-    <div className="messages-container" style={stickyUserHeader ? { paddingTop: 55 } : undefined}>
+    <div ref={containerRef} onScroll={onScroll} className="messages-container" style={stickyUserHeader ? { paddingTop: 50 } : undefined}>
       {error !== undefined && (
         <div onClick={clearError} className="error-banner">
           {error} — click to dismiss
@@ -571,7 +597,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           <div className="welcome-hint">with the pi coding agent</div>
         </div>
       ) : (
-        <div ref={scrollRef} onScroll={onScroll} style={stickyUserHeader ? { overflow: "visible", paddingTop: 0 } : { overflow: "visible" }} className="chat-scroll">
+        <div ref={scrollRef} style={stickyUserHeader ? { overflow: "visible", paddingTop: 0 } : { overflow: "visible" }} className="chat-scroll">
           <div className="chat-message-list">
             {renderedRows}
 
