@@ -1554,6 +1554,10 @@ body {
   color: var(--accent-text);
 }
 
+.rewind-btn {
+  margin-left: 2px;
+}
+
 /* ═══ Tool results ═══ */
 .tool-result {
   border-radius: var(--radius);
