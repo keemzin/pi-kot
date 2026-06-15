@@ -789,3 +789,52 @@ export async function installExtension(
 ): Promise<{ success: boolean; error?: string }> {
   return request("POST", "/api/v1/extensions/install", { package: packageName });
 }
+
+// ---- Checkpoints (pi-rewind baked-in support) ----
+
+export interface CheckpointFileChange {
+  path: string;
+  added: number;
+  removed: number;
+}
+
+export interface CheckpointEntry {
+  id: string;
+  kind: string;
+  userEntryId: string;
+  beforeCommit: string;
+  afterCommit: string;
+  prompt: string;
+  fileCount: number;
+  fileChanges: CheckpointFileChange[];
+  createdAt: string;
+}
+
+export interface CheckpointsResponse {
+  checkpoints: CheckpointEntry[];
+}
+
+export async function fetchCheckpoints(
+  sessionId: string,
+): Promise<CheckpointsResponse> {
+  return request<CheckpointsResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/checkpoints`,
+  );
+}
+
+export interface RewindRequest {
+  checkpointId: string;
+  mode: "code" | "conversation" | "both";
+}
+
+export async function rewindSession(
+  sessionId: string,
+  req: RewindRequest,
+): Promise<{ success: boolean; error?: string }> {
+  return request(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/rewind`,
+    req,
+  );
+}

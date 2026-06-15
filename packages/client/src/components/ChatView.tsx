@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Copy, Check, CornerUpLeft } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
+import { RewindModal } from "./RewindModal";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -357,14 +358,14 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 
 /* ── Rewind button ── */
 
-function RewindMsgButton({ sendPrompt }: { sendPrompt: (text: string) => void }) {
+function RewindMsgButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        sendPrompt("/rewind");
+        onClick();
       }}
       className="copy-msg-btn rewind-btn"
       title="Rewind to checkpoint (requires pi-rewind)"
@@ -388,6 +389,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const clearError = useSessionStore((s) => s.clearError);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const { rewind: rewindAvailable } = useExtensions();
+  const [showRewindModal, setShowRewindModal] = useState(false);
 
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 
@@ -569,7 +571,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
-                {rewindAvailable && <RewindMsgButton sendPrompt={sendPrompt} />}
+                {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
               </div>
             )}
           </div>,
@@ -586,7 +588,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`user-${userIdx}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
-              {rewindAvailable && <RewindMsgButton sendPrompt={sendPrompt} />}
+              {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
             </div>,
           );
         }
@@ -598,7 +600,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`turn-${ti}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
-              {rewindAvailable && <RewindMsgButton sendPrompt={sendPrompt} />}
+              {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
             </div>,
           );
         }
@@ -662,6 +664,13 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             )}
           </div>
         </div>
+      )}
+      {showRewindModal && (
+        <RewindModal
+          sessionId={sessionId}
+          onClose={() => setShowRewindModal(false)}
+          onRewindComplete={() => setShowRewindModal(false)}
+        />
       )}
     </div>
   );
