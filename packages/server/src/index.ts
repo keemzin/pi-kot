@@ -17,6 +17,7 @@ import { disposeAllSessions, getSession } from "./session-registry.js";
 import { subscribe as subscribeAskUserQuestion } from "./ask-user-question/registry.js";
 import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
+import { extensionRoutes } from "./routes/extensions.js";
 
 /**
  * Per-route auth metadata. Routes that should skip the auth preHandler
@@ -122,6 +123,7 @@ export async function buildServer() {
       await api.register(controlRoutes);
       await api.register(fileRoutes);
       await api.register(projectRoutes);
+      await api.register(extensionRoutes);
       await api.register(orchestrationRoutes);
     },
     { prefix: "/api/v1" },

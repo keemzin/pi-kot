@@ -742,3 +742,50 @@ export async function resumeWorkerUI(
     `/api/v1/orchestration/sessions/${encodeURIComponent(supervisorId)}/workers/${encodeURIComponent(workerId)}/resume`,
   );
 }
+
+// ---- Extension Discovery ----
+
+export interface DiscoveredExtension {
+  name: string;
+  source: "extensions_dir" | "agents_dir" | "package" | "builtin";
+  description: string;
+  version?: string;
+  agentTypes?: string[];
+  enablesFeatures?: string[];
+}
+
+export interface RecommendedExtension {
+  id: string;
+  name: string;
+  description: string;
+  package: string;
+  category: "orchestration" | "tools" | "ui" | "integration" | "productivity";
+  installed: boolean;
+  providesAgentTypes?: string[];
+  enablesFeatures?: string[];
+  icon: string;
+}
+
+export interface AgentDef {
+  name: string;
+  description: string;
+  model?: string;
+  tools?: string[];
+  source: "file" | "builtin";
+}
+
+export interface ExtensionsResponse {
+  detected: DiscoveredExtension[];
+  recommended: RecommendedExtension[];
+  agents: AgentDef[];
+}
+
+export async function fetchExtensions(): Promise<ExtensionsResponse> {
+  return request<ExtensionsResponse>("GET", "/api/v1/extensions");
+}
+
+export async function installExtension(
+  packageName: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request("POST", "/api/v1/extensions/install", { package: packageName });
+}

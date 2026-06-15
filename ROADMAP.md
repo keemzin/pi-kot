@@ -327,6 +327,10 @@ Phases are intentionally ordered so each one:
 │   ├── settings         🔴 not started
 │   ├── models          🔴 not started
 │   └── skills/...       🔴 not started
+├── extensions/     ✅ (Phase 8 — runtime discovery + install)
+│   ├── GET /            ✅ list detected + recommended
+│   └── POST /install    ✅ install a package
+├── orchestration/  ✅ (Phase 8)
 └── terminal        🔴 (Phase 6 — WebSocket, not started)
 `````
 
@@ -342,7 +346,7 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-**Total: ~41/71 tasks completed (~58% of roadmap)**
+| **Total: ~42/72 tasks completed (~58% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **92% done** (15/16 routes)
@@ -352,7 +356,7 @@ Phases are intentionally ordered so each one:
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
 - **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
-- **Phase 8 (Advanced):** ✅ **25% done** (3/12 tasks, model switching + ask_user_question + orchestration)
+- **Phase 8 (Advanced):** ✅ **40% done** (4/10 tasks, model switching + ask_user_question + orchestration + extension discovery)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
@@ -362,6 +366,7 @@ Phases are intentionally ordered so each one:
 - ✅ `ask_user_question` tool with UI panel
 - ✅ Per-session model override
 - ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
+- ✅ Runtime extension discovery — detect installed pi.dev extensions + curated recommendations with one-click install; dynamic agent type settings when pi-subagents detected
 
 ### **Remaining Work:**
 - Git integration (status, diff, commit, etc.)
