@@ -127,22 +127,92 @@ export function App() {
     }
   }, [activeProjectId]);
 
-  // Auto-select first session if none active, or create one if none exist
+  // Restore stored session on refresh, or auto-select/auto-create as fallback
   useEffect(() => {
     if (loading || authRequired || projects.length === 0) return;
-    if (activeSessionId === undefined && activeProjectId !== undefined) {
-      const projectSessionsList = projectSessions[activeProjectId];
-      // Wait for sessions to finish loading (undefined = still loading)
-      if (projectSessionsList === undefined) return;
+    if (activeProjectId === undefined) return;
 
-      if (projectSessionsList.length > 0) {
-        setActiveSession(projectSessionsList[0].sessionId);
-      } else if (!_autoCreatedProjects.has(activeProjectId)) {
-        _autoCreatedProjects.add(activeProjectId);
-        createAndActivate(activeProjectId);
+    const projectSessionsList = projectSessions[activeProjectId];
+    // Wait for sessions to finish loading (undefined = still loading)
+    if (projectSessionsList === undefined) return;
+
+    // We have a stored session ID (from localStorage or URL hash)
+    if (activeSessionId !== undefined) {
+      const exists = projectSessionsList.some(
+        (s) => s.sessionId === activeSessionId,
+      );
+      if (!exists) {
+        // Stored session was deleted on the server — clear ID and fall through
+        try {
+          localStorage.removeItem("pi-kot/active-session-id");
+        } catch { /* private mode */ }
+        useSessionStore.setState({ activeSessionId: undefined });
+        return; // Let next render auto-create
       }
+      // Session still exists — check if it needs activation (page refresh case)
+      const st = useSessionStore.getState();
+      if (st.sseClient === undefined) {
+        setActiveSession(activeSessionId);
+      }
+      return;
+    }
+
+    // No stored session — auto-select first or create
+    if (projectSessionsList.length > 0) {
+      setActiveSession(projectSessionsList[0].sessionId);
+    } else if (!_autoCreatedProjects.has(activeProjectId)) {
+      _autoCreatedProjects.add(activeProjectId);
+      createAndActivate(activeProjectId);
     }
   }, [loading, authRequired, activeProjectId, projectSessions, activeSessionId]);
+
+  // ── URL hash sync (deep-linkable sessions) ──
+  // Write the active project/session into the URL hash so a refresh
+  // or bookmark restores the same view.
+  useEffect(() => {
+    const pid = activeProjectId;
+    const sid = activeSessionId;
+    let newHash: string;
+    if (pid && sid) {
+      newHash = `#/project/${pid}/session/${sid}`;
+    } else if (pid) {
+      newHash = `#/project/${pid}`;
+    } else {
+      newHash = "#";
+    }
+    if (window.location.hash !== newHash) {
+      history.replaceState(null, "", newHash);
+    }
+  }, [activeProjectId, activeSessionId]);
+
+  // Respond to back/forward hash navigation
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash;
+      const m = hash.match(/^#\/project\/([^/]+)(?:\/session\/([^/]+))?$/);
+      if (!m) return;
+      const hashProjectId = m[1];
+      const hashSessionId = m[2] ?? undefined;
+      const state = useSessionStore.getState();
+      if (hashSessionId && hashSessionId !== state.activeSessionId) {
+        const exists = Object.values(state.projectSessions).some((list) =>
+          list.some((s) => s.sessionId === hashSessionId),
+        );
+        if (exists) {
+          // Ensure we're on the right project first
+          if (hashProjectId !== state.activeProjectId) {
+            state.setActiveProject(hashProjectId).then(() => {
+              state.setActiveSession(hashSessionId);
+            });
+          } else {
+            state.setActiveSession(hashSessionId);
+          }
+        }
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   // Auto-expand worker groups when any worker in any project is live
   useEffect(() => {

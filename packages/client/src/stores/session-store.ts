@@ -18,6 +18,34 @@ import { useAskUserQuestionStore } from "./ask-user-question-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 
+// ── localStorage persistence keys ──
+
+const ACTIVE_PROJECT_KEY = "pi-kot/active-project-id";
+const ACTIVE_SESSION_KEY = "pi-kot/active-session-id";
+
+function getInitialActiveProjectId(): string | undefined {
+  try {
+    // URL hash takes priority (deep link / bookmark)
+    const hash = window.location.hash;
+    const m = hash.match(/^#\/project\/([^/]+)/);
+    if (m) return m[1];
+    return localStorage.getItem(ACTIVE_PROJECT_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getInitialActiveSessionId(): string | undefined {
+  try {
+    const hash = window.location.hash;
+    const m = hash.match(/^#\/project\/[^/]+\/session\/([^/]+)/);
+    if (m) return m[1];
+    return localStorage.getItem(ACTIVE_SESSION_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface MessageLike {
   role?: string;
   content?: unknown;
@@ -79,11 +107,11 @@ type SessionStore = SessionState & SessionActions;
 export const useSessionStore = create<SessionStore>((set, get) => ({
   // State
   projects: [],
-  activeProjectId: undefined,
+  activeProjectId: getInitialActiveProjectId(),
   sessions: [],
   projectSessions: {},
   archivedSessions: {},
-  activeSessionId: undefined,
+  activeSessionId: getInitialActiveSessionId(),
   messages: [],
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
   loading: false,
@@ -94,13 +122,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   loadProjects: async () => {
     try {
       const { projects } = await fetchProjects();
-      set({ projects });
-      // Auto-select first project if none active and projects exist
       const state = get();
-      if (state.activeProjectId === undefined && projects.length > 0) {
-        const firstId = projects[0].id;
-        set({ activeProjectId: firstId });
-        await get().loadProjectSessions(firstId);
+      let nextProjectId = state.activeProjectId;
+
+      // Validate stored project still exists on the server
+      if (nextProjectId !== undefined && !projects.some((p) => p.id === nextProjectId)) {
+        nextProjectId = undefined;
+      }
+
+      // Auto-select first project if none active and projects exist
+      if (nextProjectId === undefined && projects.length > 0) {
+        nextProjectId = projects[0].id;
+      }
+
+      set({ projects, activeProjectId: nextProjectId });
+
+      if (nextProjectId !== undefined) {
+        try {
+          localStorage.setItem(ACTIVE_PROJECT_KEY, nextProjectId);
+        } catch { /* private mode */ }
+        await get().loadProjectSessions(nextProjectId);
       }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to load projects" });
@@ -108,6 +149,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   setActiveProject: async (id: string) => {
+    try {
+      localStorage.setItem(ACTIVE_PROJECT_KEY, id);
+      localStorage.removeItem(ACTIVE_SESSION_KEY);
+    } catch { /* private mode */ }
     set({ activeProjectId: id, activeSessionId: undefined, messages: [] });
     // Disconnect old SSE
     const old = get().sseClient;
@@ -157,6 +202,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         messages: [],
         loading: false,
       }));
+      try {
+        localStorage.setItem(ACTIVE_SESSION_KEY, res.sessionId);
+      } catch { /* private mode */ }
       get().connectSSE(res.sessionId);
       return res.sessionId;
     } catch (err) {
@@ -169,6 +217,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   setActiveSession: async (id: string) => {
+    try {
+      localStorage.setItem(ACTIVE_SESSION_KEY, id);
+    } catch { /* private mode */ }
     // Disconnect old SSE
     const old = get().sseClient;
     old?.close();
@@ -422,6 +473,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       await archiveSessionAPI(sessionId, projectId);
       // Remove from local state
+      const wasActive = get().activeSessionId === sessionId;
       set((s) => ({
         sessions: s.sessions.filter((sess) => sess.sessionId !== sessionId),
         projectSessions: projectId
@@ -435,6 +487,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeSessionId:
           s.activeSessionId === sessionId ? undefined : s.activeSessionId,
       }));
+      if (wasActive) {
+        try {
+          localStorage.removeItem(ACTIVE_SESSION_KEY);
+        } catch { /* private mode */ }
+      }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to archive session" });
     }
@@ -479,6 +536,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       await deleteProjectAPI(id);
       const state = get();
+      if (state.activeProjectId === id) {
+        try {
+          localStorage.removeItem(ACTIVE_PROJECT_KEY);
+          localStorage.removeItem(ACTIVE_SESSION_KEY);
+        } catch { /* private mode */ }
+      }
       let nextActiveProjectId: string | undefined = state.activeProjectId;
       let nextSessions: SessionSummary[] = state.sessions;
       if (state.activeProjectId === id) {

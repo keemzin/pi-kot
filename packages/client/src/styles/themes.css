@@ -42,7 +42,7 @@
   color-scheme: dark;
 
   --bg-solid: #212121;
-  --header-bg: rgba(33, 33, 33, 0.7);
+  --header-bg: rgba(55, 55, 60, 0.75);
   --sidebar-bg: rgba(40, 40, 38, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.06);
@@ -90,7 +90,7 @@
   color-scheme: dark;
 
   --bg-solid: #000000;
-  --header-bg: rgba(0, 0, 0, 0.65);
+  --header-bg: rgba(25, 25, 28, 0.72);
   --sidebar-bg: rgba(18, 18, 17, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.03);
   --bg-glass-hover: rgba(255, 255, 255, 0.05);
@@ -137,7 +137,7 @@
   color-scheme: dark;
 
   --bg-solid: #1a1d26;
-  --header-bg: rgba(26, 29, 38, 0.65);
+  --header-bg: rgba(45, 48, 55, 0.72);
   --sidebar-bg: rgba(30, 34, 44, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.07);
@@ -186,7 +186,7 @@
   color-scheme: dark;
 
   --bg-solid: #171515;
-  --header-bg: rgba(23, 21, 21, 0.75);
+  --header-bg: rgba(42, 40, 38, 0.78);
   --sidebar-bg: rgba(28, 27, 26, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.06);
@@ -236,7 +236,7 @@
   color-scheme: light;
 
   --bg-solid: #fffdf4;
-  --header-bg: rgba(255, 253, 244, 0.65);
+  --header-bg: rgba(242, 240, 232, 0.72);
   --sidebar-bg: rgba(246, 245, 238, 0.95);
   --bg-glass: rgba(0, 0, 0, 0.03);
   --bg-glass-hover: rgba(0, 0, 0, 0.06);
@@ -285,7 +285,7 @@
   color-scheme: light;
 
   --bg-solid: #ffffff;
-  --header-bg: rgba(255, 255, 255, 0.65);
+  --header-bg: rgba(240, 240, 244, 0.72);
   --sidebar-bg: rgba(242, 242, 247, 0.95);
   --bg-glass: rgba(0, 0, 0, 0.03);
   --bg-glass-hover: rgba(0, 0, 0, 0.06);
@@ -334,7 +334,7 @@
   color-scheme: light;
 
   --bg-solid: #f4f1ec;
-  --header-bg: rgba(244, 241, 236, 0.65);
+  --header-bg: rgba(232, 228, 222, 0.72);
   --sidebar-bg: rgba(240, 234, 224, 0.95);
   --bg-glass: rgba(244, 241, 236, 0.6);
   --bg-glass-hover: rgba(0, 0, 0, 0.06);
@@ -383,7 +383,7 @@
   color-scheme: light;
 
   --bg-solid: #f0f2ec;
-  --header-bg: rgba(240, 242, 236, 0.65);
+  --header-bg: rgba(228, 230, 224, 0.72);
   --sidebar-bg: rgba(232, 238, 226, 0.95);
   --bg-glass: rgba(240, 242, 236, 0.6);
   --bg-glass-hover: rgba(0, 0, 0, 0.06);
@@ -432,7 +432,7 @@
   color-scheme: dark;
 
   --bg-solid: #272822;
-  --header-bg: rgba(39, 40, 34, 0.75);
+  --header-bg: rgba(55, 56, 48, 0.78);
   --sidebar-bg: rgba(30, 31, 28, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.06);
@@ -482,7 +482,7 @@
   color-scheme: dark;
 
   --bg-solid: #282a36;
-  --header-bg: rgba(40, 42, 54, 0.72);
+  --header-bg: rgba(55, 57, 68, 0.75);
   --sidebar-bg: rgba(30, 32, 44, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.06);
@@ -532,7 +532,7 @@
   color-scheme: dark;
 
   --bg-solid: #2e3440;
-  --header-bg: rgba(46, 52, 64, 0.72);
+  --header-bg: rgba(60, 65, 76, 0.75);
   --sidebar-bg: rgba(36, 42, 54, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.06);
@@ -582,7 +582,7 @@
   color-scheme: dark;
 
   --bg-solid: #001e25;
-  --header-bg: rgba(0, 30, 37, 0.75);
+  --header-bg: rgba(18, 44, 50, 0.78);
   --sidebar-bg: rgba(2, 35, 46, 0.95);
   --bg-glass: rgba(255, 255, 255, 0.04);
   --bg-glass-hover: rgba(255, 255, 255, 0.07);
@@ -632,7 +632,7 @@
   color-scheme: light;
 
   --bg-solid: #fdf6e3;
-  --header-bg: rgba(253, 246, 227, 0.65);
+  --header-bg: rgba(240, 234, 216, 0.72);
   --sidebar-bg: rgba(246, 239, 218, 0.95);
   --bg-glass: rgba(0, 0, 0, 0.03);
   --bg-glass-hover: rgba(0, 0, 0, 0.06);
@@ -722,8 +722,8 @@ body {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
   background: var(--sidebar-bg);
-  backdrop-filter: blur(var(--blur-heavy)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(1.5);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(1.5);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -733,6 +733,7 @@ body {
   top: 50px;
   left: 0;
   bottom: 0;
+  will-change: transform;
   overflow-y: auto;
   box-shadow: 4px 0 32px rgba(0,0,0,0.18);
 }
@@ -1088,8 +1089,8 @@ body {
   margin-bottom: 4px;
   z-index: 100;
   background: var(--header-bg);
-  backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  backdrop-filter: blur(40px) saturate(1.5);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   max-height: 240px;
@@ -1271,8 +1272,8 @@ body {
   align-items: center;
   padding: 8px 16px;
   background: var(--header-bg);
-  backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  backdrop-filter: blur(40px) saturate(1.5);
   border-bottom: 1px solid var(--border);
   height: 50px;
   position: absolute;
@@ -1280,6 +1281,8 @@ body {
   left: 0;
   right: 0;
   z-index: 200;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.15);
+  will-change: transform;
 }
 
 .header-left,
@@ -1536,8 +1539,8 @@ body {
   color: var(--user-bubble-text);
   border: 1px solid var(--border);
   border-bottom-right-radius: 6px;
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   font-weight: 500;
   white-space: pre-wrap;
   max-width: 80%;
@@ -1884,8 +1887,8 @@ body {
   margin: 0 auto;
   padding: 10px 20px 12px;
   background: var(--header-bg);
-  backdrop-filter: blur(40px) saturate(1.5);
   -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  backdrop-filter: blur(40px) saturate(1.5);
   border-top: none;
 }
 
@@ -1942,8 +1945,8 @@ body {
   max-height: 160px;
   line-height: 1.45;
   overflow-y: auto;
-  backdrop-filter: blur(var(--blur));
   -webkit-backdrop-filter: blur(var(--blur));
+  backdrop-filter: blur(var(--blur));
   transition: all var(--duration) var(--ease);
 }
 
@@ -2190,8 +2193,8 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg-frosted);
-  backdrop-filter: blur(40px) saturate(1.6);
   -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  backdrop-filter: blur(40px) saturate(1.6);
   border: 1px solid var(--border-hover);
   border-radius: var(--radius-lg);
   box-shadow: 0 16px 48px rgba(0,0,0,0.4);
