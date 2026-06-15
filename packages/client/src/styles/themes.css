@@ -1062,7 +1062,9 @@ body {
   right: 0;
   margin-bottom: 4px;
   z-index: 100;
-  background: var(--bg-elevated);
+  background: var(--header-bg);
+  backdrop-filter: blur(40px) saturate(1.5);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   max-height: 240px;
