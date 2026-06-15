@@ -160,10 +160,11 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   }, [load, refreshing]);
 
   const handleUninstall = async (ext: DiscoveredExtension) => {
+    const pkgId = ext.package ?? ext.name;
     if (!confirm(`Uninstall "${ext.name}"? It will be removed from the packages list and can be reinstalled from recommendations.`)) return;
     setUninstalling(ext.name);
     try {
-      const result = await uninstallExtApi(ext.name.startsWith("npm:") ? ext.name : `npm:${ext.name}`);
+      const result = await uninstallExtApi(pkgId);
       if (!result.success) {
         onError(result.error ?? "Uninstall failed");
       }

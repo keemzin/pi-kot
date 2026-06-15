@@ -25,6 +25,8 @@ export interface DiscoveredExtension {
   description: string;
   /** Version string if available */
   version?: string;
+  /** Original package identifier (e.g. "npm:@ayulab/pi-rewind"). Only set for package source. */
+  package?: string;
   /** The agent type definitions this extension provides (e.g. scout, planner) */
   agentTypes?: string[];
   /** What UI features this extension enables */
@@ -351,6 +353,7 @@ export async function discoverExtensions(): Promise<ExtensionsResponse> {
         known?.description ?? `Installed package: ${pkg}`,
       source: "package",
       version: known ? undefined : undefined,
+      package: pkg,
       agentTypes: known?.providesAgentTypes,
       enablesFeatures: known?.enablesFeatures,
     });

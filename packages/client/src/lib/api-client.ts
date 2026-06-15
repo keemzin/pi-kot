@@ -763,6 +763,8 @@ export interface DiscoveredExtension {
   source: "extensions_dir" | "agents_dir" | "package" | "builtin";
   description: string;
   version?: string;
+  /** Original package identifier (e.g. "npm:@ayulab/pi-rewind"). Only set for package source. */
+  package?: string;
   agentTypes?: string[];
   enablesFeatures?: string[];
 }
