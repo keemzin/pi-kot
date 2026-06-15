@@ -11,7 +11,7 @@
 import { type FastifyPluginAsync } from "fastify";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import { config } from "../config.js";
@@ -181,17 +181,39 @@ async function readCheckpointsFromFile(
   }
 }
 
-/** Restore code by checking out a git commit in the workspace. */
+/** Restore code by resetting to a checkpoint commit in pi-rewind's bare repo.
+ *
+ * pi-rewind stores checkpoints in a bare git repo at
+ * ~/.pi/agent/ayu/checkpoints/sessions/{sessionFileBasename}/.git
+ * with --work-tree pointing at the user's project directory.
+ * We do the same here — git --git-dir + --work-tree reset --hard.
+ */
 function restoreCode(
   workspacePath: string,
   commit: string,
+  sessionFile?: string,
 ): { success: boolean; error?: string } {
   try {
-    execSync(`git checkout ${commit}`, {
-      cwd: workspacePath,
-      stdio: "pipe",
-      timeout: 30_000,
-    });
+    // Derive the checkpoint bare repo dir from the session file path
+    let gitDir: string;
+    if (sessionFile !== undefined) {
+      const base = basename(sessionFile, ".jsonl");
+      const repoDir = join(homedir(), ".pi", "agent", "ayu", "checkpoints", "sessions", base, ".git");
+      gitDir = repoDir;
+    } else {
+      // Fallback: try the project's own git repo
+      gitDir = join(workspacePath, ".git");
+    }
+
+    execSync(
+      `git -c core.autocrlf=false -c core.safecrlf=false --git-dir=${gitDir} --work-tree=${workspacePath} reset --hard ${commit}`,
+      { stdio: "pipe", timeout: 30_000 },
+    );
+    // Also clean untracked files that were staged by pi-rewind
+    execSync(
+      `git -c core.autocrlf=false -c core.safecrlf=false --git-dir=${gitDir} --work-tree=${workspacePath} clean -fd`,
+      { stdio: "pipe", timeout: 30_000 },
+    );
     return { success: true };
   } catch (err) {
     return {
@@ -335,10 +357,13 @@ export const checkpointRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         // Execute restore based on mode
+        // Get the session file path for checkpoint repo resolution
+        const sessionFile = live.sessionManager.getSessionFile();
+
         if (body.mode === "code" || body.mode === "both") {
           // Only restore code if there were file changes
           if (cp.fileCount > 0 && cp.beforeCommit) {
-            const result = restoreCode(live.workspacePath, cp.beforeCommit);
+            const result = restoreCode(live.workspacePath, cp.beforeCommit, sessionFile);
             if (!result.success) {
               return reply.send({ success: false, error: `Code restore failed: ${result.error}` });
             }
