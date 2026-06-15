@@ -550,6 +550,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
+                  {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
                 </div>
               )}
               <div
@@ -571,7 +572,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
-                {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
               </div>
             )}
           </div>,
@@ -600,7 +600,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`turn-${ti}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
-              {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
             </div>,
           );
         }
