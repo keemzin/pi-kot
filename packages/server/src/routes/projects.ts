@@ -93,57 +93,70 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
       },
     },
     async (req, reply) => {
-      const { readdir, stat } = await import("node:fs/promises");
+      const { readdir } = await import("node:fs/promises");
       const query = (req.query.q ?? "").trim();
       const suggestions: string[] = [];
+      const ws = config.workspacePath;
 
-      // If query starts with / or ~ or is an absolute path, search from root/home
-      // Otherwise search from the default workspace dir
+      // Determine search base and prefix
       let searchBase: string;
       let searchPrefix: string;
 
-      if (query.startsWith("/")) {
-        // Absolute path query — search from root
-        searchBase = query;
-        searchPrefix = query;
-      } else if (query.startsWith("~/")) {
-        const { homedir } = await import("node:os");
-        searchBase = join(homedir(), query.slice(2));
-        searchPrefix = searchBase;
-      } else if (query.length > 0) {
-        // Relative query — search from workspace root
-        searchBase = config.workspacePath;
-        searchPrefix = join(searchBase, query);
-      } else {
-        // No query — show workspace root
-        suggestions.push(config.workspacePath);
+      if (query.length === 0) {
+        // No query — just show the workspace dir itself
+        suggestions.push(ws);
         return reply.send({ suggestions });
       }
 
-      try {
-        const parent = resolve(searchPrefix, "..");
-        const dirName = resolve(searchPrefix);
-        const parentEntries = await readdir(parent, { withFileTypes: true });
+      if (query.startsWith("~/")) {
+        // Tilde — expand home
+        const { homedir } = await import("node:os");
+        searchBase = join(homedir(), query.slice(2));
+        searchPrefix = searchBase;
+      } else if (query.startsWith("/")) {
+        // User typed a slash — treat as workspace root, not filesystem root.
+        // Prepend workspace path so "/pi-rewind" searches workspace/pi-rewind
+        const sub = query.slice(1); // remove leading /
+        searchBase = sub.length > 0 ? join(ws, sub) : ws;
+        searchPrefix = searchBase;
+      } else {
+        // Relative query — search from workspace root
+        searchBase = join(ws, query);
+        searchPrefix = searchBase;
+      }
 
-        for (const entry of parentEntries) {
+      // Find parent dir, list its subdirectories
+      try {
+        const parent = resolve(searchBase, "..");
+        const dirName = resolve(searchBase);
+        const entries = await readdir(parent, { withFileTypes: true });
+
+        for (const entry of entries) {
           if (!entry.isDirectory()) continue;
-          // Skip hidden dirs (starting with .) unless prefix starts with .
-          if (entry.name.startsWith(".") && !dirName.includes(".")) continue;
+          // Skip hidden dirs unless query starts with .
+          if (entry.name.startsWith(".") && !query.startsWith(".")) continue;
 
           const fullPath = join(parent, entry.name);
+          // Include if it starts with the prefix, or prefix starts with it
           if (fullPath.startsWith(searchPrefix) || dirName.startsWith(fullPath)) {
             suggestions.push(fullPath);
           }
         }
       } catch {
-        // Directory doesn't exist — try the parent's parent
+        // Dir doesn't exist — try query as a literal filesystem path
+        // (user typed something like /home/hakeem explictly)
         try {
-          const grandparent = resolve(searchPrefix, "..", "..");
-          const entries = await readdir(grandparent, { withFileTypes: true });
-          for (const entry of entries) {
-            if (!entry.isDirectory()) continue;
-            if (entry.name.startsWith(".")) continue;
-            suggestions.push(join(grandparent, entry.name));
+          if (query.startsWith("/")) {
+            const parent = resolve(query, "..");
+            const entries = await readdir(parent, { withFileTypes: true });
+            for (const entry of entries) {
+              if (!entry.isDirectory()) continue;
+              if (entry.name.startsWith(".")) continue;
+              const fullPath = join(parent, entry.name);
+              if (fullPath.startsWith(query)) {
+                suggestions.push(fullPath);
+              }
+            }
           }
         } catch {
           // No suggestions
