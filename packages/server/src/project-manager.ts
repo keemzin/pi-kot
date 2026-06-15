@@ -1,5 +1,6 @@
 import { readFile, rename, unlink, writeFile, mkdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { config } from "./config.js";
 
@@ -99,7 +100,9 @@ export async function createProject(
   const trimmed = name.trim();
   if (trimmed.length === 0) throw new InvalidNameError("project name cannot be empty");
 
-  const resolvedPath = resolve(path);
+  // Expand ~/ to home directory
+  const expanded = path.startsWith("~/") ? join(homedir(), path.slice(2)) : path;
+  const resolvedPath = resolve(expanded);
 
   return withProjectsLock(async () => {
     const projects = await readProjects();

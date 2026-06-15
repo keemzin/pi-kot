@@ -95,7 +95,7 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        const path = req.body.path ?? config.workspacePath;
+        const path = req.body.path?.trim() || config.workspacePath;
         const project = await createProject(req.body.name, path);
         return reply.code(201).send(project);
       } catch (err) {
