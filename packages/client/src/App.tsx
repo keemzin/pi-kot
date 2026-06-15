@@ -17,6 +17,7 @@ import {
   fetchProviders,
   type ProviderGroup,
   createProjectAPI,
+  browseDirectories,
   cloneRepo,
 } from "./lib/api-client";
 
@@ -66,6 +67,10 @@ export function App() {
   const [showOrch, setShowOrch] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const [pathSuggestions, setPathSuggestions] = useState<string[]>([]);
+  const [showPathSuggestions, setShowPathSuggestions] = useState(false);
+  const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
+  const pathDebounceRef = useRef<number | undefined>(undefined);
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -201,6 +206,71 @@ export function App() {
       setShowAddProject(false);
     } catch (err) {
       setModelError(err instanceof Error ? err.message : "Failed to create project");
+    }
+  };
+
+  const fetchPathSuggestions = useCallback(async (query: string) => {
+    if (pathDebounceRef.current) clearTimeout(pathDebounceRef.current);
+    pathDebounceRef.current = setTimeout(async () => {
+      try {
+        const { suggestions } = await browseDirectories(query);
+        setPathSuggestions(suggestions);
+        setShowPathSuggestions(suggestions.length > 0);
+        setPathSuggestionIdx(-1);
+      } catch {
+        setShowPathSuggestions(false);
+      }
+    }, 200);
+  }, []);
+
+  const handlePathInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewProjectPath(val);
+    setShowPathSuggestions(false);
+    if (val.trim().length > 0) {
+      fetchPathSuggestions(val.trim());
+    } else {
+      setPathSuggestions([]);
+    }
+  };
+
+  const selectPathSuggestion = (path: string) => {
+    setNewProjectPath(path);
+    setShowPathSuggestions(false);
+    setPathSuggestions([]);
+  };
+
+  const handlePathKeyDown = (e: React.KeyboardEvent) => {
+    if (showPathSuggestions && pathSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setPathSuggestionIdx((prev) =>
+          prev < pathSuggestions.length - 1 ? prev + 1 : 0,
+        );
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setPathSuggestionIdx((prev) =>
+          prev > 0 ? prev - 1 : pathSuggestions.length - 1,
+        );
+        return;
+      }
+      if (e.key === "Enter" && pathSuggestionIdx >= 0) {
+        e.preventDefault();
+        selectPathSuggestion(pathSuggestions[pathSuggestionIdx]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setShowPathSuggestions(false);
+        return;
+      }
+    }
+    if (e.key === "Enter") {
+      handleAddProject();
+    }
+    if (e.key === "Escape") {
+      setShowAddProject(false);
     }
   };
 
@@ -680,17 +750,67 @@ export function App() {
                       if (e.key === "Escape") setShowAddProject(false);
                     }}
                   />
-                  <input
-                    type="text"
-                    value={newProjectPath}
-                    onChange={(e) => setNewProjectPath(e.target.value)}
-                    placeholder="Path to existing folder (e.g. ~/my-project)"
-                    className="add-project-input"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddProject();
-                      if (e.key === "Escape") setShowAddProject(false);
-                    }}
-                  />
+                  <div style={{ position: "relative" }}>
+                    <input
+                      type="text"
+                      value={newProjectPath}
+                      onChange={handlePathInputChange}
+                      onFocus={() => {
+                        if (pathSuggestions.length > 0) setShowPathSuggestions(true);
+                      }}
+                      onBlur={() => {
+                        // Delay hiding so click on suggestion registers
+                        setTimeout(() => setShowPathSuggestions(false), 200);
+                      }}
+                      onKeyDown={handlePathKeyDown}
+                      placeholder="/home or ~/ or folder name → auto-suggest"
+                      className="add-project-input"
+                      style={{ width: "100%" }}
+                    />
+                    {showPathSuggestions && pathSuggestions.length > 0 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          zIndex: 100,
+                          background: "var(--bg-surface, #1a1a2e)",
+                          border: "1px solid var(--border-color, #333)",
+                          borderRadius: 6,
+                          maxHeight: 240,
+                          overflowY: "auto",
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                        }}
+                      >
+                        {pathSuggestions.slice(0, 20).map((s, i) => {
+                          return (
+                            <div
+                              key={s}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                selectPathSuggestion(s);
+                              }}
+                              style={{
+                                padding: "6px 10px",
+                                cursor: "pointer",
+                                fontSize: 12,
+                                fontFamily: "monospace",
+                                color: "var(--text-primary)",
+                                background:
+                                  i === pathSuggestionIdx
+                                    ? "var(--accent-subtle, #1e3a5f)"
+                                    : "none",
+                              }}
+                              onMouseEnter={() => setPathSuggestionIdx(i)}
+                            >
+                              📁 {s}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                   <div className="add-project-actions">
                     <button onClick={handleAddProject} className="add-project-btn">
                       Add

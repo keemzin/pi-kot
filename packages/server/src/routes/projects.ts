@@ -58,6 +58,110 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // GET /api/v1/projects/browse — directory autocomplete
+  fastify.get<{
+    Querystring: { q?: string };
+  }>(
+    "/projects/browse",
+    {
+      schema: {
+        description:
+          "List matching directory paths for the Add Project path autocomplete.",
+        tags: ["projects"],
+        querystring: {
+          type: "object",
+          properties: {
+            q: {
+              type: "string",
+              description:
+                "Partial path query — returns matching directory suggestions.",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["suggestions"],
+            properties: {
+              suggestions: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { readdir, stat } = await import("node:fs/promises");
+      const query = (req.query.q ?? "").trim();
+      const suggestions: string[] = [];
+
+      // If query starts with / or ~ or is an absolute path, search from root/home
+      // Otherwise search from the default workspace dir
+      let searchBase: string;
+      let searchPrefix: string;
+
+      if (query.startsWith("/")) {
+        // Absolute path query — search from root
+        searchBase = query;
+        searchPrefix = query;
+      } else if (query.startsWith("~/")) {
+        const { homedir } = await import("node:os");
+        searchBase = join(homedir(), query.slice(2));
+        searchPrefix = searchBase;
+      } else if (query.length > 0) {
+        // Relative query — search from workspace root
+        searchBase = config.workspacePath;
+        searchPrefix = join(searchBase, query);
+      } else {
+        // No query — show workspace root
+        suggestions.push(config.workspacePath);
+        return reply.send({ suggestions });
+      }
+
+      try {
+        const parent = resolve(searchPrefix, "..");
+        const dirName = resolve(searchPrefix);
+        const parentEntries = await readdir(parent, { withFileTypes: true });
+
+        for (const entry of parentEntries) {
+          if (!entry.isDirectory()) continue;
+          // Skip hidden dirs (starting with .) unless prefix starts with .
+          if (entry.name.startsWith(".") && !dirName.includes(".")) continue;
+
+          const fullPath = join(parent, entry.name);
+          if (fullPath.startsWith(searchPrefix) || dirName.startsWith(fullPath)) {
+            suggestions.push(fullPath);
+          }
+        }
+      } catch {
+        // Directory doesn't exist — try the parent's parent
+        try {
+          const grandparent = resolve(searchPrefix, "..", "..");
+          const entries = await readdir(grandparent, { withFileTypes: true });
+          for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+            if (entry.name.startsWith(".")) continue;
+            suggestions.push(join(grandparent, entry.name));
+          }
+        } catch {
+          // No suggestions
+        }
+      }
+
+      // Sort: closest match first, then alphabetical
+      suggestions.sort((a, b) => {
+        const aMatch = a.startsWith(searchPrefix) ? 0 : 1;
+        const bMatch = b.startsWith(searchPrefix) ? 0 : 1;
+        if (aMatch !== bMatch) return aMatch - bMatch;
+        return a.localeCompare(b);
+      });
+
+      return reply.send({ suggestions: suggestions.slice(0, 20) });
+    },
+  );
+
   // POST /api/v1/projects — create a new project
   fastify.post<{
     Body: { name: string; path?: string };

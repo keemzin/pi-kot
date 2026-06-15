@@ -251,6 +251,19 @@ export interface Project {
   createdAt: string;
 }
 
+export interface BrowseSuggestions {
+  suggestions: string[];
+}
+
+export async function browseDirectories(
+  query: string,
+): Promise<BrowseSuggestions> {
+  return request<BrowseSuggestions>(
+    "GET",
+    `/api/v1/projects/browse?q=${encodeURIComponent(query)}`,
+  );
+}
+
 export async function fetchProjects(): Promise<{ projects: Project[] }> {
   return request<{ projects: Project[] }>("GET", "/api/v1/projects");
 }
