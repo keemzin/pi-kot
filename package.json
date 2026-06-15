@@ -8,10 +8,10 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "dev": "concurrently \"npm run dev -w packages/server\" \"npm run dev -w packages/client\"",
+    "dev": "PORT=\"${PORT:-3333}\" concurrently \"PORT=\"${PORT:-3333}\" npm run dev -w packages/server\" \"VITE_API_PORT=\"${PORT:-3333}\" npm run dev -w packages/client\"",
     "start": "node packages/server/dist/index.js",
-    "dev:server": "npm run dev -w packages/server",
-    "dev:client": "npm run dev -w packages/client",
+    "dev:server": "PORT=\"${PORT:-3333}\" npm run dev -w packages/server",
+    "dev:client": "VITE_API_PORT=\"${PORT:-3333}\" npm run dev -w packages/client",
     "typecheck": "npm run check --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
