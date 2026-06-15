@@ -82,22 +82,33 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
 
 function CodeCopyButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
-  const onClick = () => {
-    if (!code) return;
-    const flash = () => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    };
-    navigator.clipboard?.writeText?.(code)?.then(flash)?.catch(() => {
+  const flash = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+  const fallback = (text: string): void => {
+    try {
       const ta = document.createElement("textarea");
-      ta.value = code;
+      ta.value = text;
       ta.style.position = "fixed";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
+      document.body.removeChild(ta);
       flash();
-    });
+    } catch {
+      // Clipboard unavailable
+    }
+  };
+  const onClick = () => {
+    if (!code) return;
+    const writeAsync = navigator.clipboard?.writeText?.bind(navigator.clipboard);
+    if (writeAsync !== undefined) {
+      void writeAsync(code).then(flash).catch(() => fallback(code));
+    } else {
+      fallback(code);
+    }
   };
   return (
     <button type="button" onClick={onClick} className="code-copy-btn" title="Copy code block" aria-label="Copy code block">
