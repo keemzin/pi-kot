@@ -36,6 +36,12 @@ const ALLOWED_EVENT_TYPES = new Set([
   "snapshot",
   "ask_user_question",
   "ask_user_question_cancelled",
+  // Extension UI bridge events
+  "extension_ui_select",
+  "extension_ui_confirm",
+  "extension_ui_input",
+  "extension_ui_notify",
+  "extension_ui_done",
 ]);
 
 function isAllowedEvent(event: { type: string }): boolean {

@@ -5,6 +5,19 @@ Keep it concise and accurate. Detailed guidance is split into `docs/agent/*` as 
 
 ---
 
+## 🚫 Working Directory Constraint
+
+**This project lives at `/home/hakeem/pi-kot/`. You MUST stay in this directory.**
+
+- Do **not** `cd` outside `/home/hakeem/pi-kot/` for any reason.
+- Do **not** read, write, or execute commands outside this directory (e.g., `../`, `/home/other/`).
+- Access subdirectories inside `/home/hakeem/pi-kot/` normally — `./pi-forge/`, `./openkot-ref/`, `./WORKING/`, `./packages/` are all fine.
+- For files in `node_modules/`, use the full path under `/home/hakeem/pi-kot/node_modules/...` (never via `../`).
+- Use absolute paths when calling tools like `read`, `write`, `edit`, or `bash` to avoid ambiguity.
+- **Stick to this directory. If you're not sure a path is inside `/home/hakeem/pi-kot/`, check first.**
+
+---
+
 ## What This Project Is
 
 **pi-kot** is a browser UI (web wrapper / web frontend) for the [pi coding agent](https://pi.dev).
@@ -384,6 +397,7 @@ pi-kot/
 | `9f8757f` | Aligned sticky header with sidebar file explorer position (44px → 55px settled) |
 | `4c40a25` | Moved new-session button to project header row |
 | `1e4e2b5` | Dynamic provider/model dropdowns in Agent settings |
+| *(current)* | Removed server-side `checkpoints.ts` route entirely (had wrong git repo logic + duplicating pi-rewind). RewindModal now delegates to `POST /command { command: "rewind" }` — the extension handles everything via the SSE bridge. Created `ExtensionUIInteractionModal` to render select/confirm/input bridge events. Fixed bridge `custom()` being a no-op (undefined → fall back to `select()`). |
 
 ## Current Working State
 
@@ -403,3 +417,13 @@ pi-kot/
   - GitHub: https://github.com/earendil-works/pi
 - **SDK package**: `@earendil-works/pi-coding-agent` on npm
 - **OpenKot** (UX pattern reference): `./openkot-ref/`
+- **pi-rewind extension** (checkpoint/rewind reference): `./node_modules/@ayulab/pi-rewind/`
+  - Entry: `index.js` — registers `/rewind` command, auto-checkpoint lifecycle via `pi.on('turn_start'/'turn_end'/'agent_end')`
+  - Checkpoint engine: `@ayulab__pi-checkpoint.js` — git-based checkpoint repo, config loading, diff parsing, safe checkout
+  - Config path: `ayu.rewind` / `ayu.checkpoint` in settings, merged recursively from `~/.pi/agent/settings.json` + `.pi/settings.json`
+  - Key patterns:
+    - `AutoCheckpointProducer` wraps git snapshots around each agent turn
+    - `sessionTasks` queue prevents concurrent checkpoint operations per session
+    - Fork/clone copies checkpoint storage via `cloneSessionCheckpointStorage()`
+    - Tree navigation hooks (`session_before_tree` / `session_tree`) conditionally restore file state
+    - `safeRestore()` stages all, checkouts target commit, with rollback on failure

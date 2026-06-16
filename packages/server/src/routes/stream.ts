@@ -3,6 +3,7 @@ import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-ag
 
 import type { FastifyPluginAsync } from "fastify";
 import {
+  buildBindings,
   getSession,
   registerSession,
   type LiveSession,
@@ -35,6 +36,13 @@ async function warmUpSession(
           cwd,
           sessionManager: sm,
           agentDir: config.piConfigDir,
+        });
+
+        // Trigger session_start and wire real command context actions
+        // (navigateTree, etc.) so extension commands like /rewind can
+        // navigate the conversation tree.
+        await session.bindExtensions(buildBindings(session)).catch(() => {
+          // best-effort
         });
 
         const now = new Date();

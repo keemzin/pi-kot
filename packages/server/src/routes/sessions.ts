@@ -16,6 +16,7 @@ import {
 import { getProject } from "../project-manager.js";
 import { bridgeWorkerDeleted } from "../orchestration/event-bridge.js";
 import { getSupervisorIdForWorker } from "../orchestration/store.js";
+import { buildSnapshot } from "../sse-bridge.js";
 
 export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // POST /api/v1/sessions — create a new session
@@ -574,6 +575,17 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const out: Record<string, unknown> = { cancelled: result.cancelled };
         if (result.aborted !== undefined) out.aborted = result.aborted;
         if (result.editorText !== undefined) out.editorText = result.editorText;
+
+        // Emit snapshot to all connected SSE clients so the chat UI
+        // reflects the new session leaf without a client-triggered refetch.
+        for (const client of live.clients) {
+          try {
+            client.send(buildSnapshot(live));
+          } catch {
+            live.clients.delete(client);
+          }
+        }
+
         return out;
       } catch (err) {
         return reply.code(400).send({ error: "navigate_failed", message: err instanceof Error ? err.message : String(err) });

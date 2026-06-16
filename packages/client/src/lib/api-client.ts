@@ -812,51 +812,42 @@ export async function uninstallExtension(
   return request("POST", "/api/v1/extensions/uninstall", { package: packageName });
 }
 
-// ---- Checkpoints (pi-rewind baked-in support) ----
+// ---- Extension Commands (generic bridge) ----
 
-export interface CheckpointFileChange {
-  path: string;
-  added: number;
-  removed: number;
+export interface InvokeCommandResponse {
+  accepted: boolean;
 }
 
-export interface CheckpointEntry {
-  id: string;
-  kind: string;
-  userEntryId: string;
-  beforeCommit: string;
-  afterCommit: string;
-  prompt: string;
-  fileCount: number;
-  fileChanges: CheckpointFileChange[];
-  createdAt: string;
-}
-
-export interface CheckpointsResponse {
-  checkpoints: CheckpointEntry[];
-}
-
-export async function fetchCheckpoints(
+/**
+ * Invoke a registered extension command (e.g. "/rewind") via the
+ * extension UI bridge. Returns 202 Accepted — the command runs
+ * asynchronously and drives its UI interactions over SSE
+ * (`extension_ui_select`, `extension_ui_confirm`, etc.).
+ */
+export async function invokeExtensionCommand(
   sessionId: string,
-): Promise<CheckpointsResponse> {
-  return request<CheckpointsResponse>(
-    "GET",
-    `/api/v1/sessions/${encodeURIComponent(sessionId)}/checkpoints`,
+  command: string,
+  args?: string,
+): Promise<InvokeCommandResponse> {
+  return request<InvokeCommandResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/command`,
+    { command, args },
   );
 }
 
-export interface RewindRequest {
-  checkpointId: string;
-  mode: "code" | "conversation" | "both";
-}
-
-export async function rewindSession(
+/**
+ * Respond to a pending extension UI interaction (select, confirm, input).
+ * The `requestId` comes from the `extension_ui_*` SSE event.
+ */
+export async function respondExtensionUI(
   sessionId: string,
-  req: RewindRequest,
-): Promise<{ success: boolean; error?: string }> {
-  return request(
+  requestId: string,
+  value: unknown,
+): Promise<{ resolved: boolean }> {
+  return request<{ resolved: boolean }>(
     "POST",
-    `/api/v1/sessions/${encodeURIComponent(sessionId)}/rewind`,
-    req,
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/extension-ui/respond`,
+    { requestId, value },
   );
 }

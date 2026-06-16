@@ -15,6 +15,37 @@ import { bridgeWorkerAgentEvent } from "./orchestration/event-bridge.js";
 import { notifySupervisorDisposed, notifySupervisorIdle } from "./orchestration/inbox.js";
 
 /**
+ * Build the ExtensionBindings for a session with real command context
+ * actions (navigateTree, fork, etc.) so extension commands like
+ * pi-rewind's `/rewind` can navigate the conversation tree.
+ *
+ * Without this, `ctx.navigateTree()` is a no-op that returns
+ * `{ cancelled: false }` without actually navigating.
+ */
+export function buildBindings(session: {
+  navigateTree: (
+    targetId: string,
+    options?: { summarize?: boolean; customInstructions?: string; label?: string },
+  ) => Promise<{ cancelled: boolean }>;
+}): Record<string, unknown> {
+  return {
+    commandContextActions: {
+      waitForIdle: async () => {},
+      newSession: async () => ({ cancelled: false }),
+      fork: async () => ({ cancelled: false }),
+      switchSession: async () => ({ cancelled: false }),
+      reload: async () => {},
+      navigateTree: async (
+        targetId: string,
+        options?: { summarize?: boolean; customInstructions?: string; label?: string },
+      ) => {
+        return session.navigateTree(targetId, options);
+      },
+    },
+  };
+}
+
+/**
  * Minimal SSE client contract — the concrete implementation lives in
  * sse-bridge.ts.
  */
@@ -174,10 +205,11 @@ export async function createSession(
     customTools,
   });
 
-  // Trigger session_start event so extensions (pi-rewind, etc.) initialize
-  await session.bindExtensions({}).catch(() => {
-    // Extension bindings are best-effort — some extensions (e.g. pi-rewind)
-    // may not have handlers for session_start, which is fine.
+  // Trigger session_start event and wire real command context actions
+  // (navigateTree, etc.) so extension commands like /rewind can
+  // navigate the conversation tree.
+  await session.bindExtensions(buildBindings(session)).catch(() => {
+    // best-effort
   });
 
   const now = new Date();
@@ -447,8 +479,9 @@ export async function rebuildSessionTools(
     customTools,
   });
 
-  // Trigger session_start event so extensions initialize
-  await session.bindExtensions({}).catch(() => {
+  // Wire real command context actions (navigateTree, etc.) so
+  // extension commands like /rewind can navigate the conversation.
+  await session.bindExtensions(buildBindings(session)).catch(() => {
     // best-effort
   });
 
@@ -605,8 +638,9 @@ export async function resumeSessionById(
     customTools,
   });
 
-  // Trigger session_start event so extensions initialize
-  await session.bindExtensions({}).catch(() => {
+  // Wire real command context actions (navigateTree, etc.) so
+  // extension commands like /rewind can navigate the conversation.
+  await session.bindExtensions(buildBindings(session)).catch(() => {
     // best-effort
   });
 
@@ -708,8 +742,9 @@ export async function forkSession(
     customTools,
   });
 
-  // Trigger session_start event so extensions initialize
-  await session.bindExtensions({}).catch(() => {
+  // Wire real command context actions (navigateTree, etc.) so
+  // extension commands like /rewind can navigate the conversation.
+  await session.bindExtensions(buildBindings(session)).catch(() => {
     // best-effort
   });
 

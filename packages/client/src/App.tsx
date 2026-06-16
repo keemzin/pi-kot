@@ -9,6 +9,7 @@ import { ModelDropdown } from "./components/ModelDropdown";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
+import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 
 import {
   fetchAuthStatus,
@@ -1095,6 +1096,11 @@ export function App() {
         <SettingsPanel
           onClose={() => setShowSettings(false)}
         />
+      )}
+
+      {/* Extension UI bridge interactions (select/confirm/input from extension commands) */}
+      {activeSessionId !== undefined && (
+        <ExtensionUIInteractionModal sessionId={activeSessionId} />
       )}
     </div>
   );

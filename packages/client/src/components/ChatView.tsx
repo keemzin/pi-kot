@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Copy, Check, CornerUpLeft } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
-import { RewindModal } from "./RewindModal";
+import { invokeExtensionCommand } from "../lib/api-client";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -358,14 +358,21 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 
 /* ── Rewind button ── */
 
-function RewindMsgButton({ onClick }: { onClick: () => void }) {
+function RewindMsgButton({ sessionId }: { sessionId: string }) {
+  const [invoking, setInvoking] = useState(false);
   return (
     <button
       type="button"
-      onClick={(e) => {
+      disabled={invoking}
+      onClick={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        onClick();
+        setInvoking(true);
+        try {
+          await invokeExtensionCommand(sessionId, "rewind");
+        } catch {
+          setInvoking(false);
+        }
       }}
       className="copy-msg-btn rewind-btn"
       title="Rewind to checkpoint (requires pi-rewind)"
@@ -389,7 +396,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const clearError = useSessionStore((s) => s.clearError);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const { rewind: rewindAvailable } = useExtensions();
-  const [showRewindModal, setShowRewindModal] = useState(false);
 
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 
@@ -550,7 +556,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
-                  {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
+                  {rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
                 </div>
               )}
               <div
@@ -588,7 +594,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`user-${userIdx}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
-              {rewindAvailable && <RewindMsgButton onClick={() => setShowRewindModal(true)} />}
+              {rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
             </div>,
           );
         }
@@ -663,17 +669,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             )}
           </div>
         </div>
-      )}
-      {showRewindModal && (
-        <RewindModal
-          sessionId={sessionId}
-          onClose={() => setShowRewindModal(false)}
-          onRewindComplete={(checkpointId) => {
-            setShowRewindModal(false);
-            // Reload messages so the UI reflects the rewound conversation state
-            useSessionStore.getState().reloadMessages(sessionId);
-          }}
-        />
       )}
     </div>
   );

@@ -15,6 +15,7 @@ import {
 } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 import { useAskUserQuestionStore } from "./ask-user-question-store";
+import { useExtensionUIStore } from "./extension-ui-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 
@@ -400,6 +401,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             }
             flushDelta();
             refetchMessages();
+            break;
+          }
+          // ── Extension UI bridge events ──
+          case "extension_ui_select":
+          case "extension_ui_confirm":
+          case "extension_ui_input":
+          case "extension_ui_notify":
+          case "extension_ui_done": {
+            // Route extension UI bridge events to the dedicated store.
+            // This allows any React component to react to extension interactions
+            // without coupling SSE handling to specific component logic.
+            useExtensionUIStore.getState().pushEvent(
+              event as unknown as import("../stores/extension-ui-store").ExtensionUIEvent,
+            );
             break;
           }
         }
