@@ -8,16 +8,17 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "dev": "PORT=\"${PORT:-3333}\" concurrently \"PORT=\"${PORT:-3333}\" npm run dev -w packages/server\" \"VITE_API_PORT=\"${PORT:-3333}\" npm run dev -w packages/client\"",
+    "dev": "cross-env PORT=3333 concurrently \"cross-env PORT=3333 npm run dev -w packages/server\" \"cross-env VITE_API_PORT=3333 npm run dev -w packages/client\"",
     "start": "node packages/server/dist/index.js",
-    "dev:server": "PORT=\"${PORT:-3333}\" npm run dev -w packages/server",
-    "dev:client": "VITE_API_PORT=\"${PORT:-3333}\" npm run dev -w packages/client",
+    "dev:server": "cross-env PORT=3333 npm run dev -w packages/server",
+    "dev:client": "cross-env VITE_API_PORT=3333 npm run dev -w packages/client",
     "typecheck": "npm run check --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "concurrently": "^10.0.0",
+    "cross-env": "^10.1.0",
     "prettier": "^3.5.3",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
