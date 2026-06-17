@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "dev": "cross-env PORT=3333 concurrently \"cross-env PORT=3333 npm run dev -w packages/server\" \"cross-env VITE_API_PORT=3333 npm run dev -w packages/client\"",
+    "dev": "cross-env PORT=3333 concurrently --kill-others \"cross-env PORT=3333 npm run dev -w packages/server\" \"wait-on tcp:3333 && cross-env VITE_API_PORT=3333 npm run dev -w packages/client\"",
     "start": "node packages/server/dist/index.js",
     "dev:server": "cross-env PORT=3333 npm run dev -w packages/server",
     "dev:client": "cross-env VITE_API_PORT=3333 npm run dev -w packages/client",
@@ -21,7 +21,8 @@
     "cross-env": "^10.1.0",
     "prettier": "^3.5.3",
     "tsx": "^4.22.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "wait-on": "^9.0.10"
   },
   "dependencies": {
     "@ayulab/pi-rewind": "^0.3.1"
