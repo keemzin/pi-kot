@@ -4,6 +4,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { config } from "./config.js";
 import { authEnabled, extractBearer, verifyHmac } from "./routes/auth.js";
 import { healthRoutes, authRoutes } from "./routes/auth.js";
@@ -205,6 +206,23 @@ export async function start(): Promise<void> {
     }
   } catch (err) {
     fastify.log.warn({ err }, "failed to auto-create default project");
+  }
+
+  // Auto-mount CWD project if set by the CLI launcher
+  const mountCwd = process.env.MOUNT_CWD_PROJECT;
+  if (mountCwd) {
+    try {
+      const { createProject, listProjects } = await import("./project-manager.js");
+      const existing = await listProjects();
+      const alreadyMounted = existing.some((p) => resolve(p.path) === resolve(mountCwd));
+      if (!alreadyMounted) {
+        const dirName = mountCwd.split(/[/\\]/).filter(Boolean).pop() ?? "unnamed";
+        await createProject(dirName, mountCwd);
+        fastify.log.info(`auto-mounted CWD project: ${dirName} (${mountCwd})`);
+      }
+    } catch (err) {
+      fastify.log.warn({ err }, "failed to auto-mount CWD project");
+    }
   }
 
   try {

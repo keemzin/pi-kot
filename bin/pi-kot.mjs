@@ -35,6 +35,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { homedir } from "node:os";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(here, "..");
@@ -112,6 +113,16 @@ for (let i = 0; i < args.length; i++) {
 // published layout (dist/client/) rather than the in-repo relative path.
 process.env.CLIENT_DIST_PATH ??= resolve(packageRoot, "dist", "client");
 process.env.NODE_ENV ??= "production";
+
+// Auto-mount the current working directory as a project if it's not the
+// workspace root itself. This makes `npx pi-kot` from any project folder
+// show that folder in the project list automatically.
+const cwd = process.cwd();
+const defaultWorkspace = resolve(homedir(), ".pi-kot", "workspace", "default");
+const workspacePath = resolve(process.env.WORKSPACE_PATH ?? defaultWorkspace);
+if (cwd !== workspacePath) {
+  process.env.MOUNT_CWD_PROJECT = cwd;
+}
 
 // Log startup info
 const port = process.env.PORT ?? "3333";
