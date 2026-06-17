@@ -6,7 +6,7 @@
 
 const BASE = ""; // Same origin via Vite proxy
 
-import type { SessionContextResponse } from "./api-client/types";
+import type { SessionContextResponse, McpServersResponse, McpSettingsResponse, McpServerConfig } from "./api-client/types";
 
 export class ApiError extends Error {
   constructor(
@@ -860,5 +860,108 @@ export async function respondExtensionUI(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/extension-ui/respond`,
     { requestId, value },
+  );
+}
+
+// ---- MCP ----
+
+export async function getMcpSettings(): Promise<McpSettingsResponse> {
+  return request<McpSettingsResponse>("GET", "/api/v1/mcp/settings");
+}
+
+export async function setMcpEnabled(enabled: boolean): Promise<McpSettingsResponse> {
+  return request<McpSettingsResponse>("PUT", "/api/v1/mcp/settings", { enabled });
+}
+
+export async function listMcpServers(projectId?: string): Promise<McpServersResponse> {
+  const qs = projectId !== undefined ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  return request<McpServersResponse>("GET", `/api/v1/mcp/servers${qs}`);
+}
+
+export async function upsertMcpServer(
+  name: string,
+  config: McpServerConfig,
+): Promise<{ name: string }> {
+  return request<{ name: string }>(
+    "PUT",
+    `/api/v1/mcp/servers/${encodeURIComponent(name)}`,
+    config,
+  );
+}
+
+export async function deleteMcpServer(name: string): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(
+    "DELETE",
+    `/api/v1/mcp/servers/${encodeURIComponent(name)}`,
+  );
+}
+
+export async function probeMcpServer(name: string, projectId?: string): Promise<McpServersResponse> {
+  const qs = projectId !== undefined ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  return request<McpServersResponse>(
+    "POST",
+    `/api/v1/mcp/servers/${encodeURIComponent(name)}/probe${qs}`,
+  );
+}
+
+export async function grantStdioMcpTrust(projectId: string): Promise<{ trusted: boolean }> {
+  return request<{ trusted: boolean }>("POST", `/api/v1/mcp/trust/${encodeURIComponent(projectId)}`);
+}
+
+export async function revokeStdioMcpTrust(projectId: string): Promise<void> {
+  return request<void>("DELETE", `/api/v1/mcp/trust/${encodeURIComponent(projectId)}`);
+}
+
+// ---- Tool listing / overrides ----
+
+export interface ToolListingItem {
+  name: string;
+  description: string;
+  enabled: boolean;
+  globalEnabled: boolean;
+  projectOverride?: "enabled" | "disabled";
+}
+
+export interface ToolListing {
+  builtin: ToolListingItem[];
+  mcp: {
+    server: string;
+    scope: "global" | "project";
+    projectId?: string;
+    enabled: boolean;
+    state: string;
+    lastError?: string;
+    tools: (ToolListingItem & { shortName: string })[];
+  }[];
+  extension: { packageSource: string; tools: ToolListingItem[] }[];
+}
+
+export async function listTools(projectId?: string): Promise<ToolListing> {
+  const qs = projectId !== undefined ? `?projectId=${encodeURIComponent(projectId)}` : "";
+  return request<ToolListing>("GET", `/api/v1/config/tools${qs}`);
+}
+
+export async function setToolEnabled(
+  family: "builtin" | "mcp" | "extension",
+  name: string,
+  enabled: boolean,
+  opts?: { scope?: "global" | "project"; projectId?: string },
+): Promise<{ ok: boolean }> {
+  const qs = opts?.projectId !== undefined ? `?projectId=${encodeURIComponent(opts.projectId)}` : "";
+  return request<{ ok: boolean }>(
+    "PUT",
+    `/api/v1/config/tools/${encodeURIComponent(family)}/${encodeURIComponent(name)}/enabled${qs}`,
+    { enabled, scope: opts?.scope },
+  );
+}
+
+export async function clearToolProjectOverride(
+  family: "builtin" | "mcp" | "extension",
+  name: string,
+  projectId: string,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    "DELETE",
+    `/api/v1/config/tools/${encodeURIComponent(family)}/${encodeURIComponent(name)}/enabled?projectId=${encodeURIComponent(projectId)}`,
   );
 }

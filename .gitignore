@@ -3,6 +3,8 @@
 
 # Pi-forge output directory (reference project)
 pi-forge/
+.playwright-mcp/
+tau/
 
 # Dependencies
 node_modules/

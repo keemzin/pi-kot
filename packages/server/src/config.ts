@@ -55,6 +55,9 @@ export const config = Object.freeze({
   piConfigDir: resolve(readEnv("PI_CONFIG_DIR") ?? resolve(HOME, ".pi", "agent")),
   forgeDataDir: FORGE_DATA_DIR,
   sessionDir: SESSION_DIR,
+  mcpConfigFile: resolve(readEnv("MCP_CONFIG_FILE") ?? resolve(FORGE_DATA_DIR, "mcp.json")),
+  mcpStdioTrustFile: resolve(readEnv("MCP_STDIO_TRUST_FILE") ?? resolve(FORGE_DATA_DIR, "mcp-stdio-trust.json")),
+  toolOverridesFile: resolve(readEnv("TOOL_OVERRIDES_FILE") ?? resolve(FORGE_DATA_DIR, "tool-overrides.json")),
 
   // Auth
   uiPassword: readEnv("UI_PASSWORD"),

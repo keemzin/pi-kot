@@ -7,6 +7,7 @@ import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
 import { ModelDropdown } from "./components/ModelDropdown";
 import { ContextInspectModal } from "./components/ContextBar";
+import { MCPPanel } from "./components/MCPPanel";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
@@ -71,6 +72,7 @@ export function App() {
   const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
   const [showExplorer, setShowExplorer] = useState(false);
   const [showOrch, setShowOrch] = useState(false);
+  const [showMCP, setShowMCP] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [pathSuggestions, setPathSuggestions] = useState<string[]>([]);
@@ -1021,6 +1023,7 @@ export function App() {
       showOrch={showOrch}
       setShowOrch={setShowOrch}
       onInspectContext={setInspectData}
+      onOpenMCP={() => setShowMCP(true)}
     />
           </>
         ) : (
@@ -1106,6 +1109,10 @@ export function App() {
 
       {inspectData !== undefined && (
         <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} />
+      )}
+
+      {showMCP && (
+        <MCPPanel onClose={() => setShowMCP(false)} />
       )}
 
       {/* Extension UI bridge interactions (select/confirm/input from extension commands) */}

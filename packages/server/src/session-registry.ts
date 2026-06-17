@@ -13,6 +13,12 @@ import { isSupervisor } from "./orchestration/store.js";
 import { createOrchestrationTools } from "./orchestration/tools.js";
 import { bridgeWorkerAgentEvent } from "./orchestration/event-bridge.js";
 import { notifySupervisorDisposed, notifySupervisorIdle } from "./orchestration/inbox.js";
+import {
+  customToolsForProject as mcpCustomToolsForProject,
+  ensureGlobalLoaded as mcpEnsureGlobalLoaded,
+  ensureProjectLoaded as mcpEnsureProjectLoaded,
+  isGloballyEnabled as mcpIsGloballyEnabled,
+} from "./mcp/manager.js";
 
 /**
  * Build the ExtensionBindings for a session with real command context
@@ -192,8 +198,10 @@ export async function createSession(
   const dir = await ensureSessionDir(projectId);
   const sessionManager = SessionManager.create(workspacePath, dir);
   const sessionId = sessionManager.getSessionId();
+  const mcpTools = await resolveMcpCustomTools(projectId, workspacePath);
   const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
+    ...mcpTools,
     createAskUserQuestionTool(sessionId),
     ...orchestrationTools,
   ];
@@ -430,6 +438,22 @@ export function autoNameSession(sessionId: string, promptText: string): void {
 }
 
 /**
+ * Resolve MCP custom tools for a session.
+ * Mirrors pi-forge's resolveMcpCustomTools pattern — ensures global + project
+ * MCP config is loaded, respects the master disabled toggle, and returns
+ * the union of all connected, enabled server tools for this project.
+ */
+async function resolveMcpCustomTools(
+  projectId: string,
+  workspacePath: string,
+): Promise<ReturnType<typeof mcpCustomToolsForProject>> {
+  await mcpEnsureGlobalLoaded().catch(() => undefined);
+  if (!mcpIsGloballyEnabled()) return [];
+  await mcpEnsureProjectLoaded(projectId, workspacePath).catch(() => undefined);
+  return mcpCustomToolsForProject(projectId);
+}
+
+/**
  * Resolve orchestration tools for a session, if supervisor mode is active.
  * Returns empty array when orchestration is disabled or the session isn't
  * a registered supervisor.
@@ -457,8 +481,10 @@ export async function rebuildSessionTools(
   const live = registry.get(sessionId);
   if (live === undefined) return;
 
+  const mcpTools = await resolveMcpCustomTools(live.projectId, live.workspacePath);
   const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
+    ...mcpTools,
     createAskUserQuestionTool(sessionId),
     ...orchestrationTools,
   ];
@@ -625,8 +651,10 @@ export async function resumeSessionById(
 
   const sessionPath = join(dir, match);
   const sessionManager = SessionManager.open(sessionPath);
+  const mcpTools = await resolveMcpCustomTools(loc.projectId, loc.workspacePath);
   const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
+    ...mcpTools,
     createAskUserQuestionTool(sessionId),
     ...orchestrationTools,
   ];
@@ -729,8 +757,10 @@ export async function forkSession(
   const dir = join(config.sessionDir, sourceLive.projectId);
   const forkedSM = SessionManager.open(newPath, dir, sourceLive.workspacePath);
   const forkedId = forkedSM.getSessionId();
+  const mcpTools = await resolveMcpCustomTools(sourceLive.projectId, sourceLive.workspacePath);
   const orchestrationTools = await resolveOrchestrationTools(forkedId);
   const customTools: ToolDefinition[] = [
+    ...mcpTools,
     createAskUserQuestionTool(forkedId),
     ...orchestrationTools,
   ];

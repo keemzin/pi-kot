@@ -246,7 +246,7 @@ User can:
 || 8.7 | Quick actions | 🔴 | Pre-built prompts (fix lint, add tests, etc.) |
 || 8.8 | Webhooks | 🔴 | Outbound webhooks on session events |
 || 8.9 | Baked-in ask_user_question tool | 🟢 | Native tool + SSE events + REST endpoints + UI panel — agent can present structured questions with single/multi-select/custom options, user answers via panel above chat input |
-|| 8.10 | MCP support | 🔴 | MCP server registry, translate MCP tools → SDK customTools |
+|| 8.10 | MCP settings UI | 🟡 | MCP settings panel (enable/disable, server CRUD, probe, status indicators, stdio trust) — toolbar button, MCPPanel component, mcp-store with 30s polling; server-side routes pending |
 || 8.11 | Orchestration | 🟢 | Multi-agent workflows, sub-agent management — 8 `orchestrate_*` tools: spawn, list, read, send, interrupt, kill, detach, read_inbox. REST endpoints for enable/disable/inbox/workers/mgmt. Orch toggle (⚡) + enable/disable panel in UI. Workers nest under supervisor in sidebar, collapsed by default, auto-expand + pulsating dot when streaming |
 
 ---
@@ -331,6 +331,10 @@ Phases are intentionally ordered so each one:
 │   ├── GET /            ✅ list detected + recommended
 │   └── POST /install    ✅ install a package
 ├── orchestration/  ✅ (Phase 8)
+├── mcp/            🟡 (Phase 8 — client UI done, server routes pending)
+│   ├── settings    🟡 GET + PUT master toggle
+│   ├── servers     🟡 GET list, PUT upsert, DELETE remove, POST probe
+│   └── trust/:id   🟡 POST grant, DELETE revoke
 └── terminal        🔴 (Phase 6 — WebSocket, not started)
 `````
 
@@ -356,7 +360,7 @@ Phases are intentionally ordered so each one:
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
 - **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
-- **Phase 8 (Advanced):** ✅ **45% done** (4/11 tasks + context inspector partial — model switching + ask_user_question + orchestration + extension discovery)
+- **Phase 8 (Advanced):** ✅ **50% done** (5/12 tasks + context inspector partial + MCP UI — model switching + ask_user_question + orchestration + extension discovery + MCP settings)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
@@ -368,6 +372,7 @@ Phases are intentionally ordered so each one:
 - ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
 - ✅ Runtime extension discovery — detect installed pi.dev extensions + curated recommendations with one-click install; dynamic agent type settings when pi-subagents detected
 - ✅ Context inspector — context percentage bar in header (polls live session), agent-running pulse on send/abort button
+- 🟡 MCP settings UI — server CRUD, enable/disable toggle, probe, stdio trust; toolbar button + settings panel + Zustand store with 30s polling (server-side routes pending)
 
 ### **Remaining Work:**
 - Git integration (status, diff, commit, etc.)

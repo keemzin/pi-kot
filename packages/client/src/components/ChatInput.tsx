@@ -7,9 +7,10 @@ interface Props {
   showOrch?: boolean;
   setShowOrch?: (v: boolean) => void;
   onInspectContext?: (data: any) => void;
+  onOpenMCP?: () => void;
 }
 
-export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext }: Props) {
+export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
@@ -72,6 +73,20 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext }
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" style={{ fill: showOrch ? "currentColor" : "none" }} />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              className="ti-toolbar-btn"
+              onClick={onOpenMCP}
+              title="MCP Settings"
+              tabIndex={-1}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
               </svg>
             </button>
 

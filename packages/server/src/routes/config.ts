@@ -11,6 +11,14 @@ import {
   AuthProviderNotFoundError,
   type ModelsJson,
 } from "../config-manager.js";
+import {
+  setToolEnabled,
+  setProjectToolOverride,
+  listToolOverrides,
+  isToolEffective,
+} from "../tool-overrides.js";
+import { getStatus as mcpGetStatus, customToolsForProject, ensureProjectLoaded } from "../mcp/manager.js";
+import { getProject } from "../project-manager.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────
 
@@ -250,6 +258,194 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
       }
+    },
+  );
+
+  // ---- Tool listing ----
+  const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+  const BUILTIN_TOOL_DESCRIPTIONS: Record<string, string> = {
+    read: "Read a file from the filesystem",
+    bash: "Execute a bash command",
+    edit: "Edit an existing file",
+    write: "Write a new file",
+    grep: "Search file contents",
+    find: "Find files by name",
+    ls: "List directory contents",
+  };
+
+  fastify.get<{ Querystring: { projectId?: string } }>(
+    "/config/tools",
+    {
+      schema: {
+        description: "List all tools across builtin, MCP, and extension families.",
+        tags: ["config"],
+        querystring: {
+          type: "object",
+          properties: { projectId: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["builtin", "mcp", "extension"],
+            properties: {
+              builtin: { type: "array", items: { type: "object" } },
+              mcp: { type: "array", items: { type: "object" } },
+              extension: { type: "array", items: { type: "object" } },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const projectId = (req.query as { projectId?: string }).projectId;
+      const { readToolOverrides: readOverrides } = await import("../tool-overrides.js");
+      const overrides = await readOverrides();
+
+      // Builtin tools
+      const builtin = BUILTIN_TOOL_NAMES.map((name) => ({
+        name,
+        description: BUILTIN_TOOL_DESCRIPTIONS[name] ?? "",
+        enabled: isToolEffective(overrides, projectId, "builtin", name),
+        globalEnabled: !overrides.builtin.includes(name),
+      }));
+
+      // MCP tools
+      let mcpTools: Array<{
+        server: string;
+        scope: "global" | "project";
+        projectId?: string;
+        enabled: boolean;
+        state: string;
+        lastError?: string;
+        tools: Array<{ name: string; shortName: string; description: string; enabled: boolean; globalEnabled: boolean }>;
+      }> = [];
+
+      if (projectId !== undefined) {
+        const project = await getProject(projectId);
+        if (project !== undefined) {
+          await ensureProjectLoaded(project.id, project.path);
+        }
+      }
+
+      const mcpStatus = mcpGetStatus(projectId !== undefined ? { projectId } : undefined);
+      for (const srv of mcpStatus) {
+        const tools = srv.tools.map((t) => ({
+          name: t.name,
+          shortName: t.shortName,
+          description: t.description,
+          enabled: isToolEffective(overrides, projectId, "mcp", t.name),
+          globalEnabled: !overrides.mcp.includes(t.name),
+        }));
+        mcpTools.push({
+          server: srv.name,
+          scope: srv.scope,
+          projectId: srv.projectId,
+          enabled: srv.enabled,
+          state: srv.state,
+          lastError: srv.lastError,
+          tools,
+        });
+      }
+
+      return { builtin, mcp: mcpTools, extension: [] };
+    },
+  );
+
+  fastify.get(
+    "/config/tools/overrides",
+    {
+      schema: {
+        description: "All per-project tool overrides across all families.",
+        tags: ["config"],
+        response: {
+          200: {
+            type: "object",
+            required: ["projects"],
+            properties: {
+              projects: {
+                type: "object",
+                additionalProperties: {
+                  type: "object",
+                  required: ["builtin", "mcp", "extension"],
+                  properties: {
+                    builtin: { type: "object", properties: { enable: { type: "array", items: { type: "string" } }, disable: { type: "array", items: { type: "string" } } } },
+                    mcp: { type: "object", properties: { enable: { type: "array", items: { type: "string" } }, disable: { type: "array", items: { type: "string" } } } },
+                    extension: { type: "object", properties: { enable: { type: "array", items: { type: "string" } }, disable: { type: "array", items: { type: "string" } } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async () => {
+      const projects = await listToolOverrides();
+      return { projects };
+    },
+  );
+
+  fastify.put<{
+    Params: { family: string; name: string };
+    Querystring: { projectId?: string };
+    Body: { enabled: boolean; scope?: "global" | "project" };
+  }>(
+    "/config/tools/:family/:name/enabled",
+    {
+      schema: {
+        description: "Toggle global or per-project tool enable/disable.",
+        tags: ["config"],
+        params: { type: "object", required: ["family", "name"], properties: { family: { type: "string" }, name: { type: "string" } } },
+        body: { type: "object", required: ["enabled"], properties: { enabled: { type: "boolean" }, scope: { type: "string", enum: ["global", "project"] } } },
+        response: { 200: { type: "object", properties: { ok: { type: "boolean" } } }, 400: errorSchema },
+      },
+    },
+    async (req, reply) => {
+      const family = req.params.family as "builtin" | "mcp" | "extension";
+      if (!["builtin", "mcp", "extension"].includes(family)) {
+        return reply.code(400).send({ error: "invalid_family" });
+      }
+      const { enabled, scope } = req.body;
+      const projectId = (req.query as { projectId?: string }).projectId;
+
+      if (scope === "project" && projectId !== undefined) {
+        await setProjectToolOverride(projectId, family, req.params.name, enabled ? "enabled" : "disabled");
+      } else {
+        await setToolEnabled(family, req.params.name, enabled);
+      }
+
+      // Clear project override when re-enabling global (scope not set)
+      if (scope !== "project" && projectId !== undefined && enabled) {
+        await setProjectToolOverride(projectId, family, req.params.name, undefined);
+      }
+
+      return { ok: true };
+    },
+  );
+
+  fastify.delete<{
+    Params: { family: string; name: string };
+    Querystring: { projectId?: string };
+  }>(
+    "/config/tools/:family/:name/enabled",
+    {
+      schema: {
+        description: "Clear a per-project tool override (revert to inherit).",
+        tags: ["config"],
+        params: { type: "object", required: ["family", "name"], properties: { family: { type: "string" }, name: { type: "string" } } },
+        response: { 200: { type: "object", properties: { ok: { type: "boolean" } } }, 400: errorSchema },
+      },
+    },
+    async (req, reply) => {
+      const family = req.params.family as "builtin" | "mcp" | "extension";
+      if (!["builtin", "mcp", "extension"].includes(family)) {
+        return reply.code(400).send({ error: "invalid_family" });
+      }
+      const projectId = (req.query as { projectId?: string }).projectId;
+      if (projectId !== undefined) {
+        await setProjectToolOverride(projectId, family, req.params.name, undefined);
+      }
+      return { ok: true };
     },
   );
 };

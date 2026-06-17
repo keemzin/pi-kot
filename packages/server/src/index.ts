@@ -22,6 +22,8 @@ import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js"
 import { orchestrationRoutes } from "./routes/orchestration.js";
 import { extensionRoutes } from "./routes/extensions.js";
 import { extensionCommandRoutes } from "./routes/extension-commands.js";
+import { mcpRoutes } from "./routes/mcp.js";
+import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
  * Per-route auth metadata. Routes that should skip the auth preHandler
@@ -130,6 +132,7 @@ export async function buildServer() {
       await api.register(extensionRoutes);
       await api.register(extensionCommandRoutes);
       await api.register(orchestrationRoutes);
+      await api.register(mcpRoutes);
     },
     { prefix: "/api/v1" },
   );
@@ -170,6 +173,12 @@ export async function buildServer() {
   // Clean teardown on close
   fastify.addHook("onClose", async () => {
     await disposeAllSessions();
+    await disposeAllMcp();
+  });
+
+  // Boot-time MCP load
+  loadGlobalMcp().catch((err: unknown) => {
+    fastify.log.error({ err }, "mcp: initial load failed");
   });
 
   return fastify;
