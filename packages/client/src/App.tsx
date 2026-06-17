@@ -6,7 +6,7 @@ import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
 import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
 import { ModelDropdown } from "./components/ModelDropdown";
-import { ContextBar, ContextInspectModal } from "./components/ContextBar";
+import { ContextInspectModal } from "./components/ContextBar";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
@@ -969,8 +969,6 @@ export function App() {
               className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
             />
 
-            <ContextBar sessionId={activeSessionId} onInspect={(d) => setInspectData(d)} />
-
             <button
               type="button"
               onClick={() => setShowExplorer((v) => !v)}
@@ -1018,7 +1016,12 @@ export function App() {
               onClose={() => setShowOrch(false)}
             />
             <AskUserQuestionPanel sessionId={activeSessionId} />
-            <ChatInput sessionId={activeSessionId} showOrch={showOrch} setShowOrch={setShowOrch} />
+            <ChatInput
+      sessionId={activeSessionId}
+      showOrch={showOrch}
+      setShowOrch={setShowOrch}
+      onInspectContext={setInspectData}
+    />
           </>
         ) : (
           <div className="centered" style={{ height: "100%" }}>

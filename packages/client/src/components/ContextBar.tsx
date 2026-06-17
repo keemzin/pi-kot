@@ -2,12 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { getSessionContext } from "../lib/api-client";
 import type { SessionContextResponse } from "../lib/api-client/types";
 
-interface Props {
-  sessionId: string | undefined;
-  onInspect?: (data: SessionContextResponse) => void;
-}
-
-export function ContextBar({ sessionId, onInspect }: Props) {
+export function useContextData(sessionId: string | undefined) {
   const [data, setData] = useState<SessionContextResponse | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
@@ -34,6 +29,16 @@ export function ContextBar({ sessionId, onInspect }: Props) {
     };
   }, [sessionId]);
 
+  return data;
+}
+
+export function ContextPill({
+  data,
+  onInspect,
+}: {
+  data: SessionContextResponse | null;
+  onInspect: (data: SessionContextResponse) => void;
+}) {
   const pct = data?.contextUsage?.percent ?? null;
   if (pct === null) return null;
 
@@ -42,11 +47,12 @@ export function ContextBar({ sessionId, onInspect }: Props) {
   return (
     <button
       type="button"
-      className="ctx-bar-circle"
-      onClick={() => data !== null && onInspect?.(data)}
+      className="ctx-pill"
+      onClick={() => data !== null && onInspect(data)}
       title={`Context: ${data!.contextUsage!.tokens?.toLocaleString() ?? "?"} / ${data!.contextUsage!.contextWindow.toLocaleString()} tokens`}
     >
-      {rounded}
+      <span className="ctx-pill-dot" />
+      {rounded}%
     </button>
   );
 }
@@ -94,14 +100,14 @@ export function ContextInspectModal({ data, onClose }: { data: SessionContextRes
           {pct !== null && (
             <div className="settings-card" style={{ marginBottom: "10px" }}>
               <div className="settings-card-header">
-                <div className="ctx-bar-track" style={{ flex: 1 }}>
-                  <div className="ctx-bar-fill" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
+                <div className="ctx-modal-track" style={{ flex: 1 }}>
+                  <div className="ctx-modal-fill" style={{ width: `${Math.min(pct, 100)}%`, background: barColor }} />
                 </div>
                 <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
                   {Math.round(pct)}%
                 </span>
               </div>
-              <div className="ctx-bar-labels" style={{ padding: "0 12px 8px" }}>
+              <div className="ctx-modal-labels" style={{ padding: "0 12px 8px" }}>
                 <span>{usage!.tokens?.toLocaleString() ?? "?"} / {usage!.contextWindow.toLocaleString()} tokens</span>
               </div>
             </div>
