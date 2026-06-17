@@ -600,6 +600,11 @@ body {
   51%, 100% { opacity: 0; }
 }
 
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(248, 113, 113, 0); }
+}
+
 @keyframes msgIn {
   from { opacity: 0; transform: translateY(8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -1191,6 +1196,30 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.ctx-bar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1.5px solid var(--accent);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: all var(--duration) var(--ease);
+  flex-shrink: 0;
+}
+.ctx-bar-circle:hover {
+  background: var(--accent);
+  color: var(--bg-solid);
 }
 
 .sidebar-toggle {
@@ -1887,6 +1916,7 @@ body {
   cursor: pointer;
   color: var(--error);
   transition: all var(--duration) var(--ease);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .ti-abort-btn:hover:not(:disabled) {
@@ -2022,7 +2052,6 @@ body {
 
 .status-dot.streaming {
   background: var(--accent);
-  animation: blink 1s infinite;
 }
 
 /* ═══ Select ═══ */

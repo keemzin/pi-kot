@@ -748,26 +748,31 @@ export interface ContextTurn {
 export interface ContextUsageStats {
   /** Total context window the model supports (max input tokens). */
   contextWindow: number;
-  /** Estimated current context tokens, omitted when SDK reports unknown. */
-  tokens?: number;
-  /** Usage as fraction of contextWindow (0..1), omitted when unknown. */
-  percent?: number;
+  /** Estimated current context tokens, or null when unknown. */
+  tokens: number | null;
+  /** Usage as percentage of contextWindow (0..100), or null when unknown. */
+  percent: number | null;
+}
+
+export interface SessionTokenTotals {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
 }
 
 export interface SessionContextResponse {
-  /** Full message array as the LLM sees it (post-compaction). */
-  messages: Record<string, unknown>[];
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCacheReadTokens: number;
-  totalCacheWriteTokens: number;
-  /** Sum of input + output + cache reads + cache writes across every turn. */
-  totalTokens: number;
-  /** Cumulative USD cost across every turn. */
-  totalCost: number;
-  /** Per-turn breakdown derived from each AssistantMessage.usage. */
-  turns: ContextTurn[];
-  contextUsage: ContextUsageStats;
+  contextUsage: ContextUsageStats | null;
+  stats: {
+    userMessages: number;
+    assistantMessages: number;
+    toolCalls: number;
+    toolResults: number;
+    totalMessages: number;
+    tokens: SessionTokenTotals;
+    cost: number;
+  };
 }
 
 export interface SessionTreeResponse {

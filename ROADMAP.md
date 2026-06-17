@@ -238,7 +238,7 @@ User can:
 | # | Task | Status | Description |
 |---|---|---|---|
 || 8.1 | Turn diff panel | 🔴 | Show file changes from the last completed agent turn |
-|| 8.2 | Context inspector | 🔴 | Token usage, cost breakdown, context window pressure |
+|| 8.2 | Context inspector | 🟡 | Token usage, cost breakdown, context window pressure — context percentage bar in header + server endpoint done; full cost/turn breakdown pending |
 || 8.3 | Image attachments | 🔴 | Send images with prompts (base64), display in chat |
 || 8.4 | Model switching | 🟢 | Per-session model override via `POST /sessions/:id/model` done; mid-session cycling UI (dropdown during streaming) pending |
 || 8.5 | Compaction awareness | 🔴 | UI indicator when compaction runs, summary display |
@@ -356,7 +356,7 @@ Phases are intentionally ordered so each one:
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
 - **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
-- **Phase 8 (Advanced):** ✅ **40% done** (4/10 tasks, model switching + ask_user_question + orchestration + extension discovery)
+- **Phase 8 (Advanced):** ✅ **45% done** (4/11 tasks + context inspector partial — model switching + ask_user_question + orchestration + extension discovery)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
@@ -367,12 +367,13 @@ Phases are intentionally ordered so each one:
 - ✅ Per-session model override
 - ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
 - ✅ Runtime extension discovery — detect installed pi.dev extensions + curated recommendations with one-click install; dynamic agent type settings when pi-subagents detected
+- ✅ Context inspector — context percentage bar in header (polls live session), agent-running pulse on send/abort button
 
 ### **Remaining Work:**
 - Git integration (status, diff, commit, etc.)
 - Terminal (PTY, WebSocket, xterm.js)
 - Config UI (API keys, settings, models, skills)
 - Polish (mobile responsive, PWA, accessibility, testing)
-- Advanced (turn diff, context inspector, image attachments)
+- Advanced (turn diff, full cost/turn breakdown, image attachments, compaction awareness, auto-retry UI)
 
 ---

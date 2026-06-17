@@ -650,6 +650,72 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+  // GET /api/v1/sessions/:id/context — context usage telemetry + session stats
+  fastify.get<{
+    Params: { id: string };
+  }>(
+    "/sessions/:id/context",
+    {
+      schema: {
+        description: "Get context usage telemetry and session statistics.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              contextUsage: {
+                type: "object",
+                properties: {
+                  contextWindow: { type: "number" },
+                  tokens: { type: "number", nullable: true },
+                  percent: { type: "number", nullable: true },
+                },
+              },
+              stats: {
+                type: "object",
+                properties: {
+                  userMessages: { type: "number" },
+                  assistantMessages: { type: "number" },
+                  toolCalls: { type: "number" },
+                  toolResults: { type: "number" },
+                  totalMessages: { type: "number" },
+                  tokens: {
+                    type: "object",
+                    properties: {
+                      input: { type: "number" },
+                      output: { type: "number" },
+                      cacheRead: { type: "number" },
+                      cacheWrite: { type: "number" },
+                      total: { type: "number" },
+                    },
+                  },
+                  cost: { type: "number" },
+                },
+              },
+            },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      const usage = live.session.getContextUsage();
+      const stats = live.session.getSessionStats();
+      return { contextUsage: usage ?? null, stats };
+    },
+  );
 };
 
 /**

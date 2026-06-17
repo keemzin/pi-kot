@@ -6,6 +6,8 @@
 
 const BASE = ""; // Same origin via Vite proxy
 
+import type { SessionContextResponse } from "./api-client/types";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -159,6 +161,15 @@ export async function getSessionMessages(
   return request<SessionMessagesResponse>(
     "GET",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/messages`,
+  );
+}
+
+export async function getSessionContext(
+  sessionId: string,
+): Promise<SessionContextResponse> {
+  return request<SessionContextResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/context`,
   );
 }
 

@@ -6,11 +6,13 @@ import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
 import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
 import { ModelDropdown } from "./components/ModelDropdown";
+import { ContextBar, ContextInspectModal } from "./components/ContextBar";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 
+import type { SessionContextResponse } from "./lib/api-client/types";
 import {
   fetchAuthStatus,
   login,
@@ -66,6 +68,7 @@ export function App() {
   const [showArchived, setShowArchived] = useState<string | undefined>();
   const [projectToDelete, setProjectToDelete] = useState<string | undefined>();
   const [showSettings, setShowSettings] = useState(false);
+  const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
   const [showExplorer, setShowExplorer] = useState(false);
   const [showOrch, setShowOrch] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
@@ -966,6 +969,8 @@ export function App() {
               className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
             />
 
+            <ContextBar sessionId={activeSessionId} onInspect={(d) => setInspectData(d)} />
+
             <button
               type="button"
               onClick={() => setShowExplorer((v) => !v)}
@@ -1093,9 +1098,11 @@ export function App() {
       )}
 
       {showSettings && (
-        <SettingsPanel
-          onClose={() => setShowSettings(false)}
-        />
+        <SettingsPanel onClose={() => setShowSettings(false)} />
+      )}
+
+      {inspectData !== undefined && (
+        <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} />
       )}
 
       {/* Extension UI bridge interactions (select/confirm/input from extension commands) */}
