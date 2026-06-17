@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "build:publish": "node scripts/build-publish-dir.mjs",
     "dev": "cross-env PORT=3333 concurrently --kill-others \"cross-env PORT=3333 npm run dev -w packages/server\" \"wait-on tcp:3333 && cross-env VITE_API_PORT=3333 npm run dev -w packages/client\"",
     "start": "node packages/server/dist/index.js",
     "dev:server": "cross-env PORT=3333 npm run dev -w packages/server",
