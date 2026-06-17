@@ -216,8 +216,13 @@ export async function start(): Promise<void> {
   }
 }
 
-// Start when run directly
-const isMainModule = process.argv[1] !== undefined;
+// Start when run directly (not when imported by the bin shim or tests)
+import { fileURLToPath } from "node:url";
+const isMainModule =
+  process.argv[1] !== undefined &&
+  fileURLToPath(import.meta.url).replace(/\\/g, "/").endsWith(
+    process.argv[1].replace(/\\/g, "/"),
+  );
 if (isMainModule) {
   void start();
 }
