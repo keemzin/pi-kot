@@ -117,6 +117,18 @@ export async function listToolOverrides(): Promise<Record<string, ProjectOverrid
 
 export { readToolOverrides };
 
+/**
+ * Filter a list of `{family, name}` candidates to only those that are
+ * effectively enabled (global disabled set + per-project overrides).
+ */
+export function filterEnabledTools(
+  overrides: ToolOverrides,
+  projectId: string | undefined,
+  candidates: Array<{ family: "builtin" | "mcp" | "extension"; name: string }>,
+): Array<{ family: "builtin" | "mcp" | "extension"; name: string }> {
+  return candidates.filter((c) => isToolEffective(overrides, projectId, c.family, c.name));
+}
+
 export async function clearProjectOverrides(projectId: string): Promise<void> {
   const data = await readToolOverrides();
   delete data.projects[projectId];

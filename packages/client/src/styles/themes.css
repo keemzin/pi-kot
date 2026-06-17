@@ -1569,6 +1569,69 @@ body {
   padding-top: 4px;
 }
 
+/* ---- Tool Cascade Row ---- */
+
+.mcp-tool-row-cascade {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+/* ---- TriState Picker ---- */
+
+.mcp-tristate {
+  display: inline-flex;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.mcp-tristate-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.mcp-tristate-btn:last-child {
+  border-right: none;
+}
+
+.mcp-tristate-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.mcp-tristate-btn-active {
+  font-weight: 600;
+  color: #fff;
+}
+
+/* ---- Add Override Dropdown ---- */
+
+.mcp-add-override-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.mcp-override-form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mcp-override-select {
+  font-size: 10px;
+  padding: 2px 4px;
+  max-width: 160px;
+}
+
 /* ── End MCP Panel ── */
 
 .sidebar-toggle {

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMcpStore } from "../stores/mcp-store";
-import { listTools, setToolEnabled } from "../lib/api-client";
-import type { McpServerConfig, McpServerStatus } from "../lib/api-client/types";
+import { listTools, setToolEnabled, listToolOverrides, clearToolProjectOverride, fetchProjects } from "../lib/api-client";
+import type { McpServerConfig, McpServerStatus, ToolOverridesResponse } from "../lib/api-client/types";
 
 export function MCPPanel({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -168,13 +168,15 @@ function McpServerRow({
   name: string;
   status: McpServerStatus | undefined;
   probeLoading: boolean;
-  onProbe: () => void;
+  onProbe: () => Promise<void>;
   onDelete: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [tools, setTools] = useState<Array<{ name: string; shortName: string; description: string; enabled: boolean }> | null>(null);
+  const [tools, setTools] = useState<Array<{ name: string; shortName: string; description: string; enabled: boolean; globalEnabled: boolean; projectOverride?: "enabled" | "disabled" }> | null>(null);
   const [toolsLoading, setToolsLoading] = useState(false);
   const [togglingTools, setTogglingTools] = useState<Set<string>>(new Set());
+  const [projectsList, setProjectsList] = useState<Array<{ id: string; name: string }>>([]);
+  const [overridesData, setOverridesData] = useState<ToolOverridesResponse | null>(null);
 
   const stateColor =
     status?.state === "connected" ? "var(--success)" :
@@ -194,33 +196,76 @@ function McpServerRow({
 
   const kindLabel = status?.kind ?? "—";
 
-  const loadTools = async () => {
+  const loadTools = useCallback(async () => {
     setToolsLoading(true);
     try {
-      const listing = await listTools();
+      const [listing, overrides, projRes] = await Promise.all([
+        listTools(),
+        listToolOverrides(),
+        fetchProjects(),
+      ]);
+      setOverridesData(overrides);
+      setProjectsList(projRes.projects.map((p) => ({ id: p.id, name: p.name })));
       const srv = listing.mcp.find((s) => s.server === name);
-      setTools(srv?.tools.map((t) => ({ name: t.name, shortName: t.shortName, description: t.description, enabled: t.enabled })) ?? []);
-    } catch {
+      setTools(srv?.tools.map((t) => ({ name: t.name, shortName: t.shortName, description: t.description, enabled: t.enabled, globalEnabled: t.globalEnabled, projectOverride: t.projectOverride })) ?? []);
+    } catch (err) {
+      console.warn("loadTools failed:", err);
       setTools([]);
     } finally {
       setToolsLoading(false);
     }
-  };
+  }, [name]);
 
-  const toggleTool = async (bridgedName: string, nextEnabled: boolean) => {
+  const toggleToolGlobal = async (bridgedName: string, nextEnabled: boolean) => {
     setTogglingTools((prev) => new Set(prev).add(bridgedName));
     try {
-      await setToolEnabled("mcp", bridgedName, nextEnabled);
-      setTools((prev) => prev?.map((t) => t.name === bridgedName ? { ...t, enabled: nextEnabled } : t) ?? null);
+      await setToolEnabled("mcp", bridgedName, nextEnabled, { scope: "global" });
+      setTools((prev) => prev?.map((t) => t.name === bridgedName ? { ...t, enabled: nextEnabled, globalEnabled: nextEnabled } : t) ?? null);
     } finally {
       setTogglingTools((prev) => { const next = new Set(prev); next.delete(bridgedName); return next; });
+    }
+  };
+
+  const setProjectToolOverride = async (bridgedName: string, projectId: string, state: "enabled" | "disabled" | undefined) => {
+    const key = `proj:${projectId}:${bridgedName}`;
+    setTogglingTools((prev) => new Set(prev).add(key));
+    try {
+      if (state === undefined) {
+        await clearToolProjectOverride("mcp", bridgedName, projectId);
+      } else {
+        await setToolEnabled("mcp", bridgedName, state === "enabled", { scope: "project", projectId });
+      }
+      await loadTools();
+    } finally {
+      setTogglingTools((prev) => { const next = new Set(prev); next.delete(key); return next; });
     }
   };
 
   const handleExpand = () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && tools === null) loadTools();
+    if (next) loadTools();
+  };
+
+  const handleProbeAndReload = async () => {
+    setToolsLoading(true);
+    try {
+      await onProbe();
+      const [listing, overrides, projRes] = await Promise.all([
+        listTools(),
+        listToolOverrides(),
+        fetchProjects(),
+      ]);
+      setOverridesData(overrides);
+      setProjectsList(projRes.projects.map((p) => ({ id: p.id, name: p.name })));
+      const srv = listing.mcp.find((s) => s.server === name);
+      setTools(srv?.tools.map((t) => ({ name: t.name, shortName: t.shortName, description: t.description, enabled: t.enabled, globalEnabled: t.globalEnabled, projectOverride: t.projectOverride })) ?? []);
+    } catch (err) {
+      console.warn("reload after probe failed:", err);
+      setTools([]);
+    } finally {
+      setToolsLoading(false);
+    }
   };
 
   return (
@@ -249,25 +294,21 @@ function McpServerRow({
             <div className="mcp-tools-list">
               <div className="mcp-tools-header">Tools</div>
               {tools.map((t) => (
-                <div key={t.name} className="mcp-tool-row">
-                  <div className="mcp-tool-info">
-                    <span className="mcp-tool-name">{t.shortName}</span>
-                    <span className="mcp-tool-fqn">{t.name}</span>
-                    {t.description && <span className="mcp-tool-desc">{t.description}</span>}
-                  </div>
-                  <label className="mcp-toggle" style={{ cursor: "pointer", flexShrink: 0 }}>
-                    <span
-                      className="mcp-toggle-track"
-                      data-enabled={t.enabled}
-                      onClick={() => { if (!togglingTools.has(t.name)) toggleTool(t.name, !t.enabled); }}
-                    >
-                      <span className="mcp-toggle-thumb" />
-                    </span>
-                    <span style={{ fontSize: "10px", color: "var(--text-dim)", minWidth: "32px", textAlign: "right" }}>
-                      {togglingTools.has(t.name) ? "..." : t.enabled ? "on" : "off"}
-                    </span>
-                  </label>
-                </div>
+                <ToolCascadeRow
+                  key={t.name}
+                  family="mcp"
+                  name={t.shortName}
+                  fqn={t.name}
+                  description={t.description}
+                  enabled={t.enabled}
+                  globalEnabled={t.globalEnabled}
+                  projectOverride={t.projectOverride}
+                  projectsList={projectsList}
+                  overridesData={overridesData}
+                  busy={togglingTools.has(t.name)}
+                  onToggleGlobal={(next) => toggleToolGlobal(t.name, next)}
+                  onSetProjectOverride={(pid, state) => setProjectToolOverride(t.name, pid, state)}
+                />
               ))}
             </div>
           ) : tools !== null ? (
@@ -278,7 +319,7 @@ function McpServerRow({
             <button
               type="button"
               className="mcp-action-btn"
-              onClick={onProbe}
+              onClick={handleProbeAndReload}
               disabled={probeLoading}
             >
               {probeLoading ? "Probing..." : "Probe"}
@@ -538,6 +579,246 @@ function McpServerForm({
           {saving ? "Saving..." : "Save"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── ToolCascadeRow ──────────────────────────────────────────────────────────
+
+interface ToolCascadeRowProps {
+  family: "builtin" | "mcp" | "extension";
+  name: string;
+  fqn: string;
+  description: string;
+  enabled: boolean;
+  globalEnabled: boolean;
+  projectOverride?: "enabled" | "disabled";
+  projectsList: Array<{ id: string; name: string }>;
+  overridesData: ToolOverridesResponse | null;
+  busy: boolean;
+  onToggleGlobal: (next: boolean) => void;
+  onSetProjectOverride: (projectId: string, state: "enabled" | "disabled" | undefined) => void;
+}
+
+function ToolCascadeRow({
+  family,
+  name,
+  fqn,
+  description,
+  enabled,
+  globalEnabled,
+  projectOverride,
+  projectsList,
+  overridesData,
+  busy,
+  onToggleGlobal,
+  onSetProjectOverride,
+}: ToolCascadeRowProps) {
+  const [showOverrides, setShowOverrides] = useState(false);
+
+  const existingOverrideProjects = overridesData !== null
+    ? Object.entries(overridesData.projects)
+        .filter(([, ov]) => {
+          const arr = ov[family];
+          return arr.enable.includes(fqn) || arr.disable.includes(fqn);
+        })
+        .map(([pid]) => pid)
+    : [];
+
+  const availableForOverride = projectsList.filter(
+    (p) => !existingOverrideProjects.includes(p.id),
+  );
+
+  return (
+    <div className="mcp-tool-row" style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", width: "100%" }}>
+        <span
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: enabled ? "var(--success, #22c55e)" : "var(--text-dim)",
+            flexShrink: 0,
+          }}
+        />
+        <div className="mcp-tool-info" style={{ flex: 1, minWidth: 0 }}>
+          <span className="mcp-tool-name">{name}</span>
+          <span className="mcp-tool-fqn">{fqn}</span>
+          {description !== "" && <span className="mcp-tool-desc">{description}</span>}
+        </div>
+        <button
+          type="button"
+          className="mcp-action-btn"
+          style={{ fontSize: "10px", padding: "2px 6px" }}
+          disabled={busy}
+          onClick={() => onToggleGlobal(!globalEnabled)}
+        >
+          {busy ? "..." : globalEnabled ? "Global: enabled" : "Global: disabled"}
+        </button>
+        {projectsList.length > 0 && (
+          <button
+            type="button"
+            className="mcp-action-btn"
+            style={{ fontSize: "10px", padding: "2px 6px" }}
+            onClick={() => setShowOverrides(!showOverrides)}
+          >
+            {showOverrides ? "▴" : "▾"} Overrides ({existingOverrideProjects.length})
+          </button>
+        )}
+      </div>
+
+      {showOverrides && (
+        <div style={{ paddingLeft: "20px", paddingTop: "6px" }}>
+          {existingOverrideProjects.map((pid) => {
+            const proj = projectsList.find((p) => p.id === pid);
+            const ov = overridesData?.projects[pid]?.[family];
+            const currentState: "enabled" | "disabled" | undefined =
+              ov?.enable.includes(fqn) ? "enabled" :
+              ov?.disable.includes(fqn) ? "disabled" :
+              undefined;
+            return (
+              <div key={pid} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-secondary)", minWidth: "80px" }}>
+                  {proj?.name ?? pid}
+                </span>
+                <TriStatePicker
+                  value={currentState}
+                  disabled={busy}
+                  onChange={(state) => onSetProjectOverride(pid, state)}
+                />
+              </div>
+            );
+          })}
+          {availableForOverride.length > 0 && (
+            <AddOverrideDropdown
+              projects={availableForOverride}
+              busy={busy}
+              onSet={(pid, state) => onSetProjectOverride(pid, state)}
+            />
+          )}
+          {existingOverrideProjects.length === 0 && availableForOverride.length === 0 && (
+            <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>No projects configured</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TriStatePicker ──────────────────────────────────────────────────────────
+
+interface TriStatePickerProps {
+  value: "enabled" | "disabled" | undefined;
+  disabled: boolean;
+  onChange: (state: "enabled" | "disabled" | undefined) => void;
+}
+
+function TriStatePicker({ value, disabled, onChange }: TriStatePickerProps) {
+  const states = [
+    { label: "Inherit", state: undefined as "enabled" | "disabled" | undefined },
+    { label: "Enabled", state: "enabled" as "enabled" | "disabled" | undefined },
+    { label: "Disabled", state: "disabled" as "enabled" | "disabled" | undefined },
+  ];
+
+  return (
+    <div className="mcp-tristate" style={{ display: "inline-flex", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--border, #333)" }}>
+      {states.map((s) => {
+        const active = value === s.state;
+        const bg =
+          active && s.state === "enabled" ? "var(--success, #22c55e)" :
+          active && s.state === "disabled" ? "var(--error, #ef4444)" :
+          active ? "var(--bg-tertiary, #333)" :
+          "transparent";
+        return (
+          <button
+            key={s.label}
+            type="button"
+            disabled={disabled}
+            style={{
+              padding: "2px 8px",
+              fontSize: "10px",
+              border: "none",
+              borderRight: "1px solid var(--border, #333)",
+              cursor: disabled ? "default" : "pointer",
+              background: bg,
+              color: active ? "#fff" : "var(--text-secondary)",
+              fontWeight: active ? 600 : 400,
+            }}
+            onClick={() => onChange(s.state)}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── AddOverrideDropdown ─────────────────────────────────────────────────────
+
+interface AddOverrideDropdownProps {
+  projects: Array<{ id: string; name: string }>;
+  busy: boolean;
+  onSet: (projectId: string, state: "enabled" | "disabled") => void;
+}
+
+function AddOverrideDropdown({ projects, busy, onSet }: AddOverrideDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(projects[0]?.id ?? "");
+
+  if (projects.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: "4px" }}>
+      {!open ? (
+        <button
+          type="button"
+          className="mcp-action-btn"
+          style={{ fontSize: "10px", padding: "2px 6px" }}
+          onClick={() => setOpen(true)}
+        >
+          + Add override for&hellip;
+        </button>
+      ) : (
+        <div className="mcp-override-form" style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+          <select
+            className="mcp-form-select mcp-override-select"
+            style={{ fontSize: "10px", padding: "2px 4px", maxWidth: "160px" }}
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="mcp-action-btn"
+            style={{ fontSize: "10px", padding: "2px 6px" }}
+            disabled={busy || selected.length === 0}
+            onClick={() => { onSet(selected, "enabled"); setOpen(false); }}
+          >
+            Enable here
+          </button>
+          <button
+            type="button"
+            className="mcp-action-btn"
+            style={{ fontSize: "10px", padding: "2px 6px" }}
+            disabled={busy || selected.length === 0}
+            onClick={() => { onSet(selected, "disabled"); setOpen(false); }}
+          >
+            Disable here
+          </button>
+          <button
+            type="button"
+            className="mcp-action-btn"
+            style={{ fontSize: "10px", padding: "2px 6px" }}
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }

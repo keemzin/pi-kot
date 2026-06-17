@@ -6,7 +6,7 @@
 
 const BASE = ""; // Same origin via Vite proxy
 
-import type { SessionContextResponse, McpServersResponse, McpSettingsResponse, McpServerConfig } from "./api-client/types";
+import type { SessionContextResponse, McpServersResponse, McpSettingsResponse, McpServerConfig, ToolOverridesResponse } from "./api-client/types";
 
 export class ApiError extends Error {
   constructor(
@@ -953,6 +953,10 @@ export async function setToolEnabled(
     `/api/v1/config/tools/${encodeURIComponent(family)}/${encodeURIComponent(name)}/enabled${qs}`,
     { enabled, scope: opts?.scope },
   );
+}
+
+export async function listToolOverrides(): Promise<ToolOverridesResponse> {
+  return request<ToolOverridesResponse>("GET", "/api/v1/config/tools/overrides");
 }
 
 export async function clearToolProjectOverride(

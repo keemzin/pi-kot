@@ -283,17 +283,6 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
           type: "object",
           properties: { projectId: { type: "string" } },
         },
-        response: {
-          200: {
-            type: "object",
-            required: ["builtin", "mcp", "extension"],
-            properties: {
-              builtin: { type: "array", items: { type: "object" } },
-              mcp: { type: "array", items: { type: "object" } },
-              extension: { type: "array", items: { type: "object" } },
-            },
-          },
-        },
       },
     },
     async (req, reply) => {

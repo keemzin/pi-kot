@@ -19,6 +19,7 @@ import {
   ensureProjectLoaded as mcpEnsureProjectLoaded,
   isGloballyEnabled as mcpIsGloballyEnabled,
 } from "./mcp/manager.js";
+import { readToolOverrides, isToolEffective } from "./tool-overrides.js";
 
 /**
  * Build the ExtensionBindings for a session with real command context
@@ -450,7 +451,11 @@ async function resolveMcpCustomTools(
   await mcpEnsureGlobalLoaded().catch(() => undefined);
   if (!mcpIsGloballyEnabled()) return [];
   await mcpEnsureProjectLoaded(projectId, workspacePath).catch(() => undefined);
-  return mcpCustomToolsForProject(projectId);
+  const tools = mcpCustomToolsForProject(projectId);
+  // Apply tool-level overrides (global disabled set + per-project tri-state)
+  const overrides = await readToolOverrides().catch(() => undefined);
+  if (overrides === undefined) return tools;
+  return tools.filter((t) => isToolEffective(overrides, projectId, "mcp", t.name));
 }
 
 /**
