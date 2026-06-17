@@ -41,6 +41,23 @@ function extractText(content: unknown): string {
 
 /* ── Tool Call Components (ported from forge, styled with theme vars) ── */
 
+/** Map a tool name to a descriptive emoji icon. */
+function getToolIcon(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("bash") || n.includes("shell") || n.includes("exec") || n.includes("run")) return "⚡";
+  if (n.includes("read") || n.includes("cat") || n.includes("view") || n.includes("get")) return "📄";
+  if (n.includes("write") || n.includes("create") || n.includes("save") || n.includes("put")) return "✏️";
+  if (n.includes("edit") || n.includes("patch") || n.includes("update") || n.includes("replace")) return "🔧";
+  if (n.includes("search") || n.includes("grep") || n.includes("find") || n.includes("ls") || n.includes("list")) return "🔍";
+  if (n.includes("delete") || n.includes("remove") || n.includes("rm")) return "🗑️";
+  if (n.includes("move") || n.includes("rename") || n.includes("mv")) return "📦";
+  if (n.includes("git") || n.includes("commit") || n.includes("branch")) return "🌿";
+  if (n.includes("web") || n.includes("fetch") || n.includes("http") || n.includes("url")) return "🌐";
+  if (n.includes("test") || n.includes("spec")) return "🧪";
+  if (n.includes("ask") || n.includes("question") || n.includes("prompt")) return "💬";
+  return "🔩";
+}
+
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -61,7 +78,7 @@ function ThinkingBlock({ text }: { text: string }) {
   );
 }
 
-/** Render a single tool call + its result. */
+/** Render a single tool call + its result as a timeline node. */
 function ToolCallEntry({
   block,
   result,
@@ -69,13 +86,13 @@ function ToolCallEntry({
   block: Record<string, unknown>;
   result: PairableMessage | undefined;
 }) {
-  const [inputOpen, setInputOpen] = useState(false);
-  const [outputOpen, setOutputOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const name = String(block.name ?? "tool");
   const args = block.arguments ?? block.input ?? {};
   const argsText = typeof args === "string" ? args : JSON.stringify(args, null, 2);
 
   const isError = result?.isError === true;
+  const isRunning = result === undefined;
   const resultContent = Array.isArray(result?.content) ? result?.content : [];
   const outputText = resultContent
     .filter((c): c is { type: "text"; text: string } => {
@@ -85,56 +102,70 @@ function ToolCallEntry({
     .map((c) => c.text)
     .join("\n");
 
+  // Smart disclosure: first line of output shown inline
+  const outputPreview = outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
+
   const preview = toolPreviewFromArgs(name, args);
-  const borderColor = result === undefined
-    ? "var(--accent)"
-    : isError
-      ? "var(--error)"
-      : "var(--border)";
+  const icon = getToolIcon(name);
 
   return (
-    <div className="tool-call-chip" style={{ borderColor }}>
-      <div className="tool-call-header">
-        <span className="tool-dot" />
-        <span className="tool-name">{name}</span>
-        {preview && (
-          <span className="tool-preview" title={preview}>{preview}</span>
-        )}
-        {result === undefined && (
-          <span className="tool-running">running…</span>
-        )}
-      </div>
-      <div className="tool-input-area">
-        <button
-          type="button"
-          onClick={() => setInputOpen((o) => !o)}
-          className="tool-toggle"
-        >
-          {inputOpen ? "▾" : "▸"} Input
-        </button>
-        {inputOpen && (
-          <div className="tool-args">{argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}</div>
-        )}
-      </div>
-      {result !== undefined && outputText.length > 0 && (
-        <div className="tool-output-area">
-          <button
-            type="button"
-            onClick={() => setOutputOpen((o) => !o)}
-            className="tool-toggle"
-          >
-            {outputOpen ? "▾" : "▸"} {isError ? "Error" : "Output"}
-          </button>
-          {outputOpen && (
-            <div className="tool-output-text">{outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}</div>
+    <div className="tool-timeline-node">
+      <span
+        className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : ""}`}
+        aria-hidden="true"
+      >
+        {icon}
+      </span>
+      <div className="tool-timeline-content">
+        <div className="tool-timeline-row">
+          <span className="tool-timeline-name">{name}</span>
+          {preview && <span className="tool-timeline-arg" title={preview}>{preview}</span>}
+          {isRunning && <span className="tool-timeline-running" aria-label="running">running…</span>}
+          {!isRunning && outputText.length > 0 && (
+            <button
+              type="button"
+              className="tool-timeline-details-btn"
+              onClick={() => setDetailsOpen((o) => !o)}
+              aria-expanded={detailsOpen}
+              aria-label={detailsOpen ? "Hide details" : "Show details"}
+            >
+              {detailsOpen ? "hide" : "details"}
+            </button>
           )}
         </div>
-      )}
+        {/* Smart-disclosure output preview (always shown when not expanded) */}
+        {!isRunning && !detailsOpen && outputPreview.length > 0 && (
+          <div className={`tool-timeline-output-preview${isError ? " error-preview" : ""}`} title={outputPreview}>
+            {isError ? "✖ " : ""}{outputPreview}
+          </div>
+        )}
+        {/* Expanded details pane */}
+        {detailsOpen && (
+          <div className="tool-timeline-details">
+            {argsText.length > 2 && (
+              <div>
+                <div className="tool-timeline-section-label">input</div>
+                <pre className="tool-timeline-code">
+                  {argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}
+                </pre>
+              </div>
+            )}
+            {outputText.length > 0 && (
+              <div>
+                <div className="tool-timeline-section-label">{isError ? "error" : "output"}</div>
+                <pre className="tool-timeline-code">
+                  {outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-/** Render a batch of tool calls in a single collapsible card. */
+/** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
   const [open, setOpen] = useState(false);
   const toolEntries = entries.filter((entry) => entry.kind === "tool");
@@ -142,54 +173,36 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
   const inFlight = toolEntries.filter((e) => e.result === undefined).length;
   const errored = toolEntries.some((e) => e.result?.isError === true);
 
-  const counts = new Map<string, number>();
-  for (const e of toolEntries) {
-    const n = String(e.block.name ?? "tool");
-    counts.set(n, (counts.get(n) ?? 0) + 1);
-  }
-  const countSummary = [...counts].map(([n, c]) => `${n} ×${c}`).join(" · ");
-
-  const previews = toolEntries
-    .map((e) => {
-      const n = String(e.block.name ?? "tool");
-      const args = e.block.arguments ?? e.block.input ?? {};
-      const p = toolPreviewFromArgs(n, args);
-      return p === undefined ? n : `${n}: ${p}`;
-    })
-    .slice(0, 3);
+  // Unique tool names for the inline preview
+  const names = [...new Set(toolEntries.map((e) => String(e.block.name ?? "tool")))];
+  const previewText = names.slice(0, 4).join(" · ") + (names.length > 4 ? " · …" : "");
 
   return (
     <details
       open={open}
-      className="tool-call-chip tool-batch"
+      className="tool-timeline"
+      style={{ marginLeft: 0 }}
     >
       <summary
+        className="tool-timeline-header"
         onClick={(e) => { e.preventDefault(); setOpen((o) => !o); }}
-        className="tool-batch-summary"
+        aria-label={`${toolCount} tool ${toolCount === 1 ? "call" : "calls"}: ${previewText}`}
       >
-        <div className="tool-batch-header-row">
-          <span style={{ color: "var(--text-dim)" }}>→</span>
-          <span className="tool-name">tools</span>
-          <span style={{ color: "var(--text-dim)", fontSize: "11px" }}>
-            ×{toolCount} {toolCount === 1 ? "call" : "calls"}
+        <span className="tool-timeline-chevron" aria-hidden="true">{open ? "▾" : "▸"}</span>
+        <span className="tool-timeline-batch-label">
+          ↳ {toolCount} {toolCount === 1 ? "tool" : "tools"}
+        </span>
+        <span className="tool-timeline-batch-preview">{previewText}</span>
+        {inFlight > 0 && (
+          <span className="tool-timeline-badge" aria-label={`${inFlight} running`}>
+            {inFlight} running
           </span>
-          {countSummary && (
-            <span className="tool-batch-count" title={countSummary}>{countSummary}</span>
-          )}
-          {inFlight > 0 && (
-            <span className="tool-badge">{inFlight} running…</span>
-          )}
-          {errored && (
-            <span className="tool-badge tool-badge-error">error</span>
-          )}
-        </div>
-        {previews.length > 0 && (
-          <div className="tool-batch-previews">
-            {previews.join(" · ")}{toolCount > previews.length && " · …"}
-          </div>
+        )}
+        {errored && (
+          <span className="tool-timeline-badge error" aria-label="error">error</span>
         )}
       </summary>
-      <div className="tool-batch-body">
+      <div className="tool-timeline-track">
         {entries.map((entry, j) =>
           entry.kind === "thinking" ? (
             <ThinkingBlock key={j} text={entry.block.thinking as string ?? ""} />
@@ -238,7 +251,11 @@ function AssistantRenderSegmentView({
   const toolCount = entries.filter((e: ToolBatchEntry) => e.kind === "tool").length;
 
   if (toolCount === 1 && !hasThinking && toolEntry !== undefined) {
-    return <ToolCallEntry block={toolEntry.block} result={toolEntry.result} />;
+    return (
+      <div className="tool-timeline">
+        <ToolCallEntry block={toolEntry.block} result={toolEntry.result} />
+      </div>
+    );
   }
   return <ToolCallBatchCard entries={entries} />;
 }

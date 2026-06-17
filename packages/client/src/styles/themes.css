@@ -2731,58 +2731,219 @@ body {
 }
 .md-td { padding: 4px 10px; border-bottom: 1px solid var(--border); }
 
-/* ══ Tool call chips (chat, theme-backed) ══ */
-.tool-call-chip {
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid var(--border);
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
-  font-size: 12px;
-  line-height: 1.4;
-  animation: toolFadeIn 0.25s ease-out;
+/* ══ Tool Timeline ══ */
+@keyframes toolPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--tool-accent); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 3px transparent; }
 }
-.tool-call-header {
+@keyframes toolNodeIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* The outer wrapper that holds the vertical track + nodes */
+.tool-timeline {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+  animation: toolNodeIn 0.2s ease-out;
+}
+
+/* Vertical connector track between a batch header and its nodes */
+.tool-timeline-track {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-left: 20px;
+}
+.tool-timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+/* Batch header row — the collapsed/expanded trigger */
+.tool-timeline-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  cursor: default;
+  gap: 7px;
+  padding: 4px 6px 4px 0;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s var(--ease);
   user-select: none;
+  list-style: none;
 }
-.tool-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.tool-timeline-header:hover { background: var(--bg-glass-hover); }
+.tool-timeline-header::-webkit-details-marker { display: none; }
+
+/* The small ▸/▾ chevron beside the batch header */
+.tool-timeline-chevron {
+  font-size: 9px;
+  color: var(--text-dim);
+  width: 10px;
   flex-shrink: 0;
-  background: var(--text-dim);
+  transition: transform 0.15s var(--ease);
 }
-.tool-name { font-weight: 600; color: var(--text-secondary); }
-.tool-preview {
+
+/* Batch label: "↳ 3 tools" */
+.tool-timeline-batch-label {
+  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Inline preview of what tools ran: "bash · read · write" */
+.tool-timeline-batch-preview {
+  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-size: 10px;
+  color: var(--text-dim);
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-dim);
 }
-.tool-running { font-size: 10px; color: var(--accent); }
-.tool-input-area,
-.tool-output-area { padding: 0 10px; }
-.tool-toggle {
+
+/* Running/error state badges */
+.tool-timeline-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--bg-glass);
+}
+.tool-timeline-badge.error {
+  color: var(--error);
+  background: rgba(248,113,113,0.10);
+}
+
+/* Individual tool node row */
+.tool-timeline-node {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 3px 0;
+  position: relative;
+  animation: toolNodeIn 0.18s ease-out;
+}
+
+/* The icon/dot to the left of each node */
+.tool-timeline-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  border-radius: 50%;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  margin-top: 1px;
+  line-height: 1;
+}
+.tool-timeline-icon.running {
+  border-color: var(--tool-accent);
+  animation: toolPulse 1.4s ease-in-out infinite;
+}
+.tool-timeline-icon.error {
+  border-color: var(--error);
+}
+
+/* Right side: name + summary + details toggle */
+.tool-timeline-content {
+  flex: 1;
+  min-width: 0;
+  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.tool-timeline-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Tool name */
+.tool-timeline-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+/* e.g. "ls -la" preview arg */
+.tool-timeline-arg {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+/* "running…" inline status */
+.tool-timeline-running {
+  font-size: 10px;
+  color: var(--tool-accent);
+  animation: toolPulse 1.4s ease-in-out infinite;
+}
+
+/* Smart-disclosure: first line of output shown inline */
+.tool-timeline-output-preview {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.tool-timeline-output-preview.error-preview {
+  color: var(--error);
+}
+
+/* "show details" / "hide" toggle link */
+.tool-timeline-details-btn {
   appearance: none;
   background: transparent;
   border: none;
   outline: none;
   cursor: pointer;
-  user-select: none;
   padding: 0;
-  font-size: 11px;
+  font-size: 10px;
   font-family: inherit;
   color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.12s;
 }
-.tool-args,
-.tool-output-text {
-  margin: 4px 0 0;
+.tool-timeline-details-btn:hover { color: var(--text-secondary); }
+
+/* Expanded details pane: args + full output */
+.tool-timeline-details {
+  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tool-timeline-section-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.tool-timeline-code {
   padding: 6px 8px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2791,23 +2952,31 @@ body {
   background: var(--bg-glass);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+  max-height: 160px;
+  overflow: auto;
 }
-.tool-output-text { max-height: 140px; overflow: auto; }
 
-.tool-batch { margin-top: 4px; }
-.tool-batch summary { list-style: none; }
-.tool-batch summary::-webkit-details-marker { display: none; }
-.tool-batch-summary { cursor: pointer; }
-.tool-batch-header-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; padding: 4px 10px; }
-.tool-batch-count {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Thinking block — slim variant inside timeline */
+.thinking-block {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  font-size: 12px;
   color: var(--text-dim);
-  font-size: 10px;
+  margin: 2px 0;
 }
+.thinking-block summary { cursor: pointer; user-select: none; color: var(--text-secondary); list-style: none; }
+.thinking-block summary::-webkit-details-marker { display: none; }
+.thinking-content {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Legacy badge kept for streaming indicator in ChatView */
 .tool-badge {
   font-size: 9px;
   color: var(--accent);
@@ -2820,38 +2989,6 @@ body {
 .tool-badge-error {
   color: var(--error);
   background: rgba(248,113,113,0.1);
-}
-.tool-batch-previews {
-  font-size: 10px;
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 10px 3px;
-}
-.tool-batch-body {
-  border-top: 1px solid var(--border);
-  padding: 4px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.thinking-block {
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.thinking-block summary { cursor: pointer; user-select: none; color: var(--text-secondary); }
-.thinking-content {
-  margin-top: 4px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--text-dim);
 }
 
 /* Worker session nesting & pulsating dot */
