@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import {
   getMcpSettings,
-  setMcpEnabled,
+  setMcpEnabled as apiSetMcpEnabled,
   listMcpServers,
   upsertMcpServer,
   deleteMcpServer,
@@ -9,7 +9,39 @@ import {
   grantStdioMcpTrust,
   revokeStdioMcpTrust,
 } from "../lib/api-client";
-import type { McpSettingsResponse, McpServerStatus, McpServerConfig } from "../lib/api-client/types";
+import type {
+  McpServerConfig,
+  McpServerStatus,
+  McpSettingsResponse,
+} from "../lib/api-client/types";
+
+const POLL_INTERVAL_MS = 30_000;
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+function sameSettings(a: McpSettingsResponse | undefined, b: McpSettingsResponse): boolean {
+  return a?.enabled === b.enabled && a.connected === b.connected && a.total === b.total;
+}
+
+function sameProjectData(a: McpProjectData | undefined, b: McpProjectData): boolean {
+  return (
+    a !== undefined &&
+    stableJson(a.status) === stableJson(b.status) &&
+    stableJson(a.stdioTrust) === stableJson(b.stdioTrust)
+  );
+}
+
+/**
+ * Module-level stable empty array. Zustand selectors compare return
+ * values by reference; returning a fresh `[]` from a `useMcpStore(s
+ * => ... ?? [])` selector triggers a re-render on every store update
+ * (the new literal is a different reference even when the underlying
+ * value didn't change), eventually crashing the React tree with
+ * "Maximum update depth exceeded."
+ */
+export const EMPTY_STATUS: McpServerStatus[] = [];
 
 interface McpProjectData {
   status: McpServerStatus[];
@@ -32,15 +64,17 @@ interface McpState {
   setMcpEnabled: (enabled: boolean) => Promise<void>;
   upsertServer: (name: string, config: McpServerConfig) => Promise<void>;
   deleteServer: (name: string) => Promise<void>;
-  probeServer: (name: string) => Promise<void>;
+  probeServer: (name: string, projectId?: string) => Promise<void>;
   grantStdioTrust: (projectId: string) => Promise<void>;
   revokeStdioTrust: (projectId: string) => Promise<void>;
 }
 
+let refreshInFlight = false;
+
 export const useMcpStore = create<McpState>((set, get) => ({
   settings: undefined,
   globalServers: {},
-  globalStatus: [],
+  globalStatus: EMPTY_STATUS,
   byProject: {},
   loading: false,
   error: null,
@@ -48,10 +82,10 @@ export const useMcpStore = create<McpState>((set, get) => ({
 
   startPolling: () => {
     const h = setInterval(async () => {
-      if (!document.hidden) {
-        await get().refreshSettings();
-      }
-    }, 30000);
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (refreshInFlight) return;
+      await get().refreshSettings();
+    }, POLL_INTERVAL_MS);
     set({ pollHandle: h });
     get().refreshSettings();
   },
@@ -65,25 +99,50 @@ export const useMcpStore = create<McpState>((set, get) => ({
   },
 
   refreshSettings: async () => {
+    if (refreshInFlight) return;
+    refreshInFlight = true;
     try {
       const [settings, serversRes] = await Promise.all([
         getMcpSettings(),
         listMcpServers(),
       ]);
-      set({ settings, globalServers: serversRes.servers, globalStatus: serversRes.status, loading: false, error: null });
+      set((state) => {
+        const nextGlobalServers = serversRes.servers;
+        const nextGlobalStatus = serversRes.status;
+        const serversChanged = stableJson(state.globalServers) !== stableJson(nextGlobalServers);
+        const statusChanged = stableJson(state.globalStatus) !== stableJson(nextGlobalStatus);
+        const s = sameSettings(state.settings, settings);
+        if (!serversChanged && !statusChanged && s) {
+          return { loading: false, error: null };
+        }
+        return {
+          settings,
+          globalServers: nextGlobalServers,
+          globalStatus: nextGlobalStatus,
+          loading: false,
+          error: null,
+        };
+      });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to load MCP settings", loading: false });
+    } finally {
+      refreshInFlight = false;
     }
   },
 
   refreshProject: async (projectId: string) => {
     try {
       const res = await listMcpServers(projectId);
-      set({
-        byProject: {
-          ...get().byProject,
-          [projectId]: { status: res.status, stdioTrust: res.stdioTrust },
-        },
+      const data: McpProjectData = { status: res.status, stdioTrust: res.stdioTrust };
+      set((state) => {
+        const existing = state.byProject[projectId];
+        if (sameProjectData(existing, data)) return state;
+        return {
+          byProject: {
+            ...state.byProject,
+            [projectId]: data,
+          },
+        };
       });
     } catch {
       // silently ignore
@@ -91,8 +150,8 @@ export const useMcpStore = create<McpState>((set, get) => ({
   },
 
   setMcpEnabled: async (enabled: boolean) => {
-    const res = await setMcpEnabled(enabled);
-    set({ settings: res });
+    const res = await apiSetMcpEnabled(enabled);
+    set((state) => sameSettings(state.settings, res) ? state : { settings: res });
   },
 
   upsertServer: async (name: string, config: McpServerConfig) => {
@@ -105,9 +164,13 @@ export const useMcpStore = create<McpState>((set, get) => ({
     await get().refreshSettings();
   },
 
-  probeServer: async (name: string) => {
-    await probeMcpServer(name);
-    await get().refreshSettings();
+  probeServer: async (name: string, projectId?: string) => {
+    await probeMcpServer(name, projectId);
+    if (projectId !== undefined) {
+      await get().refreshProject(projectId);
+    } else {
+      await get().refreshSettings();
+    }
   },
 
   grantStdioTrust: async (projectId: string) => {

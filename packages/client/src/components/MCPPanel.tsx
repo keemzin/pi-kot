@@ -18,6 +18,7 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
   const upsertServer = useMcpStore((s) => s.upsertServer);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingName, setEditingName] = useState<string | undefined>(undefined);
   const [probeLoading, setProbeLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +41,22 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
     } finally {
       setProbeLoading(null);
     }
+  };
+
+  const handleToggleServer = async (name: string, next: boolean) => {
+    const prev = globalServers[name];
+    if (prev === undefined) return;
+    await upsertServer(name, { ...prev, enabled: next });
+  };
+
+  const handleEdit = (name: string) => {
+    setShowAddForm(false);
+    setEditingName(name);
+  };
+
+  const handleAdd = () => {
+    setEditingName(undefined);
+    setShowAddForm(true);
   };
 
   const serverEntries = Object.entries(globalServers);
@@ -99,39 +116,57 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
                   <button
                     type="button"
                     className="mcp-add-btn"
-                    onClick={() => setShowAddForm(!showAddForm)}
+                    onClick={() => editingName !== undefined ? setEditingName(undefined) : handleAdd()}
                     title="Add server"
                   >
                     +
                   </button>
                 </div>
 
-                {showAddForm && (
-                  <McpServerForm
-                    onSave={async (name, config) => {
-                      await upsertServer(name, config);
-                      setShowAddForm(false);
-                    }}
-                    onCancel={() => setShowAddForm(false)}
-                  />
-                )}
-
-                {serverEntries.length === 0 && !showAddForm ? (
+                {(!showAddForm && editingName === undefined) && serverEntries.length === 0 ? (
                   <div style={{ padding: "12px", textAlign: "center", fontSize: "12px", color: "var(--text-dim)" }}>
                     No MCP servers configured
                   </div>
                 ) : (
                   <div className="mcp-server-list">
+                    {showAddForm && (
+                      <McpServerForm
+                        onSave={async (name, config) => {
+                          await upsertServer(name, config);
+                          setShowAddForm(false);
+                        }}
+                        onCancel={() => setShowAddForm(false)}
+                      />
+                    )}
+
+                    {editingName !== undefined && globalServers[editingName] !== undefined && (
+                      <McpServerForm
+                        key={editingName}
+                        initialName={editingName}
+                        initialConfig={globalServers[editingName]}
+                        isEditing
+                        onSave={async (_name, config) => {
+                          await upsertServer(editingName, config);
+                          setEditingName(undefined);
+                        }}
+                        onCancel={() => setEditingName(undefined)}
+                      />
+                    )}
+
                     {serverEntries.map(([name]) => {
                       const st = globalStatus.find((s) => s.name === name);
                       return (
                         <McpServerRow
                           key={name}
                           name={name}
+                          config={globalServers[name]}
                           status={st}
                           probeLoading={probeLoading === name}
+                          onToggle={(next) => handleToggleServer(name, next)}
+                          onEdit={() => handleEdit(name)}
                           onProbe={() => handleProbe(name)}
                           onDelete={() => deleteServer(name)}
+                          isEditing={editingName === name}
                         />
                       );
                     })}
@@ -141,6 +176,7 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
                         <McpServerRow
                           key={st.name}
                           name={st.name}
+                          config={undefined}
                           status={st}
                           probeLoading={probeLoading === st.name}
                           onProbe={() => handleProbe(st.name)}
@@ -160,16 +196,24 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
 
 function McpServerRow({
   name,
+  config,
   status,
   probeLoading,
+  onToggle,
+  onEdit,
   onProbe,
   onDelete,
+  isEditing,
 }: {
   name: string;
+  config: McpServerConfig | undefined;
   status: McpServerStatus | undefined;
   probeLoading: boolean;
+  onToggle?: (enabled: boolean) => Promise<void>;
+  onEdit?: () => void;
   onProbe: () => Promise<void>;
   onDelete: () => void;
+  isEditing?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [tools, setTools] = useState<Array<{ name: string; shortName: string; description: string; enabled: boolean; globalEnabled: boolean; projectOverride?: "enabled" | "disabled" }> | null>(null);
@@ -178,20 +222,24 @@ function McpServerRow({
   const [projectsList, setProjectsList] = useState<Array<{ id: string; name: string }>>([]);
   const [overridesData, setOverridesData] = useState<ToolOverridesResponse | null>(null);
 
+  const serverEnabled = config?.enabled !== false;
+  const effectiveState = serverEnabled ? (status?.state ?? "idle") : "disabled";
+
   const stateColor =
-    status?.state === "connected" ? "var(--success)" :
-    status?.state === "connecting" ? "var(--warning)" :
-    status?.state === "error" ? "var(--error)" :
-    status?.state === "trust_required" ? "var(--warning)" :
+    effectiveState === "connected" ? "var(--success)" :
+    effectiveState === "connecting" ? "var(--warning)" :
+    effectiveState === "error" ? "var(--error)" :
+    effectiveState === "trust_required" ? "var(--warning)" :
+    effectiveState === "disabled" ? "var(--text-dim)" :
     "var(--text-dim)";
 
   const stateLabel =
-    status?.state === "connected" ? "Connected" :
-    status?.state === "connecting" ? "Connecting..." :
-    status?.state === "error" ? `Error${status.lastError ? `: ${status.lastError}` : ""}` :
-    status?.state === "disabled" ? "Disabled" :
-    status?.state === "trust_required" ? "Trust Required" :
-    status?.state === "idle" ? "Idle" :
+    effectiveState === "connected" ? "Connected" :
+    effectiveState === "connecting" ? "Connecting..." :
+    effectiveState === "error" ? `Error${status?.lastError ? `: ${status.lastError}` : ""}` :
+    effectiveState === "disabled" ? (serverEnabled ? "Disabled" : "Disabled") :
+    effectiveState === "trust_required" ? "Trust Required" :
+    effectiveState === "idle" ? "Idle" :
     status !== undefined ? status.state : "—";
 
   const kindLabel = status?.kind ?? "—";
@@ -268,19 +316,27 @@ function McpServerRow({
     }
   };
 
+  const expandable = status !== undefined;
+  const isDisabled = effectiveState === "disabled";
+
   return (
-    <div className="mcp-server-item" onClick={handleExpand}>
-      <div className="mcp-server-header">
+    <div className="mcp-server-item" onClick={expandable ? handleExpand : undefined}>
+      <div className="mcp-server-header" style={isEditing ? { opacity: 0.5, pointerEvents: "none" } : undefined}>
         <span className="mcp-server-chevron">{expanded ? "▾" : "▸"}</span>
         <span className="mcp-server-state-dot" style={{ background: stateColor }} />
         <span className="mcp-server-name">{name}</span>
+        {config !== undefined && (
+          <span className="mcp-server-badge" style={{ fontSize: "10px", color: serverEnabled ? "var(--text-secondary)" : "var(--text-dim)" }}>
+            {serverEnabled ? "Enabled" : "Disabled"}
+          </span>
+        )}
         <span className="mcp-server-badge" data-kind={kindLabel}>{kindLabel}</span>
         {status !== undefined && (
           <span className="mcp-server-tools">{status.toolCount} tools</span>
         )}
       </div>
 
-      {expanded && (
+      {expanded && !isEditing && (
         <div className="mcp-server-details" onClick={(e) => e.stopPropagation()}>
           <div className="mcp-server-meta" style={{ fontSize: "11px", color: "var(--text-dim)", paddingBottom: "6px" }}>
             <span style={{ color: stateColor, fontWeight: 600 }}>{stateLabel}</span>
@@ -315,19 +371,37 @@ function McpServerRow({
             <div style={{ fontSize: "11px", color: "var(--text-dim)", padding: "4px 0" }}>No tools available</div>
           ) : null}
 
-          <div className="mcp-server-actions" style={{ marginTop: "6px" }}>
+          <div className="mcp-server-actions" style={{ marginTop: "6px", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+            {onToggle !== undefined && (
+              <button
+                type="button"
+                className={`mcp-action-btn ${serverEnabled ? "" : "mcp-action-btn-danger"}`}
+                onClick={() => onToggle(!serverEnabled)}
+              >
+                {serverEnabled ? "Disable" : "Enable"}
+              </button>
+            )}
             <button
               type="button"
               className="mcp-action-btn"
               onClick={handleProbeAndReload}
-              disabled={probeLoading}
+              disabled={probeLoading || isDisabled}
             >
               {probeLoading ? "Probing..." : "Probe"}
             </button>
+            {onEdit !== undefined && (
+              <button
+                type="button"
+                className="mcp-action-btn"
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              >
+                Edit
+              </button>
+            )}
             <button
               type="button"
               className="mcp-action-btn mcp-action-btn-danger"
-              onClick={onDelete}
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
             >
               Remove
             </button>
@@ -338,22 +412,39 @@ function McpServerRow({
   );
 }
 
+const SECRET_PLACEHOLDER = "***REDACTED***";
+
 function McpServerForm({
+  initialName,
+  initialConfig,
+  isEditing,
   onSave,
   onCancel,
 }: {
+  initialName?: string;
+  initialConfig?: McpServerConfig;
+  isEditing?: boolean;
   onSave: (name: string, config: McpServerConfig) => Promise<void>;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [kind, setKind] = useState<"remote" | "stdio">("stdio");
-  const [url, setUrl] = useState("");
-  const [transport, setTransport] = useState("streamable-http");
-  const [command, setCommand] = useState("");
-  const [args, setArgs] = useState("");
-  const [cwd, setCwd] = useState("");
-  const [envEntries, setEnvEntries] = useState<{ key: string; value: string }[]>([]);
-  const [headersEntries, setHeadersEntries] = useState<{ key: string; value: string }[]>([]);
+  const isStdio = initialConfig !== undefined
+    ? typeof initialConfig.command === "string" && initialConfig.command.length > 0
+    : false;
+
+  const [name, setName] = useState(initialName ?? "");
+  const [kind, setKind] = useState<"remote" | "stdio">(isStdio ? "stdio" : "remote");
+  const [enabled, setEnabled] = useState(initialConfig?.enabled !== false);
+  const [url, setUrl] = useState(initialConfig?.url ?? "");
+  const [transport, setTransport] = useState(initialConfig?.transport ?? "auto");
+  const [command, setCommand] = useState(initialConfig?.command ?? "");
+  const [args, setArgs] = useState((initialConfig?.args ?? []).join(" "));
+  const [cwd, setCwd] = useState(initialConfig?.cwd ?? "");
+  const [envEntries, setEnvEntries] = useState<{ key: string; value: string }[]>(
+    Object.entries(initialConfig?.env ?? {}).map(([k, v]) => ({ key: k, value: v }))
+  );
+  const [headersEntries, setHeadersEntries] = useState<{ key: string; value: string }[]>(
+    Object.entries(initialConfig?.headers ?? {}).map(([k, v]) => ({ key: k, value: v }))
+  );
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -365,7 +456,7 @@ function McpServerForm({
       return;
     }
 
-    const config: McpServerConfig = { enabled: true };
+    const config: McpServerConfig = { enabled };
 
     if (kind === "remote") {
       if (url.trim().length === 0) {
@@ -416,6 +507,8 @@ function McpServerForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="my-mcp-server"
+          disabled={isEditing}
+          style={isEditing ? { opacity: 0.6 } : undefined}
         />
       </div>
       <div className="mcp-form-row">
@@ -424,10 +517,30 @@ function McpServerForm({
           className="mcp-form-select"
           value={kind}
           onChange={(e) => setKind(e.target.value as "remote" | "stdio")}
+          disabled={isEditing}
+          style={isEditing ? { opacity: 0.6 } : undefined}
         >
           <option value="stdio">stdio</option>
           <option value="remote">Remote URL</option>
         </select>
+        {isEditing && (
+          <span style={{ fontSize: "10px", color: "var(--text-dim)", marginLeft: "6px" }}>
+            (locked while editing)
+          </span>
+        )}
+      </div>
+      <div className="mcp-form-row">
+        <label className="mcp-form-label">Enabled</label>
+        <label className="mcp-form-checkbox-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+          />
+          <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+            Disabled servers don't connect or contribute tools
+          </span>
+        </label>
       </div>
       {kind === "remote" ? (
         <>
@@ -446,11 +559,11 @@ function McpServerForm({
             <select
               className="mcp-form-select"
               value={transport}
-              onChange={(e) => setTransport(e.target.value)}
+              onChange={(e) => setTransport(e.target.value as "auto" | "streamable-http" | "sse")}
             >
+              <option value="auto">Auto</option>
               <option value="streamable-http">Streamable HTTP</option>
               <option value="sse">SSE</option>
-              <option value="auto">Auto</option>
             </select>
           </div>
           <div className="mcp-form-section-label">Headers</div>
@@ -469,14 +582,14 @@ function McpServerForm({
               />
               <input
                 className="mcp-form-input mcp-form-input-half"
-                type="text"
-                value={entry.value}
+                type={entry.value === SECRET_PLACEHOLDER ? "text" : "password"}
+                value={entry.value === SECRET_PLACEHOLDER ? "" : entry.value}
                 onChange={(e) => {
                   const next = [...headersEntries];
                   next[i] = { ...next[i], value: e.target.value };
                   setHeadersEntries(next);
                 }}
-                placeholder="Bearer ..."
+                placeholder={entry.value === SECRET_PLACEHOLDER ? "leave blank to keep stored value" : "Bearer ..."}
               />
               <button
                 type="button"
@@ -544,14 +657,14 @@ function McpServerForm({
               />
               <input
                 className="mcp-form-input mcp-form-input-half"
-                type="text"
-                value={entry.value}
+                type={entry.value === SECRET_PLACEHOLDER ? "text" : "password"}
+                value={entry.value === SECRET_PLACEHOLDER ? "" : entry.value}
                 onChange={(e) => {
                   const next = [...envEntries];
                   next[i] = { ...next[i], value: e.target.value };
                   setEnvEntries(next);
                 }}
-                placeholder="value"
+                placeholder={entry.value === SECRET_PLACEHOLDER ? "leave blank to keep stored value" : "value"}
               />
               <button
                 type="button"
@@ -576,7 +689,7 @@ function McpServerForm({
       <div className="mcp-form-actions">
         <button type="button" className="mcp-action-btn" onClick={onCancel}>Cancel</button>
         <button type="button" className="mcp-action-btn mcp-action-btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : isEditing ? "Save changes" : "Save"}
         </button>
       </div>
     </div>

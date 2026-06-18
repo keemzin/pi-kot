@@ -20,6 +20,15 @@ import {
 import { grantStdioTrust, isStdioTrustedForProject, revokeStdioTrust } from "../mcp/stdio-trust.js";
 import { getProject } from "../project-manager.js";
 import { errorSchema } from "./_schemas.js";
+import { listSessions, rebuildSessionTools } from "../session-registry.js";
+
+/** Fire-and-forget: rebuild custom tools for all live sessions (or a
+ *  specific project's sessions) so they pick up the new MCP tool set
+ *  without requiring an SSE reconnect. */
+async function rebuildTooling(projectId?: string): Promise<void> {
+  const sessions = listSessions(projectId);
+  await Promise.allSettled(sessions.map((s) => rebuildSessionTools(s.sessionId)));
+}
 
 interface McpServerBody {
   enabled?: boolean;
@@ -168,6 +177,7 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
     async (req) => {
       await setMcpDisabled(!req.body.enabled);
       await reloadGlobal();
+      void rebuildTooling();
       const status = getStatus();
       return {
         enabled: isGloballyEnabled(),
@@ -258,6 +268,7 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
       if (cfg === undefined) return reply;
       await upsertMcpServer(name, cfg);
       await reloadGlobal();
+      void rebuildTooling();
       return { ok: true };
     },
   );
@@ -285,7 +296,10 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req) => {
       const removed = await deleteMcpServer(req.params.name);
-      if (removed) await reloadGlobal();
+      if (removed) {
+        await reloadGlobal();
+        void rebuildTooling();
+      }
       return { removed };
     },
   );
@@ -329,12 +343,14 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
         if (status === undefined) {
           return reply.code(404).send({ error: "mcp_server_not_found" });
         }
+        void rebuildTooling(project.id);
         return { status };
       }
       const status = await probe("global", name);
       if (status === undefined) {
         return reply.code(404).send({ error: "mcp_server_not_found" });
       }
+      void rebuildTooling();
       return { status };
     },
   );
@@ -418,6 +434,7 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
       await grantStdioTrust(project.id);
       await ensureProjectLoaded(project.id, project.path);
       await reconnectGatedStdioForProject(project.id);
+      void rebuildTooling(project.id);
       return {
         trusted: true,
         status: getStatus({ projectId: project.id }),
@@ -453,6 +470,7 @@ export const mcpRoutes: FastifyPluginAsync = async (fastify) => {
       }
       await revokeStdioTrust(project.id);
       await unloadProject(project.id);
+      void rebuildTooling(project.id);
       return { trusted: false };
     },
   );
