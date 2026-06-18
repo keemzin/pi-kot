@@ -577,6 +577,56 @@
   --success: #a3be8c;
 }
 
+/* ═══ Bourbon — warm amber dark (inspired by aged whisky) ═══ */
+:root[data-theme="bourbon"] {
+  color-scheme: dark;
+
+  --bg-solid: #1a1410;
+  --header-bg: rgba(50, 40, 35, 0.78);
+  --sidebar-bg: rgba(30, 25, 22, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --bg-frosted: rgba(26, 20, 16, 0.82);
+
+  --text-primary: rgba(230, 215, 200, 0.92);
+  --text-secondary: rgba(180, 160, 145, 0.70);
+  --text-dim: rgba(160, 140, 120, 0.40);
+  --text-ghost: rgba(160, 140, 120, 0.15);
+
+  --accent: #d4a054;
+  --accent-glow: rgba(212, 160, 84, 0.15);
+  --accent-subtle: rgba(212, 160, 84, 0.08);
+  --accent-text: #e8c078;
+
+  --user-bubble: #d4a054;
+  --user-bubble-text: #1a1410;
+  --user-bubble-border: transparent;
+
+  --tool-accent: #c07030;
+  --tool-accent-text: #d49050;
+  --tool-bg: rgba(192, 112, 48, 0.10);
+  --tool-border: rgba(192, 112, 48, 0.18);
+
+  --thinking-accent: #8b6914;
+  --thinking-accent-text: #b09040;
+  --thinking-bg: rgba(139, 105, 20, 0.10);
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.10);
+  --border-bright: rgba(255, 255, 255, 0.14);
+
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --input-border: rgba(255, 255, 255, 0.06);
+  --input-focus-border: var(--accent);
+
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.12);
+
+  --success: #7a9a4a;
+}
+
 /* ═══ Base Body ═══ */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
