@@ -70,7 +70,7 @@ export function App() {
   const [projectToDelete, setProjectToDelete] = useState<string | undefined>();
   const [showSettings, setShowSettings] = useState(false);
   const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
-  const [showExplorer, setShowExplorer] = useState(false);
+  const [explorerTab, setExplorerTab] = useState<"files" | "git" | undefined>(undefined);
   const [showOrch, setShowOrch] = useState(false);
   const [showMCP, setShowMCP] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
@@ -973,12 +973,12 @@ export function App() {
 
             <button
               type="button"
-              onClick={() => setShowExplorer((v) => !v)}
+              onClick={() => setExplorerTab(explorerTab === "files" ? undefined : "files")}
               title="File explorer"
               style={{
                 background: "none",
                 border: "none",
-                color: showExplorer ? "var(--accent-text)" : "var(--text-dim)",
+                color: explorerTab === "files" ? "var(--accent-text)" : "var(--text-dim)",
                 fontSize: "12px",
                 cursor: "pointer",
                 padding: "3px 6px",
@@ -987,6 +987,23 @@ export function App() {
               }}
             >
               📂
+            </button>
+            <button
+              type="button"
+              onClick={() => setExplorerTab(explorerTab === "git" ? undefined : "git")}
+              title="Git panel"
+              style={{
+                background: "none",
+                border: "none",
+                color: explorerTab === "git" ? "var(--accent-text)" : "var(--text-dim)",
+                fontSize: "12px",
+                cursor: "pointer",
+                padding: "3px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              ⎇
             </button>
           </div>
         </div>
@@ -1047,12 +1064,13 @@ export function App() {
         />
       )}
 
-      {/* File Explorer panel */}
+      {/* Explorer panel (Files + Git tabs) */}
       {activeProjectId !== undefined && (
         <FileExplorer
           projectId={activeProjectId}
-          open={showExplorer}
-          onClose={() => setShowExplorer(false)}
+          open={explorerTab !== undefined}
+          onClose={() => setExplorerTab(undefined)}
+          initialTab={explorerTab}
         />
       )}
 

@@ -168,16 +168,30 @@ User can:
 
 | # | Task | Status | Description |
 |---|---|---|---|
-|| 4.1 | Git runner | 🟢 | `git-clone.ts` (clone only, SSE progress) |
-|| 4.2 | Git status endpoint | 🔴 | `GET /api/v1/git/status` |
-|| 4.3 | Git diff endpoint | 🔴 | `GET /api/v1/git/diff` — unstaged, staged, per-file |
-|| 4.4 | Git log endpoint | 🔴 | `GET /api/v1/git/log` — commit history |
-|| 4.5 | Stage/unstage endpoints | 🔴 | `POST /api/v1/git/stage` and `POST /git/unstage` |
-|| 4.6 | Commit endpoint | 🔴 | `POST /api/v1/git/commit` |
-|| 4.7 | Push/pull endpoints | 🔴 | `POST /api/v1/git/push` and `POST /git/pull` |
-|| 4.8 | Branch management | 🔴 | `GET /branches`, `POST /branch/create` |
-|| 4.9 | Git panel | 🔴 | UI showing status, diffs, commit form, branch switcher |
-|| 4.10 | Inline diff view | 🔴 | Side-by-side or unified diff renderer |
+|| 4.1 | Git runner | 🟢 | `git-runner.ts` (1,037 lines) — security-hardened execFile wrapper with porcelain v1 status parser, custom log format, branch/remote validation, worktree support |
+|| 4.2 | Git status endpoint | 🟢 | `GET /api/v1/git/status` — parsed porcelain v1 with staged/unstaged/untracked/renamed/conflicted |
+|| 4.3 | Git diff endpoint | 🟢 | `GET /api/v1/git/diff` — unstaged, staged, per-file; `POST /api/v1/git/apply-hunks` — hunk-level staging via synthetic patches |
+|| 4.4 | Git log endpoint | 🟢 | `GET /api/v1/git/log` — commit history, custom format with `%H%x1F%s%x1F%an%x1F%aI%x1F%P%x1F%D` |
+|| 4.5 | Stage/unstage endpoints | 🟢 | `POST /api/v1/git/stage` and `POST /api/v1/git/unstage` — per-path, returns updated status |
+|| 4.6 | Commit endpoint | 🟢 | `POST /api/v1/git/commit` — simple commit with message, returns hash |
+|| 4.7 | Push/pull/fetch endpoints | 🟢 | `POST /api/v1/git/push`, `POST /api/v1/git/pull`, `POST /api/v1/git/fetch` — all with output capture |
+|| 4.8 | Branch management | 🟢 | `GET /branches`, `POST /branch/create`, `DELETE /branch/:name`, `POST /checkout`, `GET /remotes`, `POST /remote/add`, `DELETE /remote/:name`, `POST /remote/tls`, `POST /init` — full branch + remote CRUD |
+|| 4.9 | Git panel | 🟢 | `GitPanel.tsx` (730 lines) — status display, file staging/unstage/revert, inline diffs, commit form, push/pull/fetch, log, branch list + checkout, init button |
+|| 4.10 | Tab-integrated explorer | 🟢 | FileExplorer converted to tabbed panel — 📁 Files + ⎇ Git tabs, git icon in header bar alongside 📂, tab state sync via Props |
+
+**Extra routes built (not in original Phase 4 plan):**
+- `POST /api/v1/git/revert` — revert files via `git checkout -- <paths>`
+- `POST /api/v1/git/init` — initialize new git repo in project directory
+- `GET /api/v1/git/worktrees` — list worktrees
+- `GET /api/v1/git/remotes` — list remotes
+- `POST /api/v1/git/remote/add` — add remote
+- `DELETE /api/v1/git/remote/:name` — remove remote
+- `POST /api/v1/git/remote/tls` — set remote as insecureTLS
+- `POST /api/v1/git/apply-hunks` — hunk-level staging via synthetic patches + `git apply --cached --recount`
+
+**Git runner exports:** `runGitRaw`, `isGitRepo`, `getStatus`, `getDiff`, `getStagedDiff`, `getFileDiff`, `getLog`, `getBranches`, `getWorktrees`, `getRemotes`, `commit`, `stagePaths`, `unstagePaths`, `revertPaths`, `checkoutBranch`, `createBranch`, `deleteBranch`, `fetch`, `pull`, `push`, `addRemote`, `removeRemote`, `setRemoteInsecureTls`, `initRepo`, `GitCommandError`, `GitNotInstalledError`, `InvalidBranchNameError`
+
+**Hunk stager exports:** `applyHunks`, `extractHunks`, `HunkStagingError`, `ApplyMode`
 
 ---
 
@@ -311,16 +325,29 @@ Phases are intentionally ordered so each one:
 │   ├── search          ✅
 │   ├── upload          ⚪ deferred (multipart not wired)
 │   └── download        ✅
-├── git/            🔴 (Phase 4 — 1/10 done, clone only)
-│   ├── status          🔴
-│   ├── diff            🔴
-│   ├── log             🔴
-│   ├── stage           🔴
-│   ├── unstage         🔴
-│   ├── commit          🔴
-│   ├── push            🔴
-│   ├── pull            🔴
-│   └── branches        🔴
+├── git/            🟢 (Phase 4 — all 19 endpoints, full git panel UI)
+│   ├── status          🟢
+│   ├── diff            🟢
+│   ├── diff/staged     🟢
+│   ├── diff/file       🟢
+│   ├── log             🟢
+│   ├── branches        🟢
+│   ├── branch/create   🟢
+│   ├── branch/:name    🟢 (DELETE)
+│   ├── remotes         🟢
+│   ├── remote/add      🟢
+│   ├── remote/:name    🟢 (DELETE)
+│   ├── remote/tls      🟢
+│   ├── worktrees       🟢
+│   ├── init            🟢
+│   ├── stage           🟢
+│   ├── unstage         🟢
+│   ├── commit          🟢
+│   ├── revert          🟢
+│   ├── apply-hunks     🟢
+│   ├── fetch           🟢
+│   ├── pull            🟢
+│   └── push            🟢
 ├── config/         🟡 (Phase 5 — partial)
 │   ├── providers   ✅ done
 │   ├── auth/:provider  🔴 not started
@@ -352,13 +379,13 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-| **Total: ~43/72 tasks completed (~60% of roadmap)**
+| **Total: ~52/72 tasks completed (~72% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **92% done** (15/16 routes)
 - **Phase 2 (Projects & Sessions):** ✅ **93% done** (14/15 tasks)
 - **Phase 3 (File Browser & Editor):** ✅ **90% done** (9/10 tasks, 1 deferred)
-- **Phase 4 (Git Integration):** ✅ **10% done** (1/10 tasks, clone only)
+- **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
 - **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
@@ -379,7 +406,6 @@ Phases are intentionally ordered so each one:
 - 🟢 MCP settings UI — server CRUD, enable/disable toggle, probe, stdio trust, tool listing with global per-tool toggle + per-project TriStatePicker overrides; toolbar button + settings panel + Zustand store with 30s polling; full server-side routes
 
 ### **Remaining Work:**
-- Git integration (status, diff, commit, etc.)
 - Terminal (PTY, WebSocket, xterm.js)
 - Config UI (API keys, settings, models, skills)
 - Polish (mobile responsive, PWA, accessibility, testing)

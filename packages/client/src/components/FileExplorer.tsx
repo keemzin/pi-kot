@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
+import { GitPanel } from "./GitPanel";
 
 interface TreeNode {
   name: string;
@@ -9,10 +10,13 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
+export type ExplorerTab = "files" | "git";
+
 interface Props {
   projectId: string;
   open: boolean;
   onClose: () => void;
+  initialTab?: ExplorerTab;
 }
 
 interface OpenFileState {
@@ -29,7 +33,7 @@ type PaneView = "tree" | "editor";
 
 const EXPLORER_WIDTH = 360;
 
-export function FileExplorer({ projectId, open, onClose }: Props) {
+export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -43,7 +47,16 @@ export function FileExplorer({ projectId, open, onClose }: Props) {
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>();
   const [openFiles, setOpenFiles] = useState<OpenFileState[]>([]);
   const [activePath, setActivePath] = useState<string | undefined>();
+  const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
   const [view, setView] = useState<PaneView>("tree");
+
+  // Sync initialTab changes (e.g. when header git button clicked while panel is open)
+  useEffect(() => {
+    if (initialTab !== undefined && initialTab !== tab) {
+      setTab(initialTab);
+      if (initialTab === "files") setView("tree");
+    }
+  }, [initialTab]);
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
   const renameRef = useRef<HTMLInputElement>(null);
@@ -376,8 +389,46 @@ export function FileExplorer({ projectId, open, onClose }: Props) {
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* ── VIEW: Tree ── */}
-      {view === "tree" && (
+      {/* ── Tab bar ── */}
+      <div style={{
+        display: "flex", borderBottom: "1px solid var(--border)",
+        background: "var(--bg-glass)", flexShrink: 0,
+      }}>
+        <button
+          onClick={() => { setTab("files"); setView("tree"); }}
+          style={{
+            flex: 1, padding: "8px 12px", fontSize: "12px", fontWeight: 600,
+            background: tab === "files" ? "var(--bg-solid)" : "transparent",
+            color: tab === "files" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "files" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          📁 Files
+        </button>
+        <button
+          onClick={() => setTab("git")}
+          style={{
+            flex: 1, padding: "8px 12px", fontSize: "12px", fontWeight: 600,
+            background: tab === "git" ? "var(--bg-solid)" : "transparent",
+            color: tab === "git" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "git" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          ⎇ Git
+        </button>
+      </div>
+
+      {/* ── Git tab ── */}
+      {tab === "git" && (
+        <GitPanel projectId={projectId} />
+      )}
+
+      {/* ── Files tab ── */}
+      {tab === "files" && view === "tree" && (
         <>
           {/* Header */}
           <div style={{
@@ -467,7 +518,7 @@ export function FileExplorer({ projectId, open, onClose }: Props) {
       )}
 
       {/* ── VIEW: Editor ── */}
-      {view === "editor" && (
+      {tab === "files" && view === "editor" && (
         <>
           {/* Editor header with back button + tabs */}
           <div style={{
