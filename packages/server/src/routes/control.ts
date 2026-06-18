@@ -20,6 +20,85 @@ function authStorage() {
   return AuthStorage.create(join(config.piConfigDir, "auth.json"));
 }
 
+/**
+ * Error schema helper for route responses.
+ * Pattern from pi-forge's routes/_schemas.ts.
+ */
+const errorSchema = {
+  type: "object",
+  required: ["error"],
+  properties: {
+    error: { type: "string" },
+    message: { type: "string" },
+  },
+} as const;
+
+/**
+ * Wrap a Promise in a timeout. The SDK's compact call awaits an LLM
+ * round-trip; without a timeout, a hung provider holds the HTTP request
+ * open indefinitely. We surface 504 on timeout so the client can recover.
+ *
+ * Note: this does NOT abort the underlying SDK call — that needs an
+ * AbortSignal threaded through, which the current SDK API doesn't
+ * fully expose. The in-flight LLM call will eventually resolve or
+ * reject server-side; the route just returns to the client first.
+ *
+ * Pattern from pi-forge's control.ts withTimeout.
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
+
+const COMPACT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Map SDK throw strings — which are plain Error with English messages —
+ * to stable error codes the API contract documents. The SDK has no typed
+ * error classes for these cases, so message-substring matching is the
+ * best we can do.
+ *
+ * Pattern from pi-forge's control.ts mapSdkError.
+ */
+function mapSdkError(reply: import("fastify").FastifyReply, err: unknown): import("fastify").FastifyReply {
+  if (!(err instanceof Error)) {
+    return reply.code(500).send({ error: "internal_error" });
+  }
+  const m = err.message;
+  if (/already compacted/i.test(m)) {
+    return reply.code(400).send({ error: "already_compacted" });
+  }
+  if (/nothing to compact/i.test(m)) {
+    return reply.code(400).send({ error: "nothing_to_compact" });
+  }
+  if (/no model/i.test(m)) {
+    return reply.code(400).send({ error: "no_model_configured" });
+  }
+  if (/no api key found/i.test(m)) {
+    return reply.code(400).send({ error: "no_api_key" });
+  }
+  if (/compaction cancelled/i.test(m)) {
+    return reply.code(409).send({ error: "compaction_cancelled" });
+  }
+  return reply.code(500).send({ error: "internal_error" });
+}
+
 export const controlRoutes: FastifyPluginAsync = async (fastify) => {
   // POST /sessions/:id/model — set per-session model override
   fastify.post<{
@@ -56,14 +135,7 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
               modelId: { type: "string" },
             },
           },
-          400: {
-            type: "object",
-            required: ["error"],
-            properties: {
-              error: { type: "string" },
-              message: { type: "string" },
-            },
-          },
+          400: errorSchema,
           404: {
             type: "object",
             properties: { error: { type: "string" } },
@@ -224,6 +296,78 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // ── POST /sessions/:id/compact — manual compaction ──────────────
+
+  fastify.post<{
+    Params: { id: string };
+    Body: { customInstructions?: string };
+  }>(
+    "/sessions/:id/compact",
+    {
+      schema: {
+        description:
+          "Manually compact the session context. Aborts any in-flight " +
+          "agent operation first. Returns 400 with a stable error code if " +
+          "the session is too small to compact, has already been compacted, " +
+          "or has no model configured.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          additionalProperties: false,
+          properties: { customInstructions: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              summary: { type: "string" },
+              tokensBefore: { type: "integer", minimum: 0 },
+            },
+          },
+          400: errorSchema,
+          404: errorSchema,
+          409: errorSchema,
+          504: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+      try {
+        const result = await withTimeout(
+          live.session.compact(req.body.customInstructions),
+          COMPACT_TIMEOUT_MS,
+          "compact",
+        );
+        // SDK returns { summary, firstKeptEntryId, tokensBefore, details }.
+        // Cast safely with defaults so an SDK shape change doesn't
+        // surface "undefined" as a string in the response.
+        const r = result as {
+          summary?: unknown;
+          tokensBefore?: unknown;
+        };
+        return {
+          summary: typeof r.summary === "string" ? r.summary : "",
+          tokensBefore: typeof r.tokensBefore === "number" ? r.tokensBefore : 0,
+        };
+      } catch (err) {
+        if (err instanceof TimeoutError) {
+          req.log.warn({ err, sessionId: req.params.id }, "compact timed out");
+          return reply.code(504).send({ error: "compact_timeout", message: err.message });
+        }
+        return mapSdkError(reply, err);
+      }
+    },
+  );
+
   // ── POST /control/reload — reload agent config via CLI ───────────
 
   fastify.post(
@@ -252,18 +396,42 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (_req, reply) => {
       try {
-        // Reload MCP configs (re-reads settings + re-launches servers)
+        const allSessions = listSessions();
+
+        // 1. SDK full reload on every live session.
+        //    session.reload() re-reads settings.json, re-discovers
+        //    extensions/skills/prompts/themes/context files, resets
+        //    API providers, and rebuilds the extension runtime.
+        //    Sessions stay live — no reconnect needed.
+        const reloadResults = await Promise.allSettled(
+          allSessions.map(async (s) => {
+            try {
+              await s.session.reload();
+            } catch (err) {
+              _req.log.warn(
+                { sessionId: s.sessionId, err },
+                "control/reload: session.reload() failed",
+              );
+            }
+          }),
+        );
+        const reloaded = reloadResults.filter(
+          (r) => r.status === "fulfilled",
+        ).length;
+
+        // 2. Reload MCP configs (re-reads settings + re-launches servers).
+        //    This is outside the SDK's resource loader, so we do it
+        //    separately.
         const { loadGlobal: reloadMcp } = await import("../mcp/manager.js");
         await reloadMcp();
 
-        // Clear extension discovery cache so the next fetch is fresh
+        // 3. Clear extension discovery cache so the /extensions API
+        //    returns fresh data on the next fetch.
         const { clearExtensionCache } = await import("../extension-manager.js");
         clearExtensionCache();
 
-        // Rebuild tools for all live sessions so newly installed
-        // extensions (pi-subagents, pi-processes, etc.) are available
-        // immediately without reconnecting.
-        const allSessions = listSessions();
+        // 4. Rebuild tools for all live sessions so newly installed
+        //    extensions are available immediately.
         const rebuildResults = await Promise.allSettled(
           allSessions.map((s) => rebuildSessionTools(s.sessionId)),
         );
@@ -272,8 +440,8 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         ).length;
 
         _req.log.info(
-          { rebuilt, total: allSessions.length },
-          "control/reload: MCP reloaded, extension cache cleared, tools rebuilt",
+          { reloaded, rebuilt, total: allSessions.length },
+          "control/reload: sessions reloaded, MCP refreshed, tools rebuilt",
         );
         return { reloaded: true, method: "sdk-inprocess" };
       } catch (err) {

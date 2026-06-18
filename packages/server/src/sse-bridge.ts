@@ -4,6 +4,28 @@ import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { LiveSession, SSEClient } from "./session-registry.js";
 
 /**
+ * One-shot padding flush sent right after `compaction_start` so L7
+ * proxies (notably HAProxy on OpenShift) release the event immediately
+ * rather than buffering it through the multi-second compaction LLM call.
+ *
+ * The `compaction_start` event is ~150 bytes, well below any L7 proxy's
+ * minimum-buffer-to-flush threshold (1–8 KB is common). Without padding,
+ * the proxy holds the response for the entire duration of the compaction
+ * LLM call (several seconds) — by which point `compaction_end` has also
+ * fired and been buffered. The browser receives both events together,
+ * which defeats the purpose of sending `compaction_start` at all.
+ *
+ * This padding line is ~2000 bytes of comments. We use a dedicated
+ * writeRaw path that bypasses the event filter so it's invisible to
+ * clients. An `event: ping` SSE frame is less standard-compliant than
+ * a comment-only line (comments are defined in the SSE spec and all
+ * SSE parsers must ignore them).
+ *
+ * Pattern from pi-forge's packages/server/src/sse-bridge.ts.
+ */
+const COMPACTION_START_PADDING_LINE = `: ${Array(80).fill("-").join("")}\n`.repeat(40);
+
+/**
  * Serialize an event into SSE wire format.
  * Adapted from pi-forge's sse-bridge.ts.
  */
@@ -109,6 +131,13 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
       if (!isAllowedEvent(event)) return;
       try {
         raw.write(serializeSSE(event));
+        // After compaction_start, follow with a padding flush so L7
+        // proxies (notably the OpenShift HAProxy router) release the
+        // event immediately rather than holding it through the
+        // multi-second compaction LLM call.
+        if (event.type === "compaction_start") {
+          raw.write(COMPACTION_START_PADDING_LINE);
+        }
       } catch {
         close();
       }

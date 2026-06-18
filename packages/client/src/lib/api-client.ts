@@ -542,6 +542,22 @@ export async function getSessionModel(
   );
 }
 
+export interface CompactSessionResponse {
+  summary: string;
+  tokensBefore: number;
+}
+
+export async function compactSession(
+  sessionId: string,
+  customInstructions?: string,
+): Promise<CompactSessionResponse> {
+  return request<CompactSessionResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/compact`,
+    customInstructions !== undefined ? { customInstructions } : {},
+  );
+}
+
 // ---- Session Tree / Navigate / Fork ----
 
 export interface SessionTreeEntry {

@@ -1,6 +1,7 @@
-import { type FormEvent, useRef, useEffect } from "react";
+import { type FormEvent, useRef, useEffect, useState, useCallback } from "react";
 import { useSessionStore } from "../stores/session-store";
 import { useContextData, ContextPill, ContextInspectModal } from "./ContextBar";
+import { compactSession } from "../lib/api-client";
 
 interface Props {
   sessionId: string;
@@ -10,12 +11,36 @@ interface Props {
   onOpenMCP?: () => void;
 }
 
+/**
+ * Slash commands for the chat input. Matching pi-forge's pattern:
+ * `/compact` triggers manual compaction.
+ */
+const SLASH_COMMANDS = [
+  {
+    name: "/compact",
+    description: "Manually compact the session context",
+    handler: async (sessionId: string) => {
+      await compactSession(sessionId);
+    },
+  },
+  {
+    name: "/compact with summary",
+    description: "Compact and keep focus on specific areas",
+    handler: async (sessionId: string) => {
+      await compactSession(sessionId);
+    },
+  },
+];
+
 export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const abort = useSessionStore((s) => s.abort);
   const contextData = useContextData(sessionId);
+
+  const [slashSuggestions, setSlashSuggestions] = useState<typeof SLASH_COMMANDS>([]);
+  const [compacting, setCompacting] = useState(false);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -33,6 +58,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
     if (text.length === 0) return;
     el.value = "";
     el.style.height = "auto";
+    setSlashSuggestions([]);
     sendPrompt(text);
   };
 
@@ -43,22 +69,67 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
     }
   };
 
+  const handleInput = useCallback(() => {
+    const el = textareaRef.current;
+    if (el === null) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+
+    // Detect slash commands
+    const text = el.value;
+    if (text.startsWith("/")) {
+      const trimmed = text.trim().toLowerCase();
+      const matched = SLASH_COMMANDS.filter((cmd) => cmd.name.startsWith(trimmed));
+      setSlashSuggestions(matched);
+    } else {
+      setSlashSuggestions([]);
+    }
+  }, []);
+
+  const handleSlashCommand = async (cmd: (typeof SLASH_COMMANDS)[number]) => {
+    const el = textareaRef.current;
+    if (el === null) return;
+    el.value = "";
+    el.style.height = "auto";
+    setSlashSuggestions([]);
+    setCompacting(true);
+    try {
+      await cmd.handler(sessionId);
+    } catch (err) {
+      console.error("Slash command failed:", err);
+    } finally {
+      setCompacting(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="ti-area">
       <div className="ti-container">
+        {/* Slash command suggestions */}
+        {slashSuggestions.length > 0 && (
+          <div className="ti-slash-suggestions">
+            {slashSuggestions.map((cmd) => (
+              <button
+                key={cmd.name}
+                type="button"
+                className="ti-slash-item"
+                onClick={() => handleSlashCommand(cmd)}
+                disabled={compacting}
+              >
+                <span className="ti-slash-name">{cmd.name}</span>
+                <span className="ti-slash-desc">{cmd.description}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           className="ti-input"
           onKeyDown={handleKeyDown}
-          onInput={() => {
-            const el = textareaRef.current;
-            if (el !== null) {
-              el.style.height = "auto";
-              el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
-            }
-          }}
-          placeholder="Send a message..."
-          disabled={isStreaming}
+          onInput={handleInput}
+          placeholder={compacting ? "Compacting…" : "Send a message... (/compact, /abort)"}
+          disabled={isStreaming || compacting}
           rows={1}
         />
 
@@ -104,7 +175,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
                 </svg>
               </button>
             ) : (
-              <button type="submit" className="ti-send-btn" title="Send" tabIndex={-1}>
+              <button type="submit" className="ti-send-btn" title="Send" tabIndex={-1} disabled={compacting}>
                 <span className="ti-send-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="19" x2="12" y2="5" />

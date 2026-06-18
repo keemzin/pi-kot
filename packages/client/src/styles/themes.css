@@ -2333,6 +2333,60 @@ body {
   transform: scale(0.9);
 }
 
+/* ── Slash command suggestions ──────────────────────── */
+
+.ti-slash-suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  z-index: 100;
+}
+
+.ti-slash-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+  transition: background var(--duration) var(--ease);
+}
+
+.ti-slash-item:hover {
+  background: var(--surface-2);
+}
+
+.ti-slash-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ti-slash-name {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+
+.ti-slash-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* ── Settings ───────────────────────────────────────── */
+
 .settings-btn {
   padding: 8px 16px;
   border-radius: var(--radius-md);

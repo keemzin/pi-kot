@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getSessionContext } from "../lib/api-client";
+import { getSessionContext, compactSession } from "../lib/api-client";
 import type { SessionContextResponse } from "../lib/api-client/types";
 
 export function useContextData(sessionId: string | undefined) {
@@ -62,7 +62,7 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(4)}`;
 }
 
-export function ContextInspectModal({ data, onClose }: { data: SessionContextResponse; onClose: () => void }) {
+export function ContextInspectModal({ data, sessionId, onClose }: { data: SessionContextResponse; sessionId?: string; onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -80,6 +80,25 @@ export function ContextInspectModal({ data, onClose }: { data: SessionContextRes
     pct !== null && pct >= 90 ? "var(--error)" :
     pct !== null && pct >= 70 ? "var(--warning)" :
     "var(--accent)";
+
+  const [compacting, setCompacting] = useState(false);
+  const [compactError, setCompactError] = useState<string | null>(null);
+  const [compactResult, setCompactResult] = useState<{ summary: string; tokensBefore: number } | null>(null);
+
+  const handleCompact = async () => {
+    if (sessionId === undefined) return;
+    setCompacting(true);
+    setCompactError(null);
+    setCompactResult(null);
+    try {
+      const result = await compactSession(sessionId);
+      setCompactResult(result);
+    } catch (err) {
+      setCompactError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCompacting(false);
+    }
+  };
 
   return (
     <div className="settings-overlay" onClick={onClose} role="dialog" aria-modal="true">
@@ -144,6 +163,74 @@ export function ContextInspectModal({ data, onClose }: { data: SessionContextRes
               <Row label="Assistant messages" value={String(s.assistantMessages)} />
               <Row label="Tool calls" value={String(s.toolCalls)} />
               <Row label="Tool results" value={String(s.toolResults)} />
+            </div>
+          </div>
+
+          {/* Compact button */}
+          <div className="settings-card" style={{ marginTop: "10px" }}>
+            <div style={{ padding: "10px 12px" }}>
+              <button
+                type="button"
+                className="compact-ctx-btn"
+                onClick={handleCompact}
+                disabled={compacting}
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--surface-2)",
+                  color: "var(--text-primary)",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  cursor: compacting ? "wait" : "pointer",
+                  opacity: compacting ? 0.6 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                }}
+              >
+                {compacting ? (
+                  <>⏳ Compacting…</>
+                ) : (
+                  <>🗜️ Compact session</>
+                )}
+              </button>
+
+              {/* Success feedback */}
+              {compactResult !== null && (
+                <div style={{
+                  marginTop: "8px",
+                  padding: "6px 10px",
+                  background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+                  borderRadius: "var(--radius-sm)",
+                  fontSize: "11px",
+                  lineHeight: 1.5,
+                  color: "var(--text-primary)",
+                  maxHeight: "120px",
+                  overflowY: "auto",
+                }}>
+                  <div style={{ fontWeight: 600, marginBottom: "2px" }}>
+                    ✅ Compacted — context was {compactResult.tokensBefore.toLocaleString()} tokens
+                  </div>
+                  <div style={{ color: "var(--text-dim)" }}>
+                    {compactResult.summary.slice(0, 300)}
+                    {compactResult.summary.length > 300 ? "…" : ""}
+                  </div>
+                </div>
+              )}
+
+              {compactError !== null && (
+                <div style={{
+                  marginTop: "6px",
+                  fontSize: "11px",
+                  color: "var(--error)",
+                  textAlign: "center",
+                }}>
+                  {compactError}
+                </div>
+              )}
             </div>
           </div>
         </div>

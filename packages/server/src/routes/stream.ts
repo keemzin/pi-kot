@@ -4,6 +4,7 @@ import { SessionManager, createAgentSession } from "@earendil-works/pi-coding-ag
 import type { FastifyPluginAsync } from "fastify";
 import {
   buildBindings,
+  buildResourceLoader,
   getSession,
   registerSession,
   type LiveSession,
@@ -32,10 +33,12 @@ async function warmUpSession(
         const cwd = sm.getCwd();
 
         // Build a live session wrapping the existing SessionManager
+        const rl = await buildResourceLoader(cwd);
         const { session } = await createAgentSession({
           cwd,
           sessionManager: sm,
           agentDir: config.piConfigDir,
+          resourceLoader: rl,
         });
 
         // Trigger session_start and wire real command context actions

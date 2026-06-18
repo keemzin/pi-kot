@@ -1,14 +1,38 @@
 import {
   type AgentSessionEvent,
   createAgentSession,
+  DefaultResourceLoader,
   SessionManager,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { compactionContinuationExtension } from "./compaction-continuation.js";
 import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
+
+/**
+ * Build a DefaultResourceLoader with pi-kot's always-on extensions.
+ * Currently registers the compaction continuation extension that nudges
+ * the model to keep working after an overflow-driven auto-compaction.
+ * Pass the result as `resourceLoader` to createAgentSession().
+ *
+ * Must call reload() before passing to the SDK so the loader is
+ * in an operational state (the SDK skips resourceLoader.reload()
+ * when a pre-built resourceLoader is provided).
+ */
+export async function buildResourceLoader(
+  cwd: string,
+): Promise<DefaultResourceLoader> {
+  const loader = new DefaultResourceLoader({
+    cwd,
+    agentDir: config.piConfigDir,
+    extensionFactories: [compactionContinuationExtension],
+  });
+  await loader.reload();
+  return loader;
+}
 import { isSupervisor } from "./orchestration/store.js";
 import { createOrchestrationTools } from "./orchestration/tools.js";
 import { bridgeWorkerAgentEvent } from "./orchestration/event-bridge.js";
@@ -207,11 +231,13 @@ export async function createSession(
     ...orchestrationTools,
   ];
 
+  const resourceLoader = await buildResourceLoader(workspacePath);
   const { session } = await createAgentSession({
     cwd: workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
+    resourceLoader,
   });
 
   // Trigger session_start event and wire real command context actions
@@ -503,11 +529,13 @@ export async function rebuildSessionTools(
   } catch { /* ignore */ }
 
   // Create new AgentSession with same SessionManager but updated tools
+  const resourceLoader = await buildResourceLoader(live.workspacePath);
   const { session } = await createAgentSession({
     cwd: live.workspacePath,
     sessionManager: live.sessionManager,
     agentDir: config.piConfigDir,
     customTools,
+    resourceLoader,
   });
 
   // Wire real command context actions (navigateTree, etc.) so
@@ -664,11 +692,13 @@ export async function resumeSessionById(
     ...orchestrationTools,
   ];
 
+  const resourceLoader = await buildResourceLoader(loc.workspacePath);
   const { session } = await createAgentSession({
     cwd: loc.workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
+    resourceLoader,
   });
 
   // Wire real command context actions (navigateTree, etc.) so
@@ -770,11 +800,13 @@ export async function forkSession(
     ...orchestrationTools,
   ];
 
+  const resourceLoader = await buildResourceLoader(sourceLive.workspacePath);
   const { session } = await createAgentSession({
     cwd: sourceLive.workspacePath,
     sessionManager: forkedSM,
     agentDir: config.piConfigDir,
     customTools,
+    resourceLoader,
   });
 
   // Wire real command context actions (navigateTree, etc.) so

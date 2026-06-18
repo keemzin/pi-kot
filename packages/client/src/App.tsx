@@ -1108,7 +1108,7 @@ export function App() {
       )}
 
       {inspectData !== undefined && (
-        <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} />
+        <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} sessionId={activeSessionId} />
       )}
 
       {showMCP && (
