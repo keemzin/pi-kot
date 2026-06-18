@@ -51,7 +51,30 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+// ---- Version ----
+
+export interface VersionResponse {
+  serverVersion: string;
+  sdkVersion: string;
+}
+
+export interface VersionCheckResponse {
+  serverVersion: string;
+  sdkVersion: string;
+  latestSdkVersion: string;
+  updateAvailable: boolean;
+}
+
+export async function getVersions(): Promise<VersionResponse> {
+  return request<VersionResponse>("GET", "/api/v1/version");
+}
+
+export async function checkSdkUpdate(): Promise<VersionCheckResponse> {
+  return request<VersionCheckResponse>("GET", "/api/v1/version/check-update");
+}
+
 // ---- Auth ----
+
 
 export interface HealthResponse {
   status: string;

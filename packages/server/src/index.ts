@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "./config.js";
 import { authEnabled, extractBearer, verifyHmac } from "./routes/auth.js";
-import { healthRoutes, authRoutes } from "./routes/auth.js";
+import { healthRoutes, authRoutes, versionRoutes } from "./routes/auth.js";
 import { askUserQuestionRoutes } from "./routes/ask-user-question.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { promptRoutes } from "./routes/prompt.js";
@@ -128,6 +128,7 @@ export async function buildServer() {
       await api.register(configRoutes);
       await api.register(controlRoutes);
       await api.register(fileRoutes);
+      await api.register(versionRoutes);
       await api.register(projectRoutes);
       await api.register(extensionRoutes);
       await api.register(extensionCommandRoutes);

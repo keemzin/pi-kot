@@ -1,4 +1,7 @@
 import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { FastifyPluginAsync } from "fastify";
 import { config } from "../config.js";
 
@@ -45,6 +48,130 @@ export function extractBearer(header: string | undefined): string | undefined {
 export function authEnabled(): boolean {
   return config.uiPassword !== undefined || config.apiKey !== undefined;
 }
+
+/**
+ * Read the installed SDK version from its package.json at runtime.
+ */
+function readSdkVersion(): string {
+  try {
+    const pkgPath = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "..",
+      "..",
+      "..",
+      "node_modules",
+      "@earendil-works",
+      "pi-coding-agent",
+      "package.json",
+    );
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    return pkg.version ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Read the server package version.
+ */
+function readServerVersion(): string {
+  try {
+    const pkgPath = resolve(
+      dirname(fileURLToPath(import.meta.url)),
+      "..",
+      "..",
+      "package.json",
+    );
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+    return pkg.version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+const INSTALLED_SDK = readSdkVersion();
+const SERVER_VERSION = readServerVersion();
+
+export const versionRoutes: FastifyPluginAsync = async (fastify) => {
+  // GET /api/v1/version — public
+  fastify.get(
+    "/version",
+    {
+      config: { public: true },
+      schema: {
+        description: "Version info — no auth required.",
+        tags: ["version"],
+        security: [],
+        response: {
+          200: {
+            type: "object",
+            required: ["serverVersion", "sdkVersion"],
+            properties: {
+              serverVersion: { type: "string" },
+              sdkVersion: { type: "string" },
+            },
+          },
+        },
+      },
+    },
+    async () => ({
+      serverVersion: SERVER_VERSION,
+      sdkVersion: INSTALLED_SDK,
+    }),
+  );
+
+  // GET /api/v1/version/check-update — public, checks npm for latest SDK
+  fastify.get(
+    "/version/check-update",
+    {
+      config: { public: true },
+      schema: {
+        description: "Check npm for the latest pi-coding-agent version.",
+        tags: ["version"],
+        security: [],
+        response: {
+          200: {
+            type: "object",
+            required: ["serverVersion", "sdkVersion", "latestSdkVersion", "updateAvailable"],
+            properties: {
+              serverVersion: { type: "string" },
+              sdkVersion: { type: "string" },
+              latestSdkVersion: { type: "string" },
+              updateAvailable: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+    async () => {
+      let latest = INSTALLED_SDK;
+      let updateAvailable = false;
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(
+          "https://registry.npmjs.org/@earendil-works/pi-coding-agent/latest",
+          { signal: controller.signal },
+        );
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = (await res.json()) as { version: string };
+          latest = data.version ?? latest;
+          updateAvailable = latest !== INSTALLED_SDK;
+        }
+      } catch {
+        // npm check failed — just return current versions
+      }
+      return {
+        serverVersion: SERVER_VERSION,
+        sdkVersion: INSTALLED_SDK,
+        latestSdkVersion: latest,
+        updateAvailable,
+      };
+    },
+  );
+};
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /api/v1/health — public, no auth
