@@ -2303,6 +2303,15 @@ body {
   transform: scale(0.9);
 }
 
+.ti-send-btn.pulsing {
+  animation: sendPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sendPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent); }
+  50% { box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+}
+
 .ti-send-icon {
   display: flex;
   align-items: center;
@@ -3089,7 +3098,7 @@ body {
 
 /* ══ Tool Timeline ══ */
 @keyframes toolPulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--tool-accent); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--accent); }
   50% { opacity: 0.7; box-shadow: 0 0 0 3px transparent; }
 }
 @keyframes toolNodeIn {
@@ -3208,11 +3217,14 @@ body {
   line-height: 1;
 }
 .tool-timeline-icon.running {
-  border-color: var(--tool-accent);
+  border-color: var(--accent);
   animation: toolPulse 1.4s ease-in-out infinite;
 }
 .tool-timeline-icon.error {
   border-color: var(--error);
+}
+.tool-timeline-icon.success {
+  border-color: var(--success);
 }
 
 /* Right side: name + summary + details toggle */
@@ -3250,7 +3262,7 @@ body {
 /* "running…" inline status */
 .tool-timeline-running {
   font-size: 10px;
-  color: var(--tool-accent);
+  color: var(--accent);
   animation: toolPulse 1.4s ease-in-out infinite;
 }
 
@@ -3264,9 +3276,7 @@ body {
   white-space: nowrap;
   max-width: 100%;
 }
-.tool-timeline-output-preview.error-preview {
-  color: var(--error);
-}
+/* tool colors are on the circle icon only */
 
 /* "show details" / "hide" toggle link */
 .tool-timeline-details-btn {

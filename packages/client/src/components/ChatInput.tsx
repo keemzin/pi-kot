@@ -35,6 +35,7 @@ const SLASH_COMMANDS = [
 export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
+  const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const abort = useSessionStore((s) => s.abort);
   const contextData = useContextData(sessionId);
@@ -175,7 +176,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
                 </svg>
               </button>
             ) : (
-              <button type="submit" className="ti-send-btn" title="Send" tabIndex={-1} disabled={compacting}>
+              <button type="submit" className={`ti-send-btn${isStreaming && activeToolName ? " pulsing" : ""}`} title="Send" tabIndex={-1} disabled={compacting}>
                 <span className="ti-send-icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="19" x2="12" y2="5" />

@@ -111,7 +111,7 @@ function ToolCallEntry({
   return (
     <div className="tool-timeline-node">
       <span
-        className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : ""}`}
+        className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
         aria-hidden="true"
       >
         {icon}
@@ -135,8 +135,8 @@ function ToolCallEntry({
         </div>
         {/* Smart-disclosure output preview (always shown when not expanded) */}
         {!isRunning && !detailsOpen && outputPreview.length > 0 && (
-          <div className={`tool-timeline-output-preview${isError ? " error-preview" : ""}`} title={outputPreview}>
-            {isError ? "✖ " : ""}{outputPreview}
+          <div className="tool-timeline-output-preview" title={outputPreview}>
+            {isError ? "✖ " : "✓ "}{outputPreview}
           </div>
         )}
         {/* Expanded details pane */}
@@ -170,7 +170,6 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
   const [open, setOpen] = useState(false);
   const toolEntries = entries.filter((entry) => entry.kind === "tool");
   const toolCount = toolEntries.length;
-  const inFlight = toolEntries.filter((e) => e.result === undefined).length;
   const errored = toolEntries.some((e) => e.result?.isError === true);
 
   // Unique tool names for the inline preview
@@ -193,11 +192,6 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
           ↳ {toolCount} {toolCount === 1 ? "tool" : "tools"}
         </span>
         <span className="tool-timeline-batch-preview">{previewText}</span>
-        {inFlight > 0 && (
-          <span className="tool-timeline-badge" aria-label={`${inFlight} running`}>
-            {inFlight} running
-          </span>
-        )}
         {errored && (
           <span className="tool-timeline-badge error" aria-label="error">error</span>
         )}
