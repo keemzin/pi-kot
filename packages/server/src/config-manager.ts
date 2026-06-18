@@ -182,9 +182,55 @@ export async function writeSettings(settings: Record<string, unknown>): Promise<
   await atomicWriteJson(SETTINGS_FILE, settings);
 }
 
+// ── Enabled Models (settings.json → enabledModels) ─────────────────────────
+
+/**
+ * Read the enabledModels array from settings via the SDK SettingsManager.
+ * Returns undefined when no scoping is active (all models visible).
+ */
+export function readEnabledModels(): string[] | undefined {
+  const mgr = SettingsManager.create(PI_CONFIG_DIR);
+  return mgr.getEnabledModels();
+}
+
+/**
+ * Persist the enabledModels array to settings. Pass undefined or null
+ * to disable scoping (all models visible).
+ */
+export function writeEnabledModels(patterns: string[] | null | undefined): void {
+  const mgr = SettingsManager.create(PI_CONFIG_DIR);
+  mgr.setEnabledModels(patterns === null || patterns === undefined ? undefined : patterns);
+}
+
 // ── Live providers listing (from SDK ModelRegistry) ──────────────────────
 
-export function liveProvidersListing(): {
+function buildModelDetail(m: import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>, registry: ModelRegistry) {
+  const supportedThinkingLevels: string[] = (() => {
+    try {
+      return getSupportedThinkingLevels(m as Parameters<typeof getSupportedThinkingLevels>[0]);
+    } catch {
+      return [];
+    }
+  })();
+
+  return {
+    id: m.id,
+    name: m.name,
+    contextWindow: m.contextWindow,
+    maxTokens: m.maxTokens,
+    reasoning: m.reasoning,
+    input: m.input,
+    hasAuth: registry.hasConfiguredAuth(m),
+    supportedThinkingLevels,
+  };
+}
+
+export interface ProvidersListingOptions {
+  /** When true, only return models listed in enabledModels. */
+  scoped?: boolean;
+}
+
+export function liveProvidersListing(opts?: ProvidersListingOptions): {
   providers: Array<{
     provider: string;
     models: Array<{
@@ -201,8 +247,18 @@ export function liveProvidersListing(): {
 } {
   const store = AuthStorage.create(AUTH_PATH);
   const registry = ModelRegistry.create(store, MODELS_PATH);
-  const all = registry.getAll();
+  let all = registry.getAll();
   console.log("[config] total models:", all.length);
+
+  // Filter to enabled models when scoped mode is on
+  if (opts?.scoped === true) {
+    const enabled = readEnabledModels();
+    if (enabled !== undefined && enabled.length > 0) {
+      // enabledModels are stored as "provider/modelId" patterns
+      all = all.filter((m) => enabled.includes(`${m.provider}/${m.id}`));
+      console.log("[config] scoped models:", all.length);
+    }
+  }
 
   const grouped = new Map<string, {
     provider: string;
@@ -225,24 +281,7 @@ export function liveProvidersListing(): {
       grouped.set(m.provider, entry);
     }
 
-    const supportedThinkingLevels: string[] = (() => {
-      try {
-        return getSupportedThinkingLevels(m as Parameters<typeof getSupportedThinkingLevels>[0]);
-      } catch {
-        return [];
-      }
-    })();
-
-    entry.models.push({
-      id: m.id,
-      name: m.name,
-      contextWindow: m.contextWindow,
-      maxTokens: m.maxTokens,
-      reasoning: m.reasoning,
-      input: m.input,
-      hasAuth: registry.hasConfiguredAuth(m),
-      supportedThinkingLevels,
-    });
+    entry.models.push(buildModelDetail(m, registry));
   }
 
   return { providers: Array.from(grouped.values()) };

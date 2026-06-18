@@ -469,8 +469,9 @@ export interface ProvidersResponse {
   providers: ProviderGroup[];
 }
 
-export async function fetchProviders(): Promise<ProvidersResponse> {
-  return request<ProvidersResponse>("GET", "/api/v1/config/providers");
+export async function fetchProviders(scoped?: boolean): Promise<ProvidersResponse> {
+  const qs = scoped ? "?scoped=true" : "";
+  return request<ProvidersResponse>("GET", `/api/v1/config/providers${qs}`);
 }
 
 export interface AuthSummaryResponse {
@@ -507,6 +508,22 @@ export async function putModelsJson(
   data: { providers: Record<string, unknown> },
 ): Promise<{ providers: Record<string, unknown> }> {
   return request("PUT", `/api/v1/config/models`, data);
+}
+
+// ---- Enabled Models (scoped models) ----
+
+export interface EnabledModelsResponse {
+  enabledModels: string[] | null;
+}
+
+export async function getEnabledModels(): Promise<EnabledModelsResponse> {
+  return request<EnabledModelsResponse>("GET", "/api/v1/config/enabled-models");
+}
+
+export async function setEnabledModels(
+  enabledModels: string[] | null,
+): Promise<EnabledModelsResponse> {
+  return request<EnabledModelsResponse>("PUT", "/api/v1/config/enabled-models", { enabledModels });
 }
 
 // ---- Model Management ----

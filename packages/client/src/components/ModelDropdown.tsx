@@ -3,6 +3,7 @@ import {
   fetchProviders,
   setSessionModel,
   getSettings,
+  getEnabledModels,
   type ProviderGroup,
   type ModelInfo,
 } from "../lib/api-client";
@@ -65,15 +66,29 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError }: Props)
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Load providers + default model on mount
+  // Load providers + default model + enabled models on mount
   useEffect(() => {
     (async () => {
       try {
-        const [providersRes, settingsRes] = await Promise.all([
+        const [providersRes, settingsRes, enabledRes] = await Promise.all([
           fetchProviders(),
           getSettings(),
+          getEnabledModels(),
         ]);
-        setProviders(providersRes.providers);
+        const enabledArr = enabledRes.enabledModels;
+        if (enabledArr !== null && enabledArr.length > 0) {
+          // Scoping active — filter to only enabled models by fullId
+          const enabledSet = new Set(enabledArr);
+          const filtered = providersRes.providers
+            .map((p) => ({
+              ...p,
+              models: p.models.filter((m) => enabledSet.has(`${p.provider}/${m.id}`)),
+            }))
+            .filter((p) => p.models.length > 0);
+          setProviders(filtered);
+        } else {
+          setProviders(providersRes.providers);
+        }
         const dp = settingsRes.defaultProvider as string | undefined;
         const dm = settingsRes.defaultModel as string | undefined;
         if (dp && dm) {

@@ -3471,3 +3471,21 @@ body {
   white-space: nowrap;
   flex: 1;
 }
+
+/* ── Scope Picker (scoped models) ────────────────────────────────── */
+
+.scope-picker-section {
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scope-model-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-right: 4px;
+}

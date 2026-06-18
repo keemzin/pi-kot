@@ -8,8 +8,11 @@ import {
   updateSettings,
   readModelsJsonRedacted,
   writeModelsJson,
+  readEnabledModels,
+  writeEnabledModels,
   AuthProviderNotFoundError,
   type ModelsJson,
+  type ProvidersListingOptions,
 } from "../config-manager.js";
 import {
   setToolEnabled,
@@ -65,19 +68,25 @@ const modelsJsonSchema = {
 
 export const configRoutes: FastifyPluginAsync = async (fastify) => {
   // ── Providers (live listing) ──────────────────────────────────────────
-  fastify.get(
+  fastify.get<{ Querystring: { scoped?: string } }>(
     "/config/providers",
     {
       schema: {
         description:
-          "Live provider + model listing assembled from the SDK's ModelRegistry.",
+          "Live provider + model listing assembled from the SDK's ModelRegistry. Pass ?scoped=true to hide models not in the enabledModels list.",
         tags: ["config"],
+        querystring: {
+          type: "object",
+          properties: { scoped: { type: "string" } },
+        },
         response: { 200: { type: "object", required: ["providers"], properties: { providers: { type: "array" } } }, 500: errorSchema },
       },
     },
-    async (_req, reply) => {
+    async (req, reply) => {
       try {
-        return liveProvidersListing();
+        const opts: ProvidersListingOptions = {};
+        if (req.query.scoped === "true") opts.scoped = true;
+        return liveProvidersListing(opts);
       } catch (err) {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
@@ -254,6 +263,88 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         await writeModelsJson(req.body);
         return req.body;
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  // ── Enabled models (scope) ───────────────────────────────────────────
+  fastify.get(
+    "/config/enabled-models",
+    {
+      schema: {
+        description:
+          "Read enabledModels from settings. Returns an array of 'provider/modelId' strings, or null when all models are visible.",
+        tags: ["config"],
+        response: {
+          200: {
+            type: "object",
+            required: ["enabledModels"],
+            properties: {
+              enabledModels: {
+                type: "array",
+                items: { type: "string" },
+                nullable: true,
+              },
+            },
+          },
+          500: errorSchema,
+        },
+      },
+    },
+    async (_req, reply) => {
+      try {
+        const enabledModels = readEnabledModels() ?? null;
+        return { enabledModels };
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  fastify.put<{ Body: { enabledModels: string[] | null } }>(
+    "/config/enabled-models",
+    {
+      schema: {
+        description:
+          "Persist enabledModels (array of 'provider/modelId' strings) to settings. Pass null to disable scoping.",
+        tags: ["config"],
+        body: {
+          type: "object",
+          required: ["enabledModels"],
+          additionalProperties: false,
+          properties: {
+            enabledModels: {
+              type: "array",
+              items: { type: "string" },
+              nullable: true,
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["enabledModels"],
+            properties: {
+              enabledModels: {
+                type: "array",
+                items: { type: "string" },
+                nullable: true,
+              },
+            },
+          },
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        writeEnabledModels(req.body.enabledModels);
+        const result = readEnabledModels() ?? null;
+        return { enabledModels: result };
       } catch (err) {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
