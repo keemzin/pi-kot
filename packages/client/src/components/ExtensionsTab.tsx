@@ -9,11 +9,16 @@ import { useEffect, useState, useCallback } from "react";
 import {
   fetchExtensions,
   installExtension as installExtApi,
+  installManualExtension as installManualApi,
   uninstallExtension as uninstallExtApi,
+  checkExtensionUpdates,
+  updateExtension as updateExtApi,
+  reloadAgent,
   type ExtensionsResponse,
   type RecommendedExtension,
   type DiscoveredExtension,
   type AgentDef,
+  type ExtensionUpdateInfo,
 } from "../lib/api-client";
 
 // ── Styles (inline for self-contained component) ──────────────────────
@@ -141,7 +146,13 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [loading, setLoading] = useState(true);
   const [installing, setInstalling] = useState<string | null>(null);
   const [uninstalling, setUninstalling] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [reloading, setReloading] = useState(false);
   const [refreshing, setRefreshing] = useState(0);
+  const [updates, setUpdates] = useState<ExtensionUpdateInfo[] | undefined>(undefined);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [manualInput, setManualInput] = useState("");
+  const [manualInstalling, setManualInstalling] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -189,6 +200,68 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
       onError(err instanceof Error ? err.message : String(err));
     } finally {
       setInstalling(null);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true);
+    try {
+      const result = await checkExtensionUpdates();
+      setUpdates(result);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCheckingUpdates(false);
+    }
+  };
+
+  const handleUpdate = async (pkg: string) => {
+    setUpdating(pkg);
+    try {
+      const result = await updateExtApi(pkg);
+      if (!result.success) {
+        onError(result.error ?? "Update failed");
+      }
+      // Re-check updates after update
+      setUpdates(undefined);
+      setRefreshing((n) => n + 1);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleReload = async () => {
+    setReloading(true);
+    try {
+      await reloadAgent();
+      // Server re-reads configs — just refresh our lists (no slow full page reload)
+      setUpdates(undefined);
+      setRefreshing((n) => n + 1);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  const handleManualInstall = async () => {
+    const spec = manualInput.trim();
+    if (spec.length === 0) return;
+    setManualInstalling(true);
+    try {
+      const result = await installManualApi(spec);
+      if (!result.success) {
+        onError(result.error ?? "Install failed");
+      }
+      setManualInput("");
+      setRefreshing((n) => n + 1);
+      setUpdates(undefined);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setManualInstalling(false);
     }
   };
 
@@ -315,15 +388,23 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
             No extensions detected. Install some from the recommendations below.
           </div>
         ) : (
-          data.detected.map((ext, i) => (
-            <div key={`det-${i}`}>
-              <InstalledCard
-                ext={ext}
-                uninstalling={uninstalling === ext.name}
-                onUninstall={handleUninstall}
-              />
-            </div>
-          ))
+          data.detected.map((ext, i) => {
+            const extUpdate = updates?.find(
+              (u) => u.package === (ext.package?.replace("npm:", "") ?? ext.name),
+            );
+            return (
+              <div key={`det-${i}`}>
+                <InstalledCard
+                  ext={ext}
+                  update={extUpdate}
+                  updating={updating === (ext.package ?? ext.name)}
+                  uninstalling={uninstalling === ext.name}
+                  onUninstall={handleUninstall}
+                  onUpdate={handleUpdate}
+                />
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -346,6 +427,7 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
             >
               {categoryLabels[cat] ?? cat}
             </div>
+
             {exts.map((ext) => (
               <RecommendedCard
                 key={ext.id}
@@ -356,6 +438,79 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
             ))}
           </div>
         ))}
+      </div>
+
+      {/* ── Manual install ── */}
+      <div style={s.section}>
+        <div style={s.heading}>🔧 Manual Install</div>
+        <div style={s.subheading}>
+          Install any pi extension by its install spec. Delegates to{" "}
+          <code style={{ fontSize: 10 }}>pi install &lt;spec&gt;</code> CLI.
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            type="text"
+            value={manualInput}
+            onChange={(e) => setManualInput(e.target.value)}
+            placeholder={"e.g. npm:pi-free  or  git:github.com/apmantza/pi-free"}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleManualInstall();
+            }}
+            style={{
+              flex: 1,
+              padding: "6px 10px",
+              fontSize: 11,
+              fontFamily: "monospace",
+              borderRadius: 6,
+              border: "1px solid var(--border-color)",
+              background: "var(--bg-glass)",
+              color: "var(--text-primary)",
+              outline: "none",
+            }}
+          />
+          <button
+            onClick={handleManualInstall}
+            disabled={manualInstalling || manualInput.trim().length === 0}
+            style={{
+              padding: "6px 14px",
+              fontSize: 11,
+              fontWeight: 600,
+              borderRadius: 6,
+              cursor: "pointer",
+              border: "1px solid var(--border-color)",
+              background: manualInstalling ? "var(--bg-glass)" : "var(--accent-bg, #3b82f6)",
+              color: manualInstalling ? "var(--text-dim)" : "white",
+              whiteSpace: "nowrap" as const,
+            }}
+          >
+            {manualInstalling ? "Installing…" : "pi install"}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Reload agent ── */}
+      <div style={s.section}>
+        <div style={s.heading}>🔄 Agent Reload</div>
+        <div style={s.subheading}>
+          Reload the pi agent configuration (MCP + extension cache) after installing
+          or updating extensions. Fast — no full page reload.
+        </div>
+        <button
+          onClick={handleReload}
+          disabled={reloading}
+          style={{
+            padding: "6px 14px",
+            fontSize: 11,
+            fontWeight: 600,
+            borderRadius: 6,
+            cursor: reloading ? "default" : "pointer",
+            border: "1px solid var(--border-color)",
+            background: reloading ? "var(--bg-glass)" : "var(--accent-bg, #3b82f6)",
+            color: reloading ? "var(--text-dim)" : "white",
+          }}
+        >
+          {reloading ? "Reloading…" : "/reload"}
+        </button>
       </div>
     </div>
   );
@@ -395,12 +550,18 @@ function renderAgentRow(
 
 function InstalledCard({
   ext,
+  update,
+  updating,
   uninstalling,
   onUninstall,
+  onUpdate,
 }: {
   ext: DiscoveredExtension;
+  update?: ExtensionUpdateInfo;
+  updating?: boolean;
   uninstalling: boolean;
   onUninstall: (ext: DiscoveredExtension) => void;
+  onUpdate: (pkg: string) => void;
 }) {
   return (
     <div style={s.card}>
@@ -408,8 +569,32 @@ function InstalledCard({
         {ext.source === "extensions_dir" ? "📄" : ext.source === "agents_dir" ? "🤖" : "📦"}
       </span>
       <div style={s.cardBody}>
-        <div style={s.cardTitle}>{ext.name}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={s.cardTitle}>{ext.name}</div>
+          {update?.updateAvailable && (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "1px 7px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 600,
+                background: "rgba(34, 197, 94, 0.15)",
+                color: "#22c55e",
+                border: "1px solid rgba(34, 197, 94, 0.3)",
+                lineHeight: "18px",
+              }}
+            >
+              {update.installed} → {update.latest}
+            </span>
+          )}
+        </div>
         <div style={s.cardDesc}>{ext.description}</div>
+        {update && !update.updateAvailable && update.installed && (
+          <div style={{ ...s.cardMeta, color: "var(--text-dim)" }}>
+            v{update.installed}
+          </div>
+        )}
         <div style={s.cardMeta}>
           <span
             style={{
@@ -434,23 +619,44 @@ function InstalledCard({
         </div>
       </div>
       {ext.source === "package" && (
-        <button
-          onClick={() => onUninstall(ext)}
-          disabled={uninstalling}
-          style={{
-            padding: "4px 10px",
-            fontSize: 11,
-            fontWeight: 600,
-            borderRadius: 6,
-            cursor: "pointer",
-            border: "1px solid rgba(224, 108, 117, 0.4)",
-            background: uninstalling ? "var(--bg-glass)" : "rgba(224, 108, 117, 0.1)",
-            color: "var(--accent-red, #e06c75)",
-            whiteSpace: "nowrap" as const,
-          }}
-        >
-          {uninstalling ? "…" : "Uninstall"}
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {update?.updateAvailable && (
+            <button
+              onClick={() => onUpdate(ext.package ?? ext.name)}
+              disabled={updating}
+              style={{
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                borderRadius: 6,
+                cursor: "pointer",
+                border: "1px solid rgba(34, 197, 94, 0.4)",
+                background: updating ? "var(--bg-glass)" : "rgba(34, 197, 94, 0.1)",
+                color: "#22c55e",
+                whiteSpace: "nowrap" as const,
+              }}
+            >
+              {updating ? "…" : "Update"}
+            </button>
+          )}
+          <button
+            onClick={() => onUninstall(ext)}
+            disabled={uninstalling}
+            style={{
+              padding: "4px 10px",
+              fontSize: 11,
+              fontWeight: 600,
+              borderRadius: 6,
+              cursor: "pointer",
+              border: "1px solid rgba(224, 108, 117, 0.4)",
+              background: uninstalling ? "var(--bg-glass)" : "rgba(224, 108, 117, 0.1)",
+              color: "var(--accent-red, #e06c75)",
+              whiteSpace: "nowrap" as const,
+            }}
+          >
+            {uninstalling ? "…" : "Uninstall"}
+          </button>
+        </div>
       )}
     </div>
   );

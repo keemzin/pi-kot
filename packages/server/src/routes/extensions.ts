@@ -8,7 +8,10 @@ import { type FastifyPluginAsync } from "fastify";
 import {
   discoverExtensions,
   installExtension,
+  installManualExtension,
   uninstallExtension,
+  checkExtensionUpdates,
+  updateExtension,
 } from "../extension-manager.js";
 
 // ── Schemas ─────────────────────────────────────────────────────────
@@ -146,6 +149,130 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         req.log.error(err, "Failed to install extension");
+        return reply.status(500).send({ error: message });
+      }
+    },
+  );
+
+  // ── POST /api/v1/extensions/install-manual ──────────────────────────
+
+  fastify.post(
+    "/extensions/install-manual",
+    {
+      schema: {
+        description:
+          "Install from a pi install spec (npm:package, git:github.com/user/repo, etc.). " +
+          "Delegates to `pi install` CLI first, falls back to npm install for npm: packages.",
+        tags: ["extensions"],
+        body: {
+          type: "object",
+          required: ["package"],
+          properties: {
+            package: {
+              type: "string",
+              description:
+                "Install spec, e.g. 'npm:pi-free' or 'git:github.com/apmantza/pi-free'",
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              error: { type: "string" },
+            },
+          },
+          ...autoError,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const { package: pkg } = req.body as { package: string };
+        const result = await installManualExtension(pkg);
+        return reply.send(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        req.log.error(err, "Failed to install extension manually");
+        return reply.status(500).send({ error: message });
+      }
+    },
+  );
+
+  // ── GET /api/v1/extensions/updates ────────────────────────────────────
+
+  fastify.get(
+    "/extensions/updates",
+    {
+      schema: {
+        description: "Check npm registry for newer versions of installed extensions",
+        tags: ["extensions"],
+        response: {
+          200: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                package: { type: "string" },
+                name: { type: "string" },
+                installed: { type: "string" },
+                latest: { type: "string" },
+                updateAvailable: { type: "boolean" },
+              },
+            },
+          },
+          ...autoError,
+        },
+      },
+    },
+    async (_req, reply) => {
+      try {
+        const updates = await checkExtensionUpdates();
+        return reply.send(updates);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        _req.log.error(err, "Failed to check extension updates");
+        return reply.status(500).send({ error: message });
+      }
+    },
+  );
+
+  // ── POST /api/v1/extensions/update ──────────────────────────────────
+
+  fastify.post(
+    "/extensions/update",
+    {
+      schema: {
+        description: "Update an installed extension to the latest version",
+        tags: ["extensions"],
+        body: {
+          type: "object",
+          required: ["package"],
+          properties: {
+            package: { type: "string", description: "Package name" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              success: { type: "boolean" },
+              error: { type: "string" },
+            },
+          },
+          ...autoError,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const { package: pkg } = req.body as { package: string };
+        const result = await updateExtension(pkg);
+        return reply.send(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        req.log.error(err, "Failed to update extension");
         return reply.status(500).send({ error: message });
       }
     },

@@ -397,6 +397,7 @@ pi-kot/
 | `9f8757f` | Aligned sticky header with sidebar file explorer position (44px → 55px settled) |
 | `4c40a25` | Moved new-session button to project header row |
 | `1e4e2b5` | Dynamic provider/model dropdowns in Agent settings |
+| `8e6cde7` | Added per-server enable/disable toggle + Edit button to MCPPanel (edit pre-fills config, locks name/kind on edit). Added enabled checkbox in server form. Secret redaction sentinel round-trip for headers/env. Stable `stableJson()` change detection in mcp-store to prevent unnecessary re-renders on poll. `refreshInFlight` guard to prevent double-poll races. `EMPTY_STATUS` constant to fix 'Maximum update depth exceeded' crash. Fire-and-forget `rebuildTooling()` after every MCP state change so live sessions pick up updated tools without SSE reconnect. |
 | *(current)* | Removed server-side `checkpoints.ts` route entirely (had wrong git repo logic + duplicating pi-rewind). RewindModal now delegates to `POST /command { command: "rewind" }` — the extension handles everything via the SSE bridge. Created `ExtensionUIInteractionModal` to render select/confirm/input bridge events. Fixed bridge `custom()` being a no-op (undefined → fall back to `select()`). |
 
 ## Current Working State

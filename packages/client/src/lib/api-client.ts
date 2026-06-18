@@ -817,10 +817,47 @@ export async function installExtension(
   return request("POST", "/api/v1/extensions/install", { package: packageName });
 }
 
+export async function installManualExtension(
+  installSpec: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request("POST", "/api/v1/extensions/install-manual", { package: installSpec });
+}
+
 export async function uninstallExtension(
   packageName: string,
 ): Promise<{ success: boolean; error?: string }> {
   return request("POST", "/api/v1/extensions/uninstall", { package: packageName });
+}
+
+// ---- Extension Updates ----
+
+export interface ExtensionUpdateInfo {
+  package: string;
+  name: string;
+  installed: string | undefined;
+  latest: string | undefined;
+  updateAvailable: boolean;
+}
+
+export async function checkExtensionUpdates(): Promise<ExtensionUpdateInfo[]> {
+  return request<ExtensionUpdateInfo[]>("GET", "/api/v1/extensions/updates");
+}
+
+export async function updateExtension(
+  packageName: string,
+): Promise<{ success: boolean; error?: string }> {
+  return request("POST", "/api/v1/extensions/update", { package: packageName });
+}
+
+// ---- Control ----
+
+export interface ReloadResponse {
+  reloaded: boolean;
+  method: string;
+}
+
+export async function reloadAgent(): Promise<ReloadResponse> {
+  return request<ReloadResponse>("POST", "/api/v1/control/reload");
 }
 
 // ---- Extension Commands (generic bridge) ----

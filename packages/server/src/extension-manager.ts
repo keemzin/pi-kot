@@ -5,6 +5,10 @@
  *
  * Architecture adapted from pi-forge's extension dynamic detection pattern:
  *   detect → activate — UI features light up based on what's installed.
+ *
+ * Update checking:
+ *   checkExtensionUpdates() compares installed vs. npm registry latest.
+ *   updateExtension() runs npm install to upgrade to latest.
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -111,20 +115,7 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     ],
     icon: "🧩",
   },
-  {
-    id: "pi-orchestration",
-    name: "pi-orchestration",
-    description:
-      "Agnostic subagent orchestration with depth limiting, worktree isolation, and per-agent model selection. Supports chain and parallel execution.",
-    package: "npm:pi-orchestration",
-    category: "orchestration",
-    providesAgentTypes: ["scout", "specialist", "worker", "reviewer", "coordinator"],
-    enablesFeatures: [
-      "Advanced orchestration with depth limits",
-      "Worktree isolation for parallel agents",
-    ],
-    icon: "⚡",
-  },
+
 
   // ── Tools ──
   {
@@ -134,6 +125,7 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
       "Web search, content extraction, and API interaction tools for pi. Essential for research-aware coding sessions.",
     package: "npm:pi-web-access",
     category: "tools",
+    verified: true,
     enablesFeatures: ["Web search in agent sessions"],
     icon: "🌐",
   },
@@ -147,17 +139,6 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     enablesFeatures: ["Browser automation in agent sessions"],
     icon: "🎭",
   },
-  {
-    id: "pi-kilocode",
-    name: "pi-kilocode",
-    description:
-      "Kilo Code integration for structured output, code analysis, and AI-powered code transformations.",
-    package: "npm:pi-kilocode",
-    category: "tools",
-    enablesFeatures: ["Structured code analysis"],
-    icon: "📐",
-  },
-
   // ── Productivity ──
   {
     id: "pi-rewind",
@@ -175,33 +156,14 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     name: "pi-processes",
     description:
       "Long-running background processes (dev servers, watchers, builds) that outlive a single turn. Log capture, regex watches, exit alerts.",
-    package: "npm:pi-processes",
+    package: "npm:@aliou/pi-processes",
     category: "productivity",
+    verified: true,
     enablesFeatures: ["Background process management"],
     icon: "⚙️",
   },
 
-  // ── Integration ──
-  {
-    id: "@ifi/pi-extension-subagents",
-    name: "pi-extension-subagents (ifi)",
-    description:
-      "Alternative subagent implementation with built-in agent configs, conversation viewer, and cross-extension RPC.",
-    package: "npm:@ifi/pi-extension-subagents",
-    category: "orchestration",
-    providesAgentTypes: [
-      "scout",
-      "planner",
-      "worker",
-      "reviewer",
-      "context-builder",
-      "researcher",
-      "artist",
-      "frontend-designer",
-    ],
-    enablesFeatures: ["Built-in agent configs", "Conversation overlay UI"],
-    icon: "🔧",
-  },
+
 ];
 
 // ── Discovery ───────────────────────────────────────────────────────
@@ -461,6 +423,207 @@ export async function installExtension(
       timeout: 120_000,
     });
 
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+// ── Update checking ─────────────────────────────────────────────────
+
+export interface ExtensionUpdateInfo {
+  /** npm package name (without npm: prefix) */
+  package: string;
+  /** Display name */
+  name: string;
+  /** Currently installed version from node_modules/package.json */
+  installed: string | undefined;
+  /** Latest version available on npm registry */
+  latest: string | undefined;
+  /** Whether a newer version is available */
+  updateAvailable: boolean;
+}
+
+/**
+ * Hold a short-lived cache of check results to avoid hammering npm
+ * registry on every UI render. Cleared after 60 seconds.
+ */
+let _updateCache: { data: ExtensionUpdateInfo[]; timestamp: number } | undefined;
+
+/** Clear the update cache so the next `checkExtensionUpdates()` hits npm fresh. */
+export function clearExtensionCache(): void {
+  _updateCache = undefined;
+}
+
+/**
+ * Check for updates on all installed npm packages.
+ * Reads installed versions from node_modules, then fetches latest
+ * from registry.npmjs.org. Results are cached for 60 seconds.
+ */
+export async function checkExtensionUpdates(): Promise<ExtensionUpdateInfo[]> {
+  const now = Date.now();
+  if (_updateCache && now - _updateCache.timestamp < 60_000) {
+    return _updateCache.data;
+  }
+
+  const results: ExtensionUpdateInfo[] = [];
+  const npmDir = join(piAgentDir(), "npm");
+
+  // Read installed packages list
+  let packageNames: string[] = [];
+  try {
+    const pkg = JSON.parse(await readFile(join(npmDir, "package.json"), "utf-8"));
+    packageNames = Object.keys(pkg.dependencies || {});
+  } catch {
+    // No npm dir or no packages yet
+  }
+
+  for (const name of packageNames) {
+    // Read installed version
+    let installed: string | undefined;
+    try {
+      const installedPkg = JSON.parse(
+        await readFile(join(npmDir, "node_modules", name, "package.json"), "utf-8"),
+      );
+      installed = installedPkg.version;
+    } catch {
+      installed = undefined;
+    }
+
+    // Fetch latest from npm registry
+    let latest: string | undefined;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/latest`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json() as { version?: string };
+        latest = data.version;
+      }
+    } catch {
+      latest = undefined;
+    }
+
+    // Look up display name from curated list
+    const known = knownExtensions.find((k) => k.package === `npm:${name}`);
+
+    results.push({
+      package: name,
+      name: known?.name ?? name,
+      installed,
+      latest,
+      updateAvailable: installed !== undefined && latest !== undefined && installed !== latest,
+    });
+  }
+
+  _updateCache = { data: results, timestamp: now };
+  return results;
+}
+
+/**
+ * Manual install — accepts any pi install spec through the SDK config path
+ * (settings.json + npm install). No CLI dependency.
+ *
+ * Supported formats:
+ *   npm:package-name    → npm install
+ *   git:github.com/user/repo → npm install via git URL
+ *   pi install <spec>   → strips prefix first (user typed the full command)
+ */
+export async function installManualExtension(
+  installSpec: string,
+): Promise<{ success: boolean; error?: string }> {
+  // Strip leading "pi install " or "pi " if the user typed the full CLI command
+  const spec = installSpec
+    .replace(/^pi\s+install\s+/i, "")
+    .replace(/^pi\s+/i, "")
+    .trim();
+
+  if (spec.length === 0) {
+    return { success: false, error: "Empty install spec." };
+  }
+
+  try {
+    const settingsRaw = await readFile(settingsPath(), "utf-8");
+    const settings = JSON.parse(settingsRaw);
+    if (!settings.packages) settings.packages = [];
+
+    // Add the raw spec (npm:..., git:...) to settings.json packages[]
+    if (!settings.packages.includes(spec)) {
+      settings.packages.push(spec);
+    }
+
+    // Write settings back atomically
+    const tmpPath = settingsPath() + ".tmp";
+    const { writeFile, rename } = await import("node:fs/promises");
+    await writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
+    await rename(tmpPath, settingsPath());
+
+    // Translate spec to an npm-compatible package reference
+    const npmRef = specToNpmRef(spec);
+
+    // Install via npm in the agent dir
+    const npmDir = join(piAgentDir(), "npm");
+    execSync(`npm install ${npmRef}`, {
+      cwd: npmDir,
+      stdio: "pipe",
+      timeout: 180_000,
+    });
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Translate a pi install spec to an npm package reference.
+ *
+ *   npm:foo          → foo
+ *   git:github.com/user/repo → github:user/repo  (npm's GitHub shortcut)
+ *   git:github.com/user/repo.git → same logic
+ *   Anything else    → passed through as-is
+ */
+function specToNpmRef(spec: string): string {
+  if (spec.startsWith("npm:")) {
+    return spec.slice(4);
+  }
+  if (spec.startsWith("git:")) {
+    const path = spec.slice(4); // github.com/user/repo
+    // npm supports "github:user/repo" directly
+    const match = path.match(/github\.com\/([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) {
+      return `github:${match[1]}`;
+    }
+    // For other git hosts, use the full git+https URL
+    return `git+https://${path}`;
+  }
+  // Pass through as-is (bare package name, local path, etc.)
+  return spec;
+}
+
+/**
+ * Update an installed extension to the latest version via npm install.
+ * Equivalent to re-running the install but without touching settings.json
+ * (since it's already in the packages list).
+ */
+export async function updateExtension(
+  packageName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const npmName = packageName.replace(/^npm:/, "");
+    const npmDir = join(piAgentDir(), "npm");
+    execSync(`npm install ${npmName}`, {
+      cwd: npmDir,
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+    // Invalidate cache so next check picks up the new version
+    _updateCache = undefined;
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

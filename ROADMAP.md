@@ -373,6 +373,8 @@ Phases are intentionally ordered so each one:
 - ✅ Per-session model override
 - ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
 - ✅ Runtime extension discovery — detect installed pi.dev extensions + curated recommendations with one-click install; dynamic agent type settings when pi-subagents detected
+- ✅ Extension update checking — npm registry version comparison + one-click update button per installed extension
+- ✅ Agent reload — `/reload` button delegating to `pi reload` CLI or in-process MCP reload fallback
 - ✅ Context inspector — context percentage bar in header (polls live session), agent-running pulse on send/abort button
 - 🟢 MCP settings UI — server CRUD, enable/disable toggle, probe, stdio trust, tool listing with global per-tool toggle + per-project TriStatePicker overrides; toolbar button + settings panel + Zustand store with 30s polling; full server-side routes
 

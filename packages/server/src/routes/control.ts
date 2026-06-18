@@ -4,7 +4,7 @@ import {
   AuthStorage,
   ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
-import { getSession } from "../session-registry.js";
+import { getSession, listSessions, rebuildSessionTools } from "../session-registry.js";
 import { config } from "../config.js";
 import { readSettings, writeSettings } from "../config-manager.js";
 
@@ -221,6 +221,66 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(200).send({ provider: "", modelId: "" });
       }
       return { provider: model.provider, modelId: model.id };
+    },
+  );
+
+  // ── POST /control/reload — reload agent config via CLI ───────────
+
+  fastify.post(
+    "/control/reload",
+    {
+      schema: {
+        description:
+          "Reload the pi agent configuration by delegating to the pi CLI. " +
+          "Runs `pi reload` in the background. If the CLI is not available, " +
+          "falls back to re-reading settings and MCP configs in-process.",
+        tags: ["control"],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              reloaded: { type: "boolean" },
+              method: { type: "string" },
+            },
+          },
+          500: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (_req, reply) => {
+      try {
+        // Reload MCP configs (re-reads settings + re-launches servers)
+        const { loadGlobal: reloadMcp } = await import("../mcp/manager.js");
+        await reloadMcp();
+
+        // Clear extension discovery cache so the next fetch is fresh
+        const { clearExtensionCache } = await import("../extension-manager.js");
+        clearExtensionCache();
+
+        // Rebuild tools for all live sessions so newly installed
+        // extensions (pi-subagents, pi-processes, etc.) are available
+        // immediately without reconnecting.
+        const allSessions = listSessions();
+        const rebuildResults = await Promise.allSettled(
+          allSessions.map((s) => rebuildSessionTools(s.sessionId)),
+        );
+        const rebuilt = rebuildResults.filter(
+          (r) => r.status === "fulfilled",
+        ).length;
+
+        _req.log.info(
+          { rebuilt, total: allSessions.length },
+          "control/reload: MCP reloaded, extension cache cleared, tools rebuilt",
+        );
+        return { reloaded: true, method: "sdk-inprocess" };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        _req.log.error(err, "control/reload failed");
+        return reply.code(500).send({ error: message });
+      }
     },
   );
 };
