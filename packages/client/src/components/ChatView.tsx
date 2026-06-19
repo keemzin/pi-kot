@@ -396,6 +396,17 @@ function RewindMsgButton({ sessionId }: { sessionId: string }) {
   );
 }
 
+/* ── Model badge for assistant messages ── */
+
+function ModelBadge({ modelName, providerName }: { modelName?: string; providerName?: string }) {
+  if (!modelName) return null;
+  return (
+    <span className="assistant-msg-model">
+      {providerName ? `${providerName} / ` : ""}{modelName}
+    </span>
+  );
+}
+
 /* ── Main ChatView ── */
 
 const MAX_TOOL_BATCH_TOOLS = 100;
@@ -616,6 +627,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
+                <ModelBadge modelName={modelName} providerName={providerName} />
               </div>
             )}
           </div>,
@@ -646,6 +658,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`turn-${currentUserIdx}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
+              <ModelBadge modelName={modelName} providerName={providerName} />
             </div>,
           );
         }

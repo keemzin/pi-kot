@@ -1982,6 +1982,20 @@ body {
   justify-content: flex-end;
 }
 
+.assistant-msg-model {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px 4px 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
 .copy-msg-btn {
   display: inline-flex;
   align-items: center;

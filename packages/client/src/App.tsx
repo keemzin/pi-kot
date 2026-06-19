@@ -20,6 +20,7 @@ import {
   type Project,
   fetchProviders,
   type ProviderGroup,
+  getSessionModel,
   createProjectAPI,
   browseDirectories,
   cloneRepo,
@@ -105,17 +106,39 @@ export function App() {
         const res = await fetchProviders();
         setProviders(res.providers);
         const allModels = res.providers.flatMap((p) => p.models);
-        const firstWithAuth = allModels.find((m) => m.hasAuth);
-        if (firstWithAuth) {
-          setSelectedModel(firstWithAuth.id);
-          setSelectedProvider(
-            res.providers.find((p) =>
-              p.models.some((m) => m.id === firstWithAuth.id)
-            )?.provider ?? "",
-          );
-        } else if (allModels.length > 0) {
-          setSelectedModel(allModels[0].id);
-          setSelectedProvider(res.providers[0]?.provider ?? "");
+
+        // Try to restore previously selected model from localStorage
+        let restored = false;
+        try {
+          const stored = localStorage.getItem("pi-kot-model");
+          if (stored) {
+            const parsed = JSON.parse(stored) as { modelId: string; provider: string };
+            const match = allModels.find(
+              (m) => m.id === parsed.modelId && m.hasAuth,
+            );
+            if (match) {
+              setSelectedModel(match.id);
+              setSelectedProvider(parsed.provider);
+              restored = true;
+            }
+          }
+        } catch {
+          // localStorage read or parse failed
+        }
+
+        if (!restored) {
+          const firstWithAuth = allModels.find((m) => m.hasAuth);
+          if (firstWithAuth) {
+            setSelectedModel(firstWithAuth.id);
+            setSelectedProvider(
+              res.providers.find((p) =>
+                p.models.some((m) => m.id === firstWithAuth.id)
+              )?.provider ?? "",
+            );
+          } else if (allModels.length > 0) {
+            setSelectedModel(allModels[0].id);
+            setSelectedProvider(res.providers[0]?.provider ?? "");
+          }
         }
       } catch {
         // providers not available
@@ -170,6 +193,30 @@ export function App() {
       createAndActivate(activeProjectId);
     }
   }, [loading, authRequired, activeProjectId, projectSessions, activeSessionId]);
+
+  // Restore per-session model override when switching sessions
+  useEffect(() => {
+    if (!activeSessionId) return;
+    (async () => {
+      try {
+        const res = await getSessionModel(activeSessionId);
+        if (res.provider && res.modelId) {
+          setSelectedModel(res.modelId);
+          setSelectedProvider(res.provider);
+          try {
+            localStorage.setItem(
+              "pi-kot-model",
+              JSON.stringify({ modelId: res.modelId, provider: res.provider }),
+            );
+          } catch {
+            // private mode
+          }
+        }
+      } catch {
+        // Session not live or not available — keep current selection
+      }
+    })();
+  }, [activeSessionId]);
 
   // ── URL hash sync (deep-linkable sessions) ──
   // Write the active project/session into the URL hash so a refresh
@@ -1015,7 +1062,7 @@ export function App() {
 
         {activeSessionId !== undefined ? (
           <>
-            <ChatView sessionId={activeSessionId} />
+            <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
             <OrchestrationPanel
               sessionId={activeSessionId}
               open={showOrch}
