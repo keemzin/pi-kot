@@ -1,6 +1,7 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback } from "react";
 import { useSessionStore } from "../stores/session-store";
 import { useContextData, ContextPill, ContextInspectModal } from "./ContextBar";
+import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
   sessionId: string;
@@ -8,6 +9,9 @@ interface Props {
   setShowOrch?: (v: boolean) => void;
   onInspectContext?: (data: any) => void;
   onOpenMCP?: () => void;
+  selectedModel?: string;
+  onModelSelect?: (modelId: string, provider: string) => void;
+  onModelError?: (error: string) => void;
 }
 
 /**
@@ -31,7 +35,7 @@ const SLASH_COMMANDS = [
   },
 ];
 
-export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP }: Props) {
+export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP, selectedModel, onModelSelect, onModelError }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
@@ -168,6 +172,15 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
           </div>
 
           <div className="ti-toolbar-right">
+            {onModelSelect !== undefined && (
+              <ModelDropdown
+                sessionId={sessionId}
+                selected={selectedModel ?? ""}
+                onSelect={onModelSelect}
+                onError={onModelError ?? (() => {})}
+                compact
+              />
+            )}
             {isStreaming ? (
               <button type="button" onClick={abort} className="ti-abort-btn" title="Abort" tabIndex={-1}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

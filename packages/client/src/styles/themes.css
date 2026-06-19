@@ -2327,6 +2327,36 @@ body {
 .ti-toolbar-right {
   display: flex;
   align-items: center;
+  gap: 4px;
+}
+
+/* Model dropdown compact trigger inside chat toolbar — pill with truncated name */
+.ti-toolbar-right .model-dropdown-btn {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  max-width: 140px;
+  min-width: 0;
+}
+
+.ti-toolbar-right .model-dropdown-btn .model-dropdown-chevron {
+  display: none;
+}
+
+.ti-toolbar-right .model-dropdown-btn:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-hover);
+}
+
+.ti-toolbar-right .model-dropdown-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  animation: dropdownUp 0.15s var(--ease);
+}
+
+@keyframes dropdownUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .ti-send-btn {
@@ -2551,24 +2581,6 @@ body {
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
   font-weight: 600;
   animation: toolFadeIn 0.2s ease-out;
-}
-
-/* ═══ Status indicator ═══ */
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: 6px;
-}
-
-.status-dot.live {
-  background: var(--success);
-  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
-}
-
-.status-dot.streaming {
-  background: var(--accent);
 }
 
 /* ═══ Select ═══ */

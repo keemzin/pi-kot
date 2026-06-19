@@ -5,7 +5,6 @@ import { ChatInput } from "./components/ChatInput";
 import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
 import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
-import { ModelDropdown } from "./components/ModelDropdown";
 import { ContextInspectModal } from "./components/ContextBar";
 import { MCPPanel } from "./components/MCPPanel";
 import { SessionTreePanel } from "./components/SessionTreePanel";
@@ -959,18 +958,6 @@ export function App() {
             )}
           </div>
           <div className="header-right">
-            {providers.length > 0 && (
-              <ModelDropdown
-                sessionId={activeSessionId}
-                selected={selectedModel}
-                onSelect={handleModelSelect}
-                onError={handleModelError}
-              />
-            )}
-            <span
-              className={`status-dot ${activeSessionId !== undefined ? (isStreaming ? "streaming" : "live") : ""}`}
-            />
-
             <button
               type="button"
               onClick={() => setExplorerTab(explorerTab === "files" ? undefined : "files")}
@@ -1042,6 +1029,9 @@ export function App() {
       setShowOrch={setShowOrch}
       onInspectContext={setInspectData}
       onOpenMCP={() => setShowMCP(true)}
+      selectedModel={selectedModel}
+      onModelSelect={handleModelSelect}
+      onModelError={handleModelError}
     />
           </>
         ) : (

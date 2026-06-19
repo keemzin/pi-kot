@@ -16,6 +16,8 @@ interface Props {
   onSelect: (modelId: string, provider: string) => void;
   /** Called on error */
   onError: (error: string) => void;
+  /** Compact trigger — show model name only, truncated to 20 chars, no auto-focus */
+  compact?: boolean;
 }
 
 interface FlatModel {
@@ -55,7 +57,7 @@ function scoreOption(opt: FlatModel, query: string): number | undefined {
   return undefined;
 }
 
-export function ModelDropdown({ sessionId, selected, onSelect, onError }: Props) {
+export function ModelDropdown({ sessionId, selected, onSelect, onError, compact }: Props) {
   const [open, setOpen] = useState(false);
   const [providers, setProviders] = useState<ProviderGroup[]>([]);
   const [defaultModel, setDefaultModel] = useState<{ provider: string; modelId: string } | undefined>(undefined);
@@ -112,12 +114,11 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError }: Props)
     return () => window.removeEventListener("mousedown", handler);
   }, [open]);
 
-  // Reset search + active index on open, focus input
+  // Reset search + active index on open
   useEffect(() => {
     if (open) {
       setSearch("");
       setActiveIdx(-1);
-      requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [open]);
 
@@ -140,11 +141,13 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError }: Props)
   const selectedOption = options.find((o) => o.value === selected);
 
   const triggerLabel =
-    selectedOption !== undefined
-      ? `${selectedOption.provider} / ${selectedOption.name}`
-      : defaultModel !== undefined && defaultModel.provider.length > 0 && defaultModel.modelId.length > 0
-        ? `${defaultModel.provider} / ${defaultModel.modelId} (default)`
-        : "default model";
+    compact
+      ? (selectedOption?.name ?? defaultModel?.modelId ?? "default").slice(0, 20)
+      : selectedOption !== undefined
+        ? `${selectedOption.provider} / ${selectedOption.name}`
+        : defaultModel !== undefined && defaultModel.provider.length > 0 && defaultModel.modelId.length > 0
+          ? `${defaultModel.provider} / ${defaultModel.modelId} (default)`
+          : "default model";
 
   const commit = (idx: number): void => {
     setOpen(false);
