@@ -42,6 +42,10 @@ export interface CompactionEvent {
   timestamp: string;
   summary: string;
   tokensBefore: number;
+  /** Estimated token count of the kept context AFTER compaction (SDK 0.79.8+).
+   *  Derived by walking kept message entries from firstKeptEntryId using a
+   *  char/4 heuristic — same approach the SDK uses at compaction time. */
+  estimatedTokensAfter?: number;
   insertBeforeIndex: number;
   archivedMessages: AgentMessage[];
 }
@@ -98,11 +102,17 @@ export function buildCompactionHistory(session: AgentSession): CompactionEvent[]
       continue;
     }
     if (isCompactionEntry(entry)) {
+      // Estimate what the kept context size was AFTER this compaction
+      // by counting tokens for all message entries from firstKeptEntryId
+      // to the end of the entries array.
+      const estimatedTokensAfter = estimateKeptTokens(entries, entry.firstKeptEntryId);
+
       events.push({
         id: entry.id,
         timestamp: entry.timestamp,
         summary: entry.summary,
         tokensBefore: entry.tokensBefore,
+        estimatedTokensAfter: estimatedTokensAfter > 0 ? estimatedTokensAfter : undefined,
         // Filled in below — depends on the index of `firstKeptEntryId`
         // within the *kept* portion of the messages stream.
         insertBeforeIndex: 0,
@@ -148,6 +158,73 @@ export function buildCompactionHistory(session: AgentSession): CompactionEvent[]
   }
 
   return events;
+}
+
+/**
+ * Estimate token count for a single message using char/4 heuristic.
+ * Mirrors the SDK's `estimateTokens()` in `core/compaction/compaction.ts`.
+ */
+function estimateMessageTokens(msg: AgentMessage): number {
+  const m = msg as unknown as Record<string, unknown>;
+  let chars = 0;
+
+  // Roles with a `content` field: user, assistant, toolResult, custom
+  const content = m.content;
+  if (typeof content === "string") {
+    chars += content.length;
+  } else if (Array.isArray(content)) {
+    for (const block of content) {
+      const b = block as Record<string, unknown>;
+      if (b.type === "text" && typeof b.text === "string") {
+        chars += b.text.length;
+      } else if (b.type === "thinking" && typeof b.thinking === "string") {
+        chars += b.thinking.length;
+      } else if (b.type === "toolCall") {
+        chars += typeof b.name === "string" ? b.name.length : 0;
+        try {
+          chars += typeof b.arguments === "string"
+            ? b.arguments.length
+            : JSON.stringify(b.arguments).length;
+        } catch { /* skip unstringifiable */ }
+      } else if (b.type === "image") {
+        chars += 4800; // ESTIMATED_IMAGE_CHARS — same value as the SDK
+      }
+    }
+  }
+
+  // compactionSummary / branchSummary roles: carry `summary` instead of `content`
+  if (typeof m.summary === "string") {
+    chars = m.summary.length;
+  }
+  // bashExecution: carries `command` + `output`
+  if (typeof m.command === "string") {
+    chars += m.command.length;
+  }
+  if (typeof m.output === "string") {
+    chars += m.output.length;
+  }
+
+  return Math.ceil(chars / 4);
+}
+
+/**
+ * Walk message entries from `firstKeptEntryId` to the end of the entries
+ * array and estimate their total tokens. This gives us the
+ * `estimatedTokensAfter` — the approximate size of the kept context
+ * right after compaction.
+ */
+function estimateKeptTokens(entries: SessionEntry[], firstKeptEntryId: string): number {
+  const startIdx = entries.findIndex((e) => e.id === firstKeptEntryId);
+  if (startIdx === -1) return 0;
+  let total = 0;
+  for (let i = startIdx; i < entries.length; i++) {
+    const e = entries[i];
+    if (e === undefined) break;
+    if (isMessageEntry(e)) {
+      total += estimateMessageTokens(e.message);
+    }
+  }
+  return total;
 }
 
 /**

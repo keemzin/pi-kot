@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, ChevronUp, Layers } from "lucide-react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import type { CompactionEvent } from "../lib/api-client";
@@ -30,8 +30,14 @@ function findScrollParent(start: Element | null): HTMLElement | undefined {
  */
 export function CompactionCard({
   event,
+  renderArchived,
 }: {
   event: CompactionEvent;
+  /** Lazy renderer for archived messages — parent passes this so the
+   *  archived messages are only rendered into a self-contained component
+   *  when the card is expanded. Keeps the main ChatView render loop
+   *  fast by avoiding markdown-heavy archived messages on every tick. */
+  renderArchived?: () => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const when = new Date(event.timestamp);
@@ -118,7 +124,7 @@ export function CompactionCard({
             </div>
           )}
 
-          {/* Archived messages */}
+          {/* Archived messages — rendered lazily via parent callback */}
           <div
             style={{
               display: "flex",
@@ -127,36 +133,7 @@ export function CompactionCard({
               opacity: 0.85,
             }}
           >
-            {event.archivedMessages.map((msg, i) => {
-              const m = msg as { role?: string; content?: unknown };
-              const text = extractText(m.content);
-              const isUser = m.role === "user";
-              return (
-                <div
-                  key={i}
-                  style={{
-                    borderRadius: "var(--radius-sm)",
-                    padding: "8px 10px",
-                    fontSize: "12px",
-                    lineHeight: "1.5",
-                    color: "var(--text-primary)",
-                    background: isUser
-                      ? "var(--user-bubble)"
-                      : "transparent",
-                    border: isUser
-                      ? "1px solid var(--user-bubble-border)"
-                      : "none",
-                    whiteSpace: isUser ? "pre-wrap" : undefined,
-                  }}
-                >
-                  {isUser ? (
-                    text
-                  ) : (
-                    <ChatMarkdown text={text} />
-                  )}
-                </div>
-              );
-            })}
+            {renderArchived?.()}
           </div>
 
           <div style={{ marginTop: "12px" }}>{collapseBtn("bottom")}</div>
@@ -219,6 +196,12 @@ export function CompactionCard({
           }}
         >
           -{archivedCount} msg · -{event.tokensBefore.toLocaleString()} tok
+          {event.estimatedTokensAfter !== undefined && (
+            <>
+              <span style={{ margin: "0 2px", color: "var(--border)" }}>→</span>
+              ~{event.estimatedTokensAfter.toLocaleString()} tok
+            </>
+          )}
         </span>
         <span
           style={{
@@ -252,16 +235,4 @@ export function CompactionCard({
   );
 }
 
-function extractText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((block: Record<string, unknown>) => {
-        const t = block.type as string;
-        if (t === "text") return (block.text as string) ?? "";
-        return "";
-      })
-      .join("");
-  }
-  return String(content ?? "");
-}
+

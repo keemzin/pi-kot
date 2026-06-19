@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, memo } from "react";
 import { Copy, Check, CornerUpLeft } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
 import { invokeExtensionCommand } from "../lib/api-client";
@@ -40,6 +40,49 @@ function extractText(content: unknown): string {
   }
   return String(content ?? "");
 }
+
+/** Archived messages rendered inside a CompactionCard's expand drawer.
+ *  Memo'd so it only renders when expanded, not on every ChatView tick. */
+const ArchivedMessages = memo(function ArchivedMessages({
+  messages,
+}: {
+  messages: unknown[];
+}) {
+  return (
+    <>
+      {messages.map((raw, i) => {
+        const m = raw as { role?: string; content?: unknown };
+        const text = extractText(m.content);
+        const isUser = m.role === "user";
+        return (
+          <div
+            key={i}
+            style={{
+              borderRadius: "var(--radius-sm)",
+              padding: "8px 10px",
+              fontSize: "12px",
+              lineHeight: "1.5",
+              color: "var(--text-primary)",
+              background: isUser
+                ? "var(--user-bubble)"
+                : "transparent",
+              border: isUser
+                ? "1px solid var(--user-bubble-border)"
+                : "none",
+              whiteSpace: isUser ? "pre-wrap" : undefined,
+            }}
+          >
+            {isUser ? (
+              text
+            ) : (
+              <ChatMarkdown text={text} />
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+});
 
 /* ── Tool Call Components (ported from forge, styled with theme vars) ── */
 

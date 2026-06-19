@@ -24,8 +24,9 @@ import {
 import { getSavedTheme, applyTheme, themes } from "../lib/theme";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { ExtensionsTab } from "./ExtensionsTab";
+import { SkillsTab } from "./SkillsTab";
 
-type Tab = "appearance" | "providers" | "agent" | "general" | "extensions";
+type Tab = "appearance" | "providers" | "agent" | "general" | "extensions" | "skills";
 
 interface Props {
   onClose: () => void;
@@ -33,7 +34,7 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose, initialTab }: Props) {
-  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "extensions"];
+  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "extensions", "skills"];
 
   const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
   const [error, setError] = useState<string | undefined>(undefined);
@@ -76,7 +77,9 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
                       ? "Agent"
                       : t === "extensions"
                         ? "Extensions ⚗️"
-                        : "General"}
+                        : t === "skills"
+                          ? "Skills"
+                          : "General"}
               </button>
             ))}
           </div>
@@ -100,6 +103,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
           {tab === "providers" && <ProvidersTab onError={setError} />}
           {tab === "agent" && <AgentTab onError={setError} />}
           {tab === "extensions" && <ExtensionsTab onError={setError} />}
+          {tab === "skills" && <SkillsTab onError={setError} />}
           {tab === "general" && <GeneralTab />}
         </div>
       </div>

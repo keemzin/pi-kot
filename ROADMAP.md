@@ -71,7 +71,7 @@ User can:
   ✓ See tool calls inline
   ✓ Abort a running agent
   ✓ Reconnect if the server restarts
-  ✓ Switch between 6 themes from the header bar
+  ✓ Switch between 12 themes from the header bar (8 dark, 4 light)
   ✓ Collapse/expand the sidebar
   ✓ See rendered markdown with compact spacing
   ✓ Browse available models and select one from the header
@@ -80,11 +80,11 @@ User can:
 
 ### 1c — Theme System & Model Selector
 
-**Goal:** Visual polish (tau themes) and model selection in the header bar.
+**Goal:** Visual polish (themes) and model selection in the header bar.
 
 | # | Task | Status | Description |
 |---|---|---|---|
-| 1c.1 | CSS theme system | 🟢 | Port 6 tau themes (night, midnight, dawn, clean, terracotta, sage) with CSS variables |
+| 1c.1 | CSS theme system | 🟢 | Port 12 themes (night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark, clean, terracotta, sage, flexoki-light) with CSS variables |
 | 1c.2 | Theme picker | 🟢 | Custom dropdown in header, persisted to localStorage |
 | 1c.3 | Collapsible sidebar | 🟢 | Sidebar toggle with slide animation (matching tau) |
 | 1c.4 | Sticky header bar | 🟢 | Absolute-positioned glass header with session name, status dot, controls |
@@ -204,13 +204,13 @@ User can:
 | # | Task | Status | Description |
 |---|---|---|---|
 || 5.1 | Config manager | 🟢 | `config-manager.ts` (8KB) — read/write auth.json, settings.json, models.json |
-|| 5.2 | Provider list endpoint | 🟢 | `GET /api/v1/config/providers` — live models from SDK ModelRegistry, presence only, no secrets |
-|| 5.3 | API key endpoints | 🔴 | `PUT/DELETE /api/v1/config/auth/:provider` |
-|| 5.4 | Settings endpoints | 🔴 | `GET/PUT /api/v1/config/settings` — shallow merge |
-|| 5.5 | Models endpoints | 🔴 | `GET/PUT /api/v1/config/models` — keys redacted on GET |
-|| 5.6 | Skills endpoints | 🔴 | `GET /api/v1/config/skills`, `PUT /skills/:name/enabled` |
-|| 5.7 | Settings panel | 🔴 | UI for providers, API keys, model selection, thinking level |
-|| 5.8 | Skills management UI | 🔴 | Enable/disable skills per project |
+|| 5.2 | Provider list endpoint | 🟢 | `GET /api/v1/config/providers` — live models from SDK ModelRegistry, presence only, no secrets; supports `?scoped=true` |
+|| 5.3 | API key endpoints | 🟢 | `PUT/DELETE /api/v1/config/auth/:provider` — store/remove, never returns actual key values |
+|| 5.4 | Settings endpoints | 🟢 | `GET/PUT /api/v1/config/settings` — shallow merge, null-key deletes |
+|| 5.5 | Models endpoints | 🟢 | `GET/PUT /api/v1/config/models` — keys redacted on GET; `GET/PUT /config/enabled-models` for model scoping |
+|| 5.6 | Skills endpoints | 🟢 | `GET /api/v1/config/skills`, `PUT /skills/:name/enabled`, `GET /skills/overrides`, `DELETE /skills/:name/enabled` — discovered via SDK `loadSkills()`, global + per-project toggles persisted to `skill-overrides.json` |
+|| 5.7 | Settings panel | 🟢 | `SettingsPanel.tsx` — modal with Appearance, Providers, Agent (default model, thinking level, model scope, orch model), General, Extensions tabs |
+|| 5.8 | Skills management UI | 🟢 | `SkillsTab.tsx` — searchable skills list with enable/disable checkboxes, source filter tabs, diagnostics display, dimmed disabled state |
 
 ---
 
@@ -238,10 +238,10 @@ User can:
 || 7.2 | Authentication hardening | 🔴 | Token refresh, session expiry, CORS hardening |
 || 7.3 | Error boundaries | 🔴 | React error boundaries, graceful degradation |
 || 7.4 | Loading skeletons | 🔴 | Placeholder UI while data loads |
-|| 7.5 | Keyboard shortcuts | 🟢 | `Ctrl+Enter` send done; `Ctrl+P` model cycle and other shortcuts pending |
+|| 7.5 | Keyboard shortcuts | 🟢 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
 || 7.6 | Mobile responsive | 🔴 | Works on phone/tablet browsers |
 || 7.7 | PWA support | 🔴 | Service worker, manifest, install prompt |
-|| 7.8 | Dark/light theme | 🟡 | 6 dark themes done (night, midnight, dawn, clean, terracotta, sage); light theme pending |
+|| 7.8 | Dark/light theme | 🟢 | 12 themes done — 8 dark (night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark) + 4 light (clean, terracotta, sage, flexoki-light) |
 || 7.9 | Accessibility | 🔴 | ARIA labels, keyboard navigation, screen reader support |
 || 7.10 | Testing | 🔴 | Integration tests for critical flows (session, prompt, stream) |
 
@@ -253,17 +253,20 @@ User can:
 
 | # | Task | Status | Description |
 |---|---|---|---|
-|| 8.1 | Turn diff panel | 🔴 | Show file changes from the last completed agent turn |
-|| 8.2 | Context inspector | 🟡 | Token usage, cost breakdown, context window pressure — context percentage bar in header + server endpoint done; full cost/turn breakdown pending |
+|| 8.1 | Turn diff panel | 🟡 | `TurnDiffEntry` type defined, `lastAgentStartIndex` tracked in session registry; dedicated endpoint and UI panel pending |
+|| 8.2 | Context inspector | 🟢 | Context percentage bar in header (`/sessions/:id/context` endpoint), detail modal with token/cost breakdown on click, agent-running pulse on send/abort button |
 || 8.3 | Image attachments | 🔴 | Send images with prompts (base64), display in chat |
-|| 8.4 | Model switching | 🟢 | Per-session model override via `POST /sessions/:id/model` done; mid-session cycling UI (dropdown during streaming) pending |
-|| 8.5 | Compaction awareness | 🔴 | UI indicator when compaction runs, summary display |
+|| 8.4 | Model switching | 🟢 | Per-session model override via `POST /sessions/:id/model` done; model badge on assistant messages, model selection persisted across refresh; mid-session cycling UI dropdown during streaming pending |
+|| 8.5 | Compaction awareness | 🟢 | Full compaction UX ported from pi-forge — `CompactionCard`, flat-index rendering, `compactAndReload`, compaction history endpoint `GET /sessions/:id/compactions`, archived messages one-click expand |
 || 8.6 | Auto-retry UI | 🔴 | Countdown banner during rate-limit backoff |
 || 8.7 | Quick actions | 🔴 | Pre-built prompts (fix lint, add tests, etc.) |
 || 8.8 | Webhooks | 🔴 | Outbound webhooks on session events |
 || 8.9 | Baked-in ask_user_question tool | 🟢 | Native tool + SSE events + REST endpoints + UI panel — agent can present structured questions with single/multi-select/custom options, user answers via panel above chat input |
 || 8.10 | MCP settings UI | 🟢 | MCP settings panel (enable/disable, server CRUD, probe, status indicators, stdio trust, global per-tool enable/disable, per-project tool overrides with TriStatePicker) — toolbar button, MCPPanel component, mcp-store with 30s polling; full server-side routes for settings, servers, trust, tools, overrides |
 || 8.11 | Orchestration | 🟢 | Multi-agent workflows, sub-agent management — 8 `orchestrate_*` tools: spawn, list, read, send, interrupt, kill, detach, read_inbox. REST endpoints for enable/disable/inbox/workers/mgmt. Orch toggle (⚡) + enable/disable panel in UI. Workers nest under supervisor in sidebar, collapsed by default, auto-expand + pulsating dot when streaming |
+|| 8.12 | Extensions tab | 🟢 | `ExtensionsTab` — runtime extension discovery, curated recommendations, one-click install/uninstall/update, npm registry version comparison, agent reload button (`/reload`) delegating to `pi reload` CLI or MCP fallback, dynamic agent type settings when pi-subagents detected |
+|| 8.13 | Rewind | 🟢 | Rewind toggle via pi-rewind extension — delegates to extension's SSE bridge (`pi-rewind:*` events), `RewindModal` for viewing compacted turn in full |
+|| 8.14 | Extension UI bridge | 🟢 | `extension-ui-bridge.ts` — server-side SSE forwarding for extension custom UI panels (`ExtensionUIInteractionModal`), extension-commands route for extension lifecycle |
 
 ---
 
@@ -350,23 +353,34 @@ Phases are intentionally ordered so each one:
 │   ├── fetch           🟢
 │   ├── pull            🟢
 │   └── push            🟢
-├── config/         🟡 (Phase 5 — partial)
+├── config/         🟢 (Phase 5 — done)
 │   ├── providers   ✅ done
 │   ├── auth/:provider  🔴 not started
 │   ├── settings         🔴 not started
 │   ├── models          🔴 not started
-│   ├── skills/...       🔴 not started
+│   ├── skills/...       🟢 CRUD — list, overrides, global + per-project toggle
 │   └── tools/          🟢 full CRUD — list, overrides cascade, PUT/DELETE per-project tool toggle
-├── extensions/     ✅ (Phase 8 — runtime discovery + install)
+├── extensions/         ✅ (Phase 8 — runtime discovery + install)
 │   ├── GET /            ✅ list detected + recommended
-│   └── POST /install    ✅ install a package
-├── orchestration/  ✅ (Phase 8)
-├── mcp/            🟢 (Phase 8 — full CRUD)
-│   ├── settings    🟢 GET + PUT master toggle
-│   ├── servers     🟢 GET list, PUT upsert, DELETE remove, POST probe
-│   ├── trust/:id   🟢 POST grant, DELETE revoke
-│   └── tools       🟢 GET per-project tool listing with effective state
-└── terminal        🔴 (Phase 6 — WebSocket, not started)
+│   ├── POST /install    ✅ install a package
+│   ├── POST /uninstall  ✅ remove a package
+│   └── POST /update     ✅ update to latest version
+├── orchestration/       ✅ (Phase 8)
+├── mcp/                 🟢 (Phase 8 — full CRUD)
+│   ├── settings         🟢 GET + PUT master toggle
+│   ├── servers          🟢 GET list, PUT upsert, DELETE remove, POST probe
+│   ├── trust/:id        🟢 POST grant, DELETE revoke
+│   └── tools            🟢 GET per-project tool listing with effective state
+├── config/
+│   ├── providers        🟢 live provider listing
+│   ├── auth/:provider   🟢 PUT set, DELETE remove (presence-only, no secrets)
+│   ├── settings         🟢 GET read, PUT merge
+│   ├── models           🟢 GET redacted, PUT replace
+│   ├── enabled-models   🟢 GET list, PUT save (model scoping)
+│   ├── tools/...        🟢 full CRUD — builtin/MCP/extension tool listing, per-project overrides
+│   ├── skills/...       🟢 CRUD — list, overrides, global + per-project toggle
+│   └── tools/overrides  🟢 cascade view per project
+└── terminal             🔴 (Phase 6 — WebSocket, not started)
 `````
 
 ---
@@ -381,38 +395,42 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-| **Total: ~52/72 tasks completed (~72% of roadmap)**
+| **Total: ~65/79 tasks completed (~82% of roadmap)**
 
 ### **By Phase:**
-- **Phase 1 (Chat MVP):** ✅ **92% done** (15/16 routes)
+- **Phase 1 (Chat MVP):** ✅ **95% done** (all routes + features, minor completion items)
 - **Phase 2 (Projects & Sessions):** ✅ **93% done** (14/15 tasks)
 - **Phase 3 (File Browser & Editor):** ✅ **92% done** (12/13 tasks, 1 deferred)
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
-- **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
+- **Phase 5 (Config UI):** ✅ **100% done** (8/8 tasks)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
-- **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks, keyboard shortcuts + 6 themes)
-- **Phase 8 (Advanced):** ✅ **54% done** (6/12 tasks + context inspector partial + MCP UI — model switching + ask_user_question + orchestration + extension discovery + MCP settings + per-project tool overrides)
+- **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks — keyboard shortcuts, 12 themes; more Polish items pending)
+- **Phase 8 (Advanced):** ✅ **64% done** (9/14 tasks — model switching + ask_user_question + orchestration + MCP UI + compaction + context inspector + extensions + rewind + extension UI bridge)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
-- ✅ 6 dark themes (night, midnight, dawn, clean, terracotta, sage)
-- ✅ Session tree navigation, forking, archiving
-- ✅ File browser (tree, read, write, search, download)
-- ✅ Code search tab (🔍 in explorer — ripgrep/Node fallback, grouped by folder, highlighted matches)
-- ✅ Resizable explorer panel (drag handle, 220–800px)
+- ✅ 12 themes (8 dark: night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark; 4 light: clean, terracotta, sage, flexoki-light)
+- ✅ Session tree navigation, forking, archiving, naming
+- ✅ File browser (tree, read, write, search, download) + resizable explorer panel
+- ✅ Code search tab (🔍 — ripgrep/Node, grouped by folder, highlighted matches)
+- ✅ Full Git integration — status, diff, stage/unstage (incl. hunk-level), commit, push/pull/fetch, branch/remote management, init, revert, worktrees, tabbed panel
+- ✅ Config UI — SettingsPanel with Appearance, Providers (API keys), Agent (default model/thinking/orch), General tabs, model scoping
 - ✅ `ask_user_question` tool with UI panel
-- ✅ Per-session model override
-- ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions
-- ✅ Runtime extension discovery — detect installed pi.dev extensions + curated recommendations with one-click install; dynamic agent type settings when pi-subagents detected
-- ✅ Extension update checking — npm registry version comparison + one-click update button per installed extension
-- ✅ Agent reload — `/reload` button delegating to `pi reload` CLI or in-process MCP reload fallback
-- ✅ Context inspector — context percentage bar in header (polls live session), agent-running pulse on send/abort button
-- 🟢 MCP settings UI — server CRUD, enable/disable toggle, probe, stdio trust, tool listing with global per-tool toggle + per-project TriStatePicker overrides; toolbar button + settings panel + Zustand store with 30s polling; full server-side routes
+- ✅ Per-session model override (persisted across refresh, model badge on messages)
+- ✅ Context inspector — percentage bar in header with detail modal (token/cost breakdown)
+- ✅ Compaction UX — CompactionCard, flat-index rendering, compactAndReload, archived message expansion
+- ✅ Orchestration — supervisor/worker sessions with full lifecycle (spawn, list, read, send, interrupt, kill, detach, inbox)
+- ✅ MCP settings UI — server CRUD, probe, trust, per-tool enable/disable, per-project TriStatePicker overrides, 30s polling
+- ✅ Extensions tab — install/uninstall/update with npm registry check, agent reload
+- ✅ Rewind — via pi-rewind extension with SSE bridge
+- ✅ Extension UI bridge — extension→client SSE panels
 
 ### **Remaining Work:**
-- Terminal (PTY, WebSocket, xterm.js)
-- Config UI (API keys, settings, models, skills)
-- Polish (mobile responsive, PWA, accessibility, testing)
-- Advanced (turn diff, full cost/turn breakdown, image attachments, compaction awareness, auto-retry UI)
+- Terminal (PTY, WebSocket, xterm.js) — Phase 6
+- ✅ Skills management UI (enable/disable per project) — Phase 5
+- Turn diff panel (API endpoint + UI) — Phase 8
+- Image attachments (send + display) — Phase 8
+- Polish (Docker, mobile responsive, PWA, error boundaries, loading skeletons, accessibility, testing) — Phase 7
+- Auto-retry UI, quick actions, webhooks — Phase 8
 
 ---

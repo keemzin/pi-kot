@@ -24,6 +24,7 @@ import { extensionRoutes } from "./routes/extensions.js";
 import { extensionCommandRoutes } from "./routes/extension-commands.js";
 import { gitRoutes } from "./routes/git.js";
 import { mcpRoutes } from "./routes/mcp.js";
+import { skillRoutes } from "./routes/skills.js";
 import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
@@ -136,6 +137,7 @@ export async function buildServer() {
       await api.register(orchestrationRoutes);
       await api.register(gitRoutes);
       await api.register(mcpRoutes);
+      await api.register(skillRoutes);
     },
     { prefix: "/api/v1" },
   );

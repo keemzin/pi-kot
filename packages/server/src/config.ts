@@ -58,6 +58,7 @@ export const config = Object.freeze({
   mcpConfigFile: resolve(readEnv("MCP_CONFIG_FILE") ?? resolve(FORGE_DATA_DIR, "mcp.json")),
   mcpStdioTrustFile: resolve(readEnv("MCP_STDIO_TRUST_FILE") ?? resolve(FORGE_DATA_DIR, "mcp-stdio-trust.json")),
   toolOverridesFile: resolve(readEnv("TOOL_OVERRIDES_FILE") ?? resolve(FORGE_DATA_DIR, "tool-overrides.json")),
+  skillOverridesFile: resolve(readEnv("SKILL_OVERRIDES_FILE") ?? resolve(FORGE_DATA_DIR, "skill-overrides.json")),
 
   // Auth
   uiPassword: readEnv("UI_PASSWORD"),

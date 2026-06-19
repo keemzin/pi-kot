@@ -621,6 +621,8 @@ export interface CompactionEvent {
   timestamp: string;
   summary: string;
   tokensBefore: number;
+  /** Estimated token size of the kept context after compaction (optional — SDK 0.79.8+). */
+  estimatedTokensAfter?: number;
   insertBeforeIndex: number;
   archivedMessages: unknown[];
 }
@@ -1100,5 +1102,58 @@ export async function clearToolProjectOverride(
   return request<{ ok: boolean }>(
     "DELETE",
     `/api/v1/config/tools/${encodeURIComponent(family)}/${encodeURIComponent(name)}/enabled?projectId=${encodeURIComponent(projectId)}`,
+  );
+}
+
+// ---- Skills listing / overrides ----
+
+import type {
+  SkillsListResponse,
+  SkillOverridesResponse,
+} from "./api-client/types";
+
+export async function listSkills(
+  projectId?: string,
+): Promise<SkillsListResponse> {
+  const qs =
+    projectId !== undefined
+      ? `?projectId=${encodeURIComponent(projectId)}`
+      : "";
+  return request<SkillsListResponse>(
+    "GET",
+    `/api/v1/config/skills${qs}`,
+  );
+}
+
+export async function listSkillOverrides(): Promise<SkillOverridesResponse> {
+  return request<SkillOverridesResponse>(
+    "GET",
+    "/api/v1/config/skills/overrides",
+  );
+}
+
+export async function setSkillEnabled(
+  name: string,
+  enabled: boolean,
+  opts?: { scope?: "global" | "project"; projectId?: string },
+): Promise<{ ok: boolean }> {
+  const qs =
+    opts?.projectId !== undefined
+      ? `?projectId=${encodeURIComponent(opts.projectId)}`
+      : "";
+  return request<{ ok: boolean }>(
+    "PUT",
+    `/api/v1/config/skills/${encodeURIComponent(name)}/enabled${qs}`,
+    { enabled, scope: opts?.scope },
+  );
+}
+
+export async function clearSkillProjectOverride(
+  name: string,
+  projectId: string,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    "DELETE",
+    `/api/v1/config/skills/${encodeURIComponent(name)}/enabled?projectId=${encodeURIComponent(projectId)}`,
   );
 }
