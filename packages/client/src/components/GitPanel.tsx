@@ -689,10 +689,7 @@ function FileGroup(props: FileGroupProps) {
                   ) : diffState.length === 0 ? (
                     <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>(no diff)</div>
                   ) : (
-                    <pre style={{ fontSize: "10px", overflowX: "auto", margin: 0, color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                      {diffState.slice(0, 2000)}
-                      {diffState.length > 2000 && "\n… (truncated)"}
-                    </pre>
+                    <DiffView diff={diffState} maxLines={20} />
                   )}
                 </div>
               )}
@@ -703,6 +700,66 @@ function FileGroup(props: FileGroupProps) {
     </div>
   );
 }
+
+/* ─── DiffView — colored unified-diff renderer ─── */
+
+interface DiffViewProps {
+  diff: string;
+  maxLines?: number;
+}
+
+function DiffView({ diff, maxLines = 20 }: DiffViewProps) {
+  const lines = diff.split("\n");
+  const showLines = lines.slice(0, maxLines);
+  const truncated = lines.length > maxLines;
+
+  return (
+    <div style={{ fontSize: "10px", overflow: "auto", lineHeight: 1.5, fontFamily: "monospace", whiteSpace: "pre", maxHeight: "320px" }}>
+      {showLines.map((line, i) => {
+        const prefix = line.charAt(0);
+        let bg: string | undefined;
+        let color: string | undefined;
+        let leftBorder: string | undefined;
+
+        if (prefix === "+") {
+          bg = "rgba(152,195,121,0.12)";
+          color = "#b8d4a0";
+          leftBorder = "2px solid rgba(152,195,121,0.5)";
+        } else if (prefix === "-") {
+          bg = "rgba(248,113,113,0.12)";
+          color = "#f0a0a0";
+          leftBorder = "2px solid rgba(248,113,113,0.5)";
+        } else if (line.startsWith("@@")) {
+          bg = "rgba(139,169,219,0.08)";
+          color = "var(--accent-text)";
+        }
+
+        return (
+          <div
+            key={i}
+            style={{
+              background: bg ?? "transparent",
+              color: color ?? "var(--text-secondary)",
+              borderLeft: leftBorder ?? "2px solid transparent",
+              padding: "0 8px",
+              minHeight: "14px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {line || "\u00A0"}
+          </div>
+        );
+      })}
+      {truncated && (
+        <div style={{ padding: "2px 8px", fontSize: "9px", color: "var(--text-dim)", fontStyle: "italic" }}>
+          … (truncated)
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function kindBadge(kind: FileStatusKind): string {
   switch (kind) {
