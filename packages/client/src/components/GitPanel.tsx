@@ -689,7 +689,7 @@ function FileGroup(props: FileGroupProps) {
                   ) : diffState.length === 0 ? (
                     <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>(no diff)</div>
                   ) : (
-                    <DiffView diff={diffState} maxLines={20} />
+                    <DiffView diff={diffState} />
                   )}
                 </div>
               )}
@@ -705,17 +705,14 @@ function FileGroup(props: FileGroupProps) {
 
 interface DiffViewProps {
   diff: string;
-  maxLines?: number;
 }
 
-function DiffView({ diff, maxLines = 20 }: DiffViewProps) {
+function DiffView({ diff }: DiffViewProps) {
   const lines = diff.split("\n");
-  const showLines = lines.slice(0, maxLines);
-  const truncated = lines.length > maxLines;
 
   return (
     <div style={{ fontSize: "10px", overflow: "auto", lineHeight: 1.5, fontFamily: "monospace", whiteSpace: "pre", maxHeight: "320px" }}>
-      {showLines.map((line, i) => {
+      {lines.map((line, i) => {
         const prefix = line.charAt(0);
         let bg: string | undefined;
         let color: string | undefined;
@@ -751,11 +748,6 @@ function DiffView({ diff, maxLines = 20 }: DiffViewProps) {
           </div>
         );
       })}
-      {truncated && (
-        <div style={{ padding: "2px 8px", fontSize: "9px", color: "var(--text-dim)", fontStyle: "italic" }}>
-          … (truncated)
-        </div>
-      )}
     </div>
   );
 }

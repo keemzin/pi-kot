@@ -473,23 +473,6 @@ export function App() {
           >
             pi-kot
           </span>
-          <button
-            type="button"
-            onClick={() => setShowSettings(true)}
-            title="Settings"
-            style={{
-              background: "none",
-              border: "none",
-              color: "var(--text-dim)",
-              fontSize: "14px",
-              cursor: "pointer",
-              padding: "4px 4px",
-              borderRadius: "var(--radius-sm)",
-              lineHeight: 1,
-            }}
-          >
-            ⚙
-          </button>
         </div>
 
         {/* Project list */}
@@ -992,7 +975,23 @@ export function App() {
             >
               ⎇
             </button>
-
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+              style={{
+                background: "none",
+                border: "none",
+                color: showSettings ? "var(--accent-text)" : "var(--text-dim)",
+                fontSize: "14px",
+                cursor: "pointer",
+                padding: "3px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              ⚙
+            </button>
           </div>
         </div>
 
