@@ -402,7 +402,14 @@ const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
   const messages = useSessionStore((s) => s.messages);
-  const compactions = useSessionStore((s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS);
+  const rawCompactions = useSessionStore((s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS);
+  // Only show compaction cards when the current leaf is AT a compaction
+  // point (messages[0] is the SDK-synthesized compactionSummary). If you
+  // navigate to a pre-compaction leaf, messages[0] is a normal user
+  // message and compaction cards should be hidden.
+  const compactions = (messages as PairableMessage[])[0]?.role === "compactionSummary"
+    ? rawCompactions
+    : EMPTY_COMPACTIONS;
   const streamText = useSessionStore((s) => s.streamState.text);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
