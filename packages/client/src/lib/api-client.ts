@@ -361,6 +361,22 @@ export async function filesWrite(
   return request("PUT", `/api/v1/files/write`, { projectId, path, content });
 }
 
+export async function filesRename(
+  projectId: string,
+  path: string,
+  name: string,
+): Promise<{ path: string }> {
+  return request("POST", `/api/v1/files/rename`, { projectId, path, name });
+}
+
+export async function filesMkdir(
+  projectId: string,
+  parentPath: string,
+  name: string,
+): Promise<{ path: string }> {
+  return request("POST", `/api/v1/files/mkdir`, { projectId, parentPath, name });
+}
+
 export async function filesDelete(
   projectId: string,
   path: string,

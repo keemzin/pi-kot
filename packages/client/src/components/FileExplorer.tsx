@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
-import { filesSearch } from "../lib/api-client";
+import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesSearch } from "../lib/api-client";
 
 interface TreeNode {
   name: string;
@@ -158,10 +158,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
     setLoading(true);
     setError(undefined);
     try {
-      const res = await fetch(`/api/v1/files/tree?projectId=${encodeURIComponent(projectId)}`);
-      if (!res.ok) throw new Error(`tree ${res.status}`);
-      const data = (await res.json()) as { children?: TreeNode[] };
-      setTree(data.children ?? []);
+      const data = await filesTree(projectId);
+      setTree((data as { children?: TreeNode[] }).children ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "load failed");
     } finally {
@@ -195,11 +193,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
     setView("editor");
 
     try {
-      const res = await fetch(
-        `/api/v1/files/read?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}`,
-      );
-      if (!res.ok) throw new Error(`read ${res.status}`);
-      const data = (await res.json()) as { content: string; language: string; binary: boolean };
+      const data = await filesRead(projectId, path);
       const content = data.binary ? "(binary file)" : data.content ?? "";
       setOpenFiles((prev) =>
         prev.map((f) =>
@@ -231,15 +225,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
     setOpenFiles((prev) => prev.map((f) => (f.path === activePath ? { ...f, saving: true } : f)));
     setError(undefined);
     try {
-      const res = await fetch("/api/v1/files/write", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, path: activePath, content: file.content }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error((body as { error?: string }).error ?? `save failed (${res.status})`);
-      }
+      await filesWrite(projectId, activePath, file.content);
       setOpenFiles((prev) =>
         prev.map((f) =>
           f.path === activePath ? { ...f, dirty: false, saved: file.content, saving: false } : f,
@@ -275,12 +261,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
       return;
     }
     try {
-      const res = await fetch("/api/v1/files/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, path: oldPath, name }),
-      });
-      if (!res.ok) throw new Error(`rename failed`);
+      await filesRename(projectId, oldPath, name);
       setRenaming(undefined);
       setOpenFiles((prev) =>
         prev.map((f) => {
@@ -306,20 +287,10 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
     try {
       if (showCreate === "folder") {
         const parent = createParent || "/";
-        const res = await fetch("/api/v1/files/mkdir", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, parentPath: parent, name }),
-        });
-        if (!res.ok) throw new Error(`mkdir failed`);
+        await filesMkdir(projectId, parent, name);
       } else {
         const path = createParent ? `${createParent}/${name}` : `/${name}`;
-        const res = await fetch("/api/v1/files/write", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId, path, content: "" }),
-        });
-        if (!res.ok) throw new Error(`create failed`);
+        await filesWrite(projectId, path, "");
       }
       setShowCreate(undefined);
       setCreateName("");
@@ -332,11 +303,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
   const handleDelete = async (path: string) => {
     try {
-      const res = await fetch(
-        `/api/v1/files/delete?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}&recursive=true`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) throw new Error(`delete failed`);
+      await filesDelete(projectId, path, { recursive: true });
       setConfirmDelete(undefined);
       setOpenFiles((prev) => prev.filter((f) => f.path !== path));
       setActivePath((prev) => {
