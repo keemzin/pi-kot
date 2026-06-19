@@ -158,7 +158,9 @@ User can:
 || 3.7 | File download endpoint | 🟢 | `GET /api/v1/files/download` — single file or folder-as-tar.gz |
 || 3.8 | File browser panel | 🟢 | `FileExplorer.tsx` (28KB) — tree view, editor, view controls |
 || 3.9 | Code editor panel | 🟢 | `CodeMirrorEditor.tsx` (8KB) — syntax highlighting, line numbers |
-|| 3.10 | File search UI | 🟢 | Search input in FileExplorer with results navigation |
+|| 3.10 | File search UI (by name) | 🟢 | Filename filter in tree view |
+|| 3.11 | Code search tab | 🟢 | 🔍 tab in FileExplorer — calls `GET /api/v1/files/search` (ripgrep/Node fallback), groups results by folder → file → match lines with highlighting, click to open file in editor |
+|| 3.12 | Resizable explorer panel | 🟢 | Drag handle on left edge of FileExplorer panel (MIN 220px, MAX 800px), stores width in state |
 
 ---
 
@@ -318,7 +320,7 @@ Phases are intentionally ordered so each one:
 │   ├── POST /:id/unarchive       ✅ restore from archive (Phase 2)
 │   ├── DELETE /:id               ✅ dispose
 │   └── GET /:id/turn-diff        ✅ turn diff (extra)
-├── files/          ✅ (Phase 3 — 9/10 done, upload deferred)
+├── files/          ✅ (Phase 3 — 10/10 + 2 extra, upload deferred)
 │   ├── tree           ✅
 │   ├── read            ✅
 │   ├── write           ✅
@@ -384,7 +386,7 @@ Phases are intentionally ordered so each one:
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **92% done** (15/16 routes)
 - **Phase 2 (Projects & Sessions):** ✅ **93% done** (14/15 tasks)
-- **Phase 3 (File Browser & Editor):** ✅ **90% done** (9/10 tasks, 1 deferred)
+- **Phase 3 (File Browser & Editor):** ✅ **92% done** (12/13 tasks, 1 deferred)
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **25% done** (2/8 tasks, provider list + config manager)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
@@ -396,6 +398,8 @@ Phases are intentionally ordered so each one:
 - ✅ 6 dark themes (night, midnight, dawn, clean, terracotta, sage)
 - ✅ Session tree navigation, forking, archiving
 - ✅ File browser (tree, read, write, search, download)
+- ✅ Code search tab (🔍 in explorer — ripgrep/Node fallback, grouped by folder, highlighted matches)
+- ✅ Resizable explorer panel (drag handle, 220–800px)
 - ✅ `ask_user_question` tool with UI panel
 - ✅ Per-session model override
 - ✅ Orchestration — supervisor spawns/list/reads/sends/interrupts/kills/detaches worker sessions

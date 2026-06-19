@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
+import { filesSearch } from "../lib/api-client";
 
 interface TreeNode {
   name: string;
@@ -19,6 +20,20 @@ interface Props {
   initialTab?: ExplorerTab;
 }
 
+interface SearchMatch {
+  path: string;
+  line: number;
+  column: number;
+  length: number;
+  lineSnippet: string;
+}
+
+interface SearchResult {
+  engine: "ripgrep" | "node";
+  matches: SearchMatch[];
+  truncated: boolean;
+}
+
 interface OpenFileState {
   path: string;
   content: string;
@@ -31,7 +46,22 @@ interface OpenFileState {
 
 type PaneView = "tree" | "editor";
 
-const EXPLORER_WIDTH = 360;
+const DEFAULT_EXPLORER_WIDTH = 360;
+const MIN_EXPLORER_WIDTH = 220;
+const MAX_EXPLORER_WIDTH = 800;
+
+const CONTENT_SEARCH_DEBOUNCE_MS = 300;
+const MIN_CONTENT_SEARCH_LEN = 3;
+
+function groupByPath(matches: SearchMatch[]): [string, SearchMatch[]][] {
+  const map = new Map<string, SearchMatch[]>();
+  for (const m of matches) {
+    const list = map.get(m.path);
+    if (list === undefined) map.set(m.path, [m]);
+    else list.push(m);
+  }
+  return Array.from(map.entries());
+}
 
 export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
@@ -59,6 +89,68 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   }, [initialTab]);
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
+
+  // ── Resizable panel ──
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_EXPLORER_WIDTH);
+  const resizeRef = useRef<{ startX: number; startW: number } | undefined>(undefined);
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startW: panelWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (resizeRef.current === undefined) return;
+      const dx = ev.clientX - resizeRef.current.startX;
+      const w = Math.min(MAX_EXPLORER_WIDTH, Math.max(MIN_EXPLORER_WIDTH, resizeRef.current.startW - dx));
+      setPanelWidth(w);
+    };
+    const onUp = () => {
+      resizeRef.current = undefined;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [panelWidth]);
+
+  // ── Content search state (integrated into Files tab) ──
+  const [contentSearchResults, setContentSearchResults] = useState<SearchResult | undefined>(undefined);
+  const [contentSearchLoading, setContentSearchLoading] = useState(false);
+  const [contentSearchError, setContentSearchError] = useState<string | undefined>();
+  const [expandedSearchFiles, setExpandedSearchFiles] = useState<Set<string>>(new Set());
+
+  // Debounced content search that fires when the tree's filename search is long enough
+  useEffect(() => {
+    if (tab !== "files" || !open) {
+      setContentSearchResults(undefined);
+      return;
+    }
+    const q = search.trim();
+    if (q.length < MIN_CONTENT_SEARCH_LEN) {
+      setContentSearchResults(undefined);
+      setContentSearchError(undefined);
+      setContentSearchLoading(false);
+      return;
+    }
+    setContentSearchLoading(true);
+    setContentSearchError(undefined);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await filesSearch(projectId, q);
+        setContentSearchResults(res);
+        const groups = groupByPath(res.matches);
+        setExpandedSearchFiles(new Set(groups.slice(0, 5).map(([p]) => p)));
+      } catch (err) {
+        setContentSearchError(err instanceof Error ? err.message : "search failed");
+        setContentSearchResults(undefined);
+      } finally {
+        setContentSearchLoading(false);
+      }
+    }, CONTENT_SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [search, tab, open, projectId]);
+
   const renameRef = useRef<HTMLInputElement>(null);
   const createRef = useRef<HTMLInputElement>(null);
 
@@ -376,19 +468,37 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
         top: 50,
         right: 0,
         bottom: 0,
-        width: EXPLORER_WIDTH,
         zIndex: 120,
         background: "var(--bg-solid)",
         borderLeft: "1px solid var(--border)",
         boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
         display: "flex",
         flexDirection: "column",
+        width: panelWidth,
         transform: open ? "translateX(0)" : "translateX(100%)",
         transition: "transform 0.18s ease",
         willChange: "transform",
+        userSelect: resizeRef.current !== undefined ? "none" : undefined,
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      {/* ── Resize handle ── */}
+      <div
+        onMouseDown={onResizeStart}
+        className="file-explorer-resize-handle"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: "5px",
+          cursor: "col-resize",
+          zIndex: 10,
+          background: "transparent",
+          transition: "background 0.15s ease",
+        }}
+      />
+
       {/* ── Tab bar ── */}
       <div style={{
         display: "flex", borderBottom: "1px solid var(--border)",
@@ -420,6 +530,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
         >
           ⎇ Git
         </button>
+
       </div>
 
       {/* ── Git tab ── */}
@@ -461,7 +572,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search files..."
+              placeholder="Search files or code..."
               style={{
                 width: "100%", background: "var(--bg-glass)", border: "1px solid var(--border)",
                 borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px",
@@ -502,14 +613,105 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
             </div>
           )}
 
-          {/* Tree */}
+          {/* Tree + content search results */}
           <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", fontSize: "12px" }}>
             {loading && tree.length === 0 && (
               <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>Loading...</div>
             )}
-            {!loading && filteredTree.length === 0 && (
+
+            {/* ── Content search results (fires when search >= 3 chars) ── */}
+            {contentSearchLoading && (
+              <div style={{ padding: "4px 12px 2px", fontSize: "11px", color: "var(--text-dim)" }}>
+                Searching file contents…
+              </div>
+            )}
+            {contentSearchError !== undefined && (
+              <div style={{ padding: "2px 12px", fontSize: "10px", color: "var(--error)" }}>
+                {contentSearchError}
+              </div>
+            )}
+            {!contentSearchLoading && contentSearchResults !== undefined && contentSearchResults.matches.length > 0 && (
+              <>
+                <div style={{
+                  padding: "3px 12px", fontSize: "10px", color: "var(--text-dim)",
+                  borderBottom: "1px solid var(--border)", display: "flex", gap: "8px", alignItems: "center",
+                }}>
+                  <span>📄 {contentSearchResults.matches.length} match{contentSearchResults.matches.length !== 1 ? "es" : ""} in {groupByPath(contentSearchResults.matches).length} file{groupByPath(contentSearchResults.matches).length !== 1 ? "s" : ""}</span>
+                  {contentSearchResults.truncated && <span style={{ color: "var(--accent-bg)" }}>truncated</span>}
+                  {contentSearchResults.engine === "node" && (
+                    <span style={{
+                      fontSize: "8px", fontWeight: 600, textTransform: "uppercase",
+                      background: "rgba(229,188,96,0.15)", color: "var(--accent-bg)",
+                      padding: "1px 5px", borderRadius: "var(--radius-sm)",
+                    }}>fallback</span>
+                  )}
+                </div>
+                {groupByPath(contentSearchResults.matches).map(([filePath, matches]) => {
+                  const isExpanded = expandedSearchFiles.has(filePath);
+                  return (
+                    <div key={`cs-${filePath}`}>
+                      <div
+                        onClick={() => setExpandedSearchFiles((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(filePath)) next.delete(filePath); else next.add(filePath);
+                          return next;
+                        })}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "4px",
+                          padding: "3px 10px", cursor: "pointer",
+                          color: "var(--text-secondary)", fontSize: "11px",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        <span style={{ fontSize: "10px", width: "12px", flexShrink: 0 }}>{isExpanded ? "▾" : "▸"}</span>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{filePath}</span>
+                        <span style={{ fontSize: "10px", color: "var(--text-dim)", flexShrink: 0 }}>{matches.length}</span>
+                      </div>
+                      {isExpanded && matches.map((m, i) => (
+                        <div
+                          key={`${filePath}-${m.line}-${m.column}-${i}`}
+                          onClick={() => openFile(filePath)}
+                          title={`${filePath}:${m.line}:${m.column}`}
+                          style={{
+                            display: "flex", gap: "8px", padding: "1px 10px 1px 24px",
+                            cursor: "pointer", fontSize: "11px", fontFamily: "monospace",
+                            color: "var(--text-dim)",
+                          }}
+                          className="search-match-row"
+                        >
+                          <span style={{
+                            color: "var(--text-dim)", width: "36px",
+                            flexShrink: 0, textAlign: "right", fontSize: "10px",
+                          }}>{m.line}</span>
+                          <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {(() => {
+                              const col = m.column - 1;
+                              const len = m.length;
+                              const snippet = m.lineSnippet;
+                              const before = snippet.slice(0, col);
+                              const hit = snippet.slice(col, col + len);
+                              const after = snippet.slice(col + len);
+                              return (
+                                <>
+                                  <span>{before}</span>
+                                  <span style={{ background: "rgba(229,188,96,0.35)", color: "var(--text-primary)", borderRadius: "2px" }}>{hit}</span>
+                                  <span>{after}</span>
+                                </>
+                              );
+                            })()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* ── File tree (filename filtered) ── */}
+            {filteredTree.length === 0 && !loading && (
               <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
-                {search ? "No files match search" : "No files"}
+                {search ? "No files match" : "No files"}
               </div>
             )}
             {filteredTree.map((node) => renderNode(node, 0))}

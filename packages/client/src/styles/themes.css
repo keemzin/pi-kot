@@ -1920,8 +1920,8 @@ body {
 
 .message-bubble {
   min-width: 0;
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 16px;
+  line-height: 1.3;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -2983,7 +2983,7 @@ body {
 
 .text-xs { font-size: 11px; }
 
-.text-sm { font-size: 13px; }
+.text-sm { font-size: 14px; }
 
 .text-11 { font-size: 11px; }
 
@@ -3488,4 +3488,15 @@ body {
   flex-direction: column;
   gap: 1px;
   padding-right: 4px;
+}
+
+/* ── Search panel ── */
+.search-match-row:hover {
+  background: var(--accent-subtle);
+  color: var(--text-primary) !important;
+}
+
+.file-explorer-resize-handle:hover {
+  background: var(--accent-bg);
+  opacity: 0.4;
 }
