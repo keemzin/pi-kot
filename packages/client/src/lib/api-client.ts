@@ -598,6 +598,30 @@ export async function compactSession(
   );
 }
 
+// ── Compaction History ──
+
+export interface CompactionEvent {
+  id: string;
+  timestamp: string;
+  summary: string;
+  tokensBefore: number;
+  insertBeforeIndex: number;
+  archivedMessages: unknown[];
+}
+
+export interface CompactionsResponse {
+  compactions: CompactionEvent[];
+}
+
+export async function getCompactions(
+  sessionId: string,
+): Promise<CompactionsResponse> {
+  return request<CompactionsResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/compactions`,
+  );
+}
+
 // ---- Session Tree / Navigate / Fork ----
 
 export interface SessionTreeEntry {

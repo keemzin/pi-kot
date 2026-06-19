@@ -1,7 +1,6 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback } from "react";
 import { useSessionStore } from "../stores/session-store";
 import { useContextData, ContextPill, ContextInspectModal } from "./ContextBar";
-import { compactSession } from "../lib/api-client";
 
 interface Props {
   sessionId: string;
@@ -20,14 +19,14 @@ const SLASH_COMMANDS = [
     name: "/compact",
     description: "Manually compact the session context",
     handler: async (sessionId: string) => {
-      await compactSession(sessionId);
+      await useSessionStore.getState().compactAndReload(sessionId);
     },
   },
   {
     name: "/compact with summary",
     description: "Compact and keep focus on specific areas",
     handler: async (sessionId: string) => {
-      await compactSession(sessionId);
+      await useSessionStore.getState().compactAndReload(sessionId);
     },
   },
 ];

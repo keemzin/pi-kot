@@ -2,8 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } fr
 import { Copy, Check, CornerUpLeft } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
 import { invokeExtensionCommand } from "../lib/api-client";
+import type { CompactionEvent } from "../lib/api-client";
 import { ChatMarkdown } from "./ChatMarkdown";
-import { useSessionStore } from "../stores/session-store";
+import { CompactionCard } from "./CompactionCard";
+import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import {
   buildToolCallPairing,
@@ -400,6 +402,7 @@ const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
   const messages = useSessionStore((s) => s.messages);
+  const compactions = useSessionStore((s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS);
   const streamText = useSessionStore((s) => s.streamState.text);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
@@ -460,26 +463,39 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   // Build tool pairing once per render cycle
   const pairing = useMemo(() => buildToolCallPairing(messages as PairableMessage[]), [messages]);
 
-  // Render loop: group messages into turns (user + following assistant),
-  // support sticky user header (pins user msg at top while scrolling reply)
+  // Render loop: iterate messages by flat index (like pi-forge) so
+  // CompactionCards splice at arbitrary insertBeforeIndex positions,
+  // not just at user message boundaries. Preserves turn-grouped
+  // visual layout (sticky user header, copy/rewind buttons).
   const renderedRows = useMemo(() => {
     const { toolResultsById } = pairing;
     const out: React.ReactNode[] = [];
 
-    // Build turns from messages
-    type Turn = { userIdx: number; userMsg: PairableMessage; assistantMsgs: PairableMessage[] };
-    const turns: Turn[] = [];
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i] as PairableMessage;
-      if (isPairedToolResult(pairing, m)) continue;
-      if (m.role === "user") {
-        turns.push({ userIdx: i, userMsg: m, assistantMsgs: [] });
-      } else if (m.role === "assistant" && turns.length > 0) {
-        turns[turns.length - 1].assistantMsgs.push(m);
-      }
+    // Group compactions by insertBeforeIndex for O(1) lookup.
+    const compactionsAt = new Map<number, CompactionEvent[]>();
+    for (const ev of compactions) {
+      const list = compactionsAt.get(ev.insertBeforeIndex) ?? [];
+      list.push(ev);
+      compactionsAt.set(ev.insertBeforeIndex, list);
     }
 
-    // Common helper: render all assistant messages in a turn
+    // Helper: push all compaction cards for a given index.
+    const pushCardsAt = (idx: number): void => {
+      const events = compactionsAt.get(idx);
+      if (events === undefined) return;
+      for (const ev of events) {
+        out.push(<CompactionCard key={`compaction-${ev.id}`} event={ev} />);
+      }
+    };
+
+    // Kept-window range: messages in [1, latestCard.insertBeforeIndex)
+    // are hidden from inline bubbles; they appear inside the latest
+    // CompactionCard's expand drawer instead.
+    const latestCard =
+      compactions.length > 0 ? compactions[compactions.length - 1] : undefined;
+    const keptWindowEnd = latestCard?.insertBeforeIndex ?? 0;
+
+    // Common helper: assistant message rendering (tool batching etc.)
     const renderAssistantMsgs = (msgs: PairableMessage[], turnIdx: number) => {
       const elements: React.ReactNode[] = [];
       const pendingBatch: ToolBatchEntry[] = [];
@@ -539,21 +555,24 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       return elements;
     };
 
-    for (let ti = 0; ti < turns.length; ti++) {
-      const { userIdx, userMsg, assistantMsgs } = turns[ti];
-      const isLastTurn = ti === turns.length - 1;
-      const text = extractText(userMsg.content);
+    // Turn-grouped rendering helpers (for sticky user header mode)
+    // Collect messages by turn during flat iteration, then flush
+    // the accumulated turn as a grouped container.
+    let currentUserIdx = -1;
+    let currentUserMsg: PairableMessage | undefined;
+    const currentAssistantMsgs: PairableMessage[] = [];
 
-      // Combined assistant text for the copy button (once per turn)
-      const combinedAssistantText = assistantMsgs
+    const flushTurn = (): void => {
+      if (currentUserMsg === undefined) return;
+      const text = extractText(currentUserMsg.content);
+      const combinedAssistantText = currentAssistantMsgs
         .map(m => extractText(m.content))
         .filter(t => t.length > 0)
         .join("\n\n");
 
       if (stickyUserHeader && text.length > 0) {
-        // Sticky mode: wrap user message in a sticky container
         out.push(
-          <div key={`turn-${ti}`} style={{ position: "relative" }}>
+          <div key={`turn-${currentUserIdx}`} style={{ position: "relative" }}>
             <div
               style={{
                 position: "sticky",
@@ -585,7 +604,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 }}
               />
             </div>
-            {assistantMsgs.length > 0 && renderAssistantMsgs(assistantMsgs, ti)}
+            {currentAssistantMsgs.length > 0 &&
+              renderAssistantMsgs(currentAssistantMsgs, currentUserIdx)}
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
@@ -596,35 +616,88 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       } else {
         // Non-sticky mode: render user message normally
         out.push(
-          <div key={`user-${userIdx}`} className="message-row user" data-message-index={userIdx}>
+          <div
+            key={`user-${currentUserIdx}`}
+            className="message-row user"
+            data-message-index={currentUserIdx}
+          >
             <div className="message-bubble user">{text}</div>
           </div>,
         );
-        // Copy button below the user message
         if (text.length > 0) {
           out.push(
-            <div key={`user-${userIdx}-copy`} className="assistant-msg-footer user">
+            <div key={`user-${currentUserIdx}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
               {rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
             </div>,
           );
         }
-        if (assistantMsgs.length > 0) {
-          out.push(...renderAssistantMsgs(assistantMsgs, ti));
+        if (currentAssistantMsgs.length > 0) {
+          out.push(...renderAssistantMsgs(currentAssistantMsgs, currentUserIdx));
         }
-        // Copy button below the entire assistant response for this turn
         if (combinedAssistantText.length > 0) {
           out.push(
-            <div key={`turn-${ti}-copy`} className="assistant-msg-footer">
+            <div key={`turn-${currentUserIdx}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
             </div>,
           );
         }
       }
+
+      currentUserMsg = undefined;
+      currentAssistantMsgs.length = 0;
+    };
+
+    // ── Flat index iteration (matches pi-forge's render loop) ──
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i] as PairableMessage;
+
+      // Compaction cards render BEFORE the message at index i.
+      pushCardsAt(i);
+
+      // Tool results are rendered inline with their tool call.
+      if (isPairedToolResult(pairing, m)) continue;
+
+      // Skip the SDK-synthesized compactionSummary — the same text
+      // is inside our CompactionCard.
+      if (m.role === "compactionSummary") {
+        continue;
+      }
+
+      // Kept-window suppression: messages between index 1 and
+      // keptWindowEnd were kept verbatim by the latest compaction
+      // and appear inside that card's expand drawer.
+      if (latestCard !== undefined && i >= 1 && i < keptWindowEnd) {
+        continue;
+      }
+
+      if (m.role === "user") {
+        flushTurn();
+        currentUserIdx = i;
+        currentUserMsg = m;
+      } else if (m.role === "assistant") {
+        if (currentUserMsg !== undefined) {
+          currentAssistantMsgs.push(m);
+        } else {
+          // Orphan assistant message (kept-window boundary case where
+          // the preceding user was hidden). Render standalone.
+          out.push(<div key={`orphan-${i}`} data-message-index={i}>
+            {renderAssistantMsgs([m], i)}
+          </div>);
+        }
+      }
     }
 
+    // Flush the last accumulated turn.
+    flushTurn();
+
+    // Trailing cards: insertBeforeIndex === messages.length means
+    // the entire current context was archived with no new messages
+    // yet. Render the card at the bottom.
+    pushCardsAt(messages.length);
+
     return out;
-  }, [messages, pairing, stickyUserHeader]);
+  }, [messages, pairing, stickyUserHeader, compactions, sessionId, rewindAvailable]);
 
   return (
     <div ref={containerRef} onScroll={onScroll} className="messages-container" style={stickyUserHeader ? { paddingTop: 50 } : undefined}>

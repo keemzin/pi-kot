@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { getSessionContext, compactSession } from "../lib/api-client";
+import { getSessionContext } from "../lib/api-client";
+import { useSessionStore } from "../stores/session-store";
 import type { SessionContextResponse } from "../lib/api-client/types";
 
 export function useContextData(sessionId: string | undefined) {
@@ -91,7 +92,7 @@ export function ContextInspectModal({ data, sessionId, onClose }: { data: Sessio
     setCompactError(null);
     setCompactResult(null);
     try {
-      const result = await compactSession(sessionId);
+      const result = await useSessionStore.getState().compactAndReload(sessionId);
       setCompactResult(result);
     } catch (err) {
       setCompactError(err instanceof Error ? err.message : String(err));

@@ -12,12 +12,16 @@ import {
   archiveSession as archiveSessionAPI,
   unarchiveSession as unarchiveSessionAPI,
   deleteProjectAPI,
+  compactSession,
+  getCompactions,
 } from "../lib/api-client";
+import type { CompactionEvent } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 import { useAskUserQuestionStore } from "./ask-user-question-store";
 import { useExtensionUIStore } from "./extension-ui-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
+export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
 
 // ── localStorage persistence keys ──
 
@@ -74,6 +78,10 @@ interface SessionState {
   activeSessionId: string | undefined;
   /** Messages for the active session. */
   messages: unknown[];
+  /** Per-session compaction archive from GET /sessions/:id/compactions. */
+  compactionsBySession: Record<string, CompactionEvent[]>;
+  /** Per-session monotonic counter bumped on every compaction_end event. */
+  compactionEndCountBySession: Record<string, number>;
   /** Streaming state per session. */
   streamState: StreamState;
   /** Whether we're loading. */
@@ -98,6 +106,8 @@ interface SessionActions {
   archiveSession: (sessionId: string) => Promise<void>;
   unarchiveSession: (sessionId: string, projectId: string) => Promise<void>;
   loadArchivedSessions: (projectId: string) => Promise<void>;
+  loadCompactions: (sessionId: string) => Promise<void>;
+  compactAndReload: (sessionId: string) => Promise<{ summary: string; tokensBefore: number }>;
   reloadMessages: (sessionId: string) => Promise<void>;
   clearError: () => void;
   deleteProject: (id: string) => Promise<void>;
@@ -114,6 +124,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   archivedSessions: {},
   activeSessionId: getInitialActiveSessionId(),
   messages: [],
+  compactionsBySession: {},
+  compactionEndCountBySession: {},
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
   loading: false,
   error: undefined,
@@ -289,6 +301,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         });
     };
 
+    // Load the per-compaction archive on open so historical
+    // CompactionCards render immediately.
+    void get().loadCompactions(sessionId);
+
     const client = streamSessionSSE(sessionId, {
       onEvent: (event) => {
         switch (event.type) {
@@ -370,6 +386,42 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               requestId: string;
             };
             useAskUserQuestionStore.getState().clearPending(sessionId, cancelledId);
+            break;
+          }
+          case "compaction_start": {
+            // Show a brief banner so the user knows compaction is in progress.
+            // On manual compact there's already a "Compacting…" state in
+            // ChatInput, but auto-compact (context overflow) needs this.
+            set((s) => ({
+              streamState: {
+                ...s.streamState,
+                activeToolName: "compacting…",
+              },
+            }));
+            break;
+          }
+          case "compaction_end": {
+            // Clear the compacting indicator.
+            set((s) => ({
+              streamState: {
+                ...s.streamState,
+                activeToolName: undefined,
+              },
+              // Bump the compaction-end counter so panels that need to
+              // react (e.g. ContextInspectorPanel re-fetching token
+              // usage) get a stable signal.
+              compactionEndCountBySession: {
+                ...s.compactionEndCountBySession,
+                [sessionId]: (s.compactionEndCountBySession[sessionId] ?? 0) + 1,
+              },
+            }));
+            // Refetch compactions FIRST so the card data is available,
+            // then refetch messages. If messages update before compactions
+            // arrive, the ChatView renders post-compaction messages without
+            // the CompactionCard — a brief flash of ungrouped tool calls.
+            void get().loadCompactions(sessionId).then(() => {
+              refetchMessages();
+            });
             break;
           }
           case "agent_end": {
@@ -533,6 +585,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch {
       // silently fail
     }
+  },
+
+  loadCompactions: async (sessionId: string) => {
+    try {
+      const { compactions } = await getCompactions(sessionId);
+      set((s) => ({
+        compactionsBySession: { ...s.compactionsBySession, [sessionId]: compactions },
+      }));
+    } catch {
+      // Non-fatal — chat just renders without the cards.
+    }
+  },
+
+  compactAndReload: async (sessionId: string) => {
+    // Call the compact API. If it succeeds, also refetch messages and
+    // compactions so the ChatView updates even if SSE compaction_end
+    // events don't fire (race on manual compact).
+    // Load compactions FIRST, then messages — prevents a flash where
+    // post-compaction messages render without the CompactionCard.
+    const result = await compactSession(sessionId);
+    await get().loadCompactions(sessionId);
+    await get().reloadMessages(sessionId);
+    return result;
   },
 
   reloadMessages: async (sessionId: string) => {
