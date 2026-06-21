@@ -2488,6 +2488,92 @@ body {
   color: var(--text-dim);
 }
 
+/* ── Steer / Queued messages ──────────────────────────── */
+
+.ti-steer-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: 800px;
+  margin: 0 auto 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+  font-size: 11px;
+  line-height: 1.4;
+  animation: fadeIn 0.2s var(--ease);
+}
+
+.ti-steer-send {
+  background: var(--accent) !important;
+}
+.ti-steer-send:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
+.steer-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-right: 6px;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
+.queued-msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px;
+  margin: 4px 0 8px;
+  border-radius: var(--radius-md);
+  background: var(--bg-frosted);
+  border: 1px solid var(--border);
+}
+
+.queued-msg-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-primary);
+  padding: 3px 0;
+}
+
+.queued-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1.4;
+}
+.queued-badge.steer {
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+}
+.queued-badge.followUp {
+  color: var(--text-dim);
+  background: var(--bg-glass);
+}
+
+.queued-msg-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Settings ───────────────────────────────────────── */
 
 .settings-btn {

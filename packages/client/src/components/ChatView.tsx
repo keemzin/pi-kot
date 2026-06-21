@@ -301,7 +301,7 @@ function AssistantRenderSegmentView({
 
 /* ── Sticky user message component ── */
 
-function UserMessageBubble({ text }: { text: string }) {
+function UserMessageBubble({ text, isSteer }: { text: string; isSteer?: boolean }) {
   const [expanded, setExpanded] = useState(false);
   const [isLong, setIsLong] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
@@ -323,6 +323,7 @@ function UserMessageBubble({ text }: { text: string }) {
   return (
     <div className="message-row user">
       <div className="message-bubble user">
+        {isSteer && <span className="steer-tag">steer</span>}
         <div
           ref={textRef}
           style={{
@@ -467,6 +468,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const streamText = useSessionStore((s) => s.streamState.text);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
+  const queued = useSessionStore((s) => s.queuedBySession[sessionId]);
   const error = useSessionStore((s) => s.error);
   const clearError = useSessionStore((s) => s.clearError);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
@@ -631,6 +633,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         .filter(t => t.length > 0)
         .join("\n\n");
 
+      const isSteer = (currentUserMsg.metadata as { steer?: boolean } | undefined)?.steer === true;
+
       if (stickyUserHeader && text.length > 0) {
         out.push(
           <div key={`turn-${currentUserIdx}`} style={{ position: "relative" }}>
@@ -643,7 +647,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 overflowAnchor: "none",
               }}
             >
-              <UserMessageBubble text={text} />
+              <UserMessageBubble text={text} isSteer={isSteer} />
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
@@ -683,7 +687,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             className="message-row user"
             data-message-index={currentUserIdx}
           >
-            <div className="message-bubble user">{text}</div>
+            <div className="message-bubble user">
+              {isSteer && <span className="steer-tag">steer</span>}
+              {text}
+            </div>
           </div>,
         );
         if (text.length > 0) {
@@ -812,6 +819,19 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                     </span>
                   )}
                 </div>
+              </div>
+            )}
+
+            {queued !== undefined && (queued.steering.length > 0 || queued.followUp.length > 0) && (
+              <div className="queued-msgs">
+                {[...queued.steering.map((t) => ({ kind: "steer" as const, text: t })), ...queued.followUp.map((t) => ({ kind: "followUp" as const, text: t }))].map(
+                  (q, i) => (
+                    <div key={i} className="queued-msg-item">
+                      <span className={`queued-badge ${q.kind}`}>{q.kind === "steer" ? "steer" : "follow-up"}</span>
+                      <span className="queued-msg-text" title={q.text}>{q.text}</span>
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </div>

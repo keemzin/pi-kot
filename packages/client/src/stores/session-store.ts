@@ -7,6 +7,7 @@ import {
   getSessionMessages,
   sendPrompt,
   abortSession,
+  steerSession,
   fetchProjects,
   renameSession as renameSessionAPI,
   archiveSession as archiveSessionAPI,
@@ -22,6 +23,10 @@ import { useExtensionUIStore } from "./extension-ui-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
+export const EMPTY_QUEUED: { steering: string[]; followUp: string[] } = {
+  steering: [],
+  followUp: [],
+};
 
 // ── localStorage persistence keys ──
 
@@ -82,6 +87,8 @@ interface SessionState {
   compactionsBySession: Record<string, CompactionEvent[]>;
   /** Per-session monotonic counter bumped on every compaction_end event. */
   compactionEndCountBySession: Record<string, number>;
+  /** Pending steer/followUp messages per session (from SSE queued event). */
+  queuedBySession: Record<string, { steering: string[]; followUp: string[] } | undefined>;
   /** Streaming state per session. */
   streamState: StreamState;
   /** Whether we're loading. */
@@ -100,6 +107,7 @@ interface SessionActions {
   setActiveSession: (id: string) => Promise<void>;
   connectSSE: (sessionId: string) => void;
   sendPrompt: (text: string) => Promise<void>;
+  sendSteer: (text: string) => Promise<void>;
   abort: () => Promise<void>;
   refreshSessions: () => Promise<void>;
   renameSession: (sessionId: string, name: string) => Promise<void>;
@@ -126,6 +134,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   messages: [],
   compactionsBySession: {},
   compactionEndCountBySession: {},
+  queuedBySession: {},
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
   loading: false,
   error: undefined,
@@ -241,6 +250,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       activeSessionId: id,
       messages: [],
       streamState: { text: "", activeToolName: undefined, isStreaming: false },
+      queuedBySession: {},
       error: undefined,
     });
 
@@ -424,6 +434,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             });
             break;
           }
+          case "queued": {
+            const ev = event as { steering?: unknown; followUp?: unknown };
+            const steering = Array.isArray(ev.steering)
+              ? (ev.steering as unknown[]).filter((v): v is string => typeof v === "string")
+              : [];
+            const followUp = Array.isArray(ev.followUp)
+              ? (ev.followUp as unknown[]).filter((v): v is string => typeof v === "string")
+              : [];
+            set((s) => ({
+              queuedBySession: {
+                ...s.queuedBySession,
+                [sessionId]:
+                  steering.length === 0 && followUp.length === 0
+                    ? undefined
+                    : { steering, followUp },
+              },
+            }));
+            break;
+          }
           case "agent_end": {
             // Flush any remaining text delta
             if (rafId !== undefined) {
@@ -439,6 +468,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 isStreaming: false,
               },
             });
+            // Clear queued on agent end — the steer messages were delivered
+            set((s) => ({
+              queuedBySession: { ...s.queuedBySession, [sessionId]: undefined },
+            }));
             refetchMessages();
             break;
           }
@@ -516,6 +549,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       await sendPrompt(activeSessionId, text);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to send prompt" });
+    }
+  },
+
+  sendSteer: async (text: string) => {
+    const { activeSessionId } = get();
+    if (activeSessionId === undefined) return;
+
+    // Add user message immediately with metadata.steer=true
+    set((s) => ({
+      messages: [
+        ...s.messages,
+        { role: "user", content: text, metadata: { steer: true } },
+      ],
+    }));
+
+    try {
+      await steerSession(activeSessionId, text, "steer");
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : "Failed to steer" });
     }
   },
 
