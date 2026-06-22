@@ -293,11 +293,7 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
 
   const showAgentSettings = hasSubagents || subagentInstalled;
 
-  if (loading && !data) {
-    return <div style={{ padding: 16, fontSize: 12, color: "var(--text-dim)" }}>Loading extensions…</div>;
-  }
-
-  // ── Vision tool detection & providers fetch ──
+  // ── Vision tool detection & providers fetch (MUST be before early return) ──
   const hasVisionTool =
     data?.detected.some(
       (d) => d.name === "pi-vision-tool" || d.package === "npm:pi-vision-tool",
@@ -311,6 +307,10 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
     getVisionConfig().then(setVisionConfigState).catch(() => {});
     fetchProviders().then((r) => setVisionProviders(r.providers)).catch(() => {});
   }, [hasVisionTool, refreshing]);
+
+  if (loading && !data) {
+    return <div style={{ padding: 16, fontSize: 12, color: "var(--text-dim)" }}>Loading extensions…</div>;
+  }
 
   const handleSaveVisionConfig = async (provider: string, model: string) => {
     setVisionCfgSaving(true);
