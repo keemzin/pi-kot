@@ -1,6 +1,54 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import { getSession, autoNameSession } from "../session-registry.js";
 import { config } from "../config.js";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+
+const VISION_TEMP_DIR = "/tmp/pi-kot-vision";
+
+/** SDK-compatible ImageContent shape (matches @earendil-works/pi-ai's ImageContent). */
+interface ImageContent {
+  type: "image";
+  data: string;
+  mimeType: string;
+}
+
+/**
+ * If the session's model doesn't support images natively (no "image" in
+ * model.input), save the image data to temp files and inject file-path
+ * markers into the text. This lets text-only models use tools like
+ * describe_image that accept file paths.
+ *
+ * If the model supports images, passes through unchanged.
+ */
+async function maybeSaveImagesToFiles(
+  model: { input?: string[] } | undefined,
+  text: string,
+  images: ImageContent[] | undefined,
+): Promise<{ text: string; images: ImageContent[] | undefined }> {
+  if (!images || images.length === 0) return { text, images };
+  if (model?.input?.includes("image")) return { text, images };
+
+  try {
+    await mkdir(VISION_TEMP_DIR, { recursive: true });
+
+    const paths: string[] = [];
+    for (const img of images) {
+      const ext = img.mimeType.split("/")[1] ?? "png";
+      const filepath = join(VISION_TEMP_DIR, `${randomUUID()}.${ext}`);
+      await writeFile(filepath, Buffer.from(img.data, "base64"));
+      paths.push(filepath);
+    }
+
+    const pathMarkers = paths.map((p) => `[Image: ${p}]`).join("\n");
+    return { text: `${text}\n\n${pathMarkers}`, images: undefined };
+  } catch (err) {
+    console.error("[prompt] failed to save images to files, dropping:", err);
+    // Fall back to stripping images silently
+    return { text, images: undefined };
+  }
+}
 
 /**
  * Pre-flight checks shared by prompt + steer routes.
@@ -36,14 +84,7 @@ async function preflight(
 }
 
 export const promptRoutes: FastifyPluginAsync = async (fastify) => {
-  /** SDK-compatible ImageContent shape (matches @earendil-works/pi-ai's ImageContent). */
-interface ImageContent {
-  type: "image";
-  data: string;    // base64 encoded image data
-  mimeType: string; // e.g., "image/jpeg", "image/png"
-}
-
-// POST /api/v1/sessions/:id/prompt — fire-and-forget, returns 202
+  // POST /api/v1/sessions/:id/prompt — fire-and-forget, returns 202
   fastify.post<{
     Params: { id: string };
     Body: { text: string; streamingBehavior?: "steer" | "followUp"; images?: ImageContent[] };
@@ -112,7 +153,12 @@ interface ImageContent {
       const live = await preflight(req, reply);
       if (live === undefined) return reply;
 
-      const { text, streamingBehavior, images } = req.body;
+      let { text, streamingBehavior, images } = req.body;
+
+      // Save images to files if the model doesn't support vision natively
+      const transformed = await maybeSaveImagesToFiles(live.session.model, text, images);
+      text = transformed.text;
+      images = transformed.images;
 
       const opts: Parameters<typeof live.session.prompt>[1] = {};
       if (streamingBehavior !== undefined) opts.streamingBehavior = streamingBehavior;
@@ -238,7 +284,13 @@ interface ImageContent {
         return reply.code(404).send({ error: "session_not_found" });
       }
 
-      const { text, mode, images } = req.body;
+      let { text, mode, images } = req.body;
+
+      // Save images to files if the model doesn't support vision natively
+      const transformed = await maybeSaveImagesToFiles(live.session.model, text, images);
+      text = transformed.text;
+      images = transformed.images;
+
       try {
         if (mode === "followUp") {
           await live.session.followUp(text, images);
