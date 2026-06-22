@@ -5,7 +5,7 @@ import { ChatInput } from "./components/ChatInput";
 import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
 import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
-import { ContextInspectModal } from "./components/ContextBar";
+import { ContextInspectModal, useContextData, ContextPill } from "./components/ContextBar";
 import { MCPPanel } from "./components/MCPPanel";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
@@ -80,6 +80,7 @@ export function App() {
   const [showPathSuggestions, setShowPathSuggestions] = useState(false);
   const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
   const pathDebounceRef = useRef<number | undefined>(undefined);
+  const contextData = useContextData(activeSessionId);
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -913,6 +914,31 @@ export function App() {
             )}
           </div>
           <div className="header-right">
+            <ContextPill
+              data={contextData}
+              onInspect={(d) => setInspectData(d)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowMCP(true)}
+              title="MCP Settings"
+              style={{
+                background: "none",
+                border: "none",
+                color: showMCP ? "var(--accent-text)" : "var(--text-dim)",
+                fontSize: "12px",
+                cursor: "pointer",
+                padding: "3px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+            </button>
             <button
               type="button"
               onClick={() => setExplorerTab(explorerTab === "files" ? undefined : "files")}
@@ -998,8 +1024,6 @@ export function App() {
       sessionId={activeSessionId}
       showOrch={showOrch}
       setShowOrch={setShowOrch}
-      onInspectContext={setInspectData}
-      onOpenMCP={() => setShowMCP(true)}
       selectedModel={selectedModel}
       onModelSelect={handleModelSelect}
       onModelError={handleModelError}

@@ -1,15 +1,12 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
 import { useSessionStore } from "../stores/session-store";
 import type { ImageContent } from "../lib/api-client";
-import { useContextData, ContextPill, ContextInspectModal } from "./ContextBar";
 import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
   sessionId: string;
   showOrch?: boolean;
   setShowOrch?: (v: boolean) => void;
-  onInspectContext?: (data: any) => void;
-  onOpenMCP?: () => void;
   selectedModel?: string;
   onModelSelect?: (modelId: string, provider: string) => void;
   onModelError?: (error: string) => void;
@@ -36,15 +33,13 @@ const SLASH_COMMANDS = [
   },
 ];
 
-export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, onOpenMCP, selectedModel, onModelSelect, onModelError }: Props) {
+export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onModelSelect, onModelError }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const abort = useSessionStore((s) => s.abort);
-  const contextData = useContextData(sessionId);
-
   const [slashSuggestions, setSlashSuggestions] = useState<typeof SLASH_COMMANDS>([]);
   const [compacting, setCompacting] = useState(false);
 
@@ -314,24 +309,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, onInspectContext, 
               </svg>
             </button>
 
-            <button
-              type="button"
-              className="ti-toolbar-btn"
-              onClick={onOpenMCP}
-              title="MCP Settings"
-              tabIndex={-1}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </button>
-
-            <ContextPill
-              data={contextData}
-              onInspect={(d) => onInspectContext?.(d)}
-            />
+            {/* MCP moved to header bar */}
           </div>
 
           <div className="ti-toolbar-right">
