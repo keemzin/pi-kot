@@ -1,4 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getStoredToken } from "../lib/api-client";
+
+/** Wrapper around fetch that includes the auth token when available. */
+async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const token = getStoredToken();
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string> ?? {}) };
+  if (token !== undefined) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return fetch(input, { ...init, headers });
+}
 
 /* ----------------------------- types ----------------------------- */
 
@@ -88,7 +99,7 @@ export function GitPanel({ projectId }: Props) {
     setStatusError(undefined);
     try {
       const qs = new URLSearchParams({ projectId });
-      const res = await fetch(`/api/v1/git/status?${qs}`);
+      const res = await authFetch(`/api/v1/git/status?${qs}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { message?: string }).message ?? "status failed");
@@ -124,7 +135,7 @@ export function GitPanel({ projectId }: Props) {
   useEffect(() => {
     if (showLog) {
       const qs = new URLSearchParams({ projectId, limit: "30" });
-      fetch(`/api/v1/git/log?${qs}`)
+      authFetch(`/api/v1/git/log?${qs}`)
         .then((r) => r.json() as Promise<{ commits: GitLogEntry[] }>)
         .then((d) => setLog(d.commits))
         .catch(() => setLog([]));
@@ -135,7 +146,7 @@ export function GitPanel({ projectId }: Props) {
   useEffect(() => {
     if (showBranches) {
       const qs = new URLSearchParams({ projectId });
-      fetch(`/api/v1/git/branches?${qs}`)
+      authFetch(`/api/v1/git/branches?${qs}`)
         .then((r) => r.json() as Promise<{ branches: GitBranch[] }>)
         .then((d) => setBranches(d.branches))
         .catch(() => setBranches([]));
@@ -146,7 +157,7 @@ export function GitPanel({ projectId }: Props) {
   useEffect(() => {
     if (showWorktrees) {
       const qs = new URLSearchParams({ projectId });
-      fetch(`/api/v1/git/worktrees?${qs}`)
+      authFetch(`/api/v1/git/worktrees?${qs}`)
         .then((r) => r.json() as Promise<{ worktrees: GitWorktreeEntry[] }>)
         .then((d) => setWorktrees(d.worktrees))
         .catch(() => setWorktrees([]));
@@ -163,7 +174,7 @@ export function GitPanel({ projectId }: Props) {
     try {
       const qs = new URLSearchParams({ projectId, path: file.path });
       if (staged) qs.set("staged", "1");
-      const res = await fetch(`/api/v1/git/diff/file?${qs}`);
+      const res = await authFetch(`/api/v1/git/diff/file?${qs}`);
       if (!res.ok) throw new Error("diff failed");
       const data = (await res.json()) as { diff: string };
       setOpenDiffs((s) => ({ ...s, [key]: data.diff }));
@@ -176,7 +187,7 @@ export function GitPanel({ projectId }: Props) {
     if (paths.length === 0) return;
     setBusy(true); setOpError(undefined);
     try {
-      const res = await fetch("/api/v1/git/stage", {
+      const res = await authFetch("/api/v1/git/stage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, paths }),
@@ -191,7 +202,7 @@ export function GitPanel({ projectId }: Props) {
     if (paths.length === 0) return;
     setBusy(true); setOpError(undefined);
     try {
-      const res = await fetch("/api/v1/git/unstage", {
+      const res = await authFetch("/api/v1/git/unstage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, paths }),
@@ -207,7 +218,7 @@ export function GitPanel({ projectId }: Props) {
       clearPendingRevert();
       setBusy(true); setOpError(undefined);
       try {
-        const res = await fetch("/api/v1/git/revert", {
+        const res = await authFetch("/api/v1/git/revert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectId, paths: [path] }),
@@ -229,7 +240,7 @@ export function GitPanel({ projectId }: Props) {
     if (!msg) return;
     setBusy(true); setOpError(undefined); setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/commit", {
+      const res = await authFetch("/api/v1/git/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, message: msg }),
@@ -241,7 +252,7 @@ export function GitPanel({ projectId }: Props) {
       await fetchStatus();
       if (showLog) {
         const qs = new URLSearchParams({ projectId, limit: "30" });
-        const r = await fetch(`/api/v1/git/log?${qs}`);
+        const r = await authFetch(`/api/v1/git/log?${qs}`);
         const d = await r.json() as { commits: GitLogEntry[] };
         setLog(d.commits);
       }
@@ -252,7 +263,7 @@ export function GitPanel({ projectId }: Props) {
   const doPush = async () => {
     setBusy(true); setOpError(undefined); setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/push", {
+      const res = await authFetch("/api/v1/git/push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
@@ -267,7 +278,7 @@ export function GitPanel({ projectId }: Props) {
   const doPull = async () => {
     setBusy(true); setOpError(undefined); setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/pull", {
+      const res = await authFetch("/api/v1/git/pull", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
@@ -283,7 +294,7 @@ export function GitPanel({ projectId }: Props) {
   const doFetch = async () => {
     setBusy(true); setOpError(undefined); setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/fetch", {
+      const res = await authFetch("/api/v1/git/fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
@@ -298,7 +309,7 @@ export function GitPanel({ projectId }: Props) {
   const checkout = async (branch: string) => {
     setBranchBusy(branch); setOpError(undefined);
     try {
-      const res = await fetch("/api/v1/git/checkout", {
+      const res = await authFetch("/api/v1/git/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, branch }),
@@ -312,7 +323,7 @@ export function GitPanel({ projectId }: Props) {
   const reloadBranches = async () => {
     const qs = new URLSearchParams({ projectId });
     try {
-      const res = await fetch(`/api/v1/git/branches?${qs}`);
+      const res = await authFetch(`/api/v1/git/branches?${qs}`);
       const d = await res.json() as { branches: GitBranch[] };
       setBranches(d.branches);
     } catch { /* ignore */ }
@@ -321,7 +332,7 @@ export function GitPanel({ projectId }: Props) {
   const reloadWorktrees = async () => {
     const qs = new URLSearchParams({ projectId });
     try {
-      const res = await fetch(`/api/v1/git/worktrees?${qs}`);
+      const res = await authFetch(`/api/v1/git/worktrees?${qs}`);
       const d = await res.json() as { worktrees: GitWorktreeEntry[] };
       setWorktrees(d.worktrees);
     } catch { /* ignore */ }
@@ -332,7 +343,7 @@ export function GitPanel({ projectId }: Props) {
     setOpError(undefined);
     setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/worktree/add", {
+      const res = await authFetch("/api/v1/git/worktree/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, commitHash: hash }),
@@ -353,7 +364,7 @@ export function GitPanel({ projectId }: Props) {
     setOpError(undefined);
     setOpResult(undefined);
     try {
-      const res = await fetch("/api/v1/git/worktree/remove", {
+      const res = await authFetch("/api/v1/git/worktree/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId, worktreePath: path }),
@@ -374,7 +385,7 @@ export function GitPanel({ projectId }: Props) {
     const handleInit = async () => {
       setBusy(true); setOpError(undefined);
       try {
-        const res = await fetch("/api/v1/git/init", {
+        const res = await authFetch("/api/v1/git/init", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ projectId }),
