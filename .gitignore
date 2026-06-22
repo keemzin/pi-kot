@@ -56,6 +56,9 @@ Thumbs.db
 *.seed
 *.pid.lock
 
+# Git worktrees (created by 'Try this commit' UI)
+.git-worktrees/
+
 # Temp / cache
 .tmp/
 .cache/

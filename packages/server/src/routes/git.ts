@@ -1,8 +1,10 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import { resolve } from "node:path";
 import {
   GitCommandError,
   GitNotInstalledError,
   InvalidBranchNameError,
+  addWorktree,
   checkoutBranch,
   commit,
   createBranch,
@@ -23,6 +25,7 @@ import {
   isGitRepo,
   pull,
   push,
+  removeWorktree,
   revertPaths,
   stagePaths,
   unstagePaths,
@@ -398,6 +401,90 @@ export const gitRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) =>
       withProject(req.query.projectId, reply, async (p) => {
         return getWorktrees(p.path);
+      }),
+  );
+
+  fastify.post<{
+    Body: { projectId: string; commitHash: string; worktreePath?: string };
+  }>(
+    "/git/worktree/add",
+    {
+      schema: {
+        description:
+          "Create a linked working tree at `worktreePath` (relative to the project root) " +
+          "pinned to `commitHash`. If `worktreePath` is omitted, defaults to " +
+          "`.git-worktrees/<first-7-of-commitHash>/`. The working tree can be dirty — " +
+          "worktree creation doesn't require a clean index. Returns the absolute path " +
+          "of the created worktree.",
+        tags: ["git"],
+        body: {
+          type: "object",
+          required: ["projectId", "commitHash"],
+          additionalProperties: false,
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            commitHash: { type: "string", minLength: 7, maxLength: 40 },
+            worktreePath: { type: "string", minLength: 1 },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["path"],
+            properties: { path: { type: "string" } },
+          },
+          400: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) =>
+      withProject(req.body.projectId, reply, async (p) => {
+        const shortHash = req.body.commitHash.slice(0, 7);
+        const relPath = req.body.worktreePath ?? `.git-worktrees/${shortHash}/`;
+        const absPath = resolve(p.path, relPath);
+        await addWorktree(p.path, absPath, req.body.commitHash);
+        return { path: absPath };
+      }),
+  );
+
+  fastify.post<{
+    Body: { projectId: string; worktreePath: string };
+  }>(
+    "/git/worktree/remove",
+    {
+      schema: {
+        description:
+          "Remove a linked working tree at the given absolute path. Git refuses if the " +
+          "worktree has uncommitted changes; the resulting error message is surfaced " +
+          "so the user knows to commit or stash first.",
+        tags: ["git"],
+        body: {
+          type: "object",
+          required: ["projectId", "worktreePath"],
+          additionalProperties: false,
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            worktreePath: { type: "string", minLength: 1 },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { ok: { type: "boolean" } },
+            required: ["ok"],
+          },
+          400: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) =>
+      withProject(req.body.projectId, reply, async (p) => {
+        await removeWorktree(p.path, req.body.worktreePath);
+        return { ok: true };
       }),
   );
 

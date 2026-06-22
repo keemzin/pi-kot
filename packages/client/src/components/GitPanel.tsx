@@ -34,6 +34,15 @@ interface GitBranch {
   remote: boolean;
 }
 
+interface GitWorktreeEntry {
+  path: string;
+  head?: string;
+  branch?: string;
+  bare: boolean;
+  detached: boolean;
+  current: boolean;
+}
+
 /* ----------------------------- component ----------------------------- */
 
 interface Props {
@@ -48,6 +57,10 @@ export function GitPanel({ projectId }: Props) {
   const [branches, setBranches] = useState<GitBranch[] | undefined>();
   const [showLog, setShowLog] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
+  const [showWorktrees, setShowWorktrees] = useState(false);
+  const [worktrees, setWorktrees] = useState<GitWorktreeEntry[] | undefined>();
+  const [worktreeBusy, setWorktreeBusy] = useState<string | undefined>();
+  const [copiedPath, setCopiedPath] = useState<string | undefined>();
   const [commitMessage, setCommitMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [opError, setOpError] = useState<string | undefined>();
@@ -128,6 +141,17 @@ export function GitPanel({ projectId }: Props) {
         .catch(() => setBranches([]));
     }
   }, [showBranches, projectId]);
+
+  // Lazy-load worktrees
+  useEffect(() => {
+    if (showWorktrees) {
+      const qs = new URLSearchParams({ projectId });
+      fetch(`/api/v1/git/worktrees?${qs}`)
+        .then((r) => r.json() as Promise<{ worktrees: GitWorktreeEntry[] }>)
+        .then((d) => setWorktrees(d.worktrees))
+        .catch(() => setWorktrees([]));
+    }
+  }, [showWorktrees, projectId]);
 
   const toggleDiff = async (file: GitFileStatus, staged: boolean) => {
     const key = `${file.path}|${staged ? "staged" : "unstaged"}`;
@@ -292,6 +316,56 @@ export function GitPanel({ projectId }: Props) {
       const d = await res.json() as { branches: GitBranch[] };
       setBranches(d.branches);
     } catch { /* ignore */ }
+  };
+
+  const reloadWorktrees = async () => {
+    const qs = new URLSearchParams({ projectId });
+    try {
+      const res = await fetch(`/api/v1/git/worktrees?${qs}`);
+      const d = await res.json() as { worktrees: GitWorktreeEntry[] };
+      setWorktrees(d.worktrees);
+    } catch { /* ignore */ }
+  };
+
+  const handleTryCommit = async (hash: string) => {
+    setWorktreeBusy(hash);
+    setOpError(undefined);
+    setOpResult(undefined);
+    try {
+      const res = await fetch("/api/v1/git/worktree/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, commitHash: hash }),
+      });
+      if (!res.ok) throw new Error("worktree creation failed");
+      const data = (await res.json()) as { path: string };
+      setOpResult(`Worktree created at ${data.path}`);
+      if (showWorktrees) await reloadWorktrees();
+    } catch (err) {
+      setOpError(err instanceof Error ? err.message : "worktree creation failed");
+    } finally {
+      setWorktreeBusy(undefined);
+    }
+  };
+
+  const handleRemoveWorktree = async (path: string) => {
+    setWorktreeBusy(path);
+    setOpError(undefined);
+    setOpResult(undefined);
+    try {
+      const res = await fetch("/api/v1/git/worktree/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, worktreePath: path }),
+      });
+      if (!res.ok) throw new Error("worktree removal failed");
+      setOpResult(`Removed worktree at ${path}`);
+      await reloadWorktrees();
+    } catch (err) {
+      setOpError(err instanceof Error ? err.message : "worktree removal failed");
+    } finally {
+      setWorktreeBusy(undefined);
+    }
   };
 
   /* ----------------------------- git init ----------------------------- */
@@ -471,11 +545,12 @@ export function GitPanel({ projectId }: Props) {
             <button onClick={doPush} disabled={busy} style={{ ...s, flex: 1, textAlign: "center" }} type="button">Push</button>
           </div>
         </div>
+      </div>
 
-        {/* ── Log ── */}
-        <div style={{ borderTop: "1px solid var(--border)" }}>
-          <button
-            onClick={() => setShowLog((v) => !v)}
+      {/* ── Log ── */}
+      <div style={{ borderTop: "1px solid var(--border)" }}>
+        <button
+          onClick={() => setShowLog((v) => !v)}
             style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-dim)",
@@ -494,29 +569,122 @@ export function GitPanel({ projectId }: Props) {
                 <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>No commits yet.</div>
               ) : (
                 <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                  {log.map((c) => (
-                    <li key={c.hash} style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", fontSize: "11px" }}>
-                      <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
-                        <code style={{ fontSize: "10px", color: "var(--text-dim)", fontFamily: "monospace" }}>
-                          {c.hash.slice(0, 7)}
-                        </code>
-                        <span style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {c.message}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "9px", color: "var(--text-dim)", marginTop: "1px" }}>
-                        {c.author} · {new Date(c.date).toLocaleString()}
-                      </div>
-                    </li>
-                  ))}
+                  {log.map((c) => {
+                    const busy = worktreeBusy === c.hash;
+                    return (
+                      <li key={c.hash} style={{ padding: "4px 0", borderBottom: "1px solid var(--border)", fontSize: "11px" }}>
+                        <div style={{ display: "flex", gap: "6px", alignItems: "baseline" }}>
+                          <code style={{ fontSize: "10px", color: "var(--text-dim)", fontFamily: "monospace" }}>
+                            {c.hash.slice(0, 7)}
+                          </code>
+                          <span style={{ color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                            {c.message}
+                          </span>
+                          <button
+                            onClick={() => handleTryCommit(c.hash)}
+                            disabled={busy}
+                            title="Try this commit in a linked worktree"
+                            style={{
+                              background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
+                              cursor: busy ? "default" : "pointer", fontSize: "9px", padding: "1px 6px",
+                              color: "var(--accent-text)", opacity: busy ? 0.4 : 0.8, whiteSpace: "nowrap",
+                            }}
+                            type="button"
+                          >
+                            {busy ? "…" : "Try →"}
+                          </button>
+                        </div>
+                        <div style={{ fontSize: "9px", color: "var(--text-dim)", marginTop: "1px" }}>
+                          {c.author} · {new Date(c.date).toLocaleString()}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
           )}
         </div>
 
-        {/* ── Branches ── */}
-        <div style={{ borderTop: "1px solid var(--border)" }}>
+      {/* ── Worktrees ── */}
+      <div style={{ borderTop: "1px solid var(--border)" }}>
+          <button
+            onClick={() => setShowWorktrees((v) => !v)}
+            style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-dim)",
+              background: "none", border: "none", cursor: "pointer", textAlign: "left",
+            }}
+            type="button"
+          >
+            <span>Worktrees</span>
+            <span>{showWorktrees ? "−" : "+"}</span>
+          </button>
+          {showWorktrees && (
+            <div style={{ padding: "0 12px 8px" }}>
+              {worktrees === undefined ? (
+                <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>Loading…</div>
+              ) : worktrees.length === 0 ? (
+                <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>No worktrees.</div>
+              ) : (
+                <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                  {worktrees.filter((w) => !w.current).map((w) => {
+                    const busy = worktreeBusy === w.path;
+                    const copied = copiedPath === w.path;
+                    return (
+                      <li key={w.path} style={{
+                        display: "flex", alignItems: "center", gap: "4px",
+                        padding: "3px 4px", borderRadius: "var(--radius-sm)",
+                        fontSize: "10px", fontFamily: "monospace",
+                        color: "var(--text-secondary)",
+                      }}>
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {w.path}
+                        </span>
+                        {w.head && (
+                          <span style={{ fontSize: "9px", color: "var(--text-dim)" }}>
+                            {w.head.slice(0, 7)}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => {
+                            copyToClipboard(w.path);
+                            setCopiedPath(w.path);
+                            setTimeout(() => setCopiedPath(undefined), 1500);
+                          }}
+                          title="Copy path"
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            fontSize: "10px", color: copied ? "var(--accent-text)" : "var(--text-dim)",
+                            padding: "1px 4px", opacity: 0.7,
+                          }}
+                          type="button"
+                        >
+                          {copied ? "✓" : "📋"}
+                        </button>
+                        <button
+                          onClick={() => handleRemoveWorktree(w.path)}
+                          disabled={busy}
+                          style={{
+                            background: "none", border: "none", cursor: "pointer",
+                            fontSize: "10px", color: "var(--error)", padding: "1px 4px",
+                            opacity: busy ? 0.4 : 0.7,
+                          }}
+                          type="button"
+                        >
+                          {busy ? "…" : "✕"}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
+      {/* ── Branches ── */}
+      <div style={{ borderTop: "1px solid var(--border)" }}>
           <button
             onClick={() => setShowBranches((v) => !v)}
             style={{
@@ -579,7 +747,6 @@ export function GitPanel({ projectId }: Props) {
             </div>
           )}
         </div>
-      </div>
     </div>
   );
 }
@@ -750,6 +917,39 @@ function DiffView({ diff }: DiffViewProps) {
       })}
     </div>
   );
+}
+
+/**
+ * Copy `text` to clipboard. Works on HTTPS and HTTP (both desktop +
+ * mobile) by trying the async Clipboard API first and falling back
+ * to the legacy `execCommand('copy')` via a temp textarea. On mobile
+ * the textarea approach is the most reliable since the async API is
+ * restricted to secure contexts on some browsers.
+ */
+function copyToClipboard(text: string): void {
+  if (navigator.clipboard?.writeText !== undefined) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text: string): void {
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  ta.style.pointerEvents = "none";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand("copy");
+  } catch {
+    // Still failed — at least the path is visible in the UI
+  }
+  document.body.removeChild(ta);
 }
 
 

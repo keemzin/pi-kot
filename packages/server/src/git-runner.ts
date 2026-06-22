@@ -1020,6 +1020,39 @@ export async function push(cwd: string, opts: PushOptions = {}): Promise<{ stdou
   return { stdout: stdout.length > 0 ? stdout : stderr };
 }
 
+/* ----------------------------- worktrees ----------------------------- */
+
+/**
+ * Create a linked working tree at `worktreePath` pinned to `commitHash`.
+ * `git worktree add` does NOT require a clean working tree in the primary
+ * checkout — you can be mid-edit and still create a worktree to try an
+ * old commit. Returns the resolved absolute path so the UI can display
+ * it.
+ *
+ * `worktreePath` is resolved against `cwd` — the caller's route should
+ * use something like `.git-worktrees/<short-hash>/` relative to the
+ * project root.
+ */
+export async function addWorktree(
+  cwd: string,
+  worktreePath: string,
+  commitHash: string,
+): Promise<void> {
+  await runGit(cwd, ["worktree", "add", worktreePath, commitHash]);
+}
+
+/**
+ * Remove a linked working tree. Git refuses if the worktree has
+ * uncommitted changes (non-zero exit) — the route layer surfaces the
+ * `GitCommandError` message so the user knows to commit or stash
+ * before removing.
+ */
+export async function removeWorktree(cwd: string, worktreePath: string): Promise<void> {
+  await runGit(cwd, ["worktree", "remove", worktreePath]);
+}
+
+/* ----------------------------- remote validation ----------------------------- */
+
 /**
  * Validate a git remote name. Rules are looser than branch names:
  * remotes don't reserve `HEAD`/`FETCH_HEAD`/etc., and the `.lock`
