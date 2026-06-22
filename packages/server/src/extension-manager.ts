@@ -100,23 +100,6 @@ function npmPackagePath(): string {
 // ── Known extension registry (curated) ──────────────────────────────
 
 const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
-  // ── Orchestration ──
-  {
-    id: "pi-subagents",
-    name: "pi-subagents",
-    description:
-      "Delegates tasks to specialised subagents (scout, planner, worker, reviewer) with isolated context windows. The core multi-agent extension.",
-    package: "npm:pi-subagents",
-    category: "orchestration",
-    providesAgentTypes: ["scout", "planner", "worker", "reviewer"],
-    enablesFeatures: [
-      "Agent type config (planner/reviewer/scout/worker models)",
-      "Orchestration panel agent detail view",
-    ],
-    icon: "🧩",
-  },
-
-
   // ── Tools ──
   {
     id: "pi-web-access",
