@@ -36,10 +36,17 @@ async function preflight(
 }
 
 export const promptRoutes: FastifyPluginAsync = async (fastify) => {
-  // POST /api/v1/sessions/:id/prompt — fire-and-forget, returns 202
+  /** SDK-compatible ImageContent shape (matches @earendil-works/pi-ai's ImageContent). */
+interface ImageContent {
+  type: "image";
+  data: string;    // base64 encoded image data
+  mimeType: string; // e.g., "image/jpeg", "image/png"
+}
+
+// POST /api/v1/sessions/:id/prompt — fire-and-forget, returns 202
   fastify.post<{
     Params: { id: string };
-    Body: { text: string; streamingBehavior?: "steer" | "followUp" };
+    Body: { text: string; streamingBehavior?: "steer" | "followUp"; images?: ImageContent[] };
   }>(
     "/sessions/:id/prompt",
     {
@@ -64,6 +71,18 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
           properties: {
             text: { type: "string", minLength: 1 },
             streamingBehavior: { type: "string", enum: ["steer", "followUp"] },
+            images: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["type", "data", "mimeType"],
+                properties: {
+                  type: { type: "string", const: "image" },
+                  data: { type: "string" },
+                  mimeType: { type: "string" },
+                },
+              },
+            },
           },
         },
         response: {
@@ -93,10 +112,11 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
       const live = await preflight(req, reply);
       if (live === undefined) return reply;
 
-      const { text, streamingBehavior } = req.body;
+      const { text, streamingBehavior, images } = req.body;
 
       const opts: Parameters<typeof live.session.prompt>[1] = {};
       if (streamingBehavior !== undefined) opts.streamingBehavior = streamingBehavior;
+      if (images !== undefined && images.length > 0) opts.images = images;
 
       // Auto-name from the first prompt if no name is set yet
       autoNameSession(req.params.id, text);
@@ -171,7 +191,7 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
   // POST /api/v1/sessions/:id/steer — steer during streaming
   fastify.post<{
     Params: { id: string };
-    Body: { text: string; mode?: "steer" | "followUp" };
+    Body: { text: string; mode?: "steer" | "followUp"; images?: ImageContent[] };
   }>(
     "/sessions/:id/steer",
     {
@@ -189,6 +209,18 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
           properties: {
             text: { type: "string", minLength: 1 },
             mode: { type: "string", enum: ["steer", "followUp"], default: "steer" },
+            images: {
+              type: "array",
+              items: {
+                type: "object",
+                required: ["type", "data", "mimeType"],
+                properties: {
+                  type: { type: "string", const: "image" },
+                  data: { type: "string" },
+                  mimeType: { type: "string" },
+                },
+              },
+            },
           },
         },
         response: {
@@ -206,12 +238,12 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "session_not_found" });
       }
 
-      const { text, mode } = req.body;
+      const { text, mode, images } = req.body;
       try {
         if (mode === "followUp") {
-          await live.session.followUp(text);
+          await live.session.followUp(text, images);
         } else {
-          await live.session.steer(text);
+          await live.session.steer(text, images);
         }
       } catch {
         // best-effort; the session handles invalid-state calls gracefully

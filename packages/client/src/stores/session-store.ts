@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   type SessionSummary,
   type Project,
+  type ImageContent,
   createSession,
   listSessions,
   getSessionMessages,
@@ -106,8 +107,8 @@ interface SessionActions {
   createAndActivate: (projectId?: string) => Promise<string>;
   setActiveSession: (id: string) => Promise<void>;
   connectSSE: (sessionId: string) => void;
-  sendPrompt: (text: string) => Promise<void>;
-  sendSteer: (text: string) => Promise<void>;
+  sendPrompt: (text: string, images?: ImageContent[]) => Promise<void>;
+  sendSteer: (text: string, images?: ImageContent[]) => Promise<void>;
   abort: () => Promise<void>;
   refreshSessions: () => Promise<void>;
   renameSession: (sessionId: string, name: string) => Promise<void>;
@@ -536,36 +537,65 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ sseClient: client });
   },
 
-  sendPrompt: async (text: string) => {
+  sendPrompt: async (text: string, images?: ImageContent[]) => {
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
 
-    // Add user message immediately
+    // Add user message immediately (optimistic)
+    const optimisticContent: Record<string, unknown>[] = [{ type: "text", text }];
+    if (images !== undefined && images.length > 0) {
+      for (const img of images) {
+        // Use the base64 data as a data URL for the optimistic preview
+        optimisticContent.push({
+          type: "image",
+          mimeType: img.mimeType,
+          data: `data:${img.mimeType};base64,${img.data}`,
+          __blobUrl: true,
+        });
+      }
+    }
+
     set((s) => ({
-      messages: [...s.messages, { role: "user", content: text }],
+      messages: [
+        ...s.messages,
+        { role: "user", content: optimisticContent },
+      ],
     }));
 
     try {
-      await sendPrompt(activeSessionId, text);
+      await sendPrompt(activeSessionId, text, undefined, images);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to send prompt" });
     }
   },
 
-  sendSteer: async (text: string) => {
+  sendSteer: async (text: string, images?: ImageContent[]) => {
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
+
+    // Build optimistic content
+    const optimisticContent: Record<string, unknown>[] = [{ type: "text", text }];
+    if (images !== undefined && images.length > 0) {
+      for (const img of images) {
+        optimisticContent.push({
+          type: "image",
+          mimeType: img.mimeType,
+          data: `data:${img.mimeType};base64,${img.data}`,
+          __blobUrl: true,
+        });
+      }
+    }
 
     // Add user message immediately with metadata.steer=true
     set((s) => ({
       messages: [
         ...s.messages,
-        { role: "user", content: text, metadata: { steer: true } },
+        { role: "user", content: optimisticContent, metadata: { steer: true } },
       ],
     }));
 
     try {
-      await steerSession(activeSessionId, text, "steer");
+      await steerSession(activeSessionId, text, "steer", images);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to steer" });
     }

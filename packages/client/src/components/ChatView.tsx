@@ -41,6 +41,47 @@ function extractText(content: unknown): string {
   return String(content ?? "");
 }
 
+/** Extract image blocks from an SDK content array, returning { mimeType, data } for rendering. */
+function extractImages(content: unknown): { mimeType: string; data: string; __blobUrl?: boolean }[] {
+  if (!Array.isArray(content)) return [];
+  return content
+    .filter((block: Record<string, unknown>) => block.type === "image")
+    .map((block: Record<string, unknown>) => ({
+      mimeType: (block.mimeType as string) ?? "image/png",
+      data: (block.data as string) ?? "",
+      __blobUrl: (block as { __blobUrl?: boolean }).__blobUrl,
+    }));
+}
+
+/** Render images inline. Used inside user message bubbles. */
+function UserImages({ images }: { images: { mimeType: string; data: string; __blobUrl?: boolean }[] }) {
+  if (images.length === 0) return null;
+  return (
+    <div className="user-images-row">
+      {images.map((img, i) => {
+        // Optimistic entries use a complete data URL stored in img.data.
+        // Canonical entries from the server have raw base64 in img.data.
+        const src = img.__blobUrl
+          ? img.data
+          : `data:${img.mimeType};base64,${img.data}`;
+        return (
+          <img
+            key={i}
+            src={src}
+            alt={`Attached image ${i + 1}`}
+            className="user-image-thumb"
+            loading="lazy"
+            onError={(e) => {
+              // Failed to load — could be blob URL revoked or bad data
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 /** Archived messages rendered inside a CompactionCard's expand drawer.
  *  Memo'd so it only renders when expanded, not on every ChatView tick. */
 const ArchivedMessages = memo(function ArchivedMessages({
@@ -53,6 +94,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
       {messages.map((raw, i) => {
         const m = raw as { role?: string; content?: unknown };
         const text = extractText(m.content);
+        const imgs = extractImages(m.content);
         const isUser = m.role === "user";
         return (
           <div
@@ -73,7 +115,10 @@ const ArchivedMessages = memo(function ArchivedMessages({
             }}
           >
             {isUser ? (
-              text
+              <>
+                <UserImages images={imgs} />
+                {text}
+              </>
             ) : (
               <ChatMarkdown text={text} />
             )}
@@ -301,7 +346,7 @@ function AssistantRenderSegmentView({
 
 /* ── Sticky user message component ── */
 
-function UserMessageBubble({ text, isSteer }: { text: string; isSteer?: boolean }) {
+function UserMessageBubble({ text, isSteer, images }: { text: string; isSteer?: boolean; images?: { mimeType: string; data: string; __blobUrl?: boolean }[] }) {
   const [expanded, setExpanded] = useState(false);
   const [isLong, setIsLong] = useState(false);
   const textRef = useRef<HTMLDivElement>(null);
@@ -324,6 +369,9 @@ function UserMessageBubble({ text, isSteer }: { text: string; isSteer?: boolean 
     <div className="message-row user">
       <div className="message-bubble user">
         {isSteer && <span className="steer-tag">steer</span>}
+        {images !== undefined && images.length > 0 && (
+          <UserImages images={images} />
+        )}
         <div
           ref={textRef}
           style={{
@@ -558,6 +606,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       compactions.length > 0 ? compactions[compactions.length - 1] : undefined;
     const keptWindowEnd = latestCard?.insertBeforeIndex ?? 0;
 
+    // Helper: extract images from a user message's content
+    const userImages = (m: PairableMessage) => extractImages(m.content);
+
     // Common helper: assistant message rendering (tool batching etc.)
     const renderAssistantMsgs = (msgs: PairableMessage[], turnIdx: number) => {
       const elements: React.ReactNode[] = [];
@@ -647,7 +698,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 overflowAnchor: "none",
               }}
             >
-              <UserMessageBubble text={text} isSteer={isSteer} />
+              <UserMessageBubble text={text} isSteer={isSteer} images={userImages(currentUserMsg)} />
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
@@ -689,6 +740,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           >
             <div className="message-bubble user">
               {isSteer && <span className="steer-tag">steer</span>}
+              <UserImages images={userImages(currentUserMsg)} />
               {text}
             </div>
           </div>,

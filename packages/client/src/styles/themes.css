@@ -4061,3 +4061,79 @@ body {
     font-size: 13px;
   }
 }
+
+/* ═══ Image Attachments ═══ */
+
+/* Preview row in the chat input — horizontal scroll of thumbnails */
+.ti-image-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px 0;
+}
+
+/* Individual thumbnail container */
+.ti-image-preview-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  animation: fadeIn 0.15s var(--ease);
+}
+
+.ti-image-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Remove button (X) overlaying the thumbnail */
+.ti-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+}
+
+.ti-image-preview-item:hover .ti-image-remove {
+  opacity: 1;
+}
+
+/* Images rendered inside user message bubbles */
+.user-images-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.user-image-thumb {
+  max-height: 200px;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  object-fit: contain;
+  background: var(--bg-elevated);
+}
+
+/* Ti toolbar image attach button — subtle accent when images are attached */
+.ti-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

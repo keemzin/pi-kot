@@ -196,15 +196,23 @@ export async function getSessionContext(
   );
 }
 
+/** SDK-compatible ImageContent shape (matches @earendil-works/pi-ai's ImageContent). */
+export interface ImageContent {
+  type: "image";
+  data: string;    // base64 encoded image data
+  mimeType: string; // e.g., "image/jpeg", "image/png"
+}
+
 export async function sendPrompt(
   sessionId: string,
   text: string,
   streamingBehavior?: "steer" | "followUp",
+  images?: ImageContent[],
 ): Promise<PromptResponse> {
   return request<PromptResponse>(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/prompt`,
-    { text, streamingBehavior },
+    { text, streamingBehavior, images },
   );
 }
 
@@ -226,11 +234,12 @@ export async function steerSession(
   sessionId: string,
   text: string,
   mode: "steer" | "followUp" = "steer",
+  images?: ImageContent[],
 ): Promise<{ accepted: boolean }> {
   return request<{ accepted: boolean }>(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/steer`,
-    { text, mode },
+    { text, mode, images },
   );
 }
 
