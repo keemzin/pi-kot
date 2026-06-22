@@ -14,11 +14,17 @@ import {
   checkExtensionUpdates,
   updateExtension as updateExtApi,
   reloadAgent,
+  getVisionConfig,
+  setVisionConfig,
+  fetchProviders,
   type ExtensionsResponse,
   type RecommendedExtension,
   type DiscoveredExtension,
   type AgentDef,
   type ExtensionUpdateInfo,
+  type VisionConfigResponse,
+  type ProviderGroup,
+  type ModelInfo,
 } from "../lib/api-client";
 
 // ── Styles (inline for self-contained component) ──────────────────────
@@ -154,6 +160,11 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [manualInput, setManualInput] = useState("");
   const [manualInstalling, setManualInstalling] = useState(false);
 
+  // ── Vision tool config (secret: only shown when pi-vision-tool is installed) ──
+  const [visionConfig, setVisionConfigState] = useState<VisionConfigResponse | null>(null);
+  const [visionProviders, setVisionProviders] = useState<ProviderGroup[]>([]);
+  const [visionCfgSaving, setVisionCfgSaving] = useState(false);
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
@@ -286,6 +297,33 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
     return <div style={{ padding: 16, fontSize: 12, color: "var(--text-dim)" }}>Loading extensions…</div>;
   }
 
+  // ── Vision tool detection & providers fetch ──
+  const hasVisionTool =
+    data?.detected.some(
+      (d) => d.name === "pi-vision-tool" || d.package === "npm:pi-vision-tool",
+    ) ?? false;
+
+  useEffect(() => {
+    if (!hasVisionTool) {
+      setVisionConfigState(null);
+      return;
+    }
+    getVisionConfig().then(setVisionConfigState).catch(() => {});
+    fetchProviders().then((r) => setVisionProviders(r.providers)).catch(() => {});
+  }, [hasVisionTool, refreshing]);
+
+  const handleSaveVisionConfig = async (provider: string, model: string) => {
+    setVisionCfgSaving(true);
+    try {
+      await setVisionConfig({ provider, model });
+      setVisionConfigState((prev) => prev ? { ...prev, provider, model } : null);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setVisionCfgSaving(false);
+    }
+  };
+
   // ── Agent Type Settings (shown when subagent extension is detected) ──
   const agentTypes = [
     ...(data?.agents ?? []),
@@ -366,6 +404,95 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
           <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 6 }}>
             💡 Install the <strong>pi-subagents</strong> extension below to activate these agent types.
             Models are set in <code>~/.pi/agent/agents/&lt;name&gt;.md</code> frontmatter.
+          </div>
+        </div>
+      )}
+
+      {/* ── Vision Tool Config (secret: only when pi-vision-tool is installed) ── */}
+      {hasVisionTool && visionConfig?.installed && (
+        <div style={s.section}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={s.heading}>👁️ Vision Tool Settings</div>
+              <div style={s.subheading}>
+                Select which provider/model to delegate image analysis to.{" "}
+                <code style={{ fontSize: 10 }}>describe_image</code> will route to this model.
+              </div>
+            </div>
+            <span style={s.badge}>pi-vision-tool detected</span>
+          </div>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "end", marginTop: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>Provider</div>
+              <select
+                value={visionConfig.provider ?? ""}
+                onChange={(e) => {
+                  const p = e.target.value;
+                  // Reset model when provider changes
+                  const firstModel = visionProviders.find((g) => g.provider === p)?.models?.[0];
+                  void handleSaveVisionConfig(p, firstModel?.id ?? "");
+                }}
+                style={{
+                  width: "100%",
+                  padding: "6px 8px",
+                  fontSize: 11,
+                  borderRadius: 6,
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-glass)",
+                  color: "var(--text-primary)",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="" disabled>Select provider…</option>
+                {visionProviders.map((g) => (
+                  <option key={g.provider} value={g.provider}>{g.provider}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>Model</div>
+              <select
+                value={visionConfig.model ?? ""}
+                onChange={(e) => {
+                  void handleSaveVisionConfig(visionConfig.provider ?? "", e.target.value);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "6px 8px",
+                  fontSize: 11,
+                  borderRadius: 6,
+                  border: "1px solid var(--border-color)",
+                  background: "var(--bg-glass)",
+                  color: "var(--text-primary)",
+                  outline: "none",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="" disabled>Select model…</option>
+                {visionProviders
+                  .find((g) => g.provider === visionConfig.provider)
+                  ?.models?.filter((m) => m.input?.includes("image"))
+                  .map((m) => (
+                    <option key={m.id} value={m.id}>{m.name ?? m.id}</option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>&nbsp;</div>
+              {visionCfgSaving && <span style={{ fontSize: 10, color: "var(--text-dim)" }}>Saving…</span>}
+              {!visionCfgSaving && visionConfig.provider && visionConfig.model && (
+                <span style={{ fontSize: 10, color: "#22c55e" }}>✓ Saved</span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 6 }}>
+            Config saved to <code style={{ fontSize: 10 }}>~/.pi/agent/vision-tool.json</code>.
+            Changes apply on next session start.
           </div>
         </div>
       )}

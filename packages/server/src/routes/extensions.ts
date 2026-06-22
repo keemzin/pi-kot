@@ -13,6 +13,11 @@ import {
   checkExtensionUpdates,
   updateExtension,
 } from "../extension-manager.js";
+import { config } from "../config.js";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { join, dirname } from "node:path";
+
+const VISION_CONFIG_PATH = join(config.piConfigDir, "vision-tool.json");
 
 // ── Schemas ─────────────────────────────────────────────────────────
 
@@ -275,6 +280,103 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
         req.log.error(err, "Failed to update extension");
         return reply.status(500).send({ error: message });
       }
+    },
+  );
+
+  // ── GET /api/v1/extensions/vision-config ─────────────────────────────
+
+  fastify.get(
+    "/extensions/vision-config",
+    {
+      config: { public: true },
+      schema: {
+        description: "Get pi-vision-tool configuration (only meaningful when the extension is installed)",
+        tags: ["extensions"],
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              provider: { type: "string" },
+              model: { type: "string" },
+              enabled: { type: "boolean" },
+              installed: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+    async (_req, reply) => {
+      // Check if pi-vision-tool is installed
+      const extResult = await discoverExtensions();
+      const installed = extResult.detected.some(
+        (e) => e.name === "pi-vision-tool" || e.package === "npm:pi-vision-tool",
+      );
+
+      if (!installed) {
+        return reply.send({ installed: false });
+      }
+
+      try {
+        const raw = await readFile(VISION_CONFIG_PATH, "utf-8");
+        const cfg = JSON.parse(raw);
+        return reply.send({
+          installed: true,
+          provider: cfg.provider || null,
+          model: cfg.model || null,
+          enabled: cfg.enabled !== false,
+        });
+      } catch {
+        return reply.send({ installed: true, enabled: true });
+      }
+    },
+  );
+
+  // ── PUT /api/v1/extensions/vision-config ─────────────────────────────
+
+  fastify.put(
+    "/extensions/vision-config",
+    {
+      schema: {
+        description: "Update pi-vision-tool configuration",
+        tags: ["extensions"],
+        body: {
+          type: "object",
+          properties: {
+            provider: { type: "string" },
+            model: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              saved: { type: "boolean" },
+            },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const { provider, model } = req.body as { provider?: string; model?: string };
+      let existing: Record<string, unknown> = {};
+      try {
+        const raw = await readFile(VISION_CONFIG_PATH, "utf-8");
+        existing = JSON.parse(raw);
+      } catch {
+        // doesn't exist yet
+      }
+
+      const updated = {
+        ...existing,
+        ...(provider !== undefined && { provider }),
+        ...(model !== undefined && { model }),
+        enabled: true,
+      };
+
+      await mkdir(dirname(VISION_CONFIG_PATH), { recursive: true });
+      await writeFile(VISION_CONFIG_PATH, JSON.stringify(updated, null, 2) + "\n");
+
+      return reply.send({ saved: true });
     },
   );
 

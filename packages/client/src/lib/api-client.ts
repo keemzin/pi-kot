@@ -956,6 +956,26 @@ export async function updateExtension(
   return request("POST", "/api/v1/extensions/update", { package: packageName });
 }
 
+// ---- Extension Config (pi-vision-tool) ----
+
+export interface VisionConfigResponse {
+  installed: boolean;
+  provider?: string | null;
+  model?: string | null;
+  enabled?: boolean;
+}
+
+export async function getVisionConfig(): Promise<VisionConfigResponse> {
+  return request<VisionConfigResponse>("GET", "/api/v1/extensions/vision-config");
+}
+
+export async function setVisionConfig(cfg: {
+  provider?: string;
+  model?: string;
+}): Promise<{ saved: boolean }> {
+  return request<{ saved: boolean }>("PUT", "/api/v1/extensions/vision-config", cfg);
+}
+
 // ---- Control ----
 
 export interface ReloadResponse {
