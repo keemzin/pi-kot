@@ -48,6 +48,8 @@ declare module "fastify" {
  */
 export async function buildServer() {
   const fastify = Fastify({
+    // Allow images up to ~10MB as base64 + overhead
+    bodyLimit: 15 * 1024 * 1024,
     logger: {
       level: config.logLevel,
       serializers: {
