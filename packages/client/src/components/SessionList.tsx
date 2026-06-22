@@ -12,7 +12,7 @@ interface Props {
   isStreaming: boolean;
   renamingSessionId: string | undefined;
   renameValue: string;
-  renameInputRef: React.RefObject<HTMLInputElement>;
+  renameInputRef: React.RefObject<HTMLInputElement | null>;
   expandedWorkerGroups: Set<string>;
   pendingRevert?: string;
   onSelect: (sessionId: string) => void;

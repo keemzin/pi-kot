@@ -75,7 +75,7 @@ export function App() {
   const [showOrch, setShowOrch] = useState(false);
   const [showMCP, setShowMCP] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
-  const renameInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
   const [pathSuggestions, setPathSuggestions] = useState<string[]>([]);
   const [showPathSuggestions, setShowPathSuggestions] = useState(false);
   const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);

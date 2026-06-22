@@ -23,6 +23,11 @@ function readBool(key: string, fallback: boolean): boolean {
   return ["1", "true", "yes", "on"].includes(v);
 }
 
+function modeSuffix(): string {
+  const mode = readEnv("PIKOT_MODE") ?? "";
+  return mode === "dev" ? "-dev" : "";
+}
+
 const HOME = homedir();
 if (HOME === "/" || HOME === "") {
   throw new Error(
@@ -31,13 +36,15 @@ if (HOME === "/" || HOME === "") {
   );
 }
 
+const SUFFIX = modeSuffix();
+
 const WORKSPACE_PATH = resolve(
-  readEnv("WORKSPACE_PATH") ?? resolve(HOME, ".pi-kot", "workspace", "default"),
+  readEnv("WORKSPACE_PATH") ?? resolve(HOME, `.pi-kot${SUFFIX}`, "workspace", "default"),
 );
 const SESSION_DIR = resolve(
-  readEnv("SESSION_DIR") ?? resolve(HOME, ".pi-kot", "sessions"),
+  readEnv("SESSION_DIR") ?? resolve(HOME, `.pi-kot${SUFFIX}`, "sessions"),
 );
-const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, ".pi-kot"));
+const FORGE_DATA_DIR = resolve(readEnv("FORGE_DATA_DIR") ?? resolve(HOME, `.pi-kot${SUFFIX}`));
 
 /** Path to built client dist (Vite output). Resolved relative to server dist/ */
 const CLIENT_DIST_PATH = resolve(
@@ -52,7 +59,7 @@ export const config = Object.freeze({
   isTest: (readEnv("NODE_ENV") ?? "") === "test",
   trustProxy: readBool("TRUST_PROXY", false),
   workspacePath: WORKSPACE_PATH,
-  piConfigDir: resolve(readEnv("PI_CONFIG_DIR") ?? resolve(HOME, ".pi", "agent")),
+  piConfigDir: resolve(readEnv("PI_CONFIG_DIR") ?? resolve(HOME, ".pi", `agent${SUFFIX}`)),
   forgeDataDir: FORGE_DATA_DIR,
   sessionDir: SESSION_DIR,
   mcpConfigFile: resolve(readEnv("MCP_CONFIG_FILE") ?? resolve(FORGE_DATA_DIR, "mcp.json")),

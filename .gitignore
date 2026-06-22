@@ -43,6 +43,9 @@ Thumbs.db
 *.swo
 *~
 
+# Windows reserved device name (accidentally created by tools/redirects)
+nul
+
 # Editor / IDE
 .vscode/
 .idea/
