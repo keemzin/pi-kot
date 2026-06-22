@@ -139,6 +139,17 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     enablesFeatures: ["Browser automation in agent sessions"],
     icon: "🎭",
   },
+  {
+    id: "pi-vision-tool",
+    name: "pi-vision-tool",
+    description:
+      "Delegates image analysis to a vision-capable model. Non-vision models can call describe_image to understand screenshots, diagrams, and photos.",
+    package: "npm:pi-vision-tool",
+    category: "tools",
+    verified: true,
+    enablesFeatures: ["Image analysis via vision model delegation"],
+    icon: "👁️",
+  },
   // ── Productivity ──
   {
     id: "pi-rewind",
