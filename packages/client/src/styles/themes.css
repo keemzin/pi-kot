@@ -3735,6 +3735,39 @@ body {
   opacity: 0.4;
 }
 
+/* ── File tree row: active / context-menu highlight ── */
+.file-tree-row {
+  border-radius: var(--radius-xs);
+  transition: background 0.1s ease;
+}
+.file-tree-row:hover {
+  background: var(--accent-subtle);
+}
+.file-tree-row-active {
+  background: var(--accent-bg);
+  opacity: 0.85;
+}
+
+/* ── Context menu items ── */
+.context-menu-item:hover {
+  background: var(--accent-subtle);
+  color: var(--text-primary) !important;
+}
+.context-menu-item:active {
+  background: var(--accent-bg);
+}
+
+/* ── Row action buttons: appear on row hover ── */
+.file-row-actions {
+  opacity: 0 !important;
+  transition: opacity 0.1s ease;
+}
+.file-tree-row:hover .file-row-actions {
+  opacity: 0.7 !important;
+}
+.file-tree-row:hover .file-row-actions button:hover {
+  opacity: 1 !important;
+}
 
 /* ═══════════════════════════════════════════════════════
    Mobile / Git Panel Polish

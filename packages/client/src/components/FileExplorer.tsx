@@ -3,6 +3,7 @@ import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesSearch } from "../lib/api-client";
+import { useSessionStore } from "../stores/session-store";
 
 interface TreeNode {
   name: string;
@@ -90,6 +91,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
 
+  // ── Context menu for right-click / long-press ──
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    node: TreeNode;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const longPressPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const projectPath = useSessionStore((s) =>
+    s.projects.find((p) => p.id === projectId)?.path ?? "",
+  );
+
   // ── Resizable panel ──
   const [panelWidth, setPanelWidth] = useState(DEFAULT_EXPLORER_WIDTH);
   const resizeRef = useRef<{ startX: number; startW: number } | undefined>(undefined);
@@ -150,6 +164,98 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
     return () => clearTimeout(timer);
   }, [search, tab, open, projectId]);
+
+  // ── Close context menu on click outside / Escape ──
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    // Delay adding listener to avoid the same click that opened the menu from closing it
+    const raf = requestAnimationFrame(() => {
+      document.addEventListener("mousedown", handleClick);
+      document.addEventListener("keydown", handleKey);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [contextMenu]);
+
+  // ── Clipboard helpers ──
+  const copyToClipboard = useCallback(async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setError(undefined);
+    } catch {
+      // Fallback for insecure contexts
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+  }, []);
+
+  const handleCopyRelativePath = useCallback((path: string) => {
+    copyToClipboard(path, "Relative path");
+    setContextMenu(null);
+  }, [copyToClipboard]);
+
+  const handleCopyAbsolutePath = useCallback((path: string) => {
+    const abs = projectPath ? `${projectPath}/${path}`.replace(/\/$/, "") : path;
+    copyToClipboard(abs, "Absolute path");
+    setContextMenu(null);
+  }, [projectPath, copyToClipboard]);
+
+  // ── Context menu handlers ──
+  const showContextMenu = useCallback((e: React.MouseEvent | { clientX: number; clientY: number }, node: TreeNode) => {
+    const panel = document.querySelector(".file-explorer-panel");
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    // Clamp to panel bounds
+    const x = Math.min(e.clientX - rect.left, rect.width - 180);
+    const y = Math.min(e.clientY - rect.top, rect.height - 120);
+    setContextMenu({ x: Math.max(4, x), y: Math.max(4, y), node });
+  }, []);
+
+  const handleRowContextMenu = useCallback((e: React.MouseEvent, node: TreeNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    showContextMenu(e, node);
+  }, [showContextMenu]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent, node: TreeNode) => {
+    const touch = e.touches[0];
+    longPressPos.current = { x: touch.clientX, y: touch.clientY };
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = undefined;
+      showContextMenu({ clientX: touch.clientX, clientY: touch.clientY }, node);
+    }, 500);
+  }, [showContextMenu]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = undefined;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = undefined;
+    }
+  }, []);
 
   const renameRef = useRef<HTMLInputElement>(null);
   const createRef = useRef<HTMLInputElement>(null);
@@ -343,11 +449,16 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
     return (
       <div key={node.path}>
         <div
+          onContextMenu={(e) => handleRowContextMenu(e, node)}
+          onTouchStart={(e) => handleTouchStart(e, node)}
+          onTouchEnd={handleTouchEnd}
+          onTouchMove={handleTouchMove}
           style={{
             display: "flex", alignItems: "center", gap: "2px",
             padding: "2px 0", paddingLeft: `${8 + depth * 16}px`,
+            position: "relative",
           }}
-          className="file-tree-row"
+          className={`file-tree-row${contextMenu?.node.path === node.path ? " file-tree-row-active" : ""}`}
         >
           {isDir ? (
             <button
@@ -398,7 +509,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
           )}
 
           {!isRenaming && (
-            <div style={{ display: "flex", gap: "1px", opacity: 0.7, flexShrink: 0 }} className="file-row-actions">
+            <div style={{ display: "flex", gap: "1px", flexShrink: 0 }} className="file-row-actions">
               {isDir && (
                 <button
                   onClick={() => { setCreateParent(node.path); setShowCreate("file"); setCreateName(""); }}
@@ -884,6 +995,155 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
           )}
         </>
       )}
+
+      {/* ── Context menu ── */}
+      {contextMenu && (
+        <>
+          {/* Backdrop to capture clicks outside on mobile */}
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 999,
+              background: "transparent",
+            }}
+            onClick={() => setContextMenu(null)}
+          />
+          <div
+            ref={contextMenuRef}
+            style={{
+              position: "absolute",
+              left: contextMenu.x,
+              top: contextMenu.y,
+              zIndex: 1000,
+              minWidth: "180px",
+              background: "var(--bg-solid)",
+              border: "1px solid var(--border-bright)",
+              borderRadius: "var(--radius-sm)",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              padding: "4px 0",
+              fontSize: "12px",
+              userSelect: "none",
+            }}
+            onClick={() => setContextMenu(null)}
+          >
+            {/* Header showing the file/folder name */}
+            <div style={{
+              padding: "4px 12px 6px",
+              borderBottom: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              fontWeight: 600,
+              fontSize: "11px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: "220px",
+            }}>
+              {contextMenu.node.type === "directory" ? "📁" : "📄"} {contextMenu.node.name}
+            </div>
+
+            {/* Copy Relative Path */}
+            <div
+              className="context-menu-item"
+              onClick={(e) => { e.stopPropagation(); handleCopyRelativePath(contextMenu.node.path); }}
+              style={contextMenuItemStyle}
+            >
+              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📋</span>
+              <span>Copy Relative Path</span>
+            </div>
+
+            {/* Copy Absolute Path */}
+            <div
+              className="context-menu-item"
+              onClick={(e) => { e.stopPropagation(); handleCopyAbsolutePath(contextMenu.node.path); }}
+              style={contextMenuItemStyle}
+            >
+              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📎</span>
+              <span>Copy Absolute Path</span>
+            </div>
+
+            {/* Separator */}
+            <div style={{ height: "1px", background: "var(--border)", margin: "4px 0" }} />
+
+            {/* New File (directories only) */}
+            {contextMenu.node.type === "directory" && (
+              <div
+                className="context-menu-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setContextMenu(null);
+                  setCreateParent(contextMenu.node.path);
+                  setShowCreate("file");
+                  setCreateName("");
+                }}
+                style={contextMenuItemStyle}
+              >
+                <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📄</span>
+                <span>New File</span>
+              </div>
+            )}
+
+            {/* New Folder (directories only) */}
+            {contextMenu.node.type === "directory" && (
+              <div
+                className="context-menu-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setContextMenu(null);
+                  setCreateParent(contextMenu.node.path);
+                  setShowCreate("folder");
+                  setCreateName("");
+                }}
+                style={contextMenuItemStyle}
+              >
+                <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📁</span>
+                <span>New Folder</span>
+              </div>
+            )}
+
+            {/* Rename */}
+            <div
+              className="context-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                setContextMenu(null);
+                setRenaming(contextMenu.node.path);
+                setRenameDraft(contextMenu.node.name);
+                setTimeout(() => renameRef.current?.focus(), 50);
+              }}
+              style={contextMenuItemStyle}
+            >
+              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>✏️</span>
+              <span>Rename</span>
+            </div>
+
+            {/* Delete */}
+            <div
+              className="context-menu-item"
+              onClick={(e) => {
+                e.stopPropagation();
+                setContextMenu(null);
+                setConfirmDelete(contextMenu.node.path);
+              }}
+              style={{
+                ...contextMenuItemStyle,
+                color: "var(--error)",
+              }}
+            >
+              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>🗑</span>
+              <span>Delete</span>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
+
+const contextMenuItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  padding: "6px 12px",
+  cursor: "pointer",
+  color: "var(--text-secondary)",
+  transition: "background 0.1s ease",
+};
