@@ -430,6 +430,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
   return (
     <div
+      className="file-explorer-panel"
       style={{
         position: "fixed",
         top: 50,
@@ -467,14 +468,14 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
       />
 
       {/* ── Tab bar ── */}
-      <div style={{
+      <div className="fe-tab-bar" style={{
         display: "flex", borderBottom: "1px solid var(--border)",
         background: "var(--bg-glass)", flexShrink: 0,
       }}>
         <button
           onClick={() => { setTab("files"); setView("tree"); }}
           style={{
-            flex: 1, padding: "8px 12px", fontSize: "12px", fontWeight: 600,
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
             background: tab === "files" ? "var(--bg-solid)" : "transparent",
             color: tab === "files" ? "var(--accent-text)" : "var(--text-dim)",
             border: "none", borderBottom: tab === "files" ? "2px solid var(--accent-text)" : "2px solid transparent",
@@ -487,7 +488,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
         <button
           onClick={() => setTab("git")}
           style={{
-            flex: 1, padding: "8px 12px", fontSize: "12px", fontWeight: 600,
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
             background: tab === "git" ? "var(--bg-solid)" : "transparent",
             color: tab === "git" ? "var(--accent-text)" : "var(--text-dim)",
             border: "none", borderBottom: tab === "git" ? "2px solid var(--accent-text)" : "2px solid transparent",

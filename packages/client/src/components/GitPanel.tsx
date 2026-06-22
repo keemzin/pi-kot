@@ -420,18 +420,18 @@ export function GitPanel({ projectId }: Props) {
   };
 
   return (
-    <div style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ fontSize: "13px", color: "var(--text-secondary)", display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header: branch + refresh */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 12px", borderBottom: "1px solid var(--border)",
+        padding: "10px 14px", borderBottom: "1px solid var(--border)",
       }}>
-        <span style={{ fontWeight: 600, fontSize: "13px", color: "var(--text-primary)" }}>
+        <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-primary)" }}>
           {status?.branch ? (
-            <><span style={{ color: "var(--text-dim)" }}>⎇</span> {status.branch}</>
+            <><span style={{ color: "var(--accent-text)" }}>⎇</span> {status.branch}</>
           ) : "—"}
         </span>
-        <button onClick={fetchStatus} title="Refresh" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", fontSize: "14px", padding: "2px 5px" }} type="button">↻</button>
+        <button onClick={fetchStatus} title="Refresh" className="git-action-btn git-refresh-btn" type="button">↻</button>
       </div>
 
       {/* Error/success banners */}
@@ -513,23 +513,18 @@ export function GitPanel({ projectId }: Props) {
             placeholder="Commit message…"
             rows={3}
             style={{
-              width: "100%", resize: "none", fontSize: "12px",
+              width: "100%", resize: "none", fontSize: "13px",
               background: "var(--bg-glass)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)", padding: "6px 8px",
-              color: "var(--text-primary)", outline: "none",
+              borderRadius: "var(--radius-sm)", padding: "8px 10px",
+              color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
             }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
-            <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
             <button
               onClick={commit}
               disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
-              style={{
-                ...s, padding: "4px 12px",
-                background: stagedFiles.length > 0 && commitMessage.trim() ? "var(--accent-bg)" : "transparent",
-                color: stagedFiles.length > 0 && commitMessage.trim() ? "var(--accent-text)" : "var(--text-dim)",
-                opacity: busy ? 0.5 : 1,
-              }}
+              className={`git-action-btn git-commit-btn ${stagedFiles.length > 0 && commitMessage.trim() ? "ready" : "disabled"}`}
               type="button"
             >
               Commit
@@ -539,10 +534,10 @@ export function GitPanel({ projectId }: Props) {
 
         {/* ── Push / Pull / Fetch ── */}
         <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
-          <div style={{ display: "flex", gap: "4px" }}>
-            <button onClick={doFetch} disabled={busy} style={{ ...s, flex: 1, textAlign: "center" }} type="button">Fetch</button>
-            <button onClick={doPull} disabled={busy} style={{ ...s, flex: 1, textAlign: "center" }} type="button">Pull</button>
-            <button onClick={doPush} disabled={busy} style={{ ...s, flex: 1, textAlign: "center" }} type="button">Push</button>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
+            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
+            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
           </div>
         </div>
       </div>
@@ -551,16 +546,12 @@ export function GitPanel({ projectId }: Props) {
       <div style={{ borderTop: "1px solid var(--border)" }}>
         <button
           onClick={() => setShowLog((v) => !v)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-dim)",
-              background: "none", border: "none", cursor: "pointer", textAlign: "left",
-            }}
-            type="button"
-          >
-            <span>Log</span>
-            <span>{showLog ? "−" : "+"}</span>
-          </button>
+          className="git-section-toggle"
+          type="button"
+        >
+          <span>Log</span>
+          <span className={`git-section-chevron${showLog ? " open" : ""}`}>▾</span>
+        </button>
           {showLog && (
             <div style={{ padding: "0 12px 8px" }}>
               {log === undefined ? (
@@ -584,11 +575,7 @@ export function GitPanel({ projectId }: Props) {
                             onClick={() => handleTryCommit(c.hash)}
                             disabled={busy}
                             title="Try this commit in a linked worktree"
-                            style={{
-                              background: "none", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                              cursor: busy ? "default" : "pointer", fontSize: "9px", padding: "1px 6px",
-                              color: "var(--accent-text)", opacity: busy ? 0.4 : 0.8, whiteSpace: "nowrap",
-                            }}
+                            className="git-try-btn"
                             type="button"
                           >
                             {busy ? "…" : "Try →"}
@@ -610,15 +597,11 @@ export function GitPanel({ projectId }: Props) {
       <div style={{ borderTop: "1px solid var(--border)" }}>
           <button
             onClick={() => setShowWorktrees((v) => !v)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-dim)",
-              background: "none", border: "none", cursor: "pointer", textAlign: "left",
-            }}
+            className="git-section-toggle"
             type="button"
           >
             <span>Worktrees</span>
-            <span>{showWorktrees ? "−" : "+"}</span>
+            <span className={`git-section-chevron${showWorktrees ? " open" : ""}`}>▾</span>
           </button>
           {showWorktrees && (
             <div style={{ padding: "0 12px 8px" }}>
@@ -687,15 +670,11 @@ export function GitPanel({ projectId }: Props) {
       <div style={{ borderTop: "1px solid var(--border)" }}>
           <button
             onClick={() => setShowBranches((v) => !v)}
-            style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-dim)",
-              background: "none", border: "none", cursor: "pointer", textAlign: "left",
-            }}
+            className="git-section-toggle"
             type="button"
           >
             <span>Branches</span>
-            <span>{showBranches ? "−" : "+"}</span>
+            <span className={`git-section-chevron${showBranches ? " open" : ""}`}>▾</span>
           </button>
           {showBranches && (
             <div style={{ padding: "0 12px 8px" }}>
@@ -772,15 +751,15 @@ function FileGroup(props: FileGroupProps) {
     <div>
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "6px 12px", borderBottom: "1px solid var(--border)",
+        padding: "8px 14px", borderBottom: "1px solid var(--border)",
         background: "var(--accent-subtle)",
       }}>
-        <span style={{ fontSize: "10px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-secondary)" }}>
           {props.label}
         </span>
         <button
           onClick={props.onGroupAction}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "10px", color: "var(--text-dim)" }}
+          className="git-action-btn git-group-action-btn"
           type="button"
         >
           {props.groupActionLabel}
@@ -792,14 +771,11 @@ function FileGroup(props: FileGroupProps) {
           const diffState = props.openDiffs[key];
           return (
             <li key={f.path} style={{ borderBottom: "1px solid var(--border)" }}>
-              <div style={{
-                display: "flex", alignItems: "center", gap: "4px",
-                padding: "4px 12px", fontSize: "11px",
-              }}>
+              <div className="git-file-row">
                 {/* Badge */}
                 <span style={{
-                  width: "18px", flexShrink: 0, textAlign: "center",
-                  fontSize: "10px", fontFamily: "monospace",
+                  width: "20px", flexShrink: 0, textAlign: "center",
+                  fontSize: "12px", fontFamily: "monospace", fontWeight: 700,
                   color: kindColor(f.kind),
                 }}>
                   {kindBadge(f.kind)}
@@ -809,10 +785,10 @@ function FileGroup(props: FileGroupProps) {
                   onClick={() => props.onClickFile(f)}
                   style={{
                     flex: 1, background: "none", border: "none",
-                    color: "var(--text-secondary)", cursor: "pointer",
-                    fontSize: "11px", fontFamily: "monospace",
+                    color: "var(--text-primary)", cursor: "pointer",
+                    fontSize: "12px", fontFamily: "monospace",
                     textAlign: "left", overflow: "hidden", textOverflow: "ellipsis",
-                    whiteSpace: "nowrap", padding: "1px 4px", borderRadius: "var(--radius-sm)",
+                    whiteSpace: "nowrap", padding: "2px 4px", borderRadius: "var(--radius-sm)",
                   }}
                   type="button"
                 >
@@ -822,11 +798,7 @@ function FileGroup(props: FileGroupProps) {
                 {props.onRevert && (
                   <button
                     onClick={() => props.onRevert!(f)}
-                    style={{
-                      background: "none", border: "none", cursor: "pointer",
-                      fontSize: "10px", padding: "1px 4px",
-                      color: props.pendingRevert === f.path ? "var(--error)" : "var(--text-dim)",
-                    }}
+                    className={`git-action-btn git-revert-btn${props.pendingRevert === f.path ? " pending" : ""}`}
                     title="Revert (discard changes)"
                     type="button"
                   >
@@ -836,11 +808,7 @@ function FileGroup(props: FileGroupProps) {
                 {/* Action */}
                 <button
                   onClick={() => props.onFileAction(f)}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    fontSize: "10px", padding: "1px 4px",
-                    color: "var(--text-dim)", opacity: 0.7,
-                  }}
+                  className="git-action-btn git-file-action-btn"
                   type="button"
                 >
                   {props.fileActionLabel}

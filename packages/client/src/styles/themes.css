@@ -673,6 +673,24 @@ body {
   overflow: hidden;
 }
 
+/* ═══ Sidebar backdrop — mobile scrim ═══ */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99; /* just below sidebar (100) */
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s var(--ease);
+}
+
+@media (max-width: 600px) {
+  .sidebar-backdrop {
+    display: block;
+  }
+}
+
 /* ═══ Sidebar — overlay ═══ */
 .sidebar {
   width: var(--sidebar-width);
@@ -697,6 +715,55 @@ body {
 .sidebar.collapsed {
   left: calc(var(--sidebar-width) * -1);
   box-shadow: none;
+}
+
+/* ── Mobile sidebar polish ── */
+@media (max-width: 600px) {
+  .sidebar {
+    /* Start off-screen on mobile — user opens with burger */
+    left: calc(var(--sidebar-width) * -1);
+    box-shadow: none;
+  }
+
+  .sidebar:not(.collapsed) {
+    left: 0;
+    box-shadow: 4px 0 48px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Bigger session tap targets */
+  .session-item {
+    padding: 14px 14px !important;
+    font-size: 14px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .project-sublist .session-item {
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+  }
+
+  /* Bigger project headers */
+  .project-header {
+    padding: 12px 12px !important;
+    font-size: 14px !important;
+  }
+
+  /* More breathing room in sidebar header */
+  .sidebar-header {
+    padding: 18px 16px 14px !important;
+    font-size: 16px !important;
+  }
+
+  /* Add project button bigger */
+  .add-project-toggle {
+    padding: 12px 14px !important;
+    font-size: 13px !important;
+  }
+
+  .new-session-mini {
+    padding: 10px 12px !important;
+    font-size: 13px !important;
+  }
 }
 
 .sidebar-header {
@@ -930,19 +997,21 @@ body {
 .new-session-inline {
   background: none;
   border: none;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1;
-  padding: 0 4px;
+  padding: 2px 6px;
   margin-left: auto;
   border-radius: var(--radius-sm);
   transition: all var(--duration) var(--ease);
   opacity: 0;
+  flex-shrink: 0;
 }
 
-.project-header:hover .new-session-inline {
+.project-header:hover .new-session-inline,
+.project-header.active .new-session-inline {
   opacity: 1;
 }
 
@@ -955,25 +1024,78 @@ body {
 .project-remove-btn {
   background: none;
   border: none;
-  color: var(--text-tertiary);
+  color: var(--text-dim);
   cursor: pointer;
   font-size: 12px;
   font-weight: 400;
   line-height: 1;
-  padding: 0 4px;
+  padding: 2px 5px;
   margin-left: 2px;
   border-radius: var(--radius-sm);
   transition: all var(--duration) var(--ease);
   opacity: 0;
+  flex-shrink: 0;
 }
 
-.project-header:hover .project-remove-btn {
+.project-header:hover .project-remove-btn,
+.project-header.active .project-remove-btn {
   opacity: 1;
 }
 
 .project-remove-btn:hover {
   color: #e06c75;
   background: var(--bg-glass-hover);
+}
+
+/* ── Mobile: always show + and × on active project header ── */
+@media (max-width: 600px) {
+  .project-header.active .new-session-inline,
+  .project-header.active .project-remove-btn {
+    opacity: 1;
+  }
+
+  .new-session-inline {
+    font-size: 20px;
+    padding: 4px 8px;
+  }
+
+  .project-remove-btn {
+    font-size: 14px;
+    padding: 4px 6px;
+  }
+}
+
+/* New session row — explicit tap target inside expanded session list */
+.new-session-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin: 2px 0 4px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-hover);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all var(--duration) var(--ease);
+}
+
+.new-session-row:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+@media (max-width: 600px) {
+  .new-session-row {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
 }
 
 /* Sidebar actions — kept for backward compat but unused in new layout */
@@ -3611,4 +3733,331 @@ body {
 .file-explorer-resize-handle:hover {
   background: var(--accent-bg);
   opacity: 0.4;
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   Mobile / Git Panel Polish
+   ═══════════════════════════════════════════════════════ */
+
+/* File explorer panel — full width on mobile */
+@media (max-width: 600px) {
+  .file-explorer-panel {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border) !important;
+    top: 50px !important;
+  }
+
+  /* Hide resize handle on touch devices */
+  .file-explorer-resize-handle {
+    display: none !important;
+  }
+
+  /* Bigger tab bar for touch */
+  .fe-tab-bar button {
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* Git panel action buttons — base style */
+.git-action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+  font-family: inherit;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Per-file action (Stage / Unstage) */
+.git-file-action-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent-subtle);
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  min-width: 52px;
+}
+
+.git-file-action-btn:hover {
+  background: var(--bg-glass-active);
+}
+
+/* Revert button */
+.git-revert-btn {
+  padding: 5px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 32px;
+}
+
+.git-revert-btn:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--error);
+}
+
+.git-revert-btn.pending {
+  color: var(--error);
+  font-weight: 600;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* Group "Stage all / Unstage all" button */
+.git-group-action-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: none;
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+}
+
+.git-group-action-btn:hover {
+  background: var(--accent-subtle);
+}
+
+/* Fetch / Pull / Push primary row */
+.git-remote-btn {
+  flex: 1;
+  padding: 9px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--text-primary);
+  border: 1px solid var(--border-bright);
+  background: var(--bg-glass);
+  border-radius: var(--radius-sm);
+}
+
+.git-remote-btn:hover:not(:disabled) {
+  background: var(--bg-glass-hover);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.git-remote-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Collapsible section header (Log / Worktrees / Branches) */
+.git-section-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.git-section-toggle:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+.git-section-chevron {
+  font-size: 14px;
+  opacity: 0.6;
+  transition: transform 0.2s var(--ease);
+}
+
+.git-section-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Refresh button in header */
+.git-refresh-btn {
+  padding: 6px 8px;
+  font-size: 15px;
+  color: var(--text-dim);
+  border-radius: var(--radius-sm);
+}
+
+.git-refresh-btn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+/* Commit button */
+.git-commit-btn {
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: all var(--duration) var(--ease);
+}
+
+.git-commit-btn.ready {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border-color: var(--accent-text);
+}
+
+.git-commit-btn.disabled {
+  background: transparent;
+  color: var(--text-dim);
+  cursor: default;
+}
+
+/* "Try →" worktree button in log */
+.git-try-btn {
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: 11px;
+  padding: 3px 9px;
+  color: var(--accent-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration) var(--ease);
+}
+
+.git-try-btn:hover:not(:disabled) {
+  background: var(--accent-subtle);
+}
+
+.git-try-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* File row in FileGroup */
+.git-file-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 600px) {
+  .git-file-row {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+
+  .git-file-action-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    min-width: 60px;
+  }
+
+  .git-revert-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    min-width: 36px;
+  }
+
+  .git-remote-btn {
+    padding: 12px 6px;
+    font-size: 14px;
+  }
+
+  .git-section-toggle {
+    padding: 13px 14px;
+    font-size: 13px;
+  }
+
+  .git-commit-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Session List — search + truncation
+   ═══════════════════════════════════════════════════════ */
+
+.session-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color var(--duration) var(--ease);
+  /* remove default search chrome (X button) */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.session-search-input:focus {
+  border-color: var(--border-bright);
+  background: var(--bg-glass-hover);
+}
+
+.session-search-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* clear button from type=search */
+.session-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--text-dim);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 1l10 10M11 1L1 11' stroke='currentColor' stroke-width='2'/%3E%3C/svg%3E") no-repeat center;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 1l10 10M11 1L1 11' stroke='currentColor' stroke-width='2'/%3E%3C/svg%3E") no-repeat center;
+  cursor: pointer;
+}
+
+.session-show-more-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-family: inherit;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+  opacity: 0.75;
+}
+
+.session-show-more-btn:hover {
+  background: var(--bg-glass-hover);
+  opacity: 1;
+}
+
+@media (max-width: 600px) {
+  .session-search-input {
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .session-show-more-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
 }
