@@ -15,6 +15,13 @@
 - **Reference**: Clean design patterns, API structures, and SSE layouts should mirror the local template project at `./pi-forge/`.
 - **SDK Rules**: Canonical documentation lives at `https://pi.dev/docs/latest`. Prioritize asynchronous SDK handlers like `createAgentSession()` and async event streams.
 
+## 🥇 SDK-First Principle (CRITICAL)
+- **Ask the SDK first, always**. The SDK carries everything — model/provider per message, usage tokens, stop reasons, streaming events. Before writing any custom logic, check what the SDK types/events already provide.
+- Only add custom code when the SDK doesn't have what you need. The web UI is a thin presentation layer over SDK data.
+- **If the SDK provides a field** (`AssistantMessage.model`, `AssistantMessage.provider`, `AssistantMessage.usage`, etc.) — read it from the message object, don't derive it from client state.
+- **If the SDK emits an event** (`text_delta`, `message_end`, `tool_result`) — consume it directly instead of re-fetching or reconstructing.
+- Default: SDK. Fallback: your own code. This keeps pi-kot lean and automatically gains features when the SDK updates.
+
 ## 🔍 Qdrant-First Code Lookup (CRITICAL)
 - **Always query Qdrant first** when asked to find code, understand a module, or explore the codebase. Use `qdrat__qdrant-find` with the collection `pi-kot-codebase` before running any grep/find/read.
 - **Why**: Qdrant stores indexed summaries of every module, route, component, and subsystem. A single query gives you the file name, purpose, and key exports — so you know exactly which file to read without grepping blindly.

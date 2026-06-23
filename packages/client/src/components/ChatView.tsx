@@ -488,9 +488,19 @@ function RewindMsgButton({ sessionId }: { sessionId: string }) {
   );
 }
 
-/* ── Model badge for assistant messages ── */
+/* ── Model badge for assistant messages ──
+     Reads model/provider from the message object so each response
+     shows the model that actually generated it, even after switching. */
 
-function ModelBadge({ modelName, providerName }: { modelName?: string; providerName?: string }) {
+function ModelBadge({ msg, fallbackModel, fallbackProvider }: {
+  msg?: Record<string, unknown>;
+  fallbackModel?: string;
+  fallbackProvider?: string;
+}) {
+  const modelName =
+    (typeof msg?.model === "string" ? msg.model : undefined) ?? fallbackModel;
+  const providerName =
+    (typeof msg?.provider === "string" ? msg.provider : undefined) ?? fallbackProvider;
   if (!modelName) return null;
   return (
     <span className="assistant-msg-model">
@@ -686,6 +696,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
       const isSteer = (currentUserMsg.metadata as { steer?: boolean } | undefined)?.steer === true;
 
+      // Read model info from the LAST assistant message in this turn
+      // so the badge reflects the actual generating model, not the
+      // currently-selected one. Falls back to the global props if the
+      // message object doesn't carry model info (older sessions).
+      const lastAssistantMsg = currentAssistantMsgs.length > 0
+        ? (currentAssistantMsgs[currentAssistantMsgs.length - 1] as Record<string, unknown>)
+        : undefined;
+
       if (stickyUserHeader && text.length > 0) {
         out.push(
           <div key={`turn-${currentUserIdx}`} style={{ position: "relative" }}>
@@ -725,7 +743,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
-                <ModelBadge modelName={modelName} providerName={providerName} />
+                <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
               </div>
             )}
           </div>,
@@ -760,7 +778,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`turn-${currentUserIdx}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
-              <ModelBadge modelName={modelName} providerName={providerName} />
+              <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
             </div>,
           );
         }

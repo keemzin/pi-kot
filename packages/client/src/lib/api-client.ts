@@ -8,6 +8,22 @@ const BASE = ""; // Same origin via Vite proxy
 
 import type { SessionContextResponse, McpServersResponse, McpSettingsResponse, McpServerConfig, ToolOverridesResponse } from "./api-client/types";
 
+/**
+ * Window event dispatched whenever an authenticated request returns 401.
+ * The App listens for this to clear auth state and show the login screen.
+ */
+export const UNAUTHORIZED_EVENT = "pi-kot:unauthorized";
+
+/**
+ * Register a handler that fires on any 401 response.
+ * Returns a cleanup function to unsubscribe.
+ */
+export function onUnauthorized(handler: () => void): () => void {
+  const fn = (): void => handler();
+  window.addEventListener(UNAUTHORIZED_EVENT, fn);
+  return () => window.removeEventListener(UNAUTHORIZED_EVENT, fn);
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -41,6 +57,11 @@ async function request<T>(
 
   if (res.status === 204) {
     return undefined as T;
+  }
+
+  if (res.status === 401) {
+    clearStoredToken();
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
   }
 
   if (!res.ok) {

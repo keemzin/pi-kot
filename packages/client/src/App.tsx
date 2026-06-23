@@ -17,6 +17,8 @@ import type { SessionContextResponse } from "./lib/api-client/types";
 import {
   fetchAuthStatus,
   login,
+  onUnauthorized,
+  clearStoredToken,
   type SessionSummary,
   type Project,
   fetchProviders,
@@ -268,6 +270,23 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
+  // Listen for 401 unauthorized events from the API client.
+  // When the server rejects a stale token (e.g. password changed,
+  // server restarted) this clears auth and shows the login form.
+  useEffect(() => {
+    const unsub = onUnauthorized(() => {
+      setPassword("");
+      setAuthRequired(true);
+    });
+    return unsub;
+  }, []);
+
+  const handleClearToken = useCallback(() => {
+    clearStoredToken();
+    setPassword("");
+    setAuthRequired(true);
+  }, []);
+
   // Auto-expand worker groups when any worker in any project is live
   useEffect(() => {
     const allSessions = Object.values(projectSessions).flat();
@@ -517,6 +536,20 @@ export function App() {
             className="login-input"
           />
           <button type="submit" className="login-btn">Login</button>
+          <button
+            type="button"
+            onClick={handleClearToken}
+            className="login-btn"
+            style={{
+              background: "none",
+              border: "1px solid var(--border-color, #444)",
+              color: "var(--text-dim, #888)",
+              fontSize: "11px",
+              marginTop: "4px",
+            }}
+          >
+            Clear stored token
+          </button>
         </form>
       </div>
     );
@@ -989,6 +1022,23 @@ export function App() {
               }}
             >
               ⚙
+            </button>
+            <button
+              type="button"
+              onClick={handleClearToken}
+              title="Sign out (clear stored token)"
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-dim)",
+                fontSize: "12px",
+                cursor: "pointer",
+                padding: "3px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              Sign out
             </button>
           </div>
         </div>
