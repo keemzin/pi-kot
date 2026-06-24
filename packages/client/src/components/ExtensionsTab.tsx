@@ -154,6 +154,7 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [uninstalling, setUninstalling] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [reloading, setReloading] = useState(false);
+  const [reloadSuccess, setReloadSuccess] = useState(false);
   const [refreshing, setRefreshing] = useState(0);
   const [updates, setUpdates] = useState<ExtensionUpdateInfo[] | undefined>(undefined);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
@@ -245,11 +246,14 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
 
   const handleReload = async () => {
     setReloading(true);
+    setReloadSuccess(false);
     try {
       await reloadAgent();
       // Server re-reads configs — just refresh our lists (no slow full page reload)
       setUpdates(undefined);
       setRefreshing((n) => n + 1);
+      setReloadSuccess(true);
+      setTimeout(() => setReloadSuccess(false), 2000);
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -636,7 +640,7 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
             color: reloading ? "var(--text-dim)" : "white",
           }}
         >
-          {reloading ? "Reloading…" : "/reload"}
+          {reloading ? "Reloading…" : reloadSuccess ? "Reloaded ✓" : "/reload"}
         </button>
       </div>
     </div>
