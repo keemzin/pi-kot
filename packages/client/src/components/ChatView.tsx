@@ -476,6 +476,8 @@ function RewindMsgButton({ sessionId }: { sessionId: string }) {
         try {
           await invokeExtensionCommand(sessionId, "rewind");
         } catch {
+          // error handled
+        } finally {
           setInvoking(false);
         }
       }}
