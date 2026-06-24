@@ -22,6 +22,7 @@ import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js"
 import { orchestrationRoutes } from "./routes/orchestration.js";
 import { extensionRoutes } from "./routes/extensions.js";
 import { extensionCommandRoutes } from "./routes/extension-commands.js";
+import { sessionExtensionRoutes } from "./routes/session-extensions.js";
 import { gitRoutes } from "./routes/git.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { skillRoutes } from "./routes/skills.js";
@@ -136,6 +137,7 @@ export async function buildServer() {
       await api.register(projectRoutes);
       await api.register(extensionRoutes);
       await api.register(extensionCommandRoutes);
+      await api.register(sessionExtensionRoutes);
       await api.register(orchestrationRoutes);
       await api.register(gitRoutes);
       await api.register(mcpRoutes);

@@ -13,6 +13,7 @@ import {
   checkExtensionUpdates,
   updateExtension,
 } from "../extension-manager.js";
+import { listSessions, rebuildSessionTools } from "../session-registry.js";
 import { config } from "../config.js";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
@@ -150,6 +151,9 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { package: pkg } = req.body as { package: string };
         const result = await installExtension(pkg);
+        if (result.success) {
+          await rebuildActiveSessions(req.log);
+        }
         return reply.send(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -196,6 +200,9 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { package: pkg } = req.body as { package: string };
         const result = await installManualExtension(pkg);
+        if (result.success) {
+          await rebuildActiveSessions(req.log);
+        }
         return reply.send(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -274,6 +281,9 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { package: pkg } = req.body as { package: string };
         const result = await updateExtension(pkg);
+        if (result.success) {
+          await rebuildActiveSessions(req.log);
+        }
         return reply.send(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -411,6 +421,9 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const { package: pkg } = req.body as { package: string };
         const result = await uninstallExtension(pkg);
+        if (result.success) {
+          await rebuildActiveSessions(req.log);
+        }
         return reply.send(result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -420,3 +433,22 @@ export const extensionRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 };
+
+/**
+ * After an extension install/uninstall/update, rebuild all active sessions
+ * so the new tools and commands become available without creating a new session.
+ */
+async function rebuildActiveSessions(logger: {
+  info: (obj: Record<string, unknown>, msg?: string) => void;
+  error: (obj: Record<string, unknown>, msg?: string) => void;
+}): Promise<void> {
+  const sessions = listSessions();
+  for (const live of sessions) {
+    try {
+      await rebuildSessionTools(live.sessionId);
+      logger.info({ sessionId: live.sessionId }, "Rebuilt session tools after extension change");
+    } catch (err) {
+      logger.error({ err, sessionId: live.sessionId }, "Failed to rebuild session tools");
+    }
+  }
+}

@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   fetchExtensions,
+  fetchSessionExtensions,
   installExtension as installExtApi,
   installManualExtension as installManualApi,
   uninstallExtension as uninstallExtApi,
@@ -25,7 +26,9 @@ import {
   type VisionConfigResponse,
   type ProviderGroup,
   type ModelInfo,
+  type SessionExtensionInfo,
 } from "../lib/api-client";
+import { useSessionStore } from "../stores/session-store";
 
 // ── Styles (inline for self-contained component) ──────────────────────
 
@@ -150,6 +153,8 @@ const categoryLabels: Record<string, string> = {
 export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [data, setData] = useState<ExtensionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeSessionExts, setActiveSessionExts] = useState<SessionExtensionInfo | null>(null);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const [installing, setInstalling] = useState<string | null>(null);
   const [uninstalling, setUninstalling] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -181,6 +186,23 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   useEffect(() => {
     load();
   }, [load, refreshing]);
+
+  // Fetch active session extension info when session changes
+  useEffect(() => {
+    if (!activeSessionId) {
+      setActiveSessionExts(null);
+      return;
+    }
+    let cancelled = false;
+    fetchSessionExtensions(activeSessionId)
+      .then((info) => {
+        if (!cancelled) setActiveSessionExts(info);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSessionId, refreshing]);
 
   const handleUninstall = async (ext: DiscoveredExtension) => {
     const pkgId = ext.package ?? ext.name;
@@ -337,27 +359,26 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
 
   return (
     <div style={{ fontSize: 12 }}>
-      {/* ── Experimental banner ── */}
+      {/* ── Info banner ── */}
       <div
         style={{
-          background: "var(--accent-subtle, #fef3cd)",
-          border: "1px solid var(--accent-border, #ffc107)",
+          background: "rgba(52, 211, 153, 0.1)",
+          border: "1px solid rgba(52, 211, 153, 0.25)",
           borderRadius: 8,
           padding: "8px 12px",
           marginBottom: 16,
           fontSize: 11,
-          color: "var(--accent-text, #856404)",
+          color: "#34d399",
           display: "flex",
           alignItems: "center",
           gap: 8,
         }}
       >
-        <span style={{ fontSize: 16 }}>⚗️</span>
+        <span style={{ fontSize: 16 }}>🔌</span>
         <span>
-          <strong>Experimental</strong> — extension install runs{" "}
-          <code style={{ fontSize: 10 }}>npm install</code> directly. Extensions
-          detected here may not auto-activate in sessions yet — needs more
-          SDK plumbing.
+          Extensions are installed via <code style={{ fontSize: 10 }}>npm install</code> and
+          auto-activated in all running sessions. Look for the{" "}
+          <strong>Active</strong> badge.
         </span>
       </div>
 
@@ -523,11 +544,21 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
             const extUpdate = updates?.find(
               (u) => u.package === (ext.package?.replace("npm:", "") ?? ext.name),
             );
+            // Check if this extension is active in the current session
+            const extName = ext.name;
+            const isActiveInSession = activeSessionExts?.activeExtensions.some(
+              (ae) =>
+                ae.displayPath === extName ||
+                ae.displayPath.includes(extName) ||
+                extName.includes(ae.displayPath),
+            ) ?? false;
             return (
               <div key={`det-${i}`}>
                 <InstalledCard
                   ext={ext}
                   update={extUpdate}
+                  active={isActiveInSession}
+                  sessionCommands={activeSessionExts?.commands ?? null}
                   updating={updating === (ext.package ?? ext.name)}
                   uninstalling={uninstalling === ext.name}
                   onUninstall={handleUninstall}
@@ -682,6 +713,8 @@ function renderAgentRow(
 function InstalledCard({
   ext,
   update,
+  active,
+  sessionCommands,
   updating,
   uninstalling,
   onUninstall,
@@ -689,19 +722,47 @@ function InstalledCard({
 }: {
   ext: DiscoveredExtension;
   update?: ExtensionUpdateInfo;
+  active?: boolean;
+  sessionCommands?: Array<{ name: string; invocationName: string; description: string }> | null;
   updating?: boolean;
   uninstalling: boolean;
   onUninstall: (ext: DiscoveredExtension) => void;
   onUpdate: (pkg: string) => void;
 }) {
+  // Find commands contributed by this extension (fuzzy match by name prefix)
+  const extCmds = sessionCommands?.filter(
+    (c) =>
+      ext.name.includes(c.name) ||
+      c.name.includes(ext.name.replace(/^npm:/, "")) ||
+      ext.package?.includes(c.name) ||
+      c.name.includes(ext.name),
+  ) ?? [];
+
   return (
     <div style={s.card}>
       <span style={s.cardIcon}>
         {ext.source === "extensions_dir" ? "📄" : ext.source === "agents_dir" ? "🤖" : "📦"}
       </span>
       <div style={s.cardBody}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <div style={s.cardTitle}>{ext.name}</div>
+          {active && (
+            <span
+              style={{
+                display: "inline-block",
+                padding: "1px 7px",
+                borderRadius: 10,
+                fontSize: 10,
+                fontWeight: 600,
+                background: "rgba(52, 211, 153, 0.15)",
+                color: "#34d399",
+                border: "1px solid rgba(52, 211, 153, 0.3)",
+                lineHeight: "18px",
+              }}
+            >
+              Active
+            </span>
+          )}
           {update?.updateAvailable && (
             <span
               style={{
@@ -745,6 +806,11 @@ function InstalledCard({
             <span style={{ color: "var(--text-dim)" }}>
               ✨ {ext.enablesFeatures[0]}
               {ext.enablesFeatures.length > 1 ? ` +${ext.enablesFeatures.length - 1}` : ""}
+            </span>
+          )}
+          {extCmds.length > 0 && (
+            <span style={{ color: "var(--accent-text, #818cf8)" }}>
+              /{extCmds.map((c) => c.invocationName).join(", /")}
             </span>
           )}
         </div>

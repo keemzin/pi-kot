@@ -1008,6 +1008,28 @@ export async function reloadAgent(): Promise<ReloadResponse> {
   return request<ReloadResponse>("POST", "/api/v1/control/reload");
 }
 
+// ---- Session Extensions (runtime state) ----
+
+export interface SessionExtensionInfo {
+  activeExtensions: Array<{ path: string; displayPath: string }>;
+  commands: Array<{ name: string; invocationName: string; description: string }>;
+  registeredTools: Array<{ name: string; description: string }>;
+  eventHandlers: string[];
+}
+
+/**
+ * Get runtime extension state for a live session — what extensions are
+ * active, what commands and tools they registered.
+ */
+export async function fetchSessionExtensions(
+  sessionId: string,
+): Promise<SessionExtensionInfo> {
+  return request<SessionExtensionInfo>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/extensions`,
+  );
+}
+
 // ---- Extension Commands (generic bridge) ----
 
 export interface InvokeCommandResponse {

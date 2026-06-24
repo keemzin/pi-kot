@@ -1,6 +1,7 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
 import { useSessionStore } from "../stores/session-store";
 import type { ImageContent } from "../lib/api-client";
+import { fetchSessionExtensions } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
@@ -13,25 +14,15 @@ interface Props {
 }
 
 /**
- * Slash commands for the chat input. Matching pi-forge's pattern:
- * `/compact` triggers manual compaction.
+ * Slash command descriptor for the chat input.
  */
-const SLASH_COMMANDS = [
-  {
-    name: "/compact",
-    description: "Manually compact the session context",
-    handler: async (sessionId: string) => {
-      await useSessionStore.getState().compactAndReload(sessionId);
-    },
-  },
-  {
-    name: "/compact with summary",
-    description: "Compact and keep focus on specific areas",
-    handler: async (sessionId: string) => {
-      await useSessionStore.getState().compactAndReload(sessionId);
-    },
-  },
-];
+interface SlashCommand {
+  name: string;
+  description: string;
+  handler: (sessionId: string) => Promise<void>;
+  /** Whether this is an extension command that needs the invokeExtensionCommand API */
+  isExtension?: boolean;
+}
 
 export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onModelSelect, onModelError }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -40,8 +31,54 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const abort = useSessionStore((s) => s.abort);
-  const [slashSuggestions, setSlashSuggestions] = useState<typeof SLASH_COMMANDS>([]);
+  const [slashSuggestions, setSlashSuggestions] = useState<SlashCommand[]>([]);
+  const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>([]);
   const [compacting, setCompacting] = useState(false);
+
+  // Fetch extension commands from the session's ExtensionRunner
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    fetchSessionExtensions(sessionId)
+      .then((info) => {
+        if (cancelled) return;
+        const cmds: SlashCommand[] = info.commands.map((cmd) => ({
+          name: "/" + cmd.invocationName,
+          description: cmd.description || "Extension command",
+          handler: async (sid: string) => {
+            const { invokeExtensionCommand } = await import("../lib/api-client");
+            await invokeExtensionCommand(sid, cmd.invocationName);
+          },
+          isExtension: true,
+        }));
+        setExtensionCommands(cmds);
+      })
+      .catch(() => {
+        // session may not be live yet — that's fine
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // Build the full slash command list from builtins + extension commands
+  const builtinCommands: SlashCommand[] = [
+    {
+      name: "/compact",
+      description: "Manually compact the session context",
+      handler: async (sid: string) => {
+        await useSessionStore.getState().compactAndReload(sid);
+      },
+    },
+    {
+      name: "/compact with summary",
+      description: "Compact and keep focus on specific areas",
+      handler: async (sid: string) => {
+        await useSessionStore.getState().compactAndReload(sid);
+      },
+    },
+  ];
+  const allSlashCommands = [...builtinCommands, ...extensionCommands];
 
   // ── Image attachments ──
   const [images, setImages] = useState<{ file: File; dataUrl: string }[]>([]);
@@ -174,18 +211,18 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
 
-    // Detect slash commands
+    // Detect slash commands — match against both builtin and extension commands
     const text = el.value;
     if (text.startsWith("/")) {
       const trimmed = text.trim().toLowerCase();
-      const matched = SLASH_COMMANDS.filter((cmd) => cmd.name.startsWith(trimmed));
+      const matched = allSlashCommands.filter((cmd) => cmd.name.startsWith(trimmed));
       setSlashSuggestions(matched);
     } else {
       setSlashSuggestions([]);
     }
-  }, []);
+  }, [extensionCommands, allSlashCommands]);
 
-  const handleSlashCommand = async (cmd: (typeof SLASH_COMMANDS)[number]) => {
+  const handleSlashCommand = async (cmd: SlashCommand) => {
     const el = textareaRef.current;
     if (el === null) return;
     el.value = "";

@@ -364,6 +364,22 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
     ls: "List directory contents",
   };
 
+/**
+ * Derive a human-readable package name from a source info baseDir or source.
+ * e.g. "/home/user/.pi/agent/npm/node_modules/@ayulab/pi-rewind" → "@ayulab/pi-rewind"
+ */
+function friendlySourceName(src: string): string {
+  const nmIndex = src.lastIndexOf("node_modules/");
+  if (nmIndex !== -1) {
+    const afterNm = src.slice(nmIndex + "node_modules/".length);
+    const parts = afterNm.split("/");
+    if (parts[0]?.startsWith("@")) {
+      return `${parts[0]}/${parts[1] ?? ""}`;
+    }
+    return parts[0] ?? src;
+  }
+  return src;
+}
   fastify.get<{ Querystring: { projectId?: string } }>(
     "/config/tools",
     {
@@ -427,7 +443,43 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      return { builtin, mcp: mcpTools, extension: [] };
+      // Extension-contributed tools — collect from all live sessions
+      const extensionTools: Array<{ packageSource: string; tools: typeof builtin }> = [];
+      const seenExtensionTools = new Set<string>();
+      const { listSessions } = await import("../session-registry.js");
+      for (const live of listSessions()) {
+        const runner = live.session.extensionRunner;
+        const tools = runner.getAllRegisteredTools();
+        for (const t of tools) {
+          if (!seenExtensionTools.has(t.definition.name)) {
+            seenExtensionTools.add(t.definition.name);
+          }
+        }
+        // Group by source (approximate — use extension path prefix)
+        const bySource = new Map<string, typeof builtin>();
+        for (const t of tools) {
+          if (!seenExtensionTools.has(t.definition.name)) continue;
+          seenExtensionTools.delete(t.definition.name); // only show once
+          const src = t.sourceInfo?.baseDir ?? t.sourceInfo?.source ?? "extension";
+          const pkgName = friendlySourceName(src);
+          const arr = bySource.get(pkgName) ?? [];
+          arr.push({
+            name: t.definition.name,
+            description:
+              typeof t.definition.description === "string"
+                ? t.definition.description
+                : "",
+            enabled: isToolEffective(overrides, projectId, "extension", t.definition.name),
+            globalEnabled: !overrides.extension.includes(t.definition.name),
+          });
+          bySource.set(pkgName, arr);
+        }
+        for (const [pkgSource, toolList] of bySource) {
+          extensionTools.push({ packageSource: pkgSource, tools: toolList });
+        }
+      }
+
+      return { builtin, mcp: mcpTools, extension: extensionTools };
     },
   );
 
