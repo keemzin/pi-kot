@@ -1370,6 +1370,103 @@ body {
   gap: 10px;
 }
 
+/* ── Mobile header overflow ── */
+@media (max-width: 600px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: flex !important;
+  }
+  .header-left > span {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.mobile-only {
+  display: none;
+}
+
+.mobile-overflow-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+.mobile-overflow-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+.header-overflow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.35);
+  animation: fadeIn 0.15s var(--ease);
+}
+
+.mobile-overflow-menu {
+  position: absolute;
+  top: 50px;
+  right: 8px;
+  z-index: 301;
+  background: var(--bg-glass);
+  -webkit-backdrop-filter: blur(40px) saturate(1.5);
+  backdrop-filter: blur(40px) saturate(1.5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.1s var(--ease);
+}
+
+.overflow-item-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  transition: background var(--duration) var(--ease);
+}
+.overflow-item-btn:hover {
+  background: var(--bg-glass-hover);
+}
+.overflow-item-btn svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
 .ctx-pill {
   display: flex;
   align-items: center;

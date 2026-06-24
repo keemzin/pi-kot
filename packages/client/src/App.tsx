@@ -83,6 +83,14 @@ export function App() {
   const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
   const pathDebounceRef = useRef<number | undefined>(undefined);
   const contextData = useContextData(activeSessionId);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 600);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -953,27 +961,6 @@ export function App() {
             />
             <button
               type="button"
-              onClick={() => setShowMCP(true)}
-              title="MCP Settings"
-              style={{
-                background: "none",
-                border: "none",
-                color: showMCP ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-              </svg>
-            </button>
-            <button
-              type="button"
               onClick={() => setExplorerTab(explorerTab === "files" ? undefined : "files")}
               title="File explorer"
               style={{
@@ -989,59 +976,108 @@ export function App() {
             >
               📂
             </button>
+            <div className="header-overflow desktop-only">
+              <button
+                type="button"
+                onClick={() => setShowMCP(true)}
+                title="MCP Settings"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: showMCP ? "var(--accent-text)" : "var(--text-dim)",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  padding: "3px 6px",
+                  borderRadius: "var(--radius-sm)",
+                  lineHeight: 1,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSettings(true)}
+                title="Settings"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: showSettings ? "var(--accent-text)" : "var(--text-dim)",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                  padding: "3px 6px",
+                  borderRadius: "var(--radius-sm)",
+                  lineHeight: 1,
+                }}
+              >
+                ⚙
+              </button>
+              <button
+                type="button"
+                onClick={handleClearToken}
+                title="Sign out (clear stored token)"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  padding: "3px 6px",
+                  borderRadius: "var(--radius-sm)",
+                  lineHeight: 1,
+                }}
+              >
+                Sign out
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => setExplorerTab(explorerTab === "git" ? undefined : "git")}
-              title="Git panel"
-              style={{
-                background: "none",
-                border: "none",
-                color: explorerTab === "git" ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
+              onClick={() => setShowMobileMenu((v) => !v)}
+              className="mobile-overflow-btn mobile-only"
+              title="More options"
+              aria-label="More options"
             >
-              ⎇
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSettings(true)}
-              title="Settings"
-              style={{
-                background: "none",
-                border: "none",
-                color: showSettings ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "14px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
-            >
-              ⚙
-            </button>
-            <button
-              type="button"
-              onClick={handleClearToken}
-              title="Sign out (clear stored token)"
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
-            >
-              Sign out
+              ⋮
             </button>
           </div>
         </div>
+
+        {showMobileMenu && (
+          <>
+            <div className="mobile-overlay" onClick={() => setShowMobileMenu(false)} />
+            <div className="mobile-overflow-menu">
+              <button
+                type="button"
+                onClick={() => { setShowMCP(true); setShowMobileMenu(false); }}
+                className="overflow-item-btn"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+                MCP
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowSettings(true); setShowMobileMenu(false); }}
+                className="overflow-item-btn"
+              >
+                ⚙ Settings
+              </button>
+              <button
+                type="button"
+                onClick={() => { handleClearToken(); setShowMobileMenu(false); }}
+                className="overflow-item-btn"
+              >
+                Sign out
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Model error banner */}
         {modelError !== undefined && (
