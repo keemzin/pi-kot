@@ -1,12 +1,45 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Highlight, themes } from "prism-react-renderer";
+import { Highlight, themes as prismThemes } from "prism-react-renderer";
 
 interface Props {
   content: string;
   fileName: string;
+}
+
+const LIGHT_RE = /^light|clean|terracotta|sage$/i;
+
+function useIsLight(): boolean {
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const theme = document.documentElement.getAttribute("data-theme");
+      if (theme && LIGHT_RE.test(theme)) return true;
+    } catch {}
+    return window.matchMedia?.("(prefers-color-scheme: light)")?.matches ?? false;
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => {
+      const theme = root.getAttribute("data-theme");
+      setIsLight(!!(theme && LIGHT_RE.test(theme)));
+    };
+    read();
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const handler = () => read();
+    mq?.addEventListener?.("change", handler);
+    const obs = new MutationObserver(handler);
+    root && obs.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      mq?.removeEventListener?.("change", handler);
+      obs.disconnect();
+    };
+  }, []);
+
+  return isLight;
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -21,10 +54,12 @@ const EXT_TO_LANG: Record<string, string> = {
 };
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
+  const isLight = useIsLight();
   const lang = EXT_TO_LANG[language] ?? "bash";
+  const prismTheme = isLight ? prismThemes.vsLight : prismThemes.vsDark;
   return (
     <Highlight
-      theme={themes.nightOwl}
+      theme={prismTheme}
       code={code.trimEnd()}
       language={lang}
     >
@@ -39,7 +74,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
             lineHeight: 1.6,
             overflowX: "auto",
             borderRadius: "6px",
-            background: "var(--bg-glass-strong, #1a1a2e)",
+            background: "var(--bg-glass-strong)",
           }}
         >
           <code>
