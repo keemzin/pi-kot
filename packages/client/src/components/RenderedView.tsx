@@ -168,45 +168,18 @@ export function RenderedView({ content, fileName }: Props) {
             },
             table({ children }) {
               return (
-                <div style={{ overflowX: "auto" }}>
-                  <table
-                    style={{
-                      borderCollapse: "collapse",
-                      border: "1px solid var(--border)",
-                      width: "100%",
-                    }}
-                  >
+                <div className="table-wrapper">
+                  <table className="md-table">
                     {children}
                   </table>
                 </div>
               );
             },
             th({ children }) {
-              return (
-                <th
-                  style={{
-                    border: "1px solid var(--border)",
-                    padding: "6px 10px",
-                    background: "var(--bg-glass)",
-                    textAlign: "left",
-                    fontWeight: 600,
-                  }}
-                >
-                  {children}
-                </th>
-              );
+              return <th className="md-th">{children}</th>;
             },
             td({ children }) {
-              return (
-                <td
-                  style={{
-                    border: "1px solid var(--border)",
-                    padding: "4px 10px",
-                  }}
-                >
-                  {children}
-                </td>
-              );
+              return <td className="md-td">{children}</td>;
             },
             blockquote({ children }) {
               return (

@@ -3741,6 +3741,14 @@ body {
 .md-link { color: var(--accent-text); text-decoration: none; border-bottom: 1px solid var(--accent-subtle); }
 .md-link:hover { border-color: var(--accent-text); }
 
+.table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-solid);
+}
+
 .md-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .md-th {
   background: var(--bg-glass-strong);
