@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { SessionList } from "./components/SessionList";
+import { AddProjectDialog } from "./components/AddProjectDialog";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -24,9 +25,6 @@ import {
   fetchProviders,
   type ProviderGroup,
   getSessionModel,
-  createProjectAPI,
-  browseDirectories,
-  cloneRepo,
 } from "./lib/api-client";
 
 // Module-level guard against React StrictMode double-invocation
@@ -56,17 +54,8 @@ export function App() {
   const [providers, setProviders] = useState<ProviderGroup[]>([]);
   const [modelError, setModelError] = useState<string | undefined>();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [showAddProject, setShowAddProject] = useState(false);
+  const [showAddProjectDialog, setShowAddProjectDialog] = useState(false);
   const [showTreePanel, setShowTreePanel] = useState(false);
-  const [cloneMode, setCloneMode] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newProjectPath, setNewProjectPath] = useState("");
-  const [cloneUrl, setCloneUrl] = useState("");
-  const [cloneFolder, setCloneFolder] = useState("");
-  const [cloneBranch, setCloneBranch] = useState("");
-  const [cloneToken, setCloneToken] = useState("");
-  const [cloning, setCloning] = useState(false);
-  const [cloneProgress, setCloneProgress] = useState<string[]>([]);
   const [renamingSessionId, setRenamingSessionId] = useState<string | undefined>();
   const [renameValue, setRenameValue] = useState("");
   const [showArchived, setShowArchived] = useState<string | undefined>();
@@ -78,10 +67,7 @@ export function App() {
   const [showMCP, setShowMCP] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const [pathSuggestions, setPathSuggestions] = useState<string[]>([]);
-  const [showPathSuggestions, setShowPathSuggestions] = useState(false);
-  const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
-  const pathDebounceRef = useRef<number | undefined>(undefined);
+
   const contextData = useContextData(activeSessionId);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
@@ -361,168 +347,6 @@ export function App() {
     });
   };
 
-  const handleAddProject = async () => {
-    const name = newProjectName.trim();
-    const path = newProjectPath.trim() || "";
-    if (!name) return;
-    try {
-      await createProjectAPI(name, path);
-      await loadProjects();
-      setNewProjectName("");
-      setNewProjectPath("");
-      setShowAddProject(false);
-    } catch (err) {
-      setModelError(err instanceof Error ? err.message : "Failed to create project");
-    }
-  };
-
-  const fetchPathSuggestions = useCallback(async (query: string, immediate?: boolean) => {
-    if (pathDebounceRef.current) clearTimeout(pathDebounceRef.current);
-    const doFetch = async () => {
-      try {
-        const { suggestions } = await browseDirectories(query);
-        setPathSuggestions(suggestions);
-        setShowPathSuggestions(suggestions.length > 0);
-        setPathSuggestionIdx(-1);
-      } catch {
-        setShowPathSuggestions(false);
-      }
-    };
-    if (immediate) {
-      await doFetch();
-    } else {
-      pathDebounceRef.current = setTimeout(doFetch, 150);
-    }
-  }, []);
-
-  const handlePathInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setNewProjectPath(val);
-    if (val.trim().length > 0) {
-      fetchPathSuggestions(val.trim());
-    } else {
-      setPathSuggestions([]);
-      setShowPathSuggestions(false);
-    }
-  };
-
-  const handlePathFocus = () => {
-    const q = newProjectPath.trim();
-    fetchPathSuggestions(q || "/", true);
-  };
-
-  const handlePathBlur = () => {
-    // Delay hiding so click on suggestion registers
-    setTimeout(() => setShowPathSuggestions(false), 200);
-  };
-
-  const selectPathSuggestion = (path: string) => {
-    setNewProjectPath(path);
-    setShowPathSuggestions(false);
-    setPathSuggestions([]);
-  };
-
-  const handlePathKeyDown = (e: React.KeyboardEvent) => {
-    if (showPathSuggestions && pathSuggestions.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setPathSuggestionIdx((prev) =>
-          prev < pathSuggestions.length - 1 ? prev + 1 : 0,
-        );
-        return;
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setPathSuggestionIdx((prev) =>
-          prev > 0 ? prev - 1 : pathSuggestions.length - 1,
-        );
-        return;
-      }
-      if (e.key === "Enter" && pathSuggestionIdx >= 0) {
-        e.preventDefault();
-        selectPathSuggestion(pathSuggestions[pathSuggestionIdx]);
-        return;
-      }
-      if (e.key === "Escape") {
-        setShowPathSuggestions(false);
-        return;
-      }
-    }
-    if (e.key === "Enter") {
-      handleAddProject();
-    }
-    if (e.key === "Escape") {
-      setShowAddProject(false);
-    }
-  };
-
-  const handleCloneRepo = () => {
-    const name = (cloneFolder || newProjectName).trim();
-    if (!cloneUrl.trim() || !name) return;
-    setCloning(true);
-    setCloneProgress([]);
-
-    const abort = cloneRepo(
-      {
-        url: cloneUrl.trim(),
-        folderName: name,
-        projectName: newProjectName.trim() || name,
-        branch: cloneBranch.trim() || undefined,
-        token: cloneToken.trim() || undefined,
-      },
-      (event) => {
-        switch (event.type) {
-          case "started":
-            setCloneProgress((p) => [...p, `Cloning ${event.cloneUrlForDisplay}...`]);
-            break;
-          case "progress":
-            if (event.percent !== null) {
-              setCloneProgress((p) => [...p, `${event.phase}: ${event.percent}%`]);
-            } else {
-              setCloneProgress((p) => [...p, `${event.phase}...`]);
-            }
-            break;
-          case "stderr":
-            setCloneProgress((p) => [...p, event.line]);
-            break;
-          case "done":
-            loadProjects().then(() => {
-              // Auto-select the newly created project
-              const state = useSessionStore.getState();
-              const lastProj = state.projects[state.projects.length - 1];
-              if (lastProj) {
-                setActiveProject(lastProj.id);
-              }
-            });
-            setCloneProgress((p) => [...p, "✓ Clone complete, project created"]);
-            setTimeout(() => {
-              setShowAddProject(false);
-              setCloneMode(false);
-              setCloning(false);
-              setCloneProgress([]);
-              setCloneUrl("");
-              setCloneFolder("");
-              setCloneBranch("");
-              setCloneToken("");
-              setNewProjectName("");
-            }, 1500);
-            break;
-          case "error":
-            setCloneProgress((p) => [...p, `✗ Error: ${event.message}`]);
-            setCloning(false);
-            break;
-        }
-      },
-      (err) => {
-        setCloneProgress((p) => [...p, `✗ ${err.message}`]);
-        setCloning(false);
-      },
-    );
-
-    // Store abort function for cancellation
-    (window as any).__cloneAbort = abort;
-  };
-
   if (loading) {
     return <div className="centered">Loading...</div>;
   }
@@ -734,178 +558,15 @@ export function App() {
           </>
         )}
 
-        {/* Add project button / form */}
+        {/* Add project button */}
         <div className="sidebar-footer">
-          {showAddProject ? (
-            <div className="add-project-form">
-              {/* Mode toggle */}
-              <div className="clone-mode-toggle">
-                <button
-                  className={`clone-mode-btn${!cloneMode ? " active" : ""}`}
-                  onClick={() => setCloneMode(false)}
-                >
-                  Existing Folder
-                </button>
-                <button
-                  className={`clone-mode-btn${cloneMode ? " active" : ""}`}
-                  onClick={() => setCloneMode(true)}
-                >
-                  Clone Repo
-                </button>
-              </div>
-
-              {cloneMode ? (
-                <>
-                  <input
-                    type="text"
-                    value={cloneUrl}
-                    onChange={(e) => setCloneUrl(e.target.value)}
-                    placeholder="Git URL (https://...)"
-                    className="add-project-input"
-                    autoFocus
-                    disabled={cloning}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCloneRepo();
-                      if (e.key === "Escape") setShowAddProject(false);
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="Project name"
-                    className="add-project-input"
-                    disabled={cloning}
-                  />
-                  <input
-                    type="text"
-                    value={cloneFolder}
-                    onChange={(e) => setCloneFolder(e.target.value)}
-                    placeholder="Folder name (under workspace)"
-                    className="add-project-input"
-                    disabled={cloning}
-                  />
-                  <input
-                    type="text"
-                    value={cloneBranch}
-                    onChange={(e) => setCloneBranch(e.target.value)}
-                    placeholder="Branch (optional)"
-                    className="add-project-input"
-                    disabled={cloning}
-                  />
-                  <input
-                    type="password"
-                    value={cloneToken}
-                    onChange={(e) => setCloneToken(e.target.value)}
-                    placeholder="Access token (optional)"
-                    className="add-project-input"
-                    disabled={cloning}
-                  />
-                  {cloneProgress.length > 0 && (
-                    <div className="clone-progress">
-                      {cloneProgress.map((line, i) => (
-                        <div key={i} className="clone-progress-line">
-                          {line}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="add-project-actions">
-                    {cloning ? (
-                      <button
-                        onClick={() => {
-                          ((window as any).__cloneAbort as (() => void) | undefined)?.();
-                          setCloning(false);
-                        }}
-                        className="add-project-cancel"
-                        style={{ flex: 1, textAlign: "center" }}
-                      >
-                        Cancel
-                      </button>
-                    ) : (
-                      <>
-                        <button onClick={handleCloneRepo} className="add-project-btn">
-                          Clone
-                        </button>
-                        <button
-                          onClick={() => setShowAddProject(false)}
-                          className="add-project-cancel"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="Project name"
-                    className="add-project-input"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddProject();
-                      if (e.key === "Escape") setShowAddProject(false);
-                    }}
-                  />
-                  <div style={{ position: "relative" }}>
-                    <input
-                      type="text"
-                      value={newProjectPath}
-                      onChange={handlePathInputChange}
-                      onFocus={handlePathFocus}
-                      onBlur={handlePathBlur}
-                      onKeyDown={handlePathKeyDown}
-                      placeholder="/home or ~/ or folder name → auto-suggest"
-                      className="add-project-input"
-                      style={{ width: "100%" }}
-                    />
-                    {showPathSuggestions && pathSuggestions.length > 0 && (
-                      <div className="path-suggestions">
-                        {pathSuggestions.slice(0, 20).map((s, i) => {
-                          return (
-                            <div
-                              key={s}
-                              className={"path-suggestion-item" + (i === pathSuggestionIdx ? " highlighted" : "")}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                selectPathSuggestion(s);
-                              }}
-                              onMouseEnter={() => setPathSuggestionIdx(i)}
-                            >
-                              📁 {s}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  <div className="add-project-actions">
-                    <button onClick={handleAddProject} className="add-project-btn">
-                      Add
-                    </button>
-                    <button
-                      onClick={() => setShowAddProject(false)}
-                      className="add-project-cancel"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAddProject(true)}
-              className="add-project-toggle"
-              title="Add a new project"
-            >
-              + Add Project
-            </button>
-          )}
+          <button
+            onClick={() => setShowAddProjectDialog(true)}
+            className="add-project-toggle"
+            title="Add a new project"
+          >
+            + Add Project
+          </button>
         </div>
       </div>
 
@@ -1208,6 +869,13 @@ export function App() {
       {/* Extension UI bridge interactions (select/confirm/input from extension commands) */}
       {activeSessionId !== undefined && (
         <ExtensionUIInteractionModal sessionId={activeSessionId} />
+      )}
+
+      {showAddProjectDialog && (
+        <AddProjectDialog
+          open={showAddProjectDialog}
+          onClose={() => setShowAddProjectDialog(false)}
+        />
       )}
     </div>
   );

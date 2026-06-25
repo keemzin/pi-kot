@@ -1130,6 +1130,284 @@ body {
   color: var(--accent-text);
 }
 
+/* ── Add Project Dialog (OpenChamber-style) ── */
+.add-project-settings-panel {
+  width: 560px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.add-project-dialog-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 4px;
+  overflow-y: auto;
+}
+
+.add-project-dialog-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.add-project-dialog-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.add-project-dialog-tab.active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-subtle);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.add-project-dialog-tab:hover:not(.active) {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+.add-project-dialog-clone-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-project-dialog-clone-row .add-project-dialog-input {
+  flex: 1;
+  padding: 7px 10px 7px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  outline: none;
+  transition: border-color var(--duration) var(--ease);
+}
+
+.add-project-dialog-clone-row .add-project-dialog-input:focus {
+  border-color: var(--accent);
+}
+
+.add-project-dialog-clone-row .add-project-dialog-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  position: absolute;
+  margin-left: 10px;
+  pointer-events: none;
+}
+
+.add-project-dialog-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-project-dialog-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.add-project-dialog-path-row .add-project-dialog-input {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  outline: none;
+  transition: border-color var(--duration) var(--ease);
+}
+
+.add-project-dialog-path-row .add-project-dialog-input:focus {
+  border-color: var(--accent);
+}
+
+.add-project-dialog-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.add-project-dialog-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.add-project-dialog-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.add-project-dialog-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.add-project-dialog-tool {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration) var(--ease);
+}
+
+.add-project-dialog-tool:hover:not(:disabled) {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+.add-project-dialog-tool:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.add-project-dialog-path-display {
+  flex: 1;
+  text-align: right;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-project-dialog-error {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass);
+  border: 1px solid var(--danger, #e53e3e);
+  color: var(--danger, #e53e3e);
+  font-size: 11px;
+}
+
+.add-project-dialog-list {
+  max-height: 280px;
+  overflow-y: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-glass);
+}
+
+.add-project-dialog-empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.add-project-dialog-entries {
+  display: flex;
+  flex-direction: column;
+}
+
+.add-project-dialog-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease);
+  font-size: 12px;
+}
+
+.add-project-dialog-entry.highlighted {
+  background: var(--bg-glass-active);
+}
+
+.add-project-dialog-entry:hover {
+  background: var(--bg-glass-hover);
+}
+
+.add-project-dialog-entry-arrow {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  width: 14px;
+}
+
+.add-project-dialog-entry-folder {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.add-project-dialog-entry-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.add-project-dialog-entry-add {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--duration) var(--ease);
+}
+
+.add-project-dialog-entry:hover .add-project-dialog-entry-add {
+  opacity: 1;
+}
+
+.add-project-dialog-entry-add:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.add-project-dialog-footer {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 6px 16px;
+  border-top: 1px solid var(--border);
+}
+
 .add-project-form {
   display: flex;
   flex-direction: column;

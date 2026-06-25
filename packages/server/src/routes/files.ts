@@ -629,4 +629,124 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // GET /api/v1/filesystem/home — filesystem home directory (public, no auth)
+  fastify.get<{}>(
+    "/filesystem/home",
+    {
+      config: { public: true },
+      schema: {
+        description:
+          "Returns the user's home directory path. Used by the Add Project " +
+          "dialog to initialise the path input to ~/.",
+        tags: ["filesystem"],
+        response: {
+          200: {
+            type: "object",
+            required: ["home"],
+            properties: { home: { type: "string" } },
+          },
+        },
+      },
+    },
+    async () => {
+      const { homedir } = await import("node:os");
+      return { home: homedir() };
+    },
+  );
+
+  // GET /api/v1/filesystem/list — list directory entries (public, no auth)
+  fastify.get<{ Querystring: { path?: string } }>(
+    "/filesystem/list",
+    {
+      config: { public: true },
+      schema: {
+        description:
+          "Lists directory entries (name, path, isDirectory) for a given " +
+          "filesystem path. Used by the Add Project dialog for live directory " +
+          "browsing. Hidden entries (dotfiles) are returned — filtering is " +
+          "the client's choice.",
+        tags: ["filesystem"],
+        querystring: {
+          type: "object",
+          properties: {
+            path: { type: "string", description: "Absolute filesystem path to list" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["entries"],
+            properties: {
+              entries: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["name", "path", "isDirectory"],
+                  properties: {
+                    name: { type: "string" },
+                    path: { type: "string" },
+                    isDirectory: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          400: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const { readdir, stat } = await import("node:fs/promises");
+      const targetPath = (req.query.path ?? "").trim();
+      if (!targetPath) {
+        return reply.code(400).send({ error: "path_required", message: "path query parameter is required" });
+      }
+
+      try {
+        const st = await stat(targetPath);
+        if (!st.isDirectory()) {
+          return reply.code(400).send({ error: "not_a_directory", message: "path is not a directory" });
+        }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") {
+          return reply.code(404).send({ error: "not_found", message: "directory not found" });
+        }
+        if (code === "EACCES" || code === "EPERM") {
+          return reply.code(403).send({ error: "permission_denied", message: "permission denied" });
+        }
+        throw err;
+      }
+
+      const entries: Array<{ name: string; path: string; isDirectory: boolean }> = [];
+      try {
+        const dirEntries = await readdir(targetPath, { withFileTypes: true });
+        for (const entry of dirEntries) {
+          entries.push({
+            name: entry.name,
+            path: join(targetPath, entry.name),
+            isDirectory: entry.isDirectory(),
+          });
+        }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "EACCES" || code === "EPERM") {
+          return reply.code(403).send({ error: "permission_denied", message: "permission denied" });
+        }
+        throw err;
+      }
+
+      // Sort: directories first, then by name
+      entries.sort((a, b) => {
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      return { entries };
+    },
+  );
+
 };

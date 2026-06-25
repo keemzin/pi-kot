@@ -348,6 +348,27 @@ export async function deleteProjectAPI(
   );
 }
 
+// ---- Filesystem (browsing for Add Project dialog) ----
+
+export interface FsEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+}
+
+export async function fetchHomeDir(): Promise<string> {
+  const res = await request<{ home: string }>("GET", "/api/v1/filesystem/home");
+  return res.home;
+}
+
+export async function listDir(path: string): Promise<FsEntry[]> {
+  const res = await request<{ entries: FsEntry[] }>(
+    "GET",
+    `/api/v1/filesystem/list?path=${encodeURIComponent(path)}`,
+  );
+  return res.entries;
+}
+
 // ---- Files ----
 
 export interface FileTreeNode {
