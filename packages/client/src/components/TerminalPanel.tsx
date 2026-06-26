@@ -40,6 +40,7 @@ interface Live {
   reconnectAttempt: number;
   reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   disposed: boolean;
+  ctrlActive: boolean;
 }
 
 const live = new Map<string, Live>();
@@ -88,6 +89,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   // Track virtual keyboard offset on mobile so the panel sits above it
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [ctrlActive, setCtrlActive] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 600);
@@ -143,6 +145,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
         zIndex: isFullScreen ? 300 : 100,
         flexDirection: "column",
         background: "var(--bg, #1e1e2e)",
+        overscrollBehavior: "none",
         transition: "bottom 0.15s ease",
         ...(isFullScreen
           ? {
@@ -289,6 +292,8 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
             key={t.id}
             tab={t}
             visible={t.projectId === projectId && t.id === activeTab?.id}
+            ctrlActive={t.id === activeTab?.id ? ctrlActive : false}
+            setCtrlActive={setCtrlActive}
           />
         ))}
       </div>
@@ -327,24 +332,53 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
             .terminal-quick-key:active {
               background: var(--bg-glass-active, rgba(255, 255, 255, 0.08));
             }
+            .terminal-quick-key.active {
+              background: var(--accent, #89b4fa);
+              color: #11111b;
+              font-weight: bold;
+            }
           `}</style>
           
-          <button className="terminal-quick-key" onClick={() => sendKey("\x03")}>^C</button>
-          <button className="terminal-quick-key" onClick={() => sendKey("\x1B")}>ESC</button>
-          <button className="terminal-quick-key" onClick={() => sendKey("\x09")}>TAB</button>
+          <button 
+            className={`terminal-quick-key ${ctrlActive ? 'active' : ''}`} 
+            onPointerDown={(e) => {
+              e.preventDefault(); // Prevents terminal textarea from losing focus
+              setCtrlActive((v) => !v);
+            }}
+          >
+            CTRL
+          </button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x03"); }}>^C</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1B"); }}>ESC</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x09"); }}>TAB</button>
           <div style={{ width: 1, height: 20, background: "var(--border-color, #313244)", margin: "0 4px" }} />
-          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[A")}>↑</button>
-          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[B")}>↓</button>
-          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[D")}>←</button>
-          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[C")}>→</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[A"); }}>↑</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[B"); }}>↓</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[D"); }}>←</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[C"); }}>→</button>
         </div>
       )}
     </div>
   );
 }
 
-function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) {
+function TerminalHost({
+  tab,
+  visible,
+  ctrlActive,
+  setCtrlActive,
+}: {
+  tab: TerminalTab;
+  visible: boolean;
+  ctrlActive: boolean;
+  setCtrlActive: (v: boolean) => void;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
+
+  const ctrlActiveRef = useRef(ctrlActive);
+  useEffect(() => {
+    ctrlActiveRef.current = ctrlActive;
+  }, [ctrlActive]);
 
   useEffect(() => {
     if (hostRef.current === null) return undefined;
@@ -441,7 +475,21 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
     const dataDisposable = term.onData((data) => {
       const sock = live.get(tab.id)?.ws;
       if (sock?.readyState === WebSocket.OPEN) {
-        sock.send(JSON.stringify({ type: "input", data }));
+        if (ctrlActiveRef.current && data.length === 1) {
+          // Translate the character to its CTRL equivalent
+          const charCode = data.charCodeAt(0);
+          // If it's a letter, apply bitwise AND 0x1F. e.g. 'c' (99) -> 3 (^C)
+          let ctrlChar = data;
+          if (charCode >= 97 && charCode <= 122) { // a-z
+            ctrlChar = String.fromCharCode(charCode - 96);
+          } else if (charCode >= 65 && charCode <= 90) { // A-Z
+            ctrlChar = String.fromCharCode(charCode - 64);
+          }
+          sock.send(JSON.stringify({ type: "input", data: ctrlChar }));
+          setCtrlActive(false); // Reset after single use
+        } else {
+          sock.send(JSON.stringify({ type: "input", data }));
+        }
       }
     });
 
@@ -456,43 +504,89 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
     });
     observer.observe(host);
 
-    // --- Touch Scrolling Implementation ---
-    // xterm.js internal scrolling doesn't play well with mobile touch natively.
-    // We capture touch moves and translate them to terminal scroll lines.
-    let lastTouchY: number | null = null;
+    // --- Touch Gestures & Scrolling Implementation ---
+    let touchStartX: number | null = null;
+    let touchStartY: number | null = null;
+    let lastTouchY: number | null = null; // Used for 2-finger scrolling
     let remainderPx = 0;
-    const lineHeightPx = 16; // approximate pixels per line
+    const lineHeightPx = 16;
+    let swipeFired = false;
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
-      lastTouchY = e.touches[0].clientY;
-      remainderPx = 0;
+      if (e.touches.length === 1) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        swipeFired = false;
+      } else if (e.touches.length === 2) {
+        lastTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        remainderPx = 0;
+      }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || lastTouchY === null) return;
-      
-      const currentY = e.touches[0].clientY;
-      const deltaY = lastTouchY - currentY;
-      lastTouchY = currentY;
+      // --- 2-Finger Scrolling ---
+      if (e.touches.length === 2 && lastTouchY !== null) {
+        const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const stepY = lastTouchY - currentY;
+        lastTouchY = currentY;
 
-      // Only scroll if we have a meaningful delta to avoid jitter
-      if (Math.abs(deltaY) < 1) return;
+        if (Math.abs(stepY) < 1) return;
 
-      e.preventDefault(); // prevent native pull-to-refresh / bouncing
-      e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
 
-      const totalPx = remainderPx + deltaY;
-      const lines = Math.trunc(totalPx / lineHeightPx);
-      remainderPx = totalPx - (lines * lineHeightPx);
+        const totalPx = remainderPx + stepY;
+        const lines = Math.trunc(totalPx / lineHeightPx);
+        remainderPx = totalPx - (lines * lineHeightPx);
 
-      if (lines !== 0) {
-        term.scrollLines(lines);
+        if (lines !== 0) {
+          term.scrollLines(lines);
+        }
+        return;
+      }
+
+      // --- 1-Finger Gestures (Arrows, Tab, Ctrl+C) ---
+      if (e.touches.length === 1 && touchStartX !== null && touchStartY !== null) {
+        const currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+        
+        const deltaX = currentX - touchStartX;
+        const deltaY = currentY - touchStartY;
+
+        // Threshold for a gesture to trigger
+        if (!swipeFired && Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 50) {
+          const sock = live.get(tab.id)?.ws;
+          
+          if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // Horizontal
+            if (deltaX > 0) {
+              sock?.send(JSON.stringify({ type: "input", data: "\x09" })); // Right: TAB
+            } else {
+              sock?.send(JSON.stringify({ type: "input", data: "\x03" })); // Left: Ctrl+C
+            }
+          } else {
+            // Vertical
+            if (deltaY > 0) {
+              sock?.send(JSON.stringify({ type: "input", data: "\x1b[B" })); // Down: Down Arrow
+            } else {
+              sock?.send(JSON.stringify({ type: "input", data: "\x1b[A" })); // Up: Up Arrow
+            }
+          }
+          
+          swipeFired = true;
+        }
+
+        if (swipeFired) {
+          e.preventDefault(); // Prevent page bounce once gesture is locked in
+        }
       }
     };
 
     const onTouchEnd = () => {
+      touchStartX = null;
+      touchStartY = null;
       lastTouchY = null;
+      swipeFired = false;
     };
 
     host.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -509,6 +603,7 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
       reconnectAttempt: 0,
       reconnectTimer: undefined,
       disposed: false,
+      ctrlActive: false,
     });
 
     void dataDisposable;
@@ -559,6 +654,7 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
         pointerEvents: visible ? "auto" : "none",
         zIndex: visible ? 1 : 0,
         padding: "2px 4px 8px 4px",
+        touchAction: "none", // Prevent native browser pinch-zoom/pan inside the terminal area
       }}
     />
   );
