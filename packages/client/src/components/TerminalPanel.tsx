@@ -138,6 +138,8 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
           ? {
               // Full-screen: cover the entire viewport above the keyboard
               inset: `0 0 ${keyboardOffset}px 0`,
+              paddingTop: "env(safe-area-inset-top, 0px)",
+              paddingBottom: keyboardOffset === 0 ? "env(safe-area-inset-bottom, 0px)" : 0,
             }
           : {
               // Desktop: bottom panel
@@ -338,6 +340,7 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
     }
 
     // First mount: create xterm + WS
+    const isMobileDevice = window.innerWidth <= 600;
     const term = new Terminal({
       theme: {
         background: cssVar("--bg", "#1e1e2e"),
@@ -363,7 +366,7 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
       },
       fontFamily:
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-      fontSize: 13,
+      fontSize: isMobileDevice ? 12 : 13,
       cursorBlink: true,
       scrollback: 5000,
       allowTransparency: true,
@@ -396,6 +399,50 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
     });
     observer.observe(host);
 
+    // --- Touch Scrolling Implementation ---
+    // xterm.js internal scrolling doesn't play well with mobile touch natively.
+    // We capture touch moves and translate them to terminal scroll lines.
+    let lastTouchY: number | null = null;
+    let remainderPx = 0;
+    const lineHeightPx = 16; // approximate pixels per line
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      lastTouchY = e.touches[0].clientY;
+      remainderPx = 0;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || lastTouchY === null) return;
+      
+      const currentY = e.touches[0].clientY;
+      const deltaY = lastTouchY - currentY;
+      lastTouchY = currentY;
+
+      // Only scroll if we have a meaningful delta to avoid jitter
+      if (Math.abs(deltaY) < 1) return;
+
+      e.preventDefault(); // prevent native pull-to-refresh / bouncing
+      e.stopPropagation();
+
+      const totalPx = remainderPx + deltaY;
+      const lines = Math.trunc(totalPx / lineHeightPx);
+      remainderPx = totalPx - (lines * lineHeightPx);
+
+      if (lines !== 0) {
+        term.scrollLines(lines);
+      }
+    };
+
+    const onTouchEnd = () => {
+      lastTouchY = null;
+    };
+
+    host.addEventListener("touchstart", onTouchStart, { passive: false });
+    host.addEventListener("touchmove", onTouchMove, { passive: false });
+    host.addEventListener("touchend", onTouchEnd);
+    host.addEventListener("touchcancel", onTouchEnd);
+
     live.set(tab.id, {
       term,
       fit,
@@ -413,6 +460,10 @@ function TerminalHost({ tab, visible }: { tab: TerminalTab; visible: boolean }) 
       // Panel hidden: disconnect only the observer. WS + term survive.
       try {
         observer.disconnect();
+        host.removeEventListener("touchstart", onTouchStart);
+        host.removeEventListener("touchmove", onTouchMove);
+        host.removeEventListener("touchend", onTouchEnd);
+        host.removeEventListener("touchcancel", onTouchEnd);
       } catch {
         // ignore
       }
