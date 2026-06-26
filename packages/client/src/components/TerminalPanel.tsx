@@ -1,13 +1,3 @@
-/**
- * TerminalPanel — xterm.js terminal connected to the server PTY via WebSocket.
- *
- * Renders as a fixed bottom overlay above the chat input area.
- * Props:
- *   open: boolean
- *   onClose: () => void
- *   projectId?: string
- */
-
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -17,11 +7,9 @@ import { getStoredToken } from "../lib/api-client";
 interface TerminalPanelProps {
   open: boolean;
   onClose: () => void;
-  /** If set, the terminal PTY starts in this directory. */
   cwd?: string;
 }
 
-/** Read a CSS variable from the document root, returning a fallback if unset. */
 function cssVar(name: string, fallback: string): string {
   if (typeof document === "undefined") return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -29,22 +17,25 @@ function cssVar(name: string, fallback: string): string {
 }
 
 const MOBILE_BP = 600;
-
 function isMobileWidth(): boolean {
   return typeof window !== "undefined" && window.innerWidth <= MOBILE_BP;
 }
 
-export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
+function SingleTerminal({
+  cwd,
+  isActive,
+  onStatusChange
+}: {
+  cwd?: string;
+  isActive: boolean;
+  onStatusChange: (status: boolean) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [mobile, setMobile] = useState(isMobileWidth);
 
   const connect = useCallback(() => {
-    if (!open) return;
-
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
 
@@ -58,7 +49,7 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
 
     ws.onopen = () => {
       wsRef.current = ws;
-      setConnected(true);
+      onStatusChange(true);
       requestAnimationFrame(() => fitRef.current?.fit());
     };
 
@@ -71,7 +62,7 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
             break;
           case "exit":
             termRef.current?.writeln(`\r\n\x1b[31mProcess exited with code ${msg.code}\x1b[0m`);
-            setConnected(false);
+            onStatusChange(false);
             break;
           case "error":
             termRef.current?.writeln(`\r\n\x1b[31mError: ${msg.message}\x1b[0m`);
@@ -87,13 +78,13 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
 
     ws.onclose = () => {
       wsRef.current = null;
-      setConnected(false);
+      onStatusChange(false);
     };
 
     ws.onerror = () => {
       termRef.current?.writeln("\r\n\x1b[31mWebSocket error\x1b[0m");
     };
-  }, [open, cwd]);
+  }, [cwd, onStatusChange]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -102,26 +93,12 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
     }
   }, []);
 
-  // Track mobile width for responsive height
   useEffect(() => {
-    if (!open) return;
-    const check = () => setMobile(isMobileWidth());
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      disconnect();
-      setConnected(false);
-      return;
-    }
-
     const element = containerRef.current;
     if (!element) return;
 
-    const bg = cssVar("--bg", "#1e1e2e");
-    const fg = cssVar("--text", "#cdd6f4");
+    const bg = cssVar("--bg-solid", "#000000");
+    const fg = cssVar("--text-primary", "#ffffff");
     const accent = cssVar("--accent", "#89b4fa");
     const accentText = cssVar("--accent-text", "#89b4fa");
 
@@ -159,8 +136,8 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
     term.loadAddon(fitAddon);
 
     term.open(element);
-    term.focus();
-
+    
+    // Fit needs a tick to calculate dimensions correctly
     const fitTimer = setTimeout(() => {
       fitAddon.fit();
     }, 50);
@@ -189,7 +166,7 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
             );
           }
         } catch {
-          // hidden
+          // hidden container might throw
         }
       }, 100);
     });
@@ -205,14 +182,84 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
       termRef.current = null;
       fitRef.current = null;
     };
-  }, [open, connect, disconnect]);
+  }, [connect, disconnect]); // Run exactly once on mount
 
-  if (!open) return null;
+  // Refit when tab becomes active
+  useEffect(() => {
+    if (isActive && fitRef.current) {
+      setTimeout(() => {
+        try {
+          fitRef.current?.fit();
+        } catch {}
+      }, 50);
+      termRef.current?.focus();
+    }
+  }, [isActive]);
 
-  const borderColor = cssVar("--border-color", "#313244");
-  const textDim = cssVar("--text-dim", "#6c7086");
-  const accent = cssVar("--accent", "#89b4fa");
-  const panelHeight = mobile ? "60vh" : "35vh";
+  return (
+    <div
+      ref={containerRef}
+      className="xterm-container"
+      style={{
+        flex: 1,
+        padding: "2px 4px 8px 4px",
+        overflow: "hidden",
+        minHeight: 0,
+        display: isActive ? "block" : "none",
+      }}
+    />
+  );
+}
+
+export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
+  const [tabs, setTabs] = useState<{ id: string; name: string }[]>([{ id: "1", name: "Terminal" }]);
+  const [activeTabId, setActiveTabId] = useState("1");
+  const [nextId, setNextId] = useState(2);
+  const [statuses, setStatuses] = useState<Record<string, boolean>>({});
+
+  const [mobile, setMobile] = useState(isMobileWidth);
+
+  useEffect(() => {
+    const check = () => setMobile(isMobileWidth());
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const addTab = () => {
+    const id = String(nextId);
+    setTabs([...tabs, { id, name: `Terminal ${id}` }]);
+    setActiveTabId(id);
+    setNextId(nextId + 1);
+  };
+
+  const closeTab = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newTabs = tabs.filter((t) => t.id !== id);
+    setTabs(newTabs);
+    // Cleanup statuses
+    setStatuses((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+
+    if (activeTabId === id && newTabs.length > 0) {
+      setActiveTabId(newTabs[newTabs.length - 1].id);
+    } else if (newTabs.length === 0) {
+      // All tabs closed, create a fresh one and hide panel
+      const freshId = String(nextId + 1);
+      setTabs([{ id: freshId, name: "Terminal" }]);
+      setActiveTabId(freshId);
+      setNextId(nextId + 2);
+      onClose();
+    }
+  };
+
+  const textDim = "var(--text-dim, #6c7086)";
+  const textPrimary = "var(--text-primary, #ffffff)";
+  const accentColor = "var(--accent, #89b4fa)";
+  const errorColor = "var(--error, #f87171)";
+  const panelHeight = mobile ? "60dvh" : "35vh";
 
   return (
     <div
@@ -225,85 +272,124 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
         zIndex: 100,
         height: panelHeight,
         minHeight: 180,
-        background: cssVar("--bg", "#1e1e2e"),
-        display: "flex",
+        background: "var(--bg-solid, #000000)",
+        display: open ? "flex" : "none",
         flexDirection: "column",
-        animation: "terminalSlideUp 0.2s ease",
-        boxShadow: "0 -2px 12px rgba(0,0,0,0.25)",
+        animation: open ? "terminalSlideUp 0.2s ease" : "none",
+        borderTop: `1px solid ${accentColor}`,
       }}
     >
-      {/* Header bar — accent line below the "Terminal" label */}
       <div
         className="terminal-header"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 12px",
-          height: 32,
-          fontSize: 12,
+          height: 36,
+          fontSize: 13,
           color: textDim,
           userSelect: "none",
           flexShrink: 0,
-          borderBottom: `1px solid ${borderColor}`,
+          borderBottom: "1px solid var(--border, #313244)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, height: "100%" }}>
-          <span
-            style={{
-              fontWeight: 600,
-              color: cssVar("--text", "#cdd6f4"),
-              borderBottom: `2px solid ${accent}`,
-              paddingBottom: 2,
-              lineHeight: "30px",
-            }}
-          >
-            Terminal
-          </span>
-          <span
-            style={{
-              display: "inline-block",
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: connected
-                ? cssVar("--success", "#34d399")
-                : cssVar("--error", "#f87171"),
-              marginTop: 2,
-            }}
-          />
+        <div 
+          className="terminal-tabs-container"
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            height: "100%", 
+            overflowX: "auto",
+            scrollbarWidth: "none",
+          }}
+        >
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTabId;
+            const connected = statuses[tab.id] ?? false;
+            return (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTabId(tab.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  height: "100%",
+                  fontWeight: 500,
+                  color: isActive ? textPrimary : textDim,
+                  borderBottom: `2px solid ${isActive ? (connected ? accentColor : errorColor) : "transparent"}`,
+                  padding: "0 10px",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  backgroundColor: isActive ? "rgba(255, 255, 255, 0.03)" : "transparent",
+                }}
+              >
+                <span style={{ color: connected ? accentColor : errorColor, fontFamily: "monospace", fontSize: 14 }}>
+                  &gt;_
+                </span>
+                {tab.name}
+                <button
+                  onClick={(e) => closeTab(tab.id, e)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "inherit",
+                    padding: "0 4px",
+                    marginLeft: "4px",
+                    fontSize: 12,
+                    cursor: "pointer",
+                    opacity: isActive ? 1 : 0.5,
+                  }}
+                  title="Close terminal"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div 
+          style={{ 
+            display: "flex", 
+            gap: 12, 
+            alignItems: "center", 
+            padding: "0 16px",
+            background: "var(--bg-solid, #000000)",
+            boxShadow: "-8px 0 8px var(--bg-solid, #000000)"
+          }}
+        >
           <button
-            onClick={() => {
-              disconnect();
-              setTimeout(connect, 50);
-            }}
-            title="Restart"
+            onClick={addTab}
+            title="New Terminal"
             style={{
               background: "none",
-              border: `1px solid ${borderColor}`,
+              border: "none",
               color: textDim,
-              borderRadius: 4,
-              padding: "2px 8px",
-              fontSize: 11,
+              fontSize: 18,
               cursor: "pointer",
-              lineHeight: "16px",
+              padding: 0,
+              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            Restart
+            +
           </button>
           <button
             onClick={onClose}
-            title="Close terminal"
+            title="Hide terminal"
             style={{
               background: "none",
               border: "none",
               color: textDim,
               fontSize: 14,
               cursor: "pointer",
-              padding: "2px 6px",
-              lineHeight: "16px",
+              padding: 0,
+              lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
             ✕
@@ -311,22 +397,22 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
         </div>
       </div>
 
-      {/* Terminal xterm container — bottom padding so text isn't flush */}
-      <div
-        ref={containerRef}
-        className="xterm-container"
-        style={{
-          flex: 1,
-          padding: "2px 4px 8px 4px",
-          overflow: "hidden",
-          minHeight: 0,
-        }}
-      />
+      {tabs.map((tab) => (
+        <SingleTerminal
+          key={tab.id}
+          cwd={cwd}
+          isActive={tab.id === activeTabId}
+          onStatusChange={(status) => setStatuses((s) => ({ ...s, [tab.id]: status }))}
+        />
+      ))}
 
       <style>{`
         @keyframes terminalSlideUp {
           from { transform: translateY(10px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
+        }
+        .terminal-tabs-container::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
     </div>
