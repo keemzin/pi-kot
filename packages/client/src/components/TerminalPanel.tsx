@@ -1,13 +1,14 @@
 /**
  * TerminalPanel — xterm.js terminal connected to the server PTY via WebSocket.
  *
+ * Renders as an inline block inside main-area, above the chat input.
  * Props:
  *   open: boolean
  *   onClose: () => void
- *   projectId?: string — used to derive the cwd sent to the PTY
+ *   projectId?: string
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -19,11 +20,19 @@ interface TerminalPanelProps {
   projectId?: string;
 }
 
+/** Read a CSS variable from the document root, returning a fallback if unset. */
+function cssVar(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
+}
+
 export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const [connected, setConnected] = useState(false);
 
   const connect = useCallback(() => {
     if (!open) return;
@@ -31,9 +40,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
 
-    // Build query params: cwd + auth token
     const params = new URLSearchParams();
-    if (projectId) params.set("cwd", `/workspace/${encodeURIComponent(projectId)}`);
     const token = getStoredToken();
     if (token) params.set("token", token);
     const qs = params.toString();
@@ -42,7 +49,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
 
     ws.onopen = () => {
       wsRef.current = ws;
-      // Trigger fit once connected so the terminal fills the container
+      setConnected(true);
       requestAnimationFrame(() => fitRef.current?.fit());
     };
 
@@ -55,12 +62,13 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
             break;
           case "exit":
             termRef.current?.writeln(`\r\n\x1b[31mProcess exited with code ${msg.code}\x1b[0m`);
+            setConnected(false);
             break;
           case "error":
             termRef.current?.writeln(`\r\n\x1b[31mError: ${msg.message}\x1b[0m`);
             break;
           case "open":
-            termRef.current?.writeln(`\r\n\x1b[32mTerminal [${msg.id}] opened at ${msg.cwd}\x1b[0m`);
+            termRef.current?.writeln(`\r\n\x1b[32mTerminal opened at ${msg.cwd}\x1b[0m`);
             break;
         }
       } catch {
@@ -70,6 +78,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
 
     ws.onclose = () => {
       wsRef.current = null;
+      setConnected(false);
     };
 
     ws.onerror = () => {
@@ -87,39 +96,47 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
   useEffect(() => {
     if (!open) {
       disconnect();
+      setConnected(false);
       return;
     }
 
     const element = containerRef.current;
     if (!element) return;
 
-    // Create terminal
+    // Read actual theme colors from CSS variables at mount time
+    const bg = cssVar("--bg", "#1e1e2e");
+    const fg = cssVar("--text", "#cdd6f4");
+    const accent = cssVar("--accent", "#89b4fa");
+    const accentText = cssVar("--accent-text", "#89b4fa");
+    const borderColor = cssVar("--border-color", "#313244");
+    const textDim = cssVar("--text-dim", "#6c7086");
+
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: "block",
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace",
       theme: {
-        background: "var(--bg, #1e1e2e)",
-        foreground: "var(--text, #cdd6f4)",
-        cursor: "var(--accent-text, #89b4fa)",
-        selectionBackground: "var(--accent, #89b4fa)",
-        black: "#45475a",
-        red: "#f38ba8",
-        green: "#a6e3a1",
-        yellow: "#f9e2af",
-        blue: "#89b4fa",
-        magenta: "#f5c2e7",
-        cyan: "#94e2d5",
-        white: "#bac2de",
-        brightBlack: "#585b70",
-        brightRed: "#f38ba8",
-        brightGreen: "#a6e3a1",
-        brightYellow: "#f9e2af",
-        brightBlue: "#89b4fa",
-        brightMagenta: "#f5c2e7",
-        brightCyan: "#94e2d5",
-        brightWhite: "#a6adc8",
+        background: bg,
+        foreground: fg,
+        cursor: accentText,
+        selectionBackground: accent,
+        black: cssVar("--ansi-black", "#45475a"),
+        red: cssVar("--ansi-red", "#f38ba8"),
+        green: cssVar("--ansi-green", "#a6e3a1"),
+        yellow: cssVar("--ansi-yellow", "#f9e2af"),
+        blue: cssVar("--ansi-blue", "#89b4fa"),
+        magenta: cssVar("--ansi-magenta", "#f5c2e7"),
+        cyan: cssVar("--ansi-cyan", "#94e2d5"),
+        white: cssVar("--ansi-white", "#bac2de"),
+        brightBlack: cssVar("--ansi-bright-black", "#585b70"),
+        brightRed: cssVar("--ansi-bright-red", "#f38ba8"),
+        brightGreen: cssVar("--ansi-bright-green", "#a6e3a1"),
+        brightYellow: cssVar("--ansi-bright-yellow", "#f9e2af"),
+        brightBlue: cssVar("--ansi-bright-blue", "#89b4fa"),
+        brightMagenta: cssVar("--ansi-bright-magenta", "#f5c2e7"),
+        brightCyan: cssVar("--ansi-bright-cyan", "#94e2d5"),
+        brightWhite: cssVar("--ansi-bright-white", "#a6adc8"),
       },
       allowTransparency: true,
     });
@@ -130,7 +147,6 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
     term.open(element);
     term.focus();
 
-    // Wait for DOM to settle then fit
     const fitTimer = setTimeout(() => {
       fitAddon.fit();
     }, 50);
@@ -138,17 +154,14 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
     termRef.current = term;
     fitRef.current = fitAddon;
 
-    // Connect WebSocket
     connect();
 
-    // Handle input from terminal → WS
     term.onData((data) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "input", data }));
       }
     });
 
-    // Handle resize (debounced)
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
     const resizeObserver = new ResizeObserver(() => {
       clearTimeout(resizeTimer);
@@ -184,102 +197,96 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
 
   return (
     <div
-      className="terminal-overlay"
-      onClick={(e) => {
-        // Close when clicking outside the panel
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className="terminal-panel"
       style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 100,
+        flexShrink: 0,
+        height: "35vh",
+        minHeight: 160,
+        background: cssVar("--bg", "#1e1e2e"),
+        borderTop: `1px solid ${cssVar("--border-color", "#313244")}`,
         display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "center",
-        background: "rgba(0,0,0,0.3)",
+        flexDirection: "column",
+        animation: "terminalSlideUp 0.2s ease",
       }}
     >
+      {/* Header bar */}
       <div
-        className="terminal-panel"
+        className="terminal-header"
         style={{
-          width: "100%",
-          height: "50vh",
-          minHeight: 200,
-          background: "var(--bg, #1e1e2e)",
-          borderTop: "1px solid var(--border-color, #313244)",
           display: "flex",
-          flexDirection: "column",
-          animation: "slideUp 0.2s ease",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "4px 12px",
+          borderBottom: `1px solid ${cssVar("--border-color", "#313244")}`,
+          fontSize: 12,
+          color: cssVar("--text-dim", "#6c7086"),
+          userSelect: "none",
+          flexShrink: 0,
         }}
       >
-        {/* Header bar */}
-        <div
-          className="terminal-header"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "6px 12px",
-            borderBottom: "1px solid var(--border-color, #313244)",
-            fontSize: 12,
-            color: "var(--text-dim, #6c7086)",
-            userSelect: "none",
-          }}
-        >
-          <span>Terminal</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button
-              onClick={() => {
-                disconnect();
-                // Reconnect after a tick
-                setTimeout(connect, 50);
-              }}
-              title="Restart terminal"
-              style={{
-                background: "none",
-                border: "1px solid var(--border-color, #313244)",
-                color: "var(--text-dim, #6c7086)",
-                borderRadius: 4,
-                padding: "2px 8px",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
-            >
-              Restart
-            </button>
-            <button
-              onClick={onClose}
-              title="Close terminal"
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-dim, #6c7086)",
-                fontSize: 14,
-                cursor: "pointer",
-                padding: "2px 6px",
-              }}
-            >
-              ✕
-            </button>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontWeight: 600 }}>Terminal</span>
+          <span
+            style={{
+              display: "inline-block",
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              background: connected ? cssVar("--success", "#34d399") : cssVar("--error", "#f87171"),
+            }}
+          />
         </div>
-
-        {/* Terminal container */}
-        <div
-          ref={containerRef}
-          className="xterm-container"
-          style={{
-            flex: 1,
-            padding: 4,
-            overflow: "hidden",
-          }}
-        />
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            onClick={() => {
+              disconnect();
+              setTimeout(connect, 50);
+            }}
+            title="Restart terminal"
+            style={{
+              background: "none",
+              border: `1px solid ${cssVar("--border-color", "#313244")}`,
+              color: cssVar("--text-dim", "#6c7086"),
+              borderRadius: 4,
+              padding: "2px 8px",
+              fontSize: 11,
+              cursor: "pointer",
+            }}
+          >
+            Restart
+          </button>
+          <button
+            onClick={onClose}
+            title="Close terminal"
+            style={{
+              background: "none",
+              border: "none",
+              color: cssVar("--text-dim", "#6c7086"),
+              fontSize: 14,
+              cursor: "pointer",
+              padding: "2px 6px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
-      {/* Keyframe for slide-up animation */}
+      {/* Terminal xterm container */}
+      <div
+        ref={containerRef}
+        className="xterm-container"
+        style={{
+          flex: 1,
+          padding: "2px 4px",
+          overflow: "hidden",
+          minHeight: 0,
+        }}
+      />
+
       <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
+        @keyframes terminalSlideUp {
+          from { transform: translateY(10px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
