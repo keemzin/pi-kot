@@ -10,6 +10,7 @@ import { MCPPanel } from "./components/MCPPanel";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
+import { TerminalPanel } from "./components/TerminalPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
@@ -67,6 +68,7 @@ export function App() {
   const [explorerTab, setExplorerTab] = useState<"files" | "git" | undefined>(undefined);
   const [showOrch, setShowOrch] = useState(false);
   const [showMCP, setShowMCP] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -649,6 +651,23 @@ export function App() {
             <div className="header-overflow desktop-only">
               <button
                 type="button"
+                onClick={() => setShowTerminal(true)}
+                title="Terminal"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: showTerminal ? "var(--accent-text)" : "var(--text-dim)",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  padding: "3px 6px",
+                  borderRadius: "var(--radius-sm)",
+                  lineHeight: 1,
+                }}
+              >
+                &gt;_
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowMCP(true)}
                 title="MCP Settings"
                 style={{
@@ -879,6 +898,16 @@ export function App() {
 
       {inspectData !== undefined && (
         <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} sessionId={activeSessionId} />
+      )}
+
+      {showTerminal && (
+        <ErrorBoundary label="TerminalPanel" compact>
+          <TerminalPanel
+            open={showTerminal}
+            onClose={() => setShowTerminal(false)}
+            projectId={activeProjectId}
+          />
+        </ErrorBoundary>
       )}
 
       {showMCP && (

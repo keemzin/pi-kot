@@ -2,6 +2,7 @@ import Fastify, { type FastifyRequest } from "fastify";
 import cors from "@fastify/cors";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
+import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -26,6 +27,7 @@ import { sessionExtensionRoutes } from "./routes/session-extensions.js";
 import { gitRoutes } from "./routes/git.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { skillRoutes } from "./routes/skills.js";
+import { terminalRoutes } from "./routes/terminal.js";
 import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
@@ -67,6 +69,9 @@ export async function buildServer() {
     disableRequestLogging: config.isTest,
     trustProxy: config.trustProxy,
   });
+
+  // WebSocket support for terminal
+  await fastify.register(websocket);
 
   // CORS — default to true (reflect request origin) for dev convenience
   await fastify.register(cors, {
@@ -142,6 +147,7 @@ export async function buildServer() {
       await api.register(gitRoutes);
       await api.register(mcpRoutes);
       await api.register(skillRoutes);
+      await api.register(terminalRoutes);
     },
     { prefix: "/api/v1" },
   );
@@ -183,6 +189,8 @@ export async function buildServer() {
   fastify.addHook("onClose", async () => {
     await disposeAllSessions();
     await disposeAllMcp();
+    const { killAllPty } = await import("./pty-manager.js");
+    killAllPty();
   });
 
   // Boot-time MCP load
