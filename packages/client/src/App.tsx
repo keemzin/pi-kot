@@ -13,6 +13,7 @@ import { FileExplorer } from "./components/FileExplorer";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -760,12 +761,16 @@ export function App() {
 
         {activeSessionId !== undefined ? (
           <>
-            <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
-            <OrchestrationPanel
-              sessionId={activeSessionId}
-              open={showOrch}
-              onClose={() => setShowOrch(false)}
-            />
+            <ErrorBoundary label="ChatView" compact>
+              <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
+            </ErrorBoundary>
+            <ErrorBoundary label="OrchestrationPanel" compact>
+              <OrchestrationPanel
+                sessionId={activeSessionId}
+                open={showOrch}
+                onClose={() => setShowOrch(false)}
+              />
+            </ErrorBoundary>
             <AskUserQuestionPanel sessionId={activeSessionId} />
             <ChatInput
       sessionId={activeSessionId}
@@ -789,22 +794,26 @@ export function App() {
 
       {/* Session Tree Panel overlay */}
       {activeSessionId !== undefined && activeProjectId !== undefined && (
-        <SessionTreePanel
-          sessionId={activeSessionId}
-          projectId={activeProjectId}
-          open={showTreePanel}
-          onClose={() => setShowTreePanel(false)}
-        />
+        <ErrorBoundary label="SessionTreePanel" compact>
+          <SessionTreePanel
+            sessionId={activeSessionId}
+            projectId={activeProjectId}
+            open={showTreePanel}
+            onClose={() => setShowTreePanel(false)}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Explorer panel (Files + Git tabs) */}
       {activeProjectId !== undefined && (
-        <FileExplorer
-          projectId={activeProjectId}
-          open={explorerTab !== undefined}
-          onClose={() => setExplorerTab(undefined)}
-          initialTab={explorerTab}
-        />
+        <ErrorBoundary label="FileExplorer" compact>
+          <FileExplorer
+            projectId={activeProjectId}
+            open={explorerTab !== undefined}
+            onClose={() => setExplorerTab(undefined)}
+            initialTab={explorerTab}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Settings Panel overlay */}
@@ -855,7 +864,9 @@ export function App() {
       )}
 
       {showSettings && (
-        <SettingsPanel onClose={() => setShowSettings(false)} />
+        <ErrorBoundary label="SettingsPanel" compact>
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </ErrorBoundary>
       )}
 
       {inspectData !== undefined && (
@@ -863,7 +874,9 @@ export function App() {
       )}
 
       {showMCP && (
-        <MCPPanel onClose={() => setShowMCP(false)} />
+        <ErrorBoundary label="MCPPanel" compact>
+          <MCPPanel onClose={() => setShowMCP(false)} />
+        </ErrorBoundary>
       )}
 
       {/* Extension UI bridge interactions (select/confirm/input from extension commands) */}

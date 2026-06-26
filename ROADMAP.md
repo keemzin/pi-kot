@@ -238,11 +238,11 @@ User can:
 || 7.2 | Authentication hardening | 🔴 | Token refresh, session expiry, CORS hardening |
 || 7.3 | Error boundaries | 🔴 | React error boundaries, graceful degradation |
 || 7.4 | Loading skeletons | 🔴 | Placeholder UI while data loads |
-|| 7.5 | Keyboard shortcuts | 🟢 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
-|| 7.6 | Mobile responsive | 🔴 | Works on phone/tablet browsers |
+|| 7.5 | Keyboard shortcuts | 🟡 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
+|| 7.6 | Mobile responsive | 🟡 | Partial — media queries at 600px, mobile overflow menu, burger toggle, sidebar auto-close on mobile; full responsive layout pending |
 || 7.7 | PWA support | 🔴 | Service worker, manifest, install prompt |
 || 7.8 | Dark/light theme | 🟢 | 12 themes done — 8 dark (night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark) + 4 light (clean, terracotta, sage, flexoki-light) |
-|| 7.9 | Accessibility | 🔴 | ARIA labels, keyboard navigation, screen reader support |
+|| 7.9 | Accessibility | 🟡 | Partial — ARIA labels on buttons/modals, `aria-expanded`, `role="dialog"` on overlays, `aria-modal`; full keyboard nav + screen reader audit pending |
 || 7.10 | Testing | 🔴 | Integration tests for critical flows (session, prompt, stream) |
 
 ---
@@ -255,7 +255,7 @@ User can:
 |---|---|---|---|
 || 8.1 | Turn diff panel | 🟡 | `TurnDiffEntry` type defined, `lastAgentStartIndex` tracked in session registry; dedicated endpoint and UI panel pending |
 || 8.2 | Context inspector | 🟢 | Context percentage bar in header (`/sessions/:id/context` endpoint), detail modal with token/cost breakdown on click, agent-running pulse on send/abort button |
-|| 8.3 | Image attachments | 🔴 | Send images with prompts (base64), display in chat |
+|| 8.3 | Image attachments | 🟢 | ChatInput file picker + paste + drag-drop with preview/remove, SDK `ImageContent[]` sent via API, server `maybeSaveImagesToFiles()` handles vision models (pass-through) and text-only models (temp file fallback), inline thumbnail rendering in ChatView |
 || 8.4 | Model switching | 🟢 | Per-session model override via `POST /sessions/:id/model` done; model badge on assistant messages, model selection persisted across refresh; mid-session cycling UI dropdown during streaming pending |
 || 8.5 | Compaction awareness | 🟢 | Full compaction UX ported from pi-forge — `CompactionCard`, flat-index rendering, `compactAndReload`, compaction history endpoint `GET /sessions/:id/compactions`, archived messages one-click expand |
 || 8.6 | Auto-retry UI | 🔴 | Countdown banner during rate-limit backoff |
@@ -322,7 +322,7 @@ Phases are intentionally ordered so each one:
 │   ├── POST /:id/archive         ✅ archive (Phase 2)
 │   ├── POST /:id/unarchive       ✅ restore from archive (Phase 2)
 │   ├── DELETE /:id               ✅ dispose
-│   └── GET /:id/turn-diff        ✅ turn diff (extra)
+│   └── 🟡 turn-diff — `lastAgentStartIndex` tracked, no endpoint or UI yet (Phase 8)
 ├── files/          ✅ (Phase 3 — 10/10 + 2 extra, upload deferred)
 │   ├── tree           ✅
 │   ├── read            ✅
@@ -354,12 +354,14 @@ Phases are intentionally ordered so each one:
 │   ├── pull            🟢
 │   └── push            🟢
 ├── config/         🟢 (Phase 5 — done)
-│   ├── providers   ✅ done
-│   ├── auth/:provider  🔴 not started
-│   ├── settings         🔴 not started
-│   ├── models          🔴 not started
+│   ├── providers        🟢 live provider listing
+│   ├── auth/:provider   🟢 PUT set, DELETE remove
+│   ├── settings         🟢 GET read, PUT merge
+│   ├── models           🟢 GET redacted, PUT replace
+│   ├── enabled-models   🟢 GET list, PUT save (model scoping)
+│   ├── tools/...        🟢 full CRUD — builtin/MCP/extension tool listing, per-project overrides
 │   ├── skills/...       🟢 CRUD — list, overrides, global + per-project toggle
-│   └── tools/          🟢 full CRUD — list, overrides cascade, PUT/DELETE per-project tool toggle
+│   └── tools/overrides  🟢 cascade view per project
 ├── extensions/         ✅ (Phase 8 — runtime discovery + install)
 │   ├── GET /            ✅ list detected + recommended
 │   ├── POST /install    ✅ install a package
@@ -371,15 +373,6 @@ Phases are intentionally ordered so each one:
 │   ├── servers          🟢 GET list, PUT upsert, DELETE remove, POST probe
 │   ├── trust/:id        🟢 POST grant, DELETE revoke
 │   └── tools            🟢 GET per-project tool listing with effective state
-├── config/
-│   ├── providers        🟢 live provider listing
-│   ├── auth/:provider   🟢 PUT set, DELETE remove (presence-only, no secrets)
-│   ├── settings         🟢 GET read, PUT merge
-│   ├── models           🟢 GET redacted, PUT replace
-│   ├── enabled-models   🟢 GET list, PUT save (model scoping)
-│   ├── tools/...        🟢 full CRUD — builtin/MCP/extension tool listing, per-project overrides
-│   ├── skills/...       🟢 CRUD — list, overrides, global + per-project toggle
-│   └── tools/overrides  🟢 cascade view per project
 └── terminal             🔴 (Phase 6 — WebSocket, not started)
 `````
 
@@ -395,7 +388,7 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-| **Total: ~65/79 tasks completed (~82% of roadmap)**
+| **Total: ~70/79 tasks completed (~87% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **95% done** (all routes + features, minor completion items)
@@ -404,8 +397,8 @@ Phases are intentionally ordered so each one:
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **100% done** (8/8 tasks)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
-- **Phase 7 (Polish & DX):** ✅ **20% done** (2/10 tasks — keyboard shortcuts, 12 themes; more Polish items pending)
-- **Phase 8 (Advanced):** ✅ **64% done** (9/14 tasks — model switching + ask_user_question + orchestration + MCP UI + compaction + context inspector + extensions + rewind + extension UI bridge)
+- **Phase 7 (Polish & DX):** ✅ **~30% done** (1 fully done — 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
+- **Phase 8 (Advanced):** ✅ **~79% done** (11/14 tasks — image attachments now done, turn-diff tracking partial)
 
 ### **Key Completed Features:**
 - ✅ Full chat MVP with streaming responses
@@ -427,10 +420,8 @@ Phases are intentionally ordered so each one:
 
 ### **Remaining Work:**
 - Terminal (PTY, WebSocket, xterm.js) — Phase 6
-- ✅ Skills management UI (enable/disable per project) — Phase 5
-- Turn diff panel (API endpoint + UI) — Phase 8
-- Image attachments (send + display) — Phase 8
-- Polish (Docker, mobile responsive, PWA, error boundaries, loading skeletons, accessibility, testing) — Phase 7
+- Turn diff panel (endpoint + UI still pending, tracking exists) — Phase 8
+- Polish (Docker, PWA, error boundaries, loading skeletons, testing, full mobile responsive, full accessibility) — Phase 7
 - Auto-retry UI, quick actions, webhooks — Phase 8
 
 ---
