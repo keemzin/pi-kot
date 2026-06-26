@@ -130,7 +130,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
       style={{
         display: open ? "flex" : "none",
         position: "fixed",
-        zIndex: 100,
+        zIndex: isFullScreen ? 300 : 100,
         flexDirection: "column",
         background: "var(--bg, #1e1e2e)",
         transition: "bottom 0.15s ease",
