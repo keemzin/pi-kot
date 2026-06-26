@@ -1,11 +1,11 @@
 /**
  * TerminalPanel — xterm.js terminal connected to the server PTY via WebSocket.
  *
- * Desktop: fixed bottom overlay (35vh).
- * Mobile (keyboard closed): fixed bottom overlay (60vh).
- * Mobile (keyboard open): fills the visual viewport above the keyboard.
- *
- * Detects the keyboard via the Visual Viewport API.
+ * Renders as a fixed bottom overlay above the chat input area.
+ * Props:
+ *   open: boolean
+ *   onClose: () => void
+ *   projectId?: string
  */
 
 import { useEffect, useRef, useCallback, useState } from "react";
@@ -29,7 +29,6 @@ function cssVar(name: string, fallback: string): string {
 }
 
 const MOBILE_BP = 600;
-const HEADER_H = 32;
 
 function isMobileWidth(): boolean {
   return typeof window !== "undefined" && window.innerWidth <= MOBILE_BP;
@@ -42,46 +41,6 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
   const fitRef = useRef<FitAddon | null>(null);
   const [connected, setConnected] = useState(false);
   const [mobile, setMobile] = useState(isMobileWidth);
-
-  /** Visual viewport tracking for mobile keyboard handling */
-  const [vv, setVv] = useState(() => ({
-    height: typeof window !== "undefined" ? window.innerHeight : 800,
-    offsetTop: 0,
-  }));
-
-  // Track mobile width
-  useEffect(() => {
-    if (!open) return;
-    const check = () => setMobile(isMobileWidth());
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, [open]);
-
-  // Track visual viewport for keyboard detection
-  useEffect(() => {
-    if (!open) return;
-    const vvApi = window.visualViewport;
-    if (!vvApi) {
-      // Fallback: use window resize
-      const handler = () =>
-        setVv({ height: window.innerHeight, offsetTop: 0 });
-      window.addEventListener("resize", handler);
-      return () => window.removeEventListener("resize", handler);
-    }
-    const handler = () => {
-      setVv({ height: vvApi.height, offsetTop: vvApi.offsetTop });
-      requestAnimationFrame(() => fitRef.current?.fit());
-    };
-    vvApi.addEventListener("resize", handler);
-    handler();
-    return () => vvApi.removeEventListener("resize", handler);
-  }, [open]);
-
-  // Detect keyboard open: visual viewport is significantly smaller than screen
-  const layoutHeight =
-    typeof window !== "undefined" ? window.innerHeight : 800;
-  const keyboardOpen = mobile && vv.height < layoutHeight * 0.8;
-  const fullHeight = mobile && keyboardOpen;
 
   const connect = useCallback(() => {
     if (!open) return;
@@ -142,6 +101,14 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
       wsRef.current = null;
     }
   }, []);
+
+  // Track mobile width for responsive height
+  useEffect(() => {
+    if (!open) return;
+    const check = () => setMobile(isMobileWidth());
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -245,41 +212,27 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
   const borderColor = cssVar("--border-color", "#313244");
   const textDim = cssVar("--text-dim", "#6c7086");
   const accent = cssVar("--accent", "#89b4fa");
+  const panelHeight = mobile ? "60vh" : "35vh";
 
-  // Panel sizing:
-  //   Desktop (or mobile keyboard closed) → bottom overlay
-  //   Mobile + keyboard open → fill the visual viewport above the keyboard
-  const panelStyle: React.CSSProperties = fullHeight
-    ? {
-        position: "fixed",
-        top: vv.offsetTop,
-        left: 0,
-        right: 0,
-        height: vv.height,
-        zIndex: 100,
-        background: cssVar("--bg", "#1e1e2e"),
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: "0 -2px 12px rgba(0,0,0,0.25)",
-      }
-    : {
+  return (
+    <div
+      className="terminal-panel"
+      style={{
         position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
         zIndex: 100,
-        height: mobile ? "60vh" : "35vh",
+        height: panelHeight,
         minHeight: 180,
         background: cssVar("--bg", "#1e1e2e"),
         display: "flex",
         flexDirection: "column",
         animation: "terminalSlideUp 0.2s ease",
         boxShadow: "0 -2px 12px rgba(0,0,0,0.25)",
-      };
-
-  return (
-    <div className="terminal-panel" style={panelStyle}>
-      {/* Header bar */}
+      }}
+    >
+      {/* Header bar — accent line below the "Terminal" label */}
       <div
         className="terminal-header"
         style={{
@@ -287,7 +240,7 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 12px",
-          height: HEADER_H,
+          height: 32,
           fontSize: 12,
           color: textDim,
           userSelect: "none",
@@ -358,7 +311,7 @@ export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
         </div>
       </div>
 
-      {/* Terminal xterm container */}
+      {/* Terminal xterm container — bottom padding so text isn't flush */}
       <div
         ref={containerRef}
         className="xterm-container"
