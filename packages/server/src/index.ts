@@ -189,14 +189,18 @@ export async function buildServer() {
   fastify.addHook("onClose", async () => {
     await disposeAllSessions();
     await disposeAllMcp();
-    const { killAllPty } = await import("./pty-manager.js");
-    killAllPty();
+    const { disposeAllPtys } = await import("./pty-manager.js");
+    disposeAllPtys();
   });
 
   // Boot-time MCP load
   loadGlobalMcp().catch((err: unknown) => {
     fastify.log.error({ err }, "mcp: initial load failed");
   });
+
+  // Install PTY exit handler (SIGTERM on all PTYs on process exit)
+  const { installPtyExitHandler } = await import("./pty-manager.js");
+  installPtyExitHandler();
 
   return fastify;
 }

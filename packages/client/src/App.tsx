@@ -900,18 +900,12 @@ export function App() {
         <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} sessionId={activeSessionId} />
       )}
 
-      {showTerminal && (() => {
-        const activeProj = useSessionStore.getState().projects.find(p => p.id === activeProjectId);
-        return (
-          <ErrorBoundary label="TerminalPanel" compact>
-            <TerminalPanel
-              open={showTerminal}
-              onClose={() => setShowTerminal(false)}
-              cwd={activeProj?.path}
-            />
-          </ErrorBoundary>
-        );
-      })()}
+      <ErrorBoundary label="TerminalPanel" compact>
+        <TerminalPanel
+          open={showTerminal}
+          onClose={() => setShowTerminal(false)}
+        />
+      </ErrorBoundary>
 
       {showMCP && (
         <ErrorBoundary label="MCPPanel" compact>
