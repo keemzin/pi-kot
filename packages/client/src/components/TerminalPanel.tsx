@@ -124,6 +124,16 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   // On mobile: full-screen overlay. On desktop: bottom panel.
   const isFullScreen = isMobile && open;
 
+  // Sends raw ANSI sequence directly to the active WebSocket
+  const sendKey = (sequence: string) => {
+    if (!activeTabId) return;
+    const entry = live.get(activeTabId);
+    if (entry && entry.ws.readyState === WebSocket.OPEN) {
+      entry.ws.send(JSON.stringify({ type: "input", data: sequence }));
+      entry.term.focus();
+    }
+  };
+
   return (
     <div
       className="terminal-panel-root"
@@ -282,6 +292,53 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
           />
         ))}
       </div>
+
+      {/* Mobile Quick Keys (Tab, ESC, Ctrl+C, Arrows) */}
+      {isFullScreen && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "4px 8px",
+            background: "var(--bg-frosted, rgba(33, 33, 33, 0.85))",
+            borderTop: "1px solid var(--border-color, #313244)",
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+            flexShrink: 0,
+            scrollbarWidth: "none", // hide scrollbar on Firefox
+          }}
+        >
+          <style>{`
+            .terminal-quick-key {
+              all: unset;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              min-width: 40px;
+              height: 32px;
+              border-radius: 4px;
+              background: var(--bg-glass, rgba(255, 255, 255, 0.04));
+              color: var(--text-primary, #cdd6f4);
+              font-size: 13px;
+              font-family: ui-monospace, SFMono-Regular, monospace;
+              cursor: pointer;
+            }
+            .terminal-quick-key:active {
+              background: var(--bg-glass-active, rgba(255, 255, 255, 0.08));
+            }
+          `}</style>
+          
+          <button className="terminal-quick-key" onClick={() => sendKey("\x03")}>^C</button>
+          <button className="terminal-quick-key" onClick={() => sendKey("\x1B")}>ESC</button>
+          <button className="terminal-quick-key" onClick={() => sendKey("\x09")}>TAB</button>
+          <div style={{ width: 1, height: 20, background: "var(--border-color, #313244)", margin: "0 4px" }} />
+          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[A")}>↑</button>
+          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[B")}>↓</button>
+          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[D")}>←</button>
+          <button className="terminal-quick-key" onClick={() => sendKey("\x1b[C")}>→</button>
+        </div>
+      )}
     </div>
   );
 }
