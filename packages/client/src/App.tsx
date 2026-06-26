@@ -740,6 +740,13 @@ export function App() {
             <div className="mobile-overflow-menu">
               <button
                 type="button"
+                onClick={() => { setShowTerminal(true); setShowMobileMenu(false); }}
+                className="overflow-item-btn"
+              >
+                &gt;_ Terminal
+              </button>
+              <button
+                type="button"
                 onClick={() => { setShowMCP(true); setShowMobileMenu(false); }}
                 className="overflow-item-btn"
               >
