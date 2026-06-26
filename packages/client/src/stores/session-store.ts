@@ -461,18 +461,57 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               rafId = undefined;
             }
             flushDelta();
-            // Stop streaming and refetch the final message state
-            set({
-              streamState: {
-                text: "",
-                activeToolName: undefined,
-                isStreaming: false,
-              },
-            });
-            // Clear queued on agent end — the steer messages were delivered
-            set((s) => ({
-              queuedBySession: { ...s.queuedBySession, [sessionId]: undefined },
-            }));
+
+            const agentEndEv = event as Record<string, unknown>;
+            const willRetry = agentEndEv.willRetry === true;
+
+            if (willRetry) {
+              // SDK auto-retry will restart the agent — keep isStreaming true
+              // so the abort button stays visible throughout the retry cycle.
+              // Without this, isStreaming toggles off then immediately on
+              // (agent_end → agent_start), causing the UI buttons to flicker.
+              set((s) => ({
+                streamState: {
+                  ...s.streamState,
+                  text: "",
+                },
+              }));
+            } else {
+              // Surface error from the final failed attempt, if any.
+              // The SDK puts errorMessage at the event top level only for
+              // synthetic agent_end (promise rejection). For real agent_end
+              // events, it's in the last assistant message's errorMessage.
+              let errorMessage = agentEndEv.errorMessage as string | undefined;
+              if (!errorMessage) {
+                const msgs = agentEndEv.messages as unknown[] | undefined;
+                if (msgs && msgs.length > 0) {
+                  const last = msgs[msgs.length - 1] as Record<string, unknown> | undefined;
+                  if (last?.role === "assistant" && last?.stopReason === "error") {
+                    errorMessage = last.errorMessage as string | undefined;
+                  }
+                }
+              }
+
+              // Stop streaming
+              set({
+                streamState: {
+                  text: "",
+                  activeToolName: undefined,
+                  isStreaming: false,
+                },
+              });
+
+              // Show error from failed LLM calls (out of credit, etc.)
+              if (errorMessage) {
+                set({ error: errorMessage });
+              }
+
+              // Clear queued on final agent end
+              set((s) => ({
+                queuedBySession: { ...s.queuedBySession, [sessionId]: undefined },
+              }));
+            }
+
             refetchMessages();
             break;
           }
@@ -496,6 +535,30 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             refetchMessages();
             break;
           }
+          case "auto_retry_start": {
+            const retryEv = event as Record<string, unknown>;
+            const attempt = retryEv.attempt ?? "?";
+            const maxAttempts = retryEv.maxAttempts ?? "?";
+            const errMsg = (retryEv.errorMessage as string) ?? "Unknown error";
+            set({ error: `Model error — retrying (${attempt}/${maxAttempts}): ${errMsg}` });
+            break;
+          }
+
+          case "auto_retry_end": {
+            const retryEndEv = event as Record<string, unknown>;
+            if (retryEndEv.success === true) {
+              // Retry succeeded — clear the error banner
+              set({ error: undefined });
+            } else {
+              // All retries exhausted — show the final error from the provider
+              const finalError = retryEndEv.finalError as string | undefined;
+              if (finalError) {
+                set({ error: finalError });
+              }
+            }
+            break;
+          }
+
           case "tool_result": {
             // Refetch to show the toolResult block inline in the
             // rendered messages. Don't clear stream text — the agent
@@ -565,7 +628,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       await sendPrompt(activeSessionId, text, undefined, images);
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to send prompt" });
+      set((s) => ({
+        error: err instanceof Error ? err.message : "Failed to send prompt",
+        // If an existing stream was active, reset it
+        streamState: s.streamState.isStreaming
+          ? { text: "", activeToolName: undefined, isStreaming: false }
+          : s.streamState,
+      }));
     }
   },
 
@@ -597,17 +666,35 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       await steerSession(activeSessionId, text, "steer", images);
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : "Failed to steer" });
+      set((s) => ({
+        error: err instanceof Error ? err.message : "Failed to steer",
+        // If an existing stream was active, reset it
+        streamState: s.streamState.isStreaming
+          ? { text: "", activeToolName: undefined, isStreaming: false }
+          : s.streamState,
+      }));
     }
   },
 
   abort: async () => {
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
+
+    // Optimistically reset streaming state so the UI responds immediately
+    // (abort button disappears, send button reappears). The SSE agent_end
+    // will confirm this, but we don't wait for it.
+    set({
+      streamState: {
+        text: "",
+        activeToolName: undefined,
+        isStreaming: false,
+      },
+    });
+
     try {
       await abortSession(activeSessionId);
     } catch {
-      // best-effort
+      // best-effort — SSE events will eventually confirm the state
     }
   },
 
