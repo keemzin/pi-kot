@@ -648,24 +648,24 @@ export function App() {
             >
               📂
             </button>
+            <button
+              type="button"
+              onClick={() => setShowTerminal(true)}
+              title="Terminal"
+              style={{
+                background: "none",
+                border: "none",
+                color: showTerminal ? "var(--accent-text)" : "var(--text-dim)",
+                fontSize: "12px",
+                cursor: "pointer",
+                padding: "3px 6px",
+                borderRadius: "var(--radius-sm)",
+                lineHeight: 1,
+              }}
+            >
+              &gt;_
+            </button>
             <div className="header-overflow desktop-only">
-              <button
-                type="button"
-                onClick={() => setShowTerminal(true)}
-                title="Terminal"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: showTerminal ? "var(--accent-text)" : "var(--text-dim)",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  padding: "3px 6px",
-                  borderRadius: "var(--radius-sm)",
-                  lineHeight: 1,
-                }}
-              >
-                &gt;_
-              </button>
               <button
                 type="button"
                 onClick={() => setShowMCP(true)}
@@ -738,13 +738,6 @@ export function App() {
           <>
             <div className="mobile-overlay" onClick={() => setShowMobileMenu(false)} />
             <div className="mobile-overflow-menu">
-              <button
-                type="button"
-                onClick={() => { setShowTerminal(true); setShowMobileMenu(false); }}
-                className="overflow-item-btn"
-              >
-                &gt;_ Terminal
-              </button>
               <button
                 type="button"
                 onClick={() => { setShowMCP(true); setShowMobileMenu(false); }}
