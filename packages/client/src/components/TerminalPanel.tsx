@@ -85,6 +85,52 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   const closeTab = useTerminalStore((s) => s.closeTab);
   const setActiveTab = useTerminalStore((s) => s.setActiveTab);
 
+  // Track virtual keyboard offset on mobile so the panel sits above it
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const layoutHeight = window.innerHeight;
+      const offset = Math.max(0, layoutHeight - vv.height);
+      setKeyboardOffset(offset);
+      setIsMobile(offset > 0);
+    };
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
+  }, []);
+
+  // Listen for focus events on the terminal host — when xterm's textarea
+  // gets focus on mobile the keyboard opens, so we nudge the panel up.
+  // Fallback for browsers where visualViewport fires late or not at all.
+  useEffect(() => {
+    if (!open) return;
+    const onFocusIn = (e: FocusEvent) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
+        setTimeout(() => {
+          const vv = window.visualViewport;
+          if (!vv) return;
+          const offset = Math.max(0, window.innerHeight - vv.height);
+          if (offset > 0) setKeyboardOffset(offset);
+        }, 300);
+      }
+    };
+    const onFocusOut = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      const offset = Math.max(0, window.innerHeight - vv.height);
+      setKeyboardOffset(offset);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, [open]);
+
   const projectTabs = tabs.filter((t) => t.projectId === projectId);
   const activeTab = projectTabs.find((t) => t.id === activeTabId) ?? projectTabs[0];
 
@@ -98,20 +144,24 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     closeTab(id);
   };
 
+  const panelHeight = isMobile ? "45vh" : "35vh";
+
   return (
     <div
+      className="terminal-panel-root"
       style={{
         display: open ? "flex" : "none",
         position: "fixed",
-        bottom: 0,
+        bottom: keyboardOffset,
         left: 0,
         right: 0,
         zIndex: 100,
-        height: "35vh",
+        height: panelHeight,
         minHeight: 180,
         background: "var(--bg, #1e1e2e)",
         flexDirection: "column",
         borderTop: "1px solid var(--border-color, #313244)",
+        transition: "bottom 0.15s ease",
       }}
     >
       {/* Tab bar */}
