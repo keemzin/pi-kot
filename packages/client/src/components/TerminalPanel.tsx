@@ -1,7 +1,7 @@
 /**
  * TerminalPanel — xterm.js terminal connected to the server PTY via WebSocket.
  *
- * Renders as an inline block inside main-area, above the chat input.
+ * Renders as a fixed bottom overlay above the chat input area.
  * Props:
  *   open: boolean
  *   onClose: () => void
@@ -27,7 +27,7 @@ function cssVar(name: string, fallback: string): string {
   return val || fallback;
 }
 
-export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) {
+export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -72,7 +72,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
             break;
         }
       } catch {
-        // binary data — ignore
+        // binary data
       }
     };
 
@@ -84,7 +84,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
     ws.onerror = () => {
       termRef.current?.writeln("\r\n\x1b[31mWebSocket error\x1b[0m");
     };
-  }, [open, projectId]);
+  }, [open]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -103,13 +103,10 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
     const element = containerRef.current;
     if (!element) return;
 
-    // Read actual theme colors from CSS variables at mount time
     const bg = cssVar("--bg", "#1e1e2e");
     const fg = cssVar("--text", "#cdd6f4");
     const accent = cssVar("--accent", "#89b4fa");
     const accentText = cssVar("--accent-text", "#89b4fa");
-    const borderColor = cssVar("--border-color", "#313244");
-    const textDim = cssVar("--text-dim", "#6c7086");
 
     const term = new Terminal({
       cursorBlink: true,
@@ -175,7 +172,7 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
             );
           }
         } catch {
-          // element hidden
+          // hidden
         }
       }, 100);
     });
@@ -195,62 +192,85 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
 
   if (!open) return null;
 
+  const borderColor = cssVar("--border-color", "#313244");
+  const textDim = cssVar("--text-dim", "#6c7086");
+  const accent = cssVar("--accent", "#89b4fa");
+
   return (
     <div
       className="terminal-panel"
       style={{
-        flexShrink: 0,
+        position: "fixed",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
         height: "35vh",
-        minHeight: 160,
+        minHeight: 180,
         background: cssVar("--bg", "#1e1e2e"),
-        borderTop: `1px solid ${cssVar("--border-color", "#313244")}`,
         display: "flex",
         flexDirection: "column",
         animation: "terminalSlideUp 0.2s ease",
+        boxShadow: "0 -2px 12px rgba(0,0,0,0.25)",
       }}
     >
-      {/* Header bar */}
+      {/* Header bar — accent line below the "Terminal" label */}
       <div
         className="terminal-header"
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "4px 12px",
-          borderBottom: `1px solid ${cssVar("--border-color", "#313244")}`,
+          padding: "0 12px",
+          height: 32,
           fontSize: 12,
-          color: cssVar("--text-dim", "#6c7086"),
+          color: textDim,
           userSelect: "none",
           flexShrink: 0,
+          borderBottom: `1px solid ${borderColor}`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontWeight: 600 }}>Terminal</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, height: "100%" }}>
+          <span
+            style={{
+              fontWeight: 600,
+              color: cssVar("--text", "#cdd6f4"),
+              borderBottom: `2px solid ${accent}`,
+              paddingBottom: 2,
+              lineHeight: "30px",
+            }}
+          >
+            Terminal
+          </span>
           <span
             style={{
               display: "inline-block",
               width: 6,
               height: 6,
               borderRadius: "50%",
-              background: connected ? cssVar("--success", "#34d399") : cssVar("--error", "#f87171"),
+              background: connected
+                ? cssVar("--success", "#34d399")
+                : cssVar("--error", "#f87171"),
+              marginTop: 2,
             }}
           />
         </div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <button
             onClick={() => {
               disconnect();
               setTimeout(connect, 50);
             }}
-            title="Restart terminal"
+            title="Restart"
             style={{
               background: "none",
-              border: `1px solid ${cssVar("--border-color", "#313244")}`,
-              color: cssVar("--text-dim", "#6c7086"),
+              border: `1px solid ${borderColor}`,
+              color: textDim,
               borderRadius: 4,
               padding: "2px 8px",
               fontSize: 11,
               cursor: "pointer",
+              lineHeight: "16px",
             }}
           >
             Restart
@@ -261,10 +281,11 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
             style={{
               background: "none",
               border: "none",
-              color: cssVar("--text-dim", "#6c7086"),
+              color: textDim,
               fontSize: 14,
               cursor: "pointer",
               padding: "2px 6px",
+              lineHeight: "16px",
             }}
           >
             ✕
@@ -272,13 +293,13 @@ export function TerminalPanel({ open, onClose, projectId }: TerminalPanelProps) 
         </div>
       </div>
 
-      {/* Terminal xterm container */}
+      {/* Terminal xterm container — bottom padding so text isn't flush */}
       <div
         ref={containerRef}
         className="xterm-container"
         style={{
           flex: 1,
-          padding: "2px 4px",
+          padding: "2px 4px 8px 4px",
           overflow: "hidden",
           minHeight: 0,
         }}

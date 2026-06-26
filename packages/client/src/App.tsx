@@ -799,15 +799,6 @@ export function App() {
               />
             </ErrorBoundary>
             <AskUserQuestionPanel sessionId={activeSessionId} />
-            {showTerminal && (
-              <ErrorBoundary label="TerminalPanel" compact>
-                <TerminalPanel
-                  open={showTerminal}
-                  onClose={() => setShowTerminal(false)}
-                  projectId={activeProjectId}
-                />
-              </ErrorBoundary>
-            )}
             <ChatInput
       sessionId={activeSessionId}
       showOrch={showOrch}
@@ -907,6 +898,15 @@ export function App() {
 
       {inspectData !== undefined && (
         <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} sessionId={activeSessionId} />
+      )}
+
+      {showTerminal && (
+        <ErrorBoundary label="TerminalPanel" compact>
+          <TerminalPanel
+            open={showTerminal}
+            onClose={() => setShowTerminal(false)}
+          />
+        </ErrorBoundary>
       )}
 
       {showMCP && (
