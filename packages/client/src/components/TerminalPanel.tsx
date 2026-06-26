@@ -17,7 +17,8 @@ import { getStoredToken } from "../lib/api-client";
 interface TerminalPanelProps {
   open: boolean;
   onClose: () => void;
-  projectId?: string;
+  /** If set, the terminal PTY starts in this directory. */
+  cwd?: string;
 }
 
 /** Read a CSS variable from the document root, returning a fallback if unset. */
@@ -27,12 +28,19 @@ function cssVar(name: string, fallback: string): string {
   return val || fallback;
 }
 
-export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
+const MOBILE_BP = 600;
+
+function isMobileWidth(): boolean {
+  return typeof window !== "undefined" && window.innerWidth <= MOBILE_BP;
+}
+
+export function TerminalPanel({ open, onClose, cwd }: TerminalPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const [connected, setConnected] = useState(false);
+  const [mobile, setMobile] = useState(isMobileWidth);
 
   const connect = useCallback(() => {
     if (!open) return;
@@ -43,6 +51,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     const params = new URLSearchParams();
     const token = getStoredToken();
     if (token) params.set("token", token);
+    if (cwd) params.set("cwd", cwd);
     const qs = params.toString();
 
     const ws = new WebSocket(`${protocol}//${host}/api/v1/terminal${qs ? `?${qs}` : ""}`);
@@ -84,7 +93,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     ws.onerror = () => {
       termRef.current?.writeln("\r\n\x1b[31mWebSocket error\x1b[0m");
     };
-  }, [open]);
+  }, [open, cwd]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
@@ -92,6 +101,14 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
       wsRef.current = null;
     }
   }, []);
+
+  // Track mobile width for responsive height
+  useEffect(() => {
+    if (!open) return;
+    const check = () => setMobile(isMobileWidth());
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -195,6 +212,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   const borderColor = cssVar("--border-color", "#313244");
   const textDim = cssVar("--text-dim", "#6c7086");
   const accent = cssVar("--accent", "#89b4fa");
+  const panelHeight = mobile ? "60vh" : "35vh";
 
   return (
     <div
@@ -205,7 +223,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
         left: 0,
         right: 0,
         zIndex: 100,
-        height: "35vh",
+        height: panelHeight,
         minHeight: 180,
         background: cssVar("--bg", "#1e1e2e"),
         display: "flex",
