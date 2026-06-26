@@ -236,7 +236,7 @@ User can:
 |---|---|---|---|
 || 7.1 | Docker support | 🔴 | Dockerfile, docker-compose for self-hosting |
 || 7.2 | Authentication hardening | 🔴 | Token refresh, session expiry, CORS hardening |
-|| 7.3 | Error boundaries | 🔴 | React error boundaries, graceful degradation |
+|| 7.3 | Error boundaries | 🟢 | `ErrorBoundary` component wrapping ChatView, FileExplorer, SettingsPanel, MCPPanel, SessionTreePanel, OrchestrationPanel — isolated crash recovery with Retry |
 || 7.4 | Loading skeletons | 🔴 | Placeholder UI while data loads |
 || 7.5 | Keyboard shortcuts | 🟡 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
 || 7.6 | Mobile responsive | 🟡 | Partial — media queries at 600px, mobile overflow menu, burger toggle, sidebar auto-close on mobile; full responsive layout pending |
@@ -388,7 +388,7 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-| **Total: ~70/79 tasks completed (~87% of roadmap)**
+| **Total: ~70/79 tasks completed (~89% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **95% done** (all routes + features, minor completion items)
@@ -397,7 +397,7 @@ Phases are intentionally ordered so each one:
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **100% done** (8/8 tasks)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
-- **Phase 7 (Polish & DX):** ✅ **~30% done** (1 fully done — 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
+- **Phase 7 (Polish & DX):** ✅ **~35% done** (2 fully done — error boundaries, 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
 - **Phase 8 (Advanced):** ✅ **~79% done** (11/14 tasks — image attachments now done, turn-diff tracking partial)
 
 ### **Key Completed Features:**
@@ -421,7 +421,7 @@ Phases are intentionally ordered so each one:
 ### **Remaining Work:**
 - Terminal (PTY, WebSocket, xterm.js) — Phase 6
 - Turn diff panel (endpoint + UI still pending, tracking exists) — Phase 8
-- Polish (Docker, PWA, error boundaries, loading skeletons, testing, full mobile responsive, full accessibility) — Phase 7
+- Polish (Docker, PWA, loading skeletons, testing, full mobile responsive, full accessibility) — Phase 7
 - Auto-retry UI, quick actions, webhooks — Phase 8
 
 ---

@@ -14,6 +14,7 @@ import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteraction
 import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { LoadingSkeleton } from "./components/LoadingSkeleton";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -349,7 +350,14 @@ export function App() {
   };
 
   if (loading) {
-    return <div className="centered">Loading...</div>;
+    return (
+      <div className="centered">
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 24 }}>
+          <LoadingSkeleton variant="card" count={2} />
+          <LoadingSkeleton variant="list" count={4} />
+        </div>
+      </div>
+    );
   }
 
   if (authRequired) {
@@ -532,7 +540,7 @@ export function App() {
             </div>
             {showArchived === activeProjectId && (() => {
               const archived = useSessionStore.getState().archivedSessions[activeProjectId];
-              if (archived === undefined) return <div className="archived-status">Loading...</div>;
+              if (archived === undefined) return <div className="archived-status"><LoadingSkeleton variant="list" count={2} /></div>;
               if (archived.length === 0) return <div className="archived-status">No archived sessions</div>;
               return (
                 <div className="session-list project-sublist archived-list">

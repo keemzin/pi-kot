@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { LoadingSkeleton } from "./LoadingSkeleton";
 import type {
   OrchestrationConfig,
   WorkerListItem,
@@ -174,7 +175,7 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
         </button>
       </div>
 
-      {role === "loading" && <span>Loading...</span>}
+      {role === "loading" && <LoadingSkeleton variant="list" count={2} />}
 
       {role === "standalone" && (
         <div

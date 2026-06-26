@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
+import { LoadingSkeleton } from "./LoadingSkeleton";
 import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesSearch } from "../lib/api-client";
@@ -695,7 +696,9 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
           {/* Tree + content search results */}
           <div style={{ flex: 1, overflowY: "auto", padding: "4px 0", fontSize: "12px" }}>
             {loading && tree.length === 0 && (
-              <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>Loading...</div>
+              <div style={{ padding: "8px 12px" }}>
+                <LoadingSkeleton variant="tree" count={8} />
+              </div>
             )}
 
             {/* ── Content search results (fires when search >= 3 chars) ── */}
