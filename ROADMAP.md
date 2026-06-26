@@ -220,11 +220,17 @@ User can:
 
 | # | Task | Status | Description |
 |---|---|---|---|
-| 6.1 | PTY manager | 🔴 | `pty-manager.ts` — node-pty lifecycle, detach/reattach |
-| 6.2 | WebSocket terminal endpoint | 🔴 | `WebSocket /api/v1/terminal` — bidirectional PTY stream |
-| 6.3 | Terminal panel | 🔴 | xterm.js component, connected via WebSocket |
-| 6.4 | Multiple terminal tabs | 🔴 | Create/switch/close terminal sessions |
-| 6.5 | Terminal resize | 🔴 | Send resize events over WS on container resize |
+| 6.1 | PTY manager | 🟢 | `pty-manager.ts` — node-pty lifecycle, detach/reattach, idle reaping, rolling output buffer |
+| 6.2 | WebSocket terminal endpoint | 🟢 | `WebSocket /api/v1/terminal` — bidirectional PTY stream, tabId reattach, binary frames |
+| 6.3 | Terminal panel | 🟢 | xterm.js component, connected via WebSocket, persists across toggle |
+| 6.4 | Multiple terminal tabs | 🟢 | Create/switch/close terminal sessions via Zustand `terminal-store` |
+| 6.5 | Terminal resize | 🟢 | Send resize events over WS on container resize using ResizeObserver |
+
+**Extra Mobile Terminal Features Built:**
+- Full-screen terminal overlay on mobile (hides chat)
+- Native-feeling touch scrolling (translates touchmove to `term.scrollLines`)
+- Quick-keys action bar floating above the virtual keyboard (CTRL, ESC, TAB, Arrows)
+- Locked viewport zoom & prevented rubber-band scrolling on mobile for a native app feel
 
 ---
 
@@ -239,7 +245,7 @@ User can:
 || 7.3 | Error boundaries | 🟢 | `ErrorBoundary` component wrapping ChatView, FileExplorer, SettingsPanel, MCPPanel, SessionTreePanel, OrchestrationPanel — isolated crash recovery with Retry |
 || 7.4 | Loading skeletons | 🟢 | `LoadingSkeleton` with 5 variants (text/card/list/tree/circle), shimmer animation, replaces bare `Loading...` in App.tsx, FileExplorer, OrchestrationPanel |
 || 7.5 | Keyboard shortcuts | 🟡 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
-|| 7.6 | Mobile responsive | 🟢 | Sidebar overlay + backdrop, burger toggle, auto-close on select, overflow menu, file explorer full-width, bigger touch targets (buttons 44px, tabs 14px), full-screen settings/MCP panels sheet from bottom, model dropdown anchored to bottom, session tree panel full-width |
+|| 7.6 | Mobile responsive | 🟢 | Sidebar overlay + backdrop, burger toggle, auto-close on select, overflow menu, file explorer full-width, bigger touch targets, full-screen settings/MCP panels sheet from bottom, model dropdown anchored to bottom, session tree panel full-width, mobile bottom action bar for quick access, sticky virtual keyboard toolbar |
 || 7.7 | PWA support | 🔴 | Service worker, manifest, install prompt |
 || 7.8 | Dark/light theme | 🟢 | 12 themes done — 8 dark (night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark) + 4 light (clean, terracotta, sage, flexoki-light) |
 || 7.9 | Accessibility | 🟡 | Partial — ARIA labels on buttons/modals, `aria-expanded`, `role="dialog"` on overlays, `aria-modal`; full keyboard nav + screen reader audit pending |
@@ -373,7 +379,7 @@ Phases are intentionally ordered so each one:
 │   ├── servers          🟢 GET list, PUT upsert, DELETE remove, POST probe
 │   ├── trust/:id        🟢 POST grant, DELETE revoke
 │   └── tools            🟢 GET per-project tool listing with effective state
-└── terminal             🔴 (Phase 6 — WebSocket, not started)
+└── terminal             🟢 (Phase 6 — WebSocket, done)
 `````
 
 ---
@@ -388,7 +394,7 @@ Phases are intentionally ordered so each one:
 
 ## 📊 **Current Implementation Summary**
 
-| **Total: ~70/79 tasks completed (~89% of roadmap)**
+| **Total: ~75/79 tasks completed (~95% of roadmap)**
 
 ### **By Phase:**
 - **Phase 1 (Chat MVP):** ✅ **95% done** (all routes + features, minor completion items)
@@ -396,8 +402,8 @@ Phases are intentionally ordered so each one:
 - **Phase 3 (File Browser & Editor):** ✅ **92% done** (12/13 tasks, 1 deferred)
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **100% done** (8/8 tasks)
-- **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
-- **Phase 7 (Polish & DX):** ✅ **~40% done** (3 fully done — error boundaries, loading skeletons, 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
+- **Phase 6 (Terminal):** ✅ **100% done** (5/5 tasks + extensive mobile optimizations)
+- **Phase 7 (Polish & DX):** ✅ **~50% done** (4 fully done — error boundaries, loading skeletons, 12 themes, mobile responsive; 2 partial — shortcuts, accessibility)
 - **Phase 8 (Advanced):** ✅ **~79% done** (11/14 tasks — image attachments now done, turn-diff tracking partial)
 
 ### **Key Completed Features:**
@@ -418,10 +424,12 @@ Phases are intentionally ordered so each one:
 - ✅ Rewind — via pi-rewind extension with SSE bridge
 - ✅ Extension UI bridge — extension→client SSE panels
 
+- ✅ Terminal integration (PTY manager, persistent multi-tab WebSocket connections)
+- ✅ Mobile Terminal enhancements (1-finger gesture control, 2-finger scrolling, floating quick-keys bar, safe-area & viewport lock)
+
 ### **Remaining Work:**
-- Terminal (PTY, WebSocket, xterm.js) — Phase 6
 - Turn diff panel (endpoint + UI still pending, tracking exists) — Phase 8
-- Polish (Docker, PWA, testing, full mobile responsive, full accessibility) — Phase 7
+- Polish (Docker, PWA, testing, full accessibility) — Phase 7
 - Auto-retry UI, quick actions, webhooks — Phase 8
 
 ---
