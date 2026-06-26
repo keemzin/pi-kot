@@ -90,46 +90,23 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth <= 600);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // VisualViewport: track keyboard height for the bottom offset
+  useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const update = () => {
-      const layoutHeight = window.innerHeight;
-      const offset = Math.max(0, layoutHeight - vv.height);
+      const offset = Math.max(0, window.innerHeight - vv.height);
       setKeyboardOffset(offset);
-      setIsMobile(offset > 0);
     };
     vv.addEventListener("resize", update);
     return () => vv.removeEventListener("resize", update);
   }, []);
-
-  // Listen for focus events on the terminal host — when xterm's textarea
-  // gets focus on mobile the keyboard opens, so we nudge the panel up.
-  // Fallback for browsers where visualViewport fires late or not at all.
-  useEffect(() => {
-    if (!open) return;
-    const onFocusIn = (e: FocusEvent) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) {
-        setTimeout(() => {
-          const vv = window.visualViewport;
-          if (!vv) return;
-          const offset = Math.max(0, window.innerHeight - vv.height);
-          if (offset > 0) setKeyboardOffset(offset);
-        }, 300);
-      }
-    };
-    const onFocusOut = () => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      const offset = Math.max(0, window.innerHeight - vv.height);
-      setKeyboardOffset(offset);
-    };
-    document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("focusout", onFocusOut);
-    return () => {
-      document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("focusout", onFocusOut);
-    };
-  }, [open]);
 
   const projectTabs = tabs.filter((t) => t.projectId === projectId);
   const activeTab = projectTabs.find((t) => t.id === activeTabId) ?? projectTabs[0];
@@ -144,7 +121,8 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     closeTab(id);
   };
 
-  const panelHeight = isMobile ? "45vh" : "35vh";
+  // On mobile: full-screen overlay. On desktop: bottom panel.
+  const isFullScreen = isMobile && open;
 
   return (
     <div
@@ -152,16 +130,24 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
       style={{
         display: open ? "flex" : "none",
         position: "fixed",
-        bottom: keyboardOffset,
-        left: 0,
-        right: 0,
         zIndex: 100,
-        height: panelHeight,
-        minHeight: 180,
-        background: "var(--bg, #1e1e2e)",
         flexDirection: "column",
-        borderTop: "1px solid var(--border-color, #313244)",
+        background: "var(--bg, #1e1e2e)",
         transition: "bottom 0.15s ease",
+        ...(isFullScreen
+          ? {
+              // Full-screen: cover the entire viewport above the keyboard
+              inset: `0 0 ${keyboardOffset}px 0`,
+            }
+          : {
+              // Desktop: bottom panel
+              bottom: keyboardOffset,
+              left: 0,
+              right: 0,
+              height: "35vh",
+              minHeight: 180,
+              borderTop: "1px solid var(--border-color, #313244)",
+            }),
       }}
     >
       {/* Tab bar */}
