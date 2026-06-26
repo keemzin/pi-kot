@@ -237,9 +237,9 @@ User can:
 || 7.1 | Docker support | 🔴 | Dockerfile, docker-compose for self-hosting |
 || 7.2 | Authentication hardening | 🔴 | Token refresh, session expiry, CORS hardening |
 || 7.3 | Error boundaries | 🟢 | `ErrorBoundary` component wrapping ChatView, FileExplorer, SettingsPanel, MCPPanel, SessionTreePanel, OrchestrationPanel — isolated crash recovery with Retry |
-|| 7.4 | Loading skeletons | 🔴 | Placeholder UI while data loads |
+|| 7.4 | Loading skeletons | 🟢 | `LoadingSkeleton` with 5 variants (text/card/list/tree/circle), shimmer animation, replaces bare `Loading...` in App.tsx, FileExplorer, OrchestrationPanel |
 || 7.5 | Keyboard shortcuts | 🟡 | `Ctrl+Enter` send, dismiss modals on Escape; `Ctrl+P` model cycle and other shortcuts pending |
-|| 7.6 | Mobile responsive | 🟡 | Partial — media queries at 600px, mobile overflow menu, burger toggle, sidebar auto-close on mobile; full responsive layout pending |
+|| 7.6 | Mobile responsive | 🟢 | Sidebar overlay + backdrop, burger toggle, auto-close on select, overflow menu, file explorer full-width, bigger touch targets (buttons 44px, tabs 14px), full-screen settings/MCP panels sheet from bottom, model dropdown anchored to bottom, session tree panel full-width |
 || 7.7 | PWA support | 🔴 | Service worker, manifest, install prompt |
 || 7.8 | Dark/light theme | 🟢 | 12 themes done — 8 dark (night, midnight, dawn, monokai, dracula, nord, bourbon, flexoki-dark) + 4 light (clean, terracotta, sage, flexoki-light) |
 || 7.9 | Accessibility | 🟡 | Partial — ARIA labels on buttons/modals, `aria-expanded`, `role="dialog"` on overlays, `aria-modal`; full keyboard nav + screen reader audit pending |
@@ -397,7 +397,7 @@ Phases are intentionally ordered so each one:
 - **Phase 4 (Git Integration):** ✅ **100% done** (10/10 tasks + 12 extra endpoints)
 - **Phase 5 (Config UI):** ✅ **100% done** (8/8 tasks)
 - **Phase 6 (Terminal):** ✅ **0% done** (0/5 tasks)
-- **Phase 7 (Polish & DX):** ✅ **~35% done** (2 fully done — error boundaries, 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
+- **Phase 7 (Polish & DX):** ✅ **~40% done** (3 fully done — error boundaries, loading skeletons, 12 themes; 3 partial — shortcuts, mobile responsive, accessibility)
 - **Phase 8 (Advanced):** ✅ **~79% done** (11/14 tasks — image attachments now done, turn-diff tracking partial)
 
 ### **Key Completed Features:**
@@ -421,7 +421,7 @@ Phases are intentionally ordered so each one:
 ### **Remaining Work:**
 - Terminal (PTY, WebSocket, xterm.js) — Phase 6
 - Turn diff panel (endpoint + UI still pending, tracking exists) — Phase 8
-- Polish (Docker, PWA, loading skeletons, testing, full mobile responsive, full accessibility) — Phase 7
+- Polish (Docker, PWA, testing, full mobile responsive, full accessibility) — Phase 7
 - Auto-retry UI, quick actions, webhooks — Phase 8
 
 ---
