@@ -16,6 +16,7 @@ import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
+import { useTouchSwipe } from "./hooks/useTouchSwipe";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -73,7 +74,6 @@ export function App() {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const contextData = useContextData(activeSessionId);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
 
   useEffect(() => {
@@ -81,6 +81,12 @@ export function App() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useTouchSwipe({
+    onSwipeLeft: () => setSidebarCollapsed(true),
+    onSwipeRight: () => setSidebarCollapsed(false),
+    threshold: 60,
+  });
 
   // Bootstrap: check auth, load projects, fetch models
   useEffect(() => {
@@ -410,7 +416,7 @@ export function App() {
       )}
       {/* Sidebar — collapsible */}
       <div className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
-        <div className="sidebar-header">
+        <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span
             style={{
               fontSize: "14px",
@@ -420,6 +426,34 @@ export function App() {
           >
             pi-kot
           </span>
+          <button
+            onClick={() => setShowAddProjectDialog(true)}
+            title="Add a new project"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              fontSize: '11px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '4px 8px',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all var(--duration) var(--ease)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'var(--text-primary)';
+              e.currentTarget.style.background = 'var(--bg-glass-hover)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'var(--text-secondary)';
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            Add Project
+          </button>
         </div>
 
         {/* Project list */}
@@ -569,15 +603,39 @@ export function App() {
           </>
         )}
 
-        {/* Add project button */}
+        {/* Sidebar Footer (Mobile Actions) */}
         <div className="sidebar-footer">
-          <button
-            onClick={() => setShowAddProjectDialog(true)}
-            className="add-project-toggle"
-            title="Add a new project"
-          >
-            + Add Project
-          </button>
+          <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <button
+              type="button"
+              onClick={() => { setShowMCP(true); setSidebarCollapsed(true); }}
+              className="add-project-toggle"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+              </svg>
+              MCP Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSettings(true); setSidebarCollapsed(true); }}
+              className="add-project-toggle"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+            >
+              ⚙ Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => { handleClearToken(); setSidebarCollapsed(true); }}
+              className="add-project-toggle"
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -722,51 +780,8 @@ export function App() {
                 Sign out
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowMobileMenu((v) => !v)}
-              className="mobile-overflow-btn mobile-only"
-              title="More options"
-              aria-label="More options"
-            >
-              ⋮
-            </button>
           </div>
         </div>
-
-        {showMobileMenu && (
-          <>
-            <div className="mobile-overlay" onClick={() => setShowMobileMenu(false)} />
-            <div className="mobile-overflow-menu">
-              <button
-                type="button"
-                onClick={() => { setShowMCP(true); setShowMobileMenu(false); }}
-                className="overflow-item-btn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-                MCP
-              </button>
-              <button
-                type="button"
-                onClick={() => { setShowSettings(true); setShowMobileMenu(false); }}
-                className="overflow-item-btn"
-              >
-                ⚙ Settings
-              </button>
-              <button
-                type="button"
-                onClick={() => { handleClearToken(); setShowMobileMenu(false); }}
-                className="overflow-item-btn"
-              >
-                Sign out
-              </button>
-            </div>
-          </>
-        )}
 
         {/* Model error banner */}
         {modelError !== undefined && (

@@ -701,19 +701,20 @@ body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: left 0.3s var(--ease);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 100;
   position: fixed;
   top: 50px;
   left: 0;
   bottom: 0;
+  transform: translateX(0);
   will-change: transform;
   overflow-y: auto;
   box-shadow: 4px 0 32px rgba(0,0,0,0.18);
 }
 
 .sidebar.collapsed {
-  left: calc(var(--sidebar-width) * -1);
+  transform: translateX(calc(var(--sidebar-width) * -1));
   box-shadow: none;
 }
 
@@ -721,12 +722,12 @@ body {
 @media (max-width: 600px) {
   .sidebar {
     /* Start off-screen on mobile — user opens with burger */
-    left: calc(var(--sidebar-width) * -1);
+    transform: translateX(calc(var(--sidebar-width) * -1));
     box-shadow: none;
   }
 
   .sidebar:not(.collapsed) {
-    left: 0;
+    transform: translateX(0);
     box-shadow: 4px 0 48px rgba(0, 0, 0, 0.5);
   }
 
@@ -943,11 +944,13 @@ body {
   display: flex;
   align-items: center;
   padding: 6px 10px;
-  margin: 4px 8px;
+  margin: 12px 8px 4px;
   border-radius: var(--radius);
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
   color: var(--text-dim);
   transition: all var(--duration) var(--ease);
   user-select: none;
@@ -1069,14 +1072,14 @@ body {
 .new-session-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 8px 12px;
-  margin: 2px 0 4px;
+  margin: 6px 0;
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--border-hover);
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 12px;
+  border: none;
+  background: var(--bg-glass-strong);
+  color: var(--text-primary);
+  font-size: 13px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
@@ -1086,7 +1089,8 @@ body {
 }
 
 .new-session-row:hover {
-  background: var(--bg-glass-hover);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
   border-color: var(--accent);
   color: var(--accent-text);
 }
@@ -4612,4 +4616,44 @@ body {
 .ti-toolbar-btn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* Unified Mobile Drawer Actions */
+.sidebar-mobile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 16px;
+  padding-top: 8px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.sidebar-mobile-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--duration) var(--ease);
+}
+
+.sidebar-mobile-action-btn:hover {
+  background: var(--bg-glass-hover);
+}
+
+.sidebar-mobile-action-btn.sign-out {
+  color: var(--text-secondary);
 }
