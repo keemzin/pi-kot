@@ -414,7 +414,7 @@ export async function installExtension(
     execSync(`npm install ${npmName}`, {
       cwd: npmDir,
       stdio: "pipe",
-      timeout: 120_000,
+      timeout: 180_000,
     });
 
     return { success: true };
@@ -611,10 +611,10 @@ export async function updateExtension(
   try {
     const npmName = packageName.replace(/^npm:/, "");
     const npmDir = join(piAgentDir(), "npm");
-    execSync(`npm install ${npmName}`, {
+    execSync(`npm install ${npmName}@latest`, {
       cwd: npmDir,
       stdio: "pipe",
-      timeout: 120_000,
+      timeout: 180_000,
     });
     // Invalidate cache so next check picks up the new version
     _updateCache = undefined;

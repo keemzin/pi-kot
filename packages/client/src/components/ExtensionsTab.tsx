@@ -526,13 +526,28 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
       <div style={s.section}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={s.heading}>📦 Installed Extensions</div>
-          <button
-            onClick={() => setRefreshing((n) => n + 1)}
-            style={s.reloadBtn}
-            title="Refresh"
-          >
-            ↻
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleCheckUpdates}
+              disabled={checkingUpdates || loading}
+              style={{
+                ...s.reloadBtn,
+                padding: "2px 8px",
+                width: "auto",
+                fontSize: 11,
+              }}
+              title="Check for updates"
+            >
+              {checkingUpdates ? "Checking..." : "Check Updates"}
+            </button>
+            <button
+              onClick={() => setRefreshing((n) => n + 1)}
+              style={s.reloadBtn}
+              title="Refresh"
+            >
+              ↻
+            </button>
+          </div>
         </div>
 
         {!data || data.detected.length === 0 ? (
