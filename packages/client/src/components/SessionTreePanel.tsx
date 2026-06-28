@@ -10,7 +10,7 @@ import { useSessionStore } from "../stores/session-store";
 
 /**
  * Session Tree Panel — modal overlay showing branching history.
- * Adapted from pi-forge's SessionTreePanel.
+ * Adapted from a reference SessionTreePanel.
  *
  * Two views:
  *   - List: indented vertical list with role badges
@@ -104,7 +104,7 @@ export function SessionTreePanel({ sessionId, projectId, open, onClose }: Props)
     setError(undefined);
     try {
       await navigateSession(sessionId, entryId, opts);
-      // pi-forge behavior: refresh tree + reload messages in-place.
+      // Refresh tree + reload messages in-place.
       // Do NOT close the panel or re-activate the session — that
       // would reconnect SSE unnecessarily and can make it look like
       // a new session appeared in the sidebar.

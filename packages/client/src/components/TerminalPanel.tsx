@@ -1,7 +1,7 @@
 /**
  * TerminalPanel — multi-tab xterm.js terminal with persistent PTY sessions.
  *
- * Architecture ported from pi-forge:
+ * Architecture:
  *
  * - **Persistent across panel toggle:** The panel stays mounted even
  *   when visually hidden (CSS display:none). Each tab's WebSocket

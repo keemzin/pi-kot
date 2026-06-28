@@ -4,7 +4,7 @@ import { clearStoredToken, getStoredToken } from "./api-client";
  * Minimal SSE reader using fetch + ReadableStream so we can send
  * Authorization header (native EventSource doesn't support custom headers).
  *
- * Inspired by pi-forge's packages/client/src/lib/sse-client.ts.
+ * Inspired by a reference template's SSE client.
  */
 
 const MAX_BACKOFF_MS = 30_000;

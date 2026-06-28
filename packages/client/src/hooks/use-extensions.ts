@@ -1,6 +1,6 @@
 /**
  * Hook to detect installed pi extensions at runtime.
- * Used to conditionally activate UI features (pi-forge style detect → activate).
+ * Used to conditionally activate UI features (detect → activate).
  *
  * Caches the result so it's not refetched on every render.
  */

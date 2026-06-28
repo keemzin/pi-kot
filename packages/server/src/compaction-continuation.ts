@@ -71,7 +71,7 @@
  * and reorders cache. A trailing user message is the cheapest signal
  * the model interprets as "respond to this now."
  *
- * Ported from pi-forge's
+ * Ported from a reference
  * packages/server/src/agent-extensions/compaction-continuation.ts.
  */
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";

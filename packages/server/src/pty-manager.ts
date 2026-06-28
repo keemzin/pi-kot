@@ -14,7 +14,7 @@
  * After {@link IDLE_REAP_MS} with no socket attached, the PTY is
  * killed. This is the safety valve.
  *
- * Architecture ported from pi-forge.
+ * Architecture for PTY session management.
  */
 
 import { randomUUID } from "node:crypto";

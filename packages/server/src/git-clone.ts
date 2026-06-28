@@ -1,7 +1,7 @@
 /**
  * Minimal `git clone` runner for pi-kot's "Clone repository" flow.
  *
- * Pattern adapted from pi-forge's git-clone.ts.
+ * Pattern adapted from a reference git-clone.
  * Supports: HTTPS URLs, optional token auth (x-access-token), progress streaming,
  * branch selection, TLS bypass for self-signed certs.
  */

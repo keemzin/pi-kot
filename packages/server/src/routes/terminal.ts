@@ -21,7 +21,7 @@
  *
  * Auth: `?token=` query param for browsers (no custom headers on WebSocket upgrade).
  *
- * Ported from pi-forge.
+ * Terminal WebSocket handler for PTY sessions.
  */
 
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";

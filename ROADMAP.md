@@ -1,7 +1,7 @@
 # pi-kot Roadmap
 
 A phased build plan for creating a web UI wrapper around the pi coding agent SDK,
-inspired by [pi-forge](./pi-forge/).
+inspired by a reference template (`./pi-forge/`).
 
 ---
 
@@ -137,7 +137,7 @@ User can:
   ✓ View message history from disk sessions
 ```
 
-**Key insight from pi-forge:**
+**Key insight:**
 
 > The `LiveSession` registry is in-memory. Sessions survive restart because JSONL files persist on disk; the registry is rebuilt lazily as SSE clients reconnect.
 
@@ -255,7 +255,7 @@ User can:
 
 ## Phase 8 — Advanced Features
 
-**Goal:** pi-forge parity + unique enhancements.
+**Goal:** feature parity + unique enhancements.
 
 | # | Task | Status | Description |
 |---|---|---|---|
@@ -263,7 +263,7 @@ User can:
 || 8.2 | Context inspector | 🟢 | Context percentage bar in header (`/sessions/:id/context` endpoint), detail modal with token/cost breakdown on click, agent-running pulse on send/abort button |
 || 8.3 | Image attachments | 🟢 | ChatInput file picker + paste + drag-drop with preview/remove, SDK `ImageContent[]` sent via API, server `maybeSaveImagesToFiles()` handles vision models (pass-through) and text-only models (temp file fallback), inline thumbnail rendering in ChatView |
 || 8.4 | Model switching | 🟢 | Per-session model override via `POST /sessions/:id/model` done; model badge on assistant messages, model selection persisted across refresh; mid-session cycling UI dropdown during streaming pending |
-|| 8.5 | Compaction awareness | 🟢 | Full compaction UX ported from pi-forge — `CompactionCard`, flat-index rendering, `compactAndReload`, compaction history endpoint `GET /sessions/:id/compactions`, archived messages one-click expand |
+|| 8.5 | Compaction awareness | 🟢 | Full compaction UX — `CompactionCard`, flat-index rendering, `compactAndReload`, compaction history endpoint `GET /sessions/:id/compactions`, archived messages one-click expand |
 || 8.6 | Auto-retry UI | 🔴 | Countdown banner during rate-limit backoff |
 || 8.7 | Quick actions | 🔴 | Pre-built prompts (fix lint, add tests, etc.) |
 || 8.8 | Webhooks | 🔴 | Outbound webhooks on session events |
@@ -387,7 +387,7 @@ Phases are intentionally ordered so each one:
 ## References
 
 - **pi SDK docs**: https://pi.dev/docs/latest/sdk
-- **pi-forge** (inspiration): `./pi-forge/` in this directory
+- **Reference template**: `./pi-forge/` in this directory
 - **AGENTS.md**: `./AGENTS.md` — full project context for coding agents
 
 ---

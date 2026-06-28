@@ -1,7 +1,7 @@
 /**
  * Config Manager — wraps SDK config files (auth.json, settings.json, models.json).
  *
- * Ported from pi-forge/packages/server/src/config-manager.ts
+ * Ported from a reference config-manager
  * Simplified for pi-kot: no prompt/skill/tool overrides, no export/import.
  */
 import { readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
@@ -157,7 +157,7 @@ export async function writeModelsJson(data: ModelsJson): Promise<void> {
 
 /**
  * Atomic JSON write (tmp + rename) for config files.
- * Pattern from pi-forge's config-manager.ts — crash-safe, no partial writes.
+ * Pattern: crash-safe writes, no partial writes.
  */
 async function atomicWriteJson(path: string, data: unknown): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
@@ -175,7 +175,7 @@ async function atomicWriteJson(path: string, data: unknown): Promise<void> {
  * Write settings.json atomically. Used by the per-session setModel route
  * to restore the global default after the SDK mutates it as a side effect
  * of session.setModel().
- * Pattern from pi-forge's config-manager.ts writeSettings().
+ * Pattern from reference writeSettings().
  */
 export async function writeSettings(settings: Record<string, unknown>): Promise<void> {
   const SETTINGS_FILE = join(PI_CONFIG_DIR, "settings.json");

@@ -21,13 +21,13 @@ import type { LiveSession, SSEClient } from "./session-registry.js";
  * a comment-only line (comments are defined in the SSE spec and all
  * SSE parsers must ignore them).
  *
- * Pattern from pi-forge's packages/server/src/sse-bridge.ts.
+ * Pattern from a reference SSE bridge.
  */
 const COMPACTION_START_PADDING_LINE = `: ${Array(80).fill("-").join("")}\n`.repeat(40);
 
 /**
  * Serialize an event into SSE wire format.
- * Adapted from pi-forge's sse-bridge.ts.
+ * Adapted from a reference SSE bridge.
  */
 export function serializeSSE(event: { type: string; [k: string]: unknown }): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -96,7 +96,7 @@ export function buildSnapshot(live: LiveSession): {
  * attached to `live.clients`. Sends a snapshot immediately, forwards
  * filtered AgentSessionEvents, and unregisters on socket close.
  *
- * Adapted from pi-forge's sse-bridge.ts createSSEClient.
+ * Adapted from a reference createSSEClient.
  */
 export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClient {
   reply.hijack();

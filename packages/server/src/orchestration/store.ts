@@ -7,7 +7,7 @@
  *
  * Separate files so the chatty inbox writes don't fight the rare
  * topology mutations. Same atomic-write + in-process lock pattern as
- * pi-forge. Single-tenant / single-process assumption.
+ * Single-tenant / single-process assumption.
  */
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";

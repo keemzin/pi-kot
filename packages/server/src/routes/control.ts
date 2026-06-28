@@ -14,7 +14,7 @@ import { readSettings, writeSettings } from "../config-manager.js";
  *    Passing a directory causes the ReadFileSync to fail silently,
  *    leaving authStorage.data empty and hasAuth() always returning false.
  *    This was the root cause of the "No API key configured" error.
- *    Pattern from pi-forge's config-manager.ts: AUTH_FILE path.
+ *    Pattern from config-manager: AUTH_FILE path.
  */
 function authStorage() {
   return AuthStorage.create(join(config.piConfigDir, "auth.json"));
@@ -22,7 +22,7 @@ function authStorage() {
 
 /**
  * Error schema helper for route responses.
- * Pattern from pi-forge's routes/_schemas.ts.
+ * Pattern from routes/_schemas.
  */
 const errorSchema = {
   type: "object",
@@ -43,7 +43,7 @@ const errorSchema = {
  * fully expose. The in-flight LLM call will eventually resolve or
  * reject server-side; the route just returns to the client first.
  *
- * Pattern from pi-forge's control.ts withTimeout.
+ * Pattern from control.ts withTimeout.
  */
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
@@ -74,7 +74,7 @@ const COMPACT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
  * error classes for these cases, so message-substring matching is the
  * best we can do.
  *
- * Pattern from pi-forge's control.ts mapSdkError.
+ * Pattern from control.ts mapSdkError.
  */
 function mapSdkError(reply: import("fastify").FastifyReply, err: unknown): import("fastify").FastifyReply {
   if (!(err instanceof Error)) {
@@ -191,7 +191,7 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
       // mutate the global default for EVERY new session.
       //
       // We snapshot settings.json BEFORE the call and restore it AFTER,
-      // so the per-session change doesn't leak. Pattern from pi-forge's
+      // so the per-session change doesn't leak. Pattern from reference
       // control.ts setModel handler.
       //
       // The snapshot is best-effort: if settings.json doesn't exist
@@ -220,7 +220,7 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
           //    `maxTokens` from it to route LLM requests. Passing a stub with only
           //    `provider` + `id` leaves those fields as undefined, which silently
           //    breaks every subsequent prompt — the session appears "dead."
-          //    Pattern from pi-forge: pass the full model from registry.find().
+          //    Pattern: pass the full model from registry.find().
           await live.session.setModel(model as Parameters<typeof live.session.setModel>[0]);
         } catch (err) {
           return {

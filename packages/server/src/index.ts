@@ -34,7 +34,7 @@ import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/
 /**
  * Per-route auth metadata. Routes that should skip the auth preHandler
  * set `config.public: true` via Fastify route config.
- * Adapted from pi-forge's packages/server/src/index.ts.
+ * Adapted from a reference template.
  */
 declare module "fastify" {
   interface FastifyContextConfig {
@@ -44,7 +44,7 @@ declare module "fastify" {
 
 /**
  * Build the Fastify server with all routes registered.
- * Architecture adapted from pi-forge:
+ * Architecture:
  *   - Fastify HTTP server with CORS
  *   - Auth gate via onRequest hook (public routes opt out)
  *   - All routes under /api/v1/

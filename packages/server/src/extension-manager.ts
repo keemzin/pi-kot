@@ -3,7 +3,7 @@
  * Scans ~/.pi/agent/ for installed extensions, agents, and packages,
  * and exposes a curated recommendation catalog optimised for pi-kot.
  *
- * Architecture adapted from pi-forge's extension dynamic detection pattern:
+ * Architecture: extension dynamic detection pattern:
  *   detect → activate — UI features light up based on what's installed.
  *
  * Update checking:

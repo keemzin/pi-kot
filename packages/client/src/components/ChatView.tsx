@@ -586,7 +586,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   // Build tool pairing once per render cycle
   const pairing = useMemo(() => buildToolCallPairing(messages as PairableMessage[]), [messages]);
 
-  // Render loop: iterate messages by flat index (like pi-forge) so
+  // Render loop: iterate messages by flat index so
   // CompactionCards splice at arbitrary insertBeforeIndex positions,
   // not just at user message boundaries. Preserves turn-grouped
   // visual layout (sticky user header, copy/rewind buttons).
@@ -790,7 +790,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       currentAssistantMsgs.length = 0;
     };
 
-    // ── Flat index iteration (matches pi-forge's render loop) ──
+    // ── Flat index iteration ──
     for (let i = 0; i < messages.length; i++) {
       const m = messages[i] as PairableMessage;
 

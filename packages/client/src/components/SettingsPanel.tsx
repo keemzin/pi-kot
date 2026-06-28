@@ -1,7 +1,7 @@
 /**
  * Settings Panel — modal overlay with config tabs.
  *
- * Ported from pi-forge/packages/client/src/components/SettingsPanel.tsx
+ * Ported from a reference template
  * Simplified for pi-kot: Appearance, Providers, Agent, General tabs.
  */
 import { useEffect, useMemo, useState } from "react";

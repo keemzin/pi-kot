@@ -2,7 +2,7 @@
  * Tool call pairing — matches toolCall blocks in assistant messages
  * with toolResult messages by toolCallId.
  *
- * Ported from pi-forge/packages/client/src/lib/tool-call-pairing.ts
+ * Ported from a reference template
  */
 
 export interface PairableMessage {

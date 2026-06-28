@@ -466,7 +466,7 @@ export function autoNameSession(sessionId: string, promptText: string): void {
 
 /**
  * Resolve MCP custom tools for a session.
- * Mirrors pi-forge's resolveMcpCustomTools pattern — ensures global + project
+ * Resolve MCP custom tools — ensures global + project
  * MCP config is loaded, respects the master disabled toggle, and returns
  * the union of all connected, enabled server tools for this project.
  */

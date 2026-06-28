@@ -32,7 +32,7 @@
  *                        before this one (or session start)" up to but
  *                        not including the new compaction.
  *
- * Ported from pi-forge's packages/server/src/compaction-history.ts.
+ * Ported from a reference compaction history module.
  */
 import type { AgentSession, SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";

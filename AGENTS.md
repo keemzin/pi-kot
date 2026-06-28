@@ -12,7 +12,7 @@
 - **pi-kot** is an HTTP bridge and browser UI wrapper for the [pi coding agent](https://pi.dev).
 - It embeds the `@earendil-works/pi-coding-agent` SDK and exposes capabilities via REST, Server-Sent Events (SSE), and WebSockets.
 - It is **NOT** a rewrite of the agent loop; it is a web frontend.
-- **Reference**: Clean design patterns, API structures, and SSE layouts should mirror the local template project at `./pi-forge/`.
+- **Reference template**: `./pi-forge/` contains reference design patterns, API structures, and SSE layouts.
 - **SDK Rules**: Canonical documentation lives at `https://pi.dev/docs/latest`. Prioritize asynchronous SDK handlers like `createAgentSession()` and async event streams.
 
 ## 🥇 SDK-First Principle (CRITICAL)

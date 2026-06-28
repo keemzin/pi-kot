@@ -9,8 +9,8 @@ import { config } from "../config.js";
  * Minimal JWT-like token for auth. Uses HMAC-SHA256 with a server-generated
  * secret (rotated on restart since sessions are ephemeral).
  *
- * Simplified from pi-forge's auth.ts — Phase 1a uses a basic API key or
- * JWT pattern. In production, pi-forge uses proper jsonwebtoken + scrypt.
+ * Simplified auth — Phase 1a uses a basic API key or
+ * JWT pattern. In production, this uses proper jsonwebtoken + scrypt.
  */
 const TOKEN_SECRET = randomBytes(32).toString("hex");
 

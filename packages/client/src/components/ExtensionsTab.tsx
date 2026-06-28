@@ -1,7 +1,7 @@
 /**
  * Extensions Tab — runtime extension discovery and curated recommendations.
  *
- * Architecture: detect → activate — inspired by pi-forge's approach.
+ * Architecture: detect → activate — inspired by a reference template.
  * Shows what pi.dev extensions are installed, and recommends optimised ones.
  */
 
