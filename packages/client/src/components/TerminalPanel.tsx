@@ -144,7 +144,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
         position: "fixed",
         zIndex: isFullScreen ? 300 : 100,
         flexDirection: "column",
-        background: "var(--bg, #1e1e2e)",
+        background: "var(--bg-solid, #1e1e2e)",
         overscrollBehavior: "none",
         transition: "bottom 0.15s ease",
         ...(isFullScreen
@@ -434,7 +434,7 @@ function TerminalHost({
     const isMobileDevice = window.innerWidth <= 600;
     const term = new Terminal({
       theme: {
-        background: cssVar("--bg", "#1e1e2e"),
+        background: cssVar("--bg-solid", "#1e1e2e"),
         foreground: cssVar("--text-primary", "#cdd6f4"),
         cursor: cssVar("--accent-text", "#89b4fa"),
         selectionBackground: cssVar("--accent", "#89b4fa"),
