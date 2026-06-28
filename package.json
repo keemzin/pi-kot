@@ -18,6 +18,7 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260627.2",
     "concurrently": "^10.0.0",
     "cross-env": "^10.1.0",
     "prettier": "^3.5.3",

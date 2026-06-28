@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
-    "check": "tsc --noEmit"
+    "build": "tsgo",
+    "check": "tsgo --noEmit"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
