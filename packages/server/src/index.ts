@@ -179,6 +179,17 @@ export async function buildServer() {
     await fastify.register(fastifyStatic, {
       root: config.clientDistPath,
       wildcard: false,
+      setHeaders: (res, path) => {
+        if (path.endsWith(".html")) {
+          // Never cache HTML so users always get the latest js/css references
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        } else if (path.includes("/assets/")) {
+          // Aggressively cache static assets (Vite hashes them)
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      },
     });
     // SPA fallback: non-/api/* GETs → index.html
     fastify.setNotFoundHandler((req, reply) => {
