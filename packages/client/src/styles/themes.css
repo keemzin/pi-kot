@@ -891,31 +891,31 @@ body {
 /* Archive button on session items (hidden by default, shown on hover) */
 .session-item {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .session-archive-btn {
-  display: none;
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+  opacity: 0;
   background: none;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 11px;
-  padding: 2px 4px;
+  font-size: 14px;
+  padding: 4px;
   border-radius: var(--radius-xs);
   line-height: 1;
-  transition: color var(--duration) var(--ease);
+  transition: opacity var(--duration) var(--ease), color var(--duration) var(--ease), background var(--duration) var(--ease);
 }
 
 .session-archive-btn:hover {
   color: var(--error);
+  background: var(--bg-glass-hover);
 }
 
 .session-item:hover .session-archive-btn {
-  display: inline-block;
+  opacity: 1;
 }
 
 /* Restore button on archived session items */
@@ -4100,12 +4100,14 @@ body {
 .session-worker-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px 3px 4px;
+  gap: 8px;
+  padding: 6px 10px 6px 28px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   position: relative;
+  color: var(--text-secondary);
+  transition: background-color var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 
 .session-worker-item:hover {

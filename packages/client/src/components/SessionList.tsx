@@ -152,19 +152,19 @@ export function SessionList({
                 />
               ) : (
                 <>
-                  <span className="session-name">{displayName}</span>
-                  <button
-                    className="session-archive-btn"
-                    title="Archive session"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (confirm(`Archive "${displayName}"?`)) {
-                        useSessionStore.getState().archiveSession(supervisor.sessionId);
-                      }
-                    }}
-                  >
-                    🗑
-                  </button>
+                <span className="session-name">{displayName}</span>
+                <button
+                  className="session-archive-btn"
+                  title="Archive session"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Archive "${displayName}"?`)) {
+                      useSessionStore.getState().archiveSession(supervisor.sessionId);
+                    }
+                  }}
+                >
+                  ✕
+                </button>
                 </>
               )}
             </div>
