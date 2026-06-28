@@ -233,10 +233,35 @@ Access settings via the **⚙** icon in the header.
 |---|---|
 | **General** | Theme (light/dark), font size, model defaults |
 | **MCP** | MCP server registry, tool enable/disable |
-| **Extensions** | Install/manage pi extensions |
+| **Extensions** | Install/manage pi extensions — **install the recommended ones to unlock features like revert & vision agent** |
 | **Skills** | Enable/disable agent skills |
 | **Auth** | Password change, API key management |
 | **About** | Version, credits, links |
+
+---
+
+## 10a. Extensions — What to Install
+
+The **Extensions** tab lists 💎 **Recommended for pi-kot** extensions. These are curated packages that unlock major features. **Install them all** for the full experience:
+
+| Extension | Install | What it unlocks |
+|---|---|---|
+| **pi-web-access** 🌐 | `💎 Recommended` → click install | Web search, content extraction — the agent can research online |
+| **pi-playwright** 🎭 | `💎 Recommended` → click install | Browser automation — the agent can navigate real websites |
+| **pi-vision-tool** 👁️ | `💎 Recommended` → click install | **Vision agent selection** — lets non-vision models call `describe_image` by delegating to a vision-capable model |
+| **pi-rewind** ⏪ | `💎 Recommended` → click install | **Session revert** — checkpoint your session, rewind to any prior state, branch from there. Undo for your agent |
+| **pi-processes** ⚙️ | `💎 Recommended` → click install | Background process management — run dev servers, watchers, and builds that outlive a single conversation turn |
+
+> ⚠️ **Important:** Some UI options (like the vision model selector, or the rewind button) **only appear** after the corresponding extension is installed. If you don't see a feature mentioned in this HOWTO, check the Extensions tab first.
+
+### Installing an extension
+
+1. Open **Settings** → **Extensions** tab
+2. Scroll to **💎 Recommended for pi-kot**
+3. Click any extension card → **Install**
+4. After installation, click **Reload Agent** for the changes to take effect
+
+The extension appears in the **Installed** section once active.
 
 ---
 

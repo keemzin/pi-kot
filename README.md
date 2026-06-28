@@ -20,7 +20,7 @@ pi-kot wraps the `@earendil-works/pi-coding-agent` SDK in an HTTP bridge with a 
 | **🔐 Auth** | Password-based login, API key support, JWT sessions |
 | **📱 Mobile-friendly** | PWA-ready, adaptive layout, touch gestures, virtual keyboard support |
 | **🔄 Session persistence** | Sessions survive restarts via JSONL on disk; reattach on reconnect |
-| **📦 Extensions** | Discover and install pi extensions from the UI |
+| **📦 Extensions** | Discover and install pi extensions from the UI — some features only appear after installing the right extension |
 
 ---
 
@@ -62,6 +62,25 @@ pi-kot's terminal supports mobile touch gestures inspired by Termius:
 | **2-finger scroll** | Scroll buffer | Up/down through terminal history |
 
 <img src="screenshot_placeholder_03.png" alt="touch gestures" width="400"/>
+
+---
+
+## 📦 Recommended Extensions
+
+Some features only appear **after** installing the corresponding extension. Head to the **Extensions tab** (⚙ → Extensions) and install the 💎 **Recommended for pi-kot** extensions:
+
+| Extension | Package | Unlocks |
+|---|---|---|
+| **pi-web-access** 🌐 | `npm:pi-web-access` | Web search, content extraction, API interaction tools for the agent |
+| **pi-playwright** 🎭 | `npm:pi-playwright` | Browser automation — the agent can interact with real web UI |
+| **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model |
+| **pi-rewind** ⏪ | `npm:@ayulab/pi-rewind` | **Session revert** — checkpoint, rewind, and branch from any prior state |
+| **pi-processes** ⚙️ | `npm:@aliou/pi-processes` | Background process management (dev servers, watchers, builds) |
+
+> 💡 **Tip:** Some UI elements only appear **after** the extension is installed. For example:
+> - **Vision model selector** in Extensions tab → appears only after `pi-vision-tool` is installed
+> - **Rewind button** on chat messages → appears only after `pi-rewind` is installed
+> If something mentioned in this README doesn't show up, check the Extensions tab first.
 
 ---
 
