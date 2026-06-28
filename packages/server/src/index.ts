@@ -4,6 +4,7 @@ import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import websocket from "@fastify/websocket";
 import fastifyStatic from "@fastify/static";
+import fastifyMultipart from "@fastify/multipart";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { config } from "./config.js";
@@ -72,6 +73,9 @@ export async function buildServer() {
 
   // WebSocket support for terminal
   await fastify.register(websocket);
+
+  // Multipart uploads
+  await fastify.register(fastifyMultipart);
 
   // CORS — default to true (reflect request origin) for dev convenience
   await fastify.register(cors, {
