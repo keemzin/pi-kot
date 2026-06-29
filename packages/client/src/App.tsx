@@ -36,6 +36,11 @@ import {
 // Tracks which project IDs have had an auto-created session.
 const _autoCreatedProjects = new Set<string>();
 
+// Tracks whether the initial app boot is done. Once true, subsequent
+// project switches (user clicking a folder) stop auto-selecting the
+// first session — the welcome screen stays visible instead.
+let _initialBootDone = false;
+
 const PROJECT_COLORS = [
   "var(--accent)",
   "#d19a66",
@@ -193,33 +198,42 @@ export function App() {
     // Wait for sessions to finish loading (undefined = still loading)
     if (projectSessionsList === undefined) return;
 
-    // We have a stored session ID (from localStorage or URL hash)
-    if (activeSessionId !== undefined) {
-      const exists = projectSessionsList.some(
-        (s) => s.sessionId === activeSessionId,
-      );
-      if (!exists) {
-        // Stored session was deleted on the server — clear ID and fall through
-        try {
-          localStorage.removeItem("pi-kot/active-session-id");
-        } catch { /* private mode */ }
-        useSessionStore.setState({ activeSessionId: undefined });
-        return; // Let next render auto-create
-      }
-      // Session still exists — check if it needs activation (page refresh case)
-      const st = useSessionStore.getState();
-      if (st.sseClient === undefined) {
-        setActiveSession(activeSessionId);
-      }
-      return;
-    }
+    // Initial boot (first time we reach here after loading completes).
+    // Restore a stored session, auto-select the first, or auto-create.
+    // Subsequent project switches (user clicking a folder) leave the
+    // welcome screen visible — no auto-select, no lag from loading a
+    // session the user didn't ask for.
+    if (!_initialBootDone) {
+      _initialBootDone = true;
 
-    // No stored session — auto-select first or create
-    if (projectSessionsList.length > 0) {
-      setActiveSession(projectSessionsList[0].sessionId);
-    } else if (!_autoCreatedProjects.has(activeProjectId)) {
-      _autoCreatedProjects.add(activeProjectId);
-      createAndActivate(activeProjectId);
+      // We have a stored session ID (from localStorage or URL hash)
+      if (activeSessionId !== undefined) {
+        const exists = projectSessionsList.some(
+          (s) => s.sessionId === activeSessionId,
+        );
+        if (!exists) {
+          // Stored session was deleted on the server — clear ID and fall through
+          try {
+            localStorage.removeItem("pi-kot/active-session-id");
+          } catch { /* private mode */ }
+          useSessionStore.setState({ activeSessionId: undefined });
+          return; // Let next render auto-select/create
+        }
+        // Session still exists — check if it needs activation (page refresh case)
+        const st = useSessionStore.getState();
+        if (st.sseClient === undefined) {
+          setActiveSession(activeSessionId);
+        }
+        return;
+      }
+
+      // No stored session — auto-select first or create
+      if (projectSessionsList.length > 0) {
+        setActiveSession(projectSessionsList[0].sessionId);
+      } else if (!_autoCreatedProjects.has(activeProjectId)) {
+        _autoCreatedProjects.add(activeProjectId);
+        createAndActivate(activeProjectId);
+      }
     }
   }, [loading, authRequired, activeProjectId, projectSessions, activeSessionId]);
 

@@ -709,7 +709,7 @@ body {
   bottom: 0;
   transform: translateX(0);
   will-change: transform;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: 4px 0 32px rgba(0,0,0,0.18);
 }
 
@@ -789,7 +789,9 @@ body {
 }
 
 .project-row {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -799,6 +801,9 @@ body {
   font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
+  background: var(--sidebar-bg);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   transition: all var(--duration) var(--ease);
   user-select: none;
   outline: none;
