@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
+import { NotificationToast } from "./components/NotificationToast";
 import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -993,6 +994,9 @@ export function App() {
       {activeSessionId !== undefined && (
         <ExtensionUIInteractionModal sessionId={activeSessionId} />
       )}
+
+      {/* Extension command notifications (toast from ctx.ui.notify) */}
+      <NotificationToast />
 
       {showAddProjectDialog && (
         <AddProjectDialog

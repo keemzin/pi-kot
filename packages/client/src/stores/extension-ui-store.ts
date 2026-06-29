@@ -52,6 +52,18 @@ export type ExtensionUIEvent =
   | ExtensionUINotify
   | ExtensionUIDone;
 
+/**
+ * A visible notification toast. Auto-dismissed after a timeout.
+ */
+export interface ExtensionUINotification {
+  /** Unique id for this notification (for dismissal). */
+  id: string;
+  message: string;
+  type: "info" | "warning" | "error";
+  /** ISO timestamp when the notification was created. */
+  createdAt: number;
+}
+
 // ── State ───────────────────────────────────────────────────────────
 
 interface ExtensionUIState {
@@ -61,6 +73,8 @@ interface ExtensionUIState {
   commandRunning: boolean;
   /** The name of the running command. */
   activeCommand: string | undefined;
+  /** Visible notification toasts. */
+  notifications: ExtensionUINotification[];
 }
 
 interface ExtensionUIActions {
@@ -70,14 +84,19 @@ interface ExtensionUIActions {
   clearInteraction: () => void;
   /** Cancel the running command. */
   cancelCommand: () => void;
+  /** Dismiss a notification by id. */
+  dismissNotification: (id: string) => void;
 }
 
 type ExtensionUIStore = ExtensionUIState & ExtensionUIActions;
+
+let _notifCounter = 0;
 
 export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
   activeInteraction: undefined,
   commandRunning: false,
   activeCommand: undefined,
+  notifications: [],
 
   pushEvent: (event) => {
     // Strip the "extension_ui_" prefix to match the switch cases below.
@@ -93,7 +112,22 @@ export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
         break;
       case "notify": {
         const n = event as { type: string; notificationType: string; message: string };
-        console.log(`[extension-ui] ${n.notificationType}: ${n.message}`);
+        const id = `ext-notif-${++_notifCounter}`;
+        const notif: ExtensionUINotification = {
+          id,
+          message: n.message,
+          type: n.notificationType as "info" | "warning" | "error",
+          createdAt: Date.now(),
+        };
+        set((state) => ({
+          notifications: [...state.notifications, notif],
+        }));
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => {
+          set((state) => ({
+            notifications: state.notifications.filter((n) => n.id !== id),
+          }));
+        }, 8000);
         break;
       }
       case "done":
@@ -116,5 +150,11 @@ export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
       commandRunning: false,
       activeCommand: undefined,
     });
+  },
+
+  dismissNotification: (id: string) => {
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id),
+    }));
   },
 }));

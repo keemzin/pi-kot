@@ -170,6 +170,22 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     const text = el.value.trim();
     if (text.length === 0 && images.length === 0) return;
 
+    // Check if the input is a slash command — route through the command
+    // handler instead of sendPrompt. Otherwise the SDK executes the command
+    // silently and the GUI never sees the result.
+    if (text.startsWith("/") && !isStreaming) {
+      const trimmed = text.trim().toLowerCase();
+      const matched = allSlashCommands.find((cmd) => cmd.name.startsWith(trimmed));
+      if (matched) {
+        el.value = "";
+        el.style.height = "auto";
+        setSlashSuggestions([]);
+        setImages([]);
+        await matched.handler(sessionId);
+        return;
+      }
+    }
+
     // Convert images to SDK ImageContent[]
     let imageContents: ImageContent[] | undefined;
     if (images.length > 0) {
