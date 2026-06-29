@@ -744,8 +744,8 @@ body {
   }
 
   /* Bigger project headers */
-  .project-header {
-    padding: 12px 12px !important;
+  .project-row {
+    padding: 10px 10px !important;
     font-size: 14px !important;
   }
 
@@ -788,35 +788,56 @@ body {
   margin-bottom: 2px;
 }
 
-.project-header {
+.project-row {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 4px 6px;
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-secondary);
   transition: all var(--duration) var(--ease);
   user-select: none;
+  outline: none;
 }
 
-.project-header:hover {
+.project-row:hover {
   background: var(--bg-glass-hover);
   color: var(--text-primary);
 }
 
-.project-header.active {
+.project-row.active {
   background: var(--accent-subtle);
   color: var(--accent-text);
 }
 
-.project-chevron {
+.project-icon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 16px;
-  font-size: 10px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.project-icon-folder {
+  display: block;
+}
+
+.project-row:hover .project-icon-folder {
+  display: none;
+}
+
+.project-icon-arrow {
+  display: none;
   opacity: 0.6;
-  transition: transform 0.15s var(--ease);
+}
+
+.project-row:hover .project-icon-arrow {
+  display: block;
 }
 
 .project-name {
@@ -824,14 +845,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.project-count {
-  font-size: 11px;
-  opacity: 0.5;
-  margin-left: 6px;
-  min-width: 16px;
-  text-align: right;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* Session sub-list within a project */
@@ -918,6 +933,65 @@ body {
   opacity: 1;
 }
 
+/* Star/favorite button on session items */
+.session-fav-btn {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: var(--radius-xs);
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity var(--duration) var(--ease), color var(--duration) var(--ease), transform var(--duration) var(--ease);
+}
+
+.session-fav-btn.favorited {
+  opacity: 1;
+  color: var(--warning, #fbbf24);
+}
+
+.session-fav-btn:hover {
+  transform: scale(1.15);
+}
+
+.session-fav-btn.favorited:hover {
+  color: var(--warning, #fbbf24);
+}
+
+.session-item:hover .session-fav-btn:not(.favorited) {
+  opacity: 0.6;
+}
+
+.session-item:hover .session-fav-btn:not(.favorited):hover {
+  opacity: 1;
+  color: var(--warning, #fbbf24);
+}
+
+/* Favorites section header */
+.favorites-section-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px 4px;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warning, #fbbf24);
+  opacity: 0.8;
+}
+
+/* Thin divider between favorites and all sessions */
+.favorites-section-divider {
+  height: 1px;
+  margin: 2px 12px 4px;
+  background: var(--border);
+  opacity: 0.4;
+}
+
 /* Restore button on archived session items */
 .session-restore-btn {
   display: none;
@@ -997,74 +1071,57 @@ body {
 }
 
 /* Inline + button on project header row */
-.new-session-inline {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 2px 6px;
+/* Hover-reveal action buttons on project row */
+.project-actions-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
-  border-radius: var(--radius-sm);
-  transition: all var(--duration) var(--ease);
-  opacity: 0;
-  flex-shrink: 0;
 }
 
-.project-header:hover .new-session-inline,
-.project-header.active .new-session-inline {
-  opacity: 1;
+.project-actions-right {
+  display: flex;
+  align-items: center;
 }
 
-.new-session-inline:hover {
-  color: var(--accent-text);
-  background: var(--bg-glass-hover);
-}
-
-/* Remove/delete project button on project header row */
-.project-remove-btn {
-  background: none;
+.project-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1;
-  padding: 2px 5px;
-  margin-left: 2px;
-  border-radius: var(--radius-sm);
-  transition: all var(--duration) var(--ease);
   opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration) var(--ease), color var(--duration) var(--ease), background var(--duration) var(--ease);
   flex-shrink: 0;
 }
 
-.project-header:hover .project-remove-btn,
-.project-header.active .project-remove-btn {
+.project-row:hover .project-action-btn,
+.project-row.active .project-action-btn {
   opacity: 1;
+  pointer-events: auto;
 }
 
-.project-remove-btn:hover {
-  color: #e06c75;
+.project-action-btn:hover {
+  color: var(--text-primary);
   background: var(--bg-glass-hover);
 }
 
-/* ── Mobile: always show + and × on active project header ── */
+/* ── Mobile: always show action buttons on active project row ── */
 @media (max-width: 600px) {
-  .project-header.active .new-session-inline,
-  .project-header.active .project-remove-btn {
+  .project-row.active .project-action-btn {
     opacity: 1;
+    pointer-events: auto;
   }
 
-  .new-session-inline {
-    font-size: 20px;
-    padding: 4px 8px;
-  }
-
-  .project-remove-btn {
-    font-size: 14px;
-    padding: 4px 6px;
+  .project-action-btn {
+    width: 28px;
+    height: 28px;
   }
 }
 

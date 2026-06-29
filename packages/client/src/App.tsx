@@ -35,6 +35,26 @@ import {
 // Tracks which project IDs have had an auto-created session.
 const _autoCreatedProjects = new Set<string>();
 
+const PROJECT_COLORS = [
+  "var(--accent)",
+  "#d19a66",
+  "#56b6c2",
+  "#c678dd",
+  "#e5c07b",
+  "#98c379",
+  "#e06c75",
+  "#61afef",
+];
+
+function projectColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
+}
+
 export function App() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeProjectId = useSessionStore((s) => s.activeProjectId);
@@ -467,7 +487,7 @@ export function App() {
               <div key={project.id} className={`project-group${isActive ? " active" : ""}`}>
                 {/* Project header */}
                 <div
-                  className={`project-header${isActive ? " active" : ""}`}
+                  className={`project-row${isActive ? " active" : ""}`}
                   onClick={() => {
                     if (isActive) {
                       toggleProject(project.id);
@@ -475,37 +495,78 @@ export function App() {
                       setActiveProject(project.id);
                     }
                   }}
+                  role="button"
+                  tabIndex={0}
                 >
-                  <span className="project-chevron">{isExpanded ? "▾" : "▸"}</span>
-                  <span className="project-name">{project.name}</span>
-                  <span className="project-count" style={{
-                    color: pSessions.length === 0 ? "var(--text-dim)" : undefined,
-                    fontStyle: pSessions.length === 0 ? "italic" : undefined,
-                  }}>
-                    {pSessions.length > 0 ? pSessions.length : ""}
+                  {/* Folder icon (default) / arrow (on hover) */}
+                  <span className="project-icon">
+                    <svg
+                      className="project-icon-folder"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: projectColor(project.id) }}
+                    >
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <svg
+                      className="project-icon-arrow"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      createAndActivate(project.id);
-                    }}
-                    className="new-session-inline"
-                    title="New session"
-                  >
-                    +
-                  </button>
-                  {project.name !== "Default" && (
+
+                  {/* Project name — lowercase, truncate */}
+                  <span className="project-name">{project.name.toLowerCase()}</span>
+
+                  {/* Hover-reveal project menu (left group) */}
+                  <div className="project-actions-left">
+                    {project.name !== "Default" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setProjectToDelete(project.id);
+                        }}
+                        className="project-action-btn"
+                        title="Remove from sidebar"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <polygon points="5 14 12 5 19 14" />
+                          <line x1="4" y1="19" x2="20" y2="19" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Far-right new session button */}
+                  <div className="project-actions-right">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setProjectToDelete(project.id);
+                        createAndActivate(project.id);
                       }}
-                      className="project-remove-btn"
-                      title="Remove project from list"
+                      className="project-action-btn"
+                      title="New draft session"
                     >
-                      ✕
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
                     </button>
-                  )}
+                  </div>
                 </div>
 
                 {/* Session list inside project */}
