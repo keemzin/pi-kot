@@ -1,5 +1,9 @@
 # AGENTS.md (pi-kot context)
 
+## 🚫 No Server Control
+- **Actions like restart, stop, or start are user-only.** Never attempt to restart, stop, or start any server or service yourself.
+- **If the project needs a server restart**, clearly tell the user to do it. Do not try to execute restart commands.
+
 ## 🚫 Working Directory & Path Guards (CRITICAL)
 - **Project Root**: `/home/hakeem/pi-kot/`. You MUST stay inside this directory.
 - **No `cd` Loops**: Never issue a naked `cd` command. Never execute consecutive `cd` steps.
