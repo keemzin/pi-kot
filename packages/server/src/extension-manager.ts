@@ -164,7 +164,7 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     package: "npm:context-mode",
     category: "productivity",
     verified: true,
-    enablesFeatures: ["Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search"],
+    enablesFeatures: ["Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search", "Commands: /ctx-stats, /ctx-doctor"],
     icon: "🧠",
   },
 ];
