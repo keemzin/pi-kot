@@ -160,11 +160,11 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     id: "context-mode",
     name: "context-mode",
     description:
-      "Saves ~98% of context window by capturing tool results in SQLite, sandboxed code execution (ctx_execute), session continuity across compaction, and BM25 search over indexed docs.",
+      "⚠️ First prompt uses ~8,181 extra tokens for setup; savings start from the second turn onward. Saves ~98% of context window by capturing tool results in SQLite, sandboxed code execution (ctx_execute), session continuity across compaction, and BM25 search over indexed docs.",
     package: "npm:context-mode",
     category: "productivity",
     verified: true,
-    enablesFeatures: ["Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search", "Commands: /ctx-stats, /ctx-doctor"],
+    enablesFeatures: ["⚠️ ~8,181 tokens on first prompt — then saves ~98%", "Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search", "Commands: /ctx-stats, /ctx-doctor"],
     icon: "🧠",
   },
 ];
