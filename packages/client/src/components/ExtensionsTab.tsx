@@ -18,6 +18,8 @@ import {
   getVisionConfig,
   setVisionConfig,
   fetchProviders,
+  listTools,
+  setToolEnabled,
   type ExtensionsResponse,
   type RecommendedExtension,
   type DiscoveredExtension,
@@ -25,8 +27,8 @@ import {
   type ExtensionUpdateInfo,
   type VisionConfigResponse,
   type ProviderGroup,
-  type ModelInfo,
   type SessionExtensionInfo,
+  type ToolListing,
 } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 
@@ -170,6 +172,25 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   const [visionConfig, setVisionConfigState] = useState<VisionConfigResponse | null>(null);
   const [visionProviders, setVisionProviders] = useState<ProviderGroup[]>([]);
   const [visionCfgSaving, setVisionCfgSaving] = useState(false);
+  // ── Tool listing for extension tool toggles ──
+  const [toolListing, setToolListing] = useState<ToolListing | undefined>(undefined);
+  const [toolBusy, setToolBusy] = useState<string | undefined>(undefined);
+
+  /** Match an extension's package name to tools registered by that package. */
+  const matchToolsForExtension = (
+    ext: DiscoveredExtension,
+    listing: ToolListing,
+  ): { tools: ToolListing["extension"][number]["tools"]; loaded: boolean } => {
+    const pkg = ext.package?.replace("npm:", "");
+    if (!pkg) return { tools: [], loaded: true };
+    const matched = listing.extension.find(
+      (extGroup) => extGroup.packageSource === pkg,
+    );
+    return {
+      tools: matched?.tools ?? [],
+      loaded: true,
+    };
+  };
 
   const load = useCallback(async () => {
     try {
@@ -186,6 +207,27 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   useEffect(() => {
     load();
   }, [load, refreshing]);
+
+  // Fetch tool listing for extension tool toggles
+  useEffect(() => {
+    listTools()
+      .then(setToolListing)
+      .catch(() => {});
+  }, [refreshing]);
+
+  const handleToggleTool = async (name: string, enabled: boolean) => {
+    setToolBusy(name);
+    try {
+      await setToolEnabled("extension", name, enabled, { scope: "global" });
+      // Re-fetch to reflect state
+      const updated = await listTools();
+      setToolListing(updated);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setToolBusy(undefined);
+    }
+  };
 
   // Fetch active session extension info when session changes
   useEffect(() => {
@@ -351,11 +393,6 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
   };
 
   // ── Agent Type Settings (shown when subagent extension is detected) ──
-  const agentTypes = [
-    ...(data?.agents ?? []),
-    // Mix in builtin defaults if not overridden by files
-    ...(data ? [] : []),
-  ];
 
   return (
     <div style={{ fontSize: 12 }}>
@@ -578,6 +615,13 @@ export function ExtensionsTab({ onError }: { onError: (msg: string) => void }) {
                   uninstalling={uninstalling === ext.name}
                   onUninstall={handleUninstall}
                   onUpdate={handleUpdate}
+                  tools={
+                    toolListing
+                      ? matchToolsForExtension(ext, toolListing).tools
+                      : undefined
+                  }
+                  onToggleTool={handleToggleTool}
+                  toolToolsLoaded={toolListing !== undefined}
                 />
               </div>
             );
@@ -734,6 +778,9 @@ function InstalledCard({
   uninstalling,
   onUninstall,
   onUpdate,
+  tools,
+  toolToolsLoaded,
+  onToggleTool,
 }: {
   ext: DiscoveredExtension;
   update?: ExtensionUpdateInfo;
@@ -743,6 +790,9 @@ function InstalledCard({
   uninstalling: boolean;
   onUninstall: (ext: DiscoveredExtension) => void;
   onUpdate: (pkg: string) => void;
+  tools?: ToolListing["extension"][number]["tools"];
+  toolToolsLoaded?: boolean;
+  onToggleTool?: (name: string, enabled: boolean) => void;
 }) {
   // Find commands contributed by this extension (fuzzy match by name prefix)
   const extCmds = sessionCommands?.filter(
@@ -753,123 +803,160 @@ function InstalledCard({
       c.name.includes(ext.name),
   ) ?? [];
 
-  return (
-    <div style={s.card}>
-      <span style={s.cardIcon}>
-        {ext.source === "extensions_dir" ? "📄" : ext.source === "agents_dir" ? "🤖" : "📦"}
-      </span>
-      <div style={s.cardBody}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={s.cardTitle}>{ext.name}</div>
-          {active && (
-            <span
-              style={{
-                display: "inline-block",
-                padding: "1px 7px",
-                borderRadius: 10,
-                fontSize: 10,
-                fontWeight: 600,
-                background: "rgba(52, 211, 153, 0.15)",
-                color: "#34d399",
-                border: "1px solid rgba(52, 211, 153, 0.3)",
-                lineHeight: "18px",
-              }}
-            >
-              Active
-            </span>
-          )}
-          {update?.updateAvailable && (
-            <span
-              style={{
-                display: "inline-block",
-                padding: "1px 7px",
-                borderRadius: 10,
-                fontSize: 10,
-                fontWeight: 600,
-                background: "rgba(34, 197, 94, 0.15)",
-                color: "#22c55e",
-                border: "1px solid rgba(34, 197, 94, 0.3)",
-                lineHeight: "18px",
-              }}
-            >
-              {update.installed} → {update.latest}
-            </span>
-          )}
-        </div>
-        <div style={s.cardDesc}>{ext.description}</div>
-        {update && !update.updateAvailable && update.installed && (
-          <div style={{ ...s.cardMeta, color: "var(--text-dim)" }}>
-            v{update.installed}
+  const body = (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          flex: 1,
+        }}
+      >
+        <span style={s.cardIcon}>
+          {ext.source === "extensions_dir" ? "📄" : ext.source === "agents_dir" ? "🤖" : "📦"}
+        </span>
+        <div style={s.cardBody}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={s.cardTitle}>{ext.name}</div>
+            {active && (
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "1px 7px",
+                  borderRadius: 10,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  background: "rgba(52, 211, 153, 0.15)",
+                  color: "#34d399",
+                  border: "1px solid rgba(52, 211, 153, 0.3)",
+                  lineHeight: "18px",
+                }}
+              >
+                Active
+              </span>
+            )}
+            {update?.updateAvailable && (
+              <span
+                style={{
+                  display: "inline-block",
+                  padding: "1px 7px",
+                  borderRadius: 10,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  background: "rgba(34, 197, 94, 0.15)",
+                  color: "#22c55e",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  lineHeight: "18px",
+                }}
+              >
+                {update.installed} → {update.latest}
+              </span>
+            )}
           </div>
-        )}
-        <div style={s.cardMeta}>
-          <span
-            style={{
-              ...s.tag,
-              background: ext.source === "package" ? "var(--accent-subtle)" : "var(--bg-glass-hover)",
-              color: ext.source === "package" ? "var(--accent-text)" : "var(--text-dim)",
-            }}
-          >
-            {ext.source === "package" ? "npm package" : ext.source === "extensions_dir" ? "extension" : ext.source === "agents_dir" ? "agent" : "builtin"}
-          </span>
-          {ext.agentTypes && ext.agentTypes.length > 0 && (
-            <span style={{ color: "var(--text-dim)" }}>
-              agents: {ext.agentTypes.join(", ")}
-            </span>
+          <div style={s.cardDesc}>{ext.description}</div>
+          {update && !update.updateAvailable && update.installed && (
+            <div style={{ ...s.cardMeta, color: "var(--text-dim)" }}>
+              v{update.installed}
+            </div>
           )}
-          {ext.enablesFeatures && ext.enablesFeatures.length > 0 && (
-            <span style={{ color: "var(--text-dim)" }}>
-              ✨ {ext.enablesFeatures[0]}
-              {ext.enablesFeatures.length > 1 ? ` +${ext.enablesFeatures.length - 1}` : ""}
+          <div style={s.cardMeta}>
+            <span
+              style={{
+                ...s.tag,
+                background: ext.source === "package" ? "var(--accent-subtle)" : "var(--bg-glass-hover)",
+                color: ext.source === "package" ? "var(--accent-text)" : "var(--text-dim)",
+              }}
+            >
+              {ext.source === "package" ? "npm package" : ext.source === "extensions_dir" ? "extension" : ext.source === "agents_dir" ? "agent" : "builtin"}
             </span>
-          )}
-          {extCmds.length > 0 && (
-            <span style={{ color: "var(--accent-text, #818cf8)" }}>
-              /{extCmds.map((c) => c.invocationName).join(", /")}
-            </span>
-          )}
+            {ext.agentTypes && ext.agentTypes.length > 0 && (
+              <span style={{ color: "var(--text-dim)" }}>
+                agents: {ext.agentTypes.join(", ")}
+              </span>
+            )}
+            {ext.enablesFeatures && ext.enablesFeatures.length > 0 && (
+              <span style={{ color: "var(--text-dim)" }}>
+                ✨ {ext.enablesFeatures[0]}
+                {ext.enablesFeatures.length > 1 ? ` +${ext.enablesFeatures.length - 1}` : ""}
+              </span>
+            )}
+            {extCmds.length > 0 && (
+              <span style={{ color: "var(--accent-text, #818cf8)" }}>
+                /{extCmds.map((c) => c.invocationName).join(", /")}
+              </span>
+            )}
+            {tools !== undefined && (
+              <span style={{ color: "var(--text-dim)" }}>
+                {tools.length} tool{tools.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
-      {ext.source === "package" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          {update?.updateAvailable && (
+        {ext.source === "package" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
+            {update?.updateAvailable && (
+              <button
+                onClick={() => onUpdate(ext.package ?? ext.name)}
+                disabled={updating}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  border: "1px solid rgba(34, 197, 94, 0.4)",
+                  background: updating ? "var(--bg-glass)" : "rgba(34, 197, 94, 0.1)",
+                  color: "#22c55e",
+                  whiteSpace: "nowrap" as const,
+                }}
+              >
+                {updating ? "…" : "Update"}
+              </button>
+            )}
             <button
-              onClick={() => onUpdate(ext.package ?? ext.name)}
-              disabled={updating}
+              onClick={() => onUninstall(ext)}
+              disabled={uninstalling}
               style={{
                 padding: "4px 10px",
                 fontSize: 11,
                 fontWeight: 600,
                 borderRadius: 6,
                 cursor: "pointer",
-                border: "1px solid rgba(34, 197, 94, 0.4)",
-                background: updating ? "var(--bg-glass)" : "rgba(34, 197, 94, 0.1)",
-                color: "#22c55e",
+                border: "1px solid rgba(224, 108, 117, 0.4)",
+                background: uninstalling ? "var(--bg-glass)" : "rgba(224, 108, 117, 0.1)",
+                color: "var(--accent-red, #e06c75)",
                 whiteSpace: "nowrap" as const,
               }}
             >
-              {updating ? "…" : "Update"}
+              {uninstalling ? "…" : "Uninstall"}
             </button>
-          )}
-          <button
-            onClick={() => onUninstall(ext)}
-            disabled={uninstalling}
-            style={{
-              padding: "4px 10px",
-              fontSize: 11,
-              fontWeight: 600,
-              borderRadius: 6,
-              cursor: "pointer",
-              border: "1px solid rgba(224, 108, 117, 0.4)",
-              background: uninstalling ? "var(--bg-glass)" : "rgba(224, 108, 117, 0.1)",
-              color: "var(--accent-red, #e06c75)",
-              whiteSpace: "nowrap" as const,
-            }}
-          >
-            {uninstalling ? "…" : "Uninstall"}
-          </button>
-        </div>
+          </div>
+        )}
+      </div>
+      {/* ── Tool toggles ── */}
+      {tools !== undefined && toolToolsLoaded && (
+        <ToolSection
+          tools={tools}
+          onToggle={onToggleTool}
+        />
       )}
+    </>
+  );
+
+  return (
+    <div
+      style={{
+        borderRadius: 8,
+        background: "var(--bg-glass)",
+        border: "1px solid var(--border-color)",
+        marginBottom: 8,
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ padding: "10px 12px" }}>
+        {body}
+      </div>
     </div>
   );
 }
@@ -951,6 +1038,159 @@ function RecommendedCard({
       >
         {installing ? "…" : installed ? "✓ Installed" : "Install"}
       </button>
+    </div>
+  );
+}
+
+// ── Tool Section (collapsible tool toggles) ─────────────────────────────
+
+function ToolSection({
+  tools,
+  onToggle,
+}: {
+  tools: ToolListing["extension"][number]["tools"];
+  onToggle?: (name: string, enabled: boolean) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div style={{ borderTop: "1px solid var(--border-color)", marginTop: 8 }}>
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          padding: "6px 12px",
+          fontSize: 11,
+          fontWeight: 600,
+          border: "none",
+          background: "transparent",
+          color: "var(--text-secondary)",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <span>
+          {expanded ? "▾" : "▸"} Tools ({tools.length})
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 12px 8px", display: "flex", flexDirection: "column", gap: 3 }}>
+          {tools.length === 0 && (
+            <p style={{ fontSize: 11, fontStyle: "italic", color: "var(--text-dim)", padding: "4px 8px" }}>
+              No tools registered yet. Start a session to load extension tools, or check the extension docs.
+            </p>
+          )}
+          {tools.map((t) => (
+            <ToolToggleRow
+              key={t.name}
+              tool={t}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolToggleRow({
+  tool,
+  onToggle,
+}: {
+  tool: ToolListing["extension"][number]["tools"][number];
+  onToggle?: (name: string, enabled: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "4px 8px",
+        borderRadius: 6,
+        background: "var(--bg-glass-hover, rgba(0,0,0,0.03))",
+        fontSize: 11,
+        opacity: tool.globalEnabled ? 1 : 0.5,
+        transition: "opacity 0.15s",
+      }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          flexShrink: 0,
+          background: tool.globalEnabled ? "var(--success, #34d399)" : "var(--border)",
+        }}
+        title={`Global: ${tool.globalEnabled ? "enabled" : "disabled"}`}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span
+          style={{
+            fontWeight: 600,
+            fontFamily: "var(--font-mono, monospace)",
+            fontSize: 11,
+            color: "var(--text-primary)",
+          }}
+        >
+          {tool.name}
+        </span>
+        {tool.description && (
+          <p
+            style={{
+              margin: "1px 0 0",
+              fontSize: 10,
+              color: "var(--text-dim)",
+              lineHeight: 1.3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={tool.description}
+          >
+            {tool.description}
+          </p>
+        )}
+      </div>
+      {onToggle && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            cursor: "pointer",
+            flexShrink: 0,
+            userSelect: "none",
+          }}
+          title={`${tool.globalEnabled ? "Disable" : "Enable"} this tool globally`}
+        >
+          <input
+            type="checkbox"
+            checked={tool.globalEnabled}
+            onChange={(e) => onToggle(tool.name, e.target.checked)}
+            style={{
+              width: 13,
+              height: 13,
+              accentColor: "var(--accent-text, #3b82f6)",
+              cursor: "pointer",
+            }}
+          />
+          <span
+            style={{
+              fontSize: 10,
+              color: tool.globalEnabled ? "var(--success, #34d399)" : "var(--text-dim)",
+              fontWeight: 600,
+              minWidth: 44,
+            }}
+          >
+            {tool.globalEnabled ? "on" : "off"}
+          </span>
+        </label>
+      )}
     </div>
   );
 }

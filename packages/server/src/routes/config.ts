@@ -1,4 +1,4 @@
-import { type FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import {
   liveProvidersListing,
   readAuthSummary,
@@ -22,6 +22,7 @@ import {
 } from "../tool-overrides.js";
 import { getStatus as mcpGetStatus, customToolsForProject, ensureProjectLoaded } from "../mcp/manager.js";
 import { getProject } from "../project-manager.js";
+import { discoverExtensionResources } from "../extensions-discovery.js";
 
 // ── Schema ────────────────────────────────────────────────────────────────
 
@@ -406,7 +407,7 @@ function friendlySourceName(src: string): string {
       }));
 
       // MCP tools
-      let mcpTools: Array<{
+      const mcpTools: Array<{
         server: string;
         scope: "global" | "project";
         projectId?: string;
@@ -443,41 +444,29 @@ function friendlySourceName(src: string): string {
         });
       }
 
-      // Extension-contributed tools — collect from all live sessions
-      const extensionTools: Array<{ packageSource: string; tools: typeof builtin }> = [];
-      const seenExtensionTools = new Set<string>();
-      const { listSessions } = await import("../session-registry.js");
-      for (const live of listSessions()) {
-        const runner = live.session.extensionRunner;
-        const tools = runner.getAllRegisteredTools();
-        for (const t of tools) {
-          if (!seenExtensionTools.has(t.definition.name)) {
-            seenExtensionTools.add(t.definition.name);
-          }
-        }
-        // Group by source (approximate — use extension path prefix)
-        const bySource = new Map<string, typeof builtin>();
-        for (const t of tools) {
-          if (!seenExtensionTools.has(t.definition.name)) continue;
-          seenExtensionTools.delete(t.definition.name); // only show once
-          const src = t.sourceInfo?.baseDir ?? t.sourceInfo?.source ?? "extension";
-          const pkgName = friendlySourceName(src);
-          const arr = bySource.get(pkgName) ?? [];
-          arr.push({
-            name: t.definition.name,
-            description:
-              typeof t.definition.description === "string"
-                ? t.definition.description
-                : "",
-            enabled: isToolEffective(overrides, projectId, "extension", t.definition.name),
-            globalEnabled: !overrides.extension.includes(t.definition.name),
-          });
-          bySource.set(pkgName, arr);
-        }
-        for (const [pkgSource, toolList] of bySource) {
-          extensionTools.push({ packageSource: pkgSource, tools: toolList });
-        }
+      // Extension-contributed tools — discover from the filesystem
+      // (no live session needed, matches forge behavior)
+      const extResources = await discoverExtensionResources(
+        process.cwd(),
+      );
+      for (const err of extResources.errors) {
+        req.log.warn({ path: err.path }, "Extension discovery warning: %s", err.error);
       }
+      const extensionGroups = new Map<string, typeof builtin>();
+      for (const t of extResources.tools) {
+        const existing = extensionGroups.get(t.packageSource) ?? [];
+        existing.push({
+          name: t.name,
+          description: t.description,
+          enabled: isToolEffective(overrides, projectId, "extension", t.name),
+          globalEnabled: !overrides.extension.includes(t.name),
+        });
+        extensionGroups.set(t.packageSource, existing);
+      }
+      const extensionTools = Array.from(extensionGroups.entries()).map(([packageSource, tools]) => ({
+        packageSource,
+        tools,
+      }));
 
       return { builtin, mcp: mcpTools, extension: extensionTools };
     },

@@ -36,6 +36,7 @@ export async function buildResourceLoader(
 import { isSupervisor } from "./orchestration/store.js";
 import { createOrchestrationTools } from "./orchestration/tools.js";
 import { bridgeWorkerAgentEvent } from "./orchestration/event-bridge.js";
+import { discoverExtensionResources } from "./extensions-discovery.js";
 import { notifySupervisorDisposed, notifySupervisorIdle } from "./orchestration/inbox.js";
 import {
   customToolsForProject as mcpCustomToolsForProject,
@@ -43,7 +44,7 @@ import {
   ensureProjectLoaded as mcpEnsureProjectLoaded,
   isGloballyEnabled as mcpIsGloballyEnabled,
 } from "./mcp/manager.js";
-import { readToolOverrides, isToolEffective } from "./tool-overrides.js";
+import { filterEnabledTools, readToolOverrides, isToolEffective } from "./tool-overrides.js";
 
 /**
  * Build the ExtensionBindings for a session with real command context
@@ -501,6 +502,50 @@ async function resolveOrchestrationTools(
   }
 }
 
+/** Builtin tool names known to the SDK. */
+const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+
+/**
+ * Build the tools allowlist for createAgentSession, respecting tool
+ * overrides (global disabled set + per-project tri-state) across
+ * builtin, MCP/custom, and extension-contributed tools.
+ */
+async function buildToolsAllowlist(
+  customTools: readonly ToolDefinition[],
+  projectId: string | undefined,
+  cwd: string,
+): Promise<string[]> {
+  const overrides = await readToolOverrides();
+  const extResources = await discoverExtensionResources(cwd);
+
+  // Classify each custom tool: forge-native tools (askUserQuestion,
+  // orchestration) are treated as "builtin"; MCP tools remain "mcp".
+  const builtinCustomToolNames = new Set<string>([
+    "ask_user_question",
+    ...BUILTIN_TOOL_NAMES,
+  ]);
+
+  const candidates: Array<{
+    family: "builtin" | "mcp" | "extension";
+    name: string;
+  }> = [
+    ...BUILTIN_TOOL_NAMES.map((n) => ({ family: "builtin" as const, name: n })),
+    ...customTools.map((t) => ({
+      family: builtinCustomToolNames.has(t.name)
+        ? ("builtin" as const)
+        : ("mcp" as const),
+      name: t.name,
+    })),
+    ...extResources.tools.map((t) => ({
+      family: "extension" as const,
+      name: t.name,
+    })),
+  ];
+
+  const enabled = filterEnabledTools(overrides, projectId, candidates);
+  return enabled.map((e) => e.name);
+}
+
 /**
  * Rebuild a live session's AgentSession with updated custom tools.
  * Preserves the SessionManager (messages intact), SSE clients stay
@@ -530,12 +575,18 @@ export async function rebuildSessionTools(
 
   // Create new AgentSession with same SessionManager but updated tools
   const resourceLoader = await buildResourceLoader(live.workspacePath);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    live.projectId,
+    live.workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: live.workspacePath,
     sessionManager: live.sessionManager,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Wire real command context actions (navigateTree, etc.) so
