@@ -2473,7 +2473,7 @@ body {
 
 @media (max-width: 640px) {
   .messages-container {
-    padding: 8px 0 72px;
+    padding: 8px 0 1px;
   }
 }
 
@@ -3735,6 +3735,8 @@ body {
 .chat-scroll {
   flex: 1;
   overflow-y: auto;
+  overflow-anchor: auto;
+  scroll-behavior: auto;
   padding: 4px 16px 2px;
 }
 .chat-message-list {
