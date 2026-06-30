@@ -34,6 +34,14 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [slashSuggestions, setSlashSuggestions] = useState<SlashCommand[]>([]);
   const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>([]);
   const [compacting, setCompacting] = useState(false);
+  const [compactMessage, setCompactMessage] = useState<string | null>(null);
+
+  // Auto-clear inline message after 2.5s
+  useEffect(() => {
+    if (compactMessage === null) return;
+    const id = setTimeout(() => setCompactMessage(null), 2500);
+    return () => clearTimeout(id);
+  }, [compactMessage]);
 
   // Fetch extension commands from the session's ExtensionRunner
   useEffect(() => {
@@ -67,14 +75,34 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       name: "/compact",
       description: "Manually compact the session context",
       handler: async (sid: string) => {
-        await useSessionStore.getState().compactAndReload(sid);
+        try {
+          await useSessionStore.getState().compactAndReload(sid);
+        } catch (err: unknown) {
+          const msg =
+            err instanceof Error ? err.message : String(err);
+          if (msg.includes("nothing_to_compact")) {
+            setCompactMessage("Nothing to compact");
+            return;
+          }
+          throw err;
+        }
       },
     },
     {
       name: "/compact with summary",
       description: "Compact and keep focus on specific areas",
       handler: async (sid: string) => {
-        await useSessionStore.getState().compactAndReload(sid);
+        try {
+          await useSessionStore.getState().compactAndReload(sid);
+        } catch (err: unknown) {
+          const msg =
+            err instanceof Error ? err.message : String(err);
+          if (msg.includes("nothing_to_compact")) {
+            setCompactMessage("Nothing to compact");
+            return;
+          }
+          throw err;
+        }
       },
     },
     {
@@ -282,6 +310,19 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         </div>
       )}
       <div className="ti-container">
+        {/* Inline status message */}
+        {compactMessage !== null && (
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--text-dim)",
+              padding: "2px 0 0",
+              textAlign: "center",
+            }}
+          >
+            {compactMessage}
+          </div>
+        )}
         {/* Slash command suggestions */}
         {slashSuggestions.length > 0 && (
           <div className="ti-slash-suggestions">
