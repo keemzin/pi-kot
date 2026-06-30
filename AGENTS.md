@@ -26,14 +26,19 @@
 - **If the SDK emits an event** (`text_delta`, `message_end`, `tool_result`) — consume it directly instead of re-fetching or reconstructing.
 - Default: SDK. Fallback: your own code. This keeps pi-kot lean and automatically gains features when the SDK updates.
 
-## 🔍 Qdrant-First Code Lookup (CRITICAL)
-- **Always query Qdrant first** when asked to find code, understand a module, or explore the codebase. Use `qdrat__qdrant-find` with the collection `pi-kot-codebase` before running any grep/find/read.
-- **Why**: Qdrant stores indexed summaries of every module, route, component, and subsystem. A single query gives you the file name, purpose, and key exports — so you know exactly which file to read without grepping blindly.
-- **Fall through only after a miss**: If Qdrant returns nothing useful for your query, then use `bash` (find/grep/rg) to locate files and `read` to inspect them. Do not skip the Qdrant step.
-- **Store findings after file reads**: After reading any file to answer a question (font sizes, CSS values, exports, logic), store the discovered details with `qdrat__qdrant-store`. This caches the answer so next time Qdrant returns it directly — no grep/read needed.
-  - Example: after reading themes.css and ChatView.tsx for font sizes, store `"Chat font sizes: body 16px, assistant p inherits, h1 18px, h2 16px, h3 14px, headings drop to 15/14/13 outside assistant bubbles. 12 themes (8 dark/4 light)."`
-- **Store module summaries**: After reading a new or unfamiliar module, store a brief Qdrant entry with `qdrat__qdrant-store` so future lookups are instant. Use metadata `type` (e.g. `"type":"server_module"`, `"type":"client_component"`).
-- **Collection invariant**: All pi-kot codebase memories go in `pi-kot-codebase`. Do not create other collections for this project.
+## 🔍 context-mode First Code Lookup (CRITICAL)
+- **Use context-mode tools for all code exploration, file analysis, and multi-command research.** Refer to the tool hierarchy below.
+- **`ctx_search` (knowledge base)**: First stop for any codebase query. Searches previously indexed content, auto-captured session events (decisions, errors, blockers, plans), and documentation. Use 2-4 specific technical terms per query.
+- **`ctx_execute_file` (file analysis)**: Run code over a file when you need to derive an answer (count lines, match patterns, parse JSON, analyze structure). Returns only `console.log()` output — raw file bytes stay out of conversation memory.
+- **`ctx_batch_execute` (multi-command research)**: Batch related commands (multi-file grep, git log + diff, directory scans) in one call. Auto-indexes output for follow-up queries.
+- **`ctx_index` (store knowledge)**: Index module summaries, API docs, design decisions, and any content you'll query later. Use `ctx_index(path: ..., source: "...")` for local files, `ctx_index(content: ..., source: "...")` for inline content.
+- **`ctx_fetch_and_index` (web docs)**: Fetch pi.dev SDK docs or other web references and index them directly — no read needed.
+- **Only fall through to bash/grep/find/read** when context-mode cannot answer (rare — typically very specific single-line content where `read` is simpler).
+
+## 📎 Qdrant — Manual Only
+- **Do NOT use Qdrant automatically.** Only `qdrat__qdrant-store` or `qdrat__qdrant-find` when the user explicitly asks for it.
+- **Still valid**: If the user says "store this in Qdrant" or "search Qdrant for...", use it. Otherwise ignore.
+- **Collection**: `pi-kot-codebase` if used.
 
 ## 💬 Communication Style
 - Keep responses short, technical, and direct. 
