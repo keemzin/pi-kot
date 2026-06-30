@@ -77,6 +77,21 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         await useSessionStore.getState().compactAndReload(sid);
       },
     },
+    {
+      name: "/reload",
+      description: "Reload agent config and rebuild session tools",
+      handler: async () => {
+        const { reloadAgent } = await import("../lib/api-client");
+        await reloadAgent();
+      },
+    },
+    {
+      name: "/abort",
+      description: "Abort the current streaming response",
+      handler: async () => {
+        useSessionStore.getState().abort();
+      },
+    },
   ];
   const allSlashCommands = [...builtinCommands, ...extensionCommands];
 

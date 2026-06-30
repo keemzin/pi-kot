@@ -2840,6 +2840,7 @@ body {
 }
 
 .ti-container {
+  position: relative;
   max-width: 800px;
   margin: 0 auto;
   background: var(--input-bg);
