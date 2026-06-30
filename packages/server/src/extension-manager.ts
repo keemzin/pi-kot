@@ -12,7 +12,7 @@
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
@@ -359,14 +359,18 @@ export async function uninstallExtension(
   packageName: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const npmName = packageName.replace(/^npm:/, "");
-    const pkgEntry = packageName.startsWith("npm:") ? packageName : `npm:${npmName}`;
-
-    // Remove from settings.json packages array
+    // Remove from settings.json packages array — match the EXACT spec as stored
     const settingsRaw = await readFile(settingsPath(), "utf-8");
     const settings = JSON.parse(settingsRaw);
     if (settings.packages) {
-      settings.packages = settings.packages.filter((p: string) => p !== pkgEntry);
+      // Remove by exact match, npm: prefixed variant, AND translated npm ref
+      const translated = packageName.startsWith("git:") ? specToNpmRef(packageName) : packageName;
+      settings.packages = settings.packages.filter(
+        (p: string) =>
+          p !== packageName &&
+          p !== `npm:${packageName.replace(/^npm:/, "")}` &&
+          p !== translated,
+      );
     }
 
     // Write settings back atomically
@@ -375,14 +379,19 @@ export async function uninstallExtension(
     await writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
     await rename(tmpPath, settingsPath());
 
-    // Uninstall via npm in the agent dir (keep settings clean even if npm uninstall fails)
+    // Uninstall via npm in the agent dir (keep settings clean even if npm uninstall fails).
+    // For git: specs, npm stores the dependency value as the shorthand (e.g. "github:user/repo")
+    // but the key is the package name from the repo's package.json. We need the key.
     const npmDir = join(piAgentDir(), "npm");
     try {
-      execSync(`npm uninstall ${npmName}`, {
-        cwd: npmDir,
-        stdio: "pipe",
-        timeout: 60_000,
-      });
+      const pkgName = findInstalledPackageName(packageName);
+      if (pkgName) {
+        execSync(`npm uninstall ${pkgName}`, {
+          cwd: npmDir,
+          stdio: "pipe",
+          timeout: 60_000,
+        });
+      }
     } catch {
       // npm uninstall may fail if the package isn't actually installed
       // but we already cleaned the settings — best effort
@@ -607,6 +616,48 @@ function specToNpmRef(spec: string): string {
   }
   // Pass through as-is (bare package name, local path, etc.)
   return spec;
+}
+
+/**
+ * Given a pi install spec (npm:foo, git:github.com/user/repo, etc.),
+ * find the actual package name as stored in npm's package.json
+ * dependency key. Needed because git: specs get stored by their
+ * repo package.json name (e.g. "@user/repo") not the install shorthand.
+ *
+ * Returns the package name, or null if not found.
+ */
+function findInstalledPackageName(packageName: string): string | null {
+  try {
+    const npmPkgPath = npmPackagePath();
+    const npmPkg = JSON.parse(readFileSync(npmPkgPath, "utf-8"));
+    const deps: Record<string, string> = npmPkg.dependencies ?? {};
+
+    if (packageName.startsWith("npm:")) {
+      const bareName = packageName.slice(4);
+      if (deps[bareName] !== undefined) return bareName;
+      // Try scoped variants
+      if (deps[`@${bareName}`] !== undefined) return `@${bareName}`;
+      return null;
+    }
+
+    // Resolve to npm shorthand / URL for matching against dependency values
+    const npmRef = specToNpmRef(packageName);
+
+    // First try matching by dependency value (git: specs store the shorthand as value)
+    for (const [key, val] of Object.entries(deps)) {
+      if (val === npmRef) return key;
+      if (val.includes(npmRef)) return key;
+    }
+
+    // Fallback: try matching the key
+    for (const [key, val] of Object.entries(deps)) {
+      if (key === packageName || key === npmRef) return key;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
