@@ -3984,6 +3984,34 @@ body {
   background: rgba(248, 113, 113, 0.1);
 }
 
+/* ── Delete provider button ────────────────────────────────────────── */
+.settings-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+  background: rgba(248, 113, 113, 0.06);
+  color: var(--error);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.settings-btn-delete:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+
+.settings-btn-delete:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .settings-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -4039,6 +4067,20 @@ body {
   background: var(--bg-glass);
   color: var(--text-dim);
   border: 1px solid var(--border);
+}
+
+.settings-badge-custom {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  color: var(--warning);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.5;
 }
 
 .settings-details {

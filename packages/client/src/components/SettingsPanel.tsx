@@ -336,6 +336,9 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
                 <span className={`settings-badge ${configured ? "settings-badge-on" : "settings-badge-off"}`}>
                   {configured ? "key set" : "no key"}
                 </span>
+                {customProviders.has(p.provider) && (
+                  <span className="settings-badge-custom">models.json</span>
+                )}
                 {presence?.source !== undefined && (
                   <span className="text-xs text-dim">via {presence.source}</span>
                 )}
@@ -365,7 +368,7 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
                   <button
                     onClick={() => setRemovingProvider(p.provider)}
                     disabled={busy}
-                    className="settings-btn settings-btn-danger"
+                    className="settings-btn-delete"
                     title="Remove from models.json"
                   >
                     Delete provider
