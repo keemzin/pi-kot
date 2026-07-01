@@ -649,9 +649,29 @@ export async function getSessionModel(
   );
 }
 
+export interface ExecResponse {
+  exitCode: number | null;
+  output: string;
+  durationMs: number;
+  truncated: boolean;
+  cancelled: boolean;
+}
+
 export interface CompactSessionResponse {
   summary: string;
   tokensBefore: number;
+}
+
+export async function execCommand(
+  sessionId: string,
+  command: string,
+  opts?: { excludeFromContext?: boolean },
+): Promise<ExecResponse> {
+  return request<ExecResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/exec`,
+    { command, excludeFromContext: opts?.excludeFromContext },
+  );
 }
 
 export async function compactSession(
@@ -954,6 +974,27 @@ export interface ExtensionsResponse {
   detected: DiscoveredExtension[];
   recommended: RecommendedExtension[];
   agents: AgentDef[];
+}
+
+export interface CompleteFilesResponse {
+  paths: string[];
+}
+
+/**
+ * Fetch file path suggestions for the chat input's `@` autocomplete.
+ * Returns paths ranked so basename matches beat deep-path matches.
+ */
+export async function completeFiles(
+  projectId: string,
+  query: string,
+  opts?: { limit?: number },
+): Promise<CompleteFilesResponse> {
+  const qs = new URLSearchParams({ projectId, query });
+  if (opts?.limit !== undefined) qs.set("limit", String(opts.limit));
+  return request<CompleteFilesResponse>(
+    "GET",
+    `/api/v1/files/complete?${qs.toString()}`,
+  );
 }
 
 export async function fetchExtensions(): Promise<ExtensionsResponse> {

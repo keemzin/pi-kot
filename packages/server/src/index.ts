@@ -29,6 +29,7 @@ import { gitRoutes } from "./routes/git.js";
 import { mcpRoutes } from "./routes/mcp.js";
 import { skillRoutes } from "./routes/skills.js";
 import { terminalRoutes } from "./routes/terminal.js";
+import { execRoutes } from "./routes/exec.js";
 import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
@@ -152,6 +153,7 @@ export async function buildServer() {
       await api.register(mcpRoutes);
       await api.register(skillRoutes);
       await api.register(terminalRoutes);
+      await api.register(execRoutes);
     },
     { prefix: "/api/v1" },
   );

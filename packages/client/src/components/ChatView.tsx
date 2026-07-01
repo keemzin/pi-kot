@@ -20,6 +20,18 @@ import {
   type AssistantRenderSegment,
 } from "../lib/tool-call-pairing";
 
+/** Shape of a bash execution message from the SDK. */
+interface BashExecMessage {
+  role: "bashExecution";
+  command: string;
+  output: string;
+  exitCode: number | undefined;
+  cancelled: boolean;
+  truncated: boolean;
+  excludeFromContext?: boolean;
+  timestamp: number;
+}
+
 interface Props {
   sessionId: string;
   modelName?: string;
@@ -461,6 +473,72 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
   );
 }
 
+/* ── Bash execution bubble ── */
+
+function BashExecBubble({ msg }: { msg: BashExecMessage }) {
+  const [expanded, setExpanded] = useState(false);
+  const icon = msg.cancelled ? "⛔" : msg.exitCode === 0 ? "✅" : "❌";
+  const status = msg.cancelled
+    ? "cancelled"
+    : msg.exitCode === 0
+      ? "success"
+      : `exit ${msg.exitCode ?? "?"}`;
+  return (
+    <div className="message-row user">
+      <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)" }}>
+        <div className="bash-exec-header" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 6 }}>
+          <span style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--accent-text)" }}>
+            $ {msg.command}
+          </span>
+          <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>
+            {icon} {status}
+          </span>
+          {msg.excludeFromContext && (
+            <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: "var(--bg-subtle)", color: "var(--text-dim)" }}>
+              local only
+            </span>
+          )}
+        </div>
+        {msg.output.length > 0 && (
+          <>
+            {expanded || msg.output.length <= 500 ? (
+              <pre
+                style={{
+                  fontSize: 11,
+                  fontFamily: "monospace",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-all",
+                  margin: 0,
+                  color: "var(--text-primary)",
+                  maxHeight: 400,
+                  overflow: "auto",
+                }}
+              >
+                {msg.truncated ? msg.output + "\n…(truncated)" : msg.output}
+              </pre>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setExpanded(true)}
+                style={{
+                  fontSize: 11,
+                  color: "var(--accent-text)",
+                  cursor: "pointer",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                }}
+              >
+                Show output ({msg.output.length} chars)
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Token usage badge ── */
 
 function TokenUsageBadge({ msg }: {
@@ -842,6 +920,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {renderAssistantMsgs([m], i)}
           </div>);
         }
+      } else if (m.role === "bashExecution") {
+        // Bash execution messages (!cmd / !!cmd) render as standalone bubbles
+        flushTurn();
+        out.push(
+          <BashExecBubble key={`bash-${i}`} msg={m as unknown as BashExecMessage} />,
+        );
       }
     }
 

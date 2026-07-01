@@ -4,6 +4,8 @@ import { config } from "../config.js";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { expandFileReferences } from "../file-references.js";
+import { getProject } from "../project-manager.js";
 
 const ABORT_TIMEOUT_MS = 10_000;
 
@@ -157,8 +159,14 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
 
       let { text, streamingBehavior, images } = req.body;
 
+      // Expand @-file references before sending to the LLM
+      const project = await getProject(live.projectId);
+      if (project !== undefined) {
+        text = await expandFileReferences(text, project.path);
+      }
+
       // Save images to files if the model doesn't support vision natively
-      const transformed = await maybeSaveImagesToFiles(live.session.model, text, images);
+      let transformed = await maybeSaveImagesToFiles(live.session.model, text, images);
       text = transformed.text;
       images = transformed.images;
 
@@ -299,6 +307,12 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       let { text, mode, images } = req.body;
+
+      // Expand @-file references
+      const project = await getProject(live.projectId);
+      if (project !== undefined) {
+        text = await expandFileReferences(text, project.path);
+      }
 
       // Save images to files if the model doesn't support vision natively
       const transformed = await maybeSaveImagesToFiles(live.session.model, text, images);
