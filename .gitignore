@@ -1,11 +1,6 @@
 # Npm artifacts
 *.tgz
 
-# Pi-forge output directory (reference project)
-pi-forge/
-.playwright-mcp/
-tau/
-
 # Dependencies
 node_modules/
 .pnpm-store/
@@ -31,10 +26,6 @@ yarn-error.log*
 .env.local
 .env.*.local
 
-# Session / data dirs
-.pi/
-.pi-kot/
-WORKING/
 
 # OS files
 .DS_Store
@@ -68,16 +59,6 @@ nul
 .turbo/
 .eslintcache
 
-# Tau theme reference
-tau-ref/
-*.bak
-tau-ref/
-
-# OpenKot reference (explored for UX patterns)
-openkot-ref/
-
-# Pi SDK reference (full repo clone for SDK examples/docs)
-pi-ref/
 PUBLISH.md
 .kilo/kilo.json
 REF/
