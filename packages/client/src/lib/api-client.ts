@@ -600,6 +600,50 @@ export async function putModelsJson(
   return request("PUT", `/api/v1/config/models`, data);
 }
 
+// ---- Custom Provider Wizard ----
+
+export interface ProbeRequest {
+  baseUrl: string;
+  apiKey?: string;
+  apiType?: string;
+  headers?: Record<string, string>;
+}
+
+export interface ProbeResult {
+  reachable: boolean;
+  error?: string;
+  detectedApiType?: string;
+  suggestedName?: string;
+  models?: Array<{ id: string; name?: string }>;
+  rawResponse?: unknown;
+}
+
+export async function probeProvider(
+  req: ProbeRequest,
+): Promise<ProbeResult> {
+  return request<ProbeResult>("POST", "/api/v1/config/providers/probe", req);
+}
+
+export async function addCustomProvider(
+  providerName: string,
+  config: Record<string, unknown>,
+): Promise<{ providers: Record<string, unknown> }> {
+  return request<{ providers: Record<string, unknown> }>(
+    "POST",
+    "/api/v1/config/providers",
+    { providerName, config },
+  );
+}
+
+export async function removeCustomProvider(
+  providerName: string,
+): Promise<{ providers: Record<string, unknown> }> {
+  return request<{ providers: Record<string, unknown> }>(
+    "DELETE",
+    `/api/v1/config/providers/${encodeURIComponent(providerName)}`,
+  );
+}
+
 // ---- Enabled Models (scoped models) ----
 
 export interface EnabledModelsResponse {

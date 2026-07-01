@@ -11,6 +11,9 @@ import {
   readEnabledModels,
   writeEnabledModels,
   AuthProviderNotFoundError,
+  probeProvider,
+  addCustomProvider,
+  removeCustomProvider,
   type ModelsJson,
   type ProvidersListingOptions,
 } from "../config-manager.js";
@@ -264,6 +267,132 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         await writeModelsJson(req.body);
         return req.body;
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  // ── Probe provider endpoint ──────────────────────────────────────────
+  fastify.post<{ Body: { baseUrl: string; apiKey?: string; apiType?: string; headers?: Record<string, string> } }>(
+    "/config/providers/probe",
+    {
+      schema: {
+        description:
+          "Test connectivity to a provider endpoint, auto-detect API type, and fetch available models.",
+        tags: ["config"],
+        body: {
+          type: "object",
+          required: ["baseUrl"],
+          additionalProperties: false,
+          properties: {
+            baseUrl: { type: "string", minLength: 1 },
+            apiKey: { type: "string" },
+            apiType: { type: "string" },
+            headers: { type: "object", additionalProperties: { type: "string" } },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["reachable"],
+            properties: {
+              reachable: { type: "boolean" },
+              error: { type: "string" },
+              detectedApiType: { type: "string" },
+              suggestedName: { type: "string" },
+              models: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { id: { type: "string" }, name: { type: "string" } },
+                },
+              },
+            },
+          },
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const result = await probeProvider(req.body);
+        return result;
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  // ── Add custom provider to models.json ───────────────────────────────
+  fastify.post<{ Body: { providerName: string; config: Record<string, unknown> } }>(
+    "/config/providers",
+    {
+      schema: {
+        description:
+          "Add or update a custom provider in models.json.",
+        tags: ["config"],
+        body: {
+          type: "object",
+          required: ["providerName", "config"],
+          additionalProperties: false,
+          properties: {
+            providerName: { type: "string", minLength: 1 },
+            config: { type: "object" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["providers"],
+            properties: {
+              providers: { type: "object", additionalProperties: true },
+            },
+          },
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return await addCustomProvider(req.body.providerName, req.body.config);
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  // ── Remove custom provider from models.json ────────────────────────────
+  fastify.delete<{ Params: { providerName: string } }>(
+    "/config/providers/:providerName",
+    {
+      schema: {
+        description:
+          "Remove a custom provider from models.json.",
+        tags: ["config"],
+        params: {
+          type: "object",
+          required: ["providerName"],
+          properties: { providerName: { type: "string", minLength: 1 } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["providers"],
+            properties: {
+              providers: { type: "object", additionalProperties: true },
+            },
+          },
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return await removeCustomProvider(req.params.providerName);
       } catch (err) {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });

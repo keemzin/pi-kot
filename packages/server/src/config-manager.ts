@@ -15,6 +15,182 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { config } from "./config.js";
 
+// ── Provider Discovery / Probing ─────────────────────────────────────────
+
+interface ProbeRequest {
+  baseUrl: string;
+  apiKey?: string;
+  apiType?: string;
+  headers?: Record<string, string>;
+}
+
+interface ProbeResult {
+  reachable: boolean;
+  error?: string;
+  detectedApiType?: string;
+  models?: Array<{ id: string; name?: string }>;
+  suggestedName?: string;
+  /** Full response from the models endpoint for debugging */
+  rawResponse?: unknown;
+}
+
+/**
+ * Probe a provider endpoint to test connectivity, detect API type,
+ * and fetch available models.
+ */
+export async function probeProvider(req: ProbeRequest): Promise<ProbeResult> {
+  const baseUrl = req.baseUrl.replace(/\/+$/, "");
+
+  // Build headers
+  const headers: Record<string, string> = {
+    ...(req.headers ?? {}),
+  };
+  if (req.apiKey) {
+    headers["Authorization"] = `Bearer ${req.apiKey}`;
+  }
+
+  // Detect API type if not provided
+  const urlLower = baseUrl.toLowerCase();
+  const apiType =
+    req.apiType ??
+    (urlLower.includes("anthropic")
+      ? "anthropic-messages"
+      : urlLower.includes("google")
+        ? "google-generative-ai"
+        : "openai-completions");
+
+  // Try to fetch models — different endpoints per API type
+  let modelsEndpoint: string;
+  if (apiType === "google-generative-ai") {
+    // Google uses /v1beta/models or /v1/models
+    modelsEndpoint = baseUrl.endsWith("/v1beta") || baseUrl.endsWith("/v1")
+      ? `${baseUrl}/models`
+      : `${baseUrl}/v1beta/models`;
+  } else if (apiType === "anthropic-messages") {
+    // Anthropic doesn't have a public models endpoint — try common patterns
+    modelsEndpoint = `${baseUrl}/models`;
+  } else {
+    // OpenAI-compatible: /v1/models or /models
+    modelsEndpoint = baseUrl.endsWith("/v1")
+      ? `${baseUrl}/models`
+      : `${baseUrl}/v1/models`;
+  }
+
+  // First test basic connectivity
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const res = await fetch(modelsEndpoint, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      return {
+        reachable: false,
+        error: `HTTP ${res.status}: ${res.statusText}. Tried ${modelsEndpoint}`,
+        detectedApiType: apiType,
+      };
+    }
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    // Parse models from response
+    let models: Array<{ id: string; name?: string }> = [];
+
+    if (Array.isArray(body.data)) {
+      // OpenAI-compatible { data: [{ id, ... }] }
+      models = body.data.map((m: Record<string, unknown>) => ({
+        id: String(m.id ?? ""),
+        name: String(m.name ?? m.id ?? ""),
+      }));
+    } else if (Array.isArray(body.models)) {
+      // Google-style { models: [{ name, ... }] }
+      models = body.models.map((m: Record<string, unknown>) => {
+        const name = String(m.name ?? "");
+        const shortId = name.includes("/") ? name.split("/").pop() ?? name : name;
+        return { id: shortId, name };
+      });
+    }
+
+    // Filter out empty ids
+    models = models.filter((m) => m.id.length > 0);
+
+    // Derive a suggested provider name from the hostname
+    let suggestedName: string;
+    try {
+      const hostname = new URL(baseUrl).hostname;
+      suggestedName = hostname
+        .replace(/^api[.-]/, "")
+        .replace(/[.-]api$/, "")
+        .replace(/\./g, "-")
+        .replace(/[^a-zA-Z0-9_-]/g, "")
+        .toLowerCase()
+        .slice(0, 24) || "custom";
+    } catch {
+      suggestedName = "custom";
+    }
+
+    return {
+      reachable: true,
+      detectedApiType: apiType,
+      models,
+      suggestedName,
+      rawResponse: models.length > 0 ? undefined : body,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      reachable: false,
+      error: `Connection failed: ${message}`,
+      detectedApiType: apiType,
+    };
+  }
+}
+
+/**
+ * Add or update a custom provider in models.json.
+ */
+export async function addCustomProvider(
+  providerName: string,
+  config: Record<string, unknown>,
+): Promise<{ providers: Record<string, unknown> }> {
+  const current = await readModelsJsonRaw();
+  current.providers[providerName] = config;
+  await writeModelsJson(current);
+  return { providers: current.providers };
+}
+
+/**
+ * Remove a custom provider from models.json.
+ */
+export async function removeCustomProvider(
+  providerName: string,
+): Promise<{ providers: Record<string, unknown> }> {
+  const current = await readModelsJsonRaw();
+  delete current.providers[providerName];
+  await writeModelsJson(current);
+  return { providers: current.providers };
+}
+
+/**
+ * Read models.json raw (without redaction).
+ */
+async function readModelsJsonRaw(): Promise<ModelsJson> {
+  try {
+    const raw = await readFile(MODELS_PATH, "utf-8");
+    return JSON.parse(raw) as ModelsJson;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      return { providers: {} };
+    }
+    throw err;
+  }
+}
+
 // ── Paths ─────────────────────────────────────────────────────────────────
 
 const PI_CONFIG_DIR = config.piConfigDir;

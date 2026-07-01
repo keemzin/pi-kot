@@ -25,6 +25,7 @@ import { getSavedTheme, applyTheme, themes } from "../lib/theme";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { ExtensionsTab } from "./ExtensionsTab";
 import { SkillsTab } from "./SkillsTab";
+import { AddProviderDialog } from "./AddProviderDialog";
 
 type Tab = "appearance" | "providers" | "agent" | "general" | "extensions" | "skills";
 
@@ -222,6 +223,7 @@ function AppearanceTab() {
 function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void }) {
   const [providers, setProviders] = useState<ProvidersResponse | undefined>(undefined);
   const [auth, setAuth] = useState<AuthSummaryResponse | undefined>(undefined);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProvider, setEditingProvider] = useState<string | undefined>(undefined);
   const [keyDraft, setKeyDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -393,6 +395,27 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
           </div>
         );
       })}
+
+      <div className="add-provider-actions" style={{ marginTop: 16, marginBottom: 8 }}>
+        <button
+          onClick={() => setShowAddDialog(true)}
+          className="settings-btn settings-btn-primary"
+        >
+          + Add Custom Provider
+        </button>
+      </div>
+
+      <AddProviderDialog
+        open={showAddDialog}
+        onClose={() => {
+          setShowAddDialog(false);
+          void refresh();
+        }}
+        onError={onError}
+        onSaved={() => {
+          void refresh();
+        }}
+      />
 
       <div className="settings-raw-json">
         <button
