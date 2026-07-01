@@ -1,7 +1,7 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
 import { useSessionStore } from "../stores/session-store";
 import type { ImageContent } from "../lib/api-client";
-import { fetchSessionExtensions } from "../lib/api-client";
+import { fetchSessionExtensions, execCommand, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
@@ -31,10 +31,30 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const abort = useSessionStore((s) => s.abort);
+  const reloadMessages = useSessionStore((s) => s.reloadMessages);
   const [slashSuggestions, setSlashSuggestions] = useState<SlashCommand[]>([]);
   const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>([]);
   const [compacting, setCompacting] = useState(false);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
+
+  // ── @-autocomplete state ──
+  const project = useSessionStore((s) => {
+    if (s.activeProjectId === undefined) return undefined;
+    return s.projects.find((p) => p.id === s.activeProjectId);
+  });
+  const [acToken, setAcToken] = useState<{ start: number; end: number; query: string } | undefined>();
+  const [acSuggestions, setAcSuggestions] = useState<string[]>([]);
+  const [acSelectedIdx, setAcSelectedIdx] = useState(0);
+  const acFetchSeqRef = useRef(0);
+
+  // ── Bang mode (! / !!) ──
+  const bangMode: "context" | "local" | undefined = (() => {
+    if (isStreaming) return undefined;
+    const text = textareaRef.current?.value ?? "";
+    if (text.startsWith("!!")) return "local";
+    if (text.startsWith("!")) return "context";
+    return undefined;
+  })();
 
   // Auto-clear inline message after 2.5s
   useEffect(() => {
@@ -206,6 +226,74 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     }
   }, []);
 
+  // ── @-autocomplete logic ──
+
+  /** Find an @-token at the caret position, if any. */
+  const findAcToken = (value: string, caret: number): { start: number; end: number; query: string } | undefined => {
+    if (caret <= 0) return undefined;
+    let i = caret - 1;
+    while (i >= 0) {
+      const ch = value[i];
+      if (ch === undefined) break;
+      if (/\s/.test(ch)) return undefined;
+      if (ch === "@") {
+        const prev = i === 0 ? " " : value[i - 1];
+        if (prev === undefined || /\s/.test(prev)) {
+          return { start: i, end: caret, query: value.slice(i + 1, caret) };
+        }
+        return undefined; // email@example.com
+      }
+      i -= 1;
+    }
+    return undefined;
+  };
+
+  // Debounced fetch of @-completion suggestions
+  useEffect(() => {
+    if (acToken === undefined || project === undefined) return undefined;
+    const seq = acFetchSeqRef.current + 1;
+    acFetchSeqRef.current = seq;
+    const handle = window.setTimeout(() => {
+      completeFiles(project.id, acToken.query, { limit: 20 })
+        .then((r) => {
+          if (acFetchSeqRef.current !== seq) return; // stale
+          setAcSuggestions(r.paths);
+          setAcSelectedIdx(0);
+        })
+        .catch(() => {
+          if (acFetchSeqRef.current !== seq) return;
+          setAcSuggestions([]);
+        });
+    }, 100);
+    return () => window.clearTimeout(handle);
+  }, [acToken, project]);
+
+  /** Insert the highlighted suggestion in place of the partial token. */
+  const acInsert = (path: string): void => {
+    if (acToken === undefined) return;
+    const el = textareaRef.current;
+    if (el === null) return;
+    const before = el.value.slice(0, acToken.start);
+    const after = el.value.slice(acToken.end);
+    const replacement = `@"${path}"`;
+    const next = `${before}${replacement}${after}`;
+    el.value = next;
+    setAcToken(undefined);
+    setAcSuggestions([]);
+    // Move caret after the inserted path
+    const newCaret = acToken.start + replacement.length;
+    el.setSelectionRange(newCaret, newCaret);
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  };
+
+  const acClose = (): void => {
+    setAcToken(undefined);
+    setAcSuggestions([]);
+  };
+
+  // ── Submit handler ──
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const el = textareaRef.current;
@@ -213,9 +301,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     const text = el.value.trim();
     if (text.length === 0 && images.length === 0) return;
 
-    // Check if the input is a slash command — route through the command
-    // handler instead of sendPrompt. Otherwise the SDK executes the command
-    // silently and the GUI never sees the result.
+    // Check if the input is a slash command
     if (text.startsWith("/") && !isStreaming) {
       const trimmed = text.trim().toLowerCase();
       const matched = allSlashCommands.find((cmd) => cmd.name.startsWith(trimmed));
@@ -224,12 +310,37 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         el.style.height = "auto";
         setSlashSuggestions([]);
         setImages([]);
+        acClose();
         await matched.handler(sessionId);
         return;
       }
     }
 
-    // Convert images to SDK ImageContent[]
+    // ── Bash exec dispatch: !cmd / !!cmd ──
+    if (!isStreaming && /^!!?[^!]/.test(text)) {
+      const excludeFromContext = text.startsWith("!!");
+      const command = text.slice(excludeFromContext ? 2 : 1).trim();
+      if (command.length === 0) {
+        setCompactMessage("Empty bash command. Type something after the `!`.");
+        return;
+      }
+      el.value = "";
+      el.style.height = "auto";
+      setSlashSuggestions([]);
+      setImages([]);
+      acClose();
+
+      try {
+        await execCommand(sessionId, command, { excludeFromContext });
+        await reloadMessages(sessionId);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setCompactMessage(`Command failed: ${msg}`);
+      }
+      return;
+    }
+
+    // ── Convert images to SDK ImageContent[] ──
     let imageContents: ImageContent[] | undefined;
     if (images.length > 0) {
       imageContents = await Promise.all(
@@ -244,10 +355,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.value = "";
     el.style.height = "auto";
     setSlashSuggestions([]);
+    acClose();
 
-    // Keep blob URLs alive for optimistic display; they get cleaned up
-    // when ChatInput unmounts (existing useEffect). Clear state so the
-    // preview thumbnails disappear but the optimistic message still works.
+    // Keep blob URLs alive for optimistic display
     setImages([]);
 
     if (isStreaming) {
@@ -257,7 +367,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -270,8 +380,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
 
-    // Detect slash commands — match against both builtin and extension commands
     const text = el.value;
+
+    // ── Detect slash commands ──
     if (text.startsWith("/")) {
       const trimmed = text.trim().toLowerCase();
       const matched = allSlashCommands.filter((cmd) => cmd.name.startsWith(trimmed));
@@ -279,7 +390,16 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     } else {
       setSlashSuggestions([]);
     }
-  }, [extensionCommands, allSlashCommands]);
+
+    // ── Detect @-autocomplete token ──
+    const caret = el.selectionStart;
+    if (caret !== undefined && !isStreaming) {
+      const token = findAcToken(text, caret);
+      setAcToken(token);
+    } else {
+      acClose();
+    }
+  }, [extensionCommands, allSlashCommands, isStreaming]);
 
   const handleSlashCommand = async (cmd: SlashCommand) => {
     const el = textareaRef.current;
@@ -287,6 +407,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.value = "";
     el.style.height = "auto";
     setSlashSuggestions([]);
+    acClose();
     setCompacting(true);
     try {
       await cmd.handler(sessionId);
@@ -341,6 +462,72 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
           </div>
         )}
 
+        {/* @-completion popover — anchored above the textarea */}
+        {acToken !== undefined && acSuggestions.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              marginBottom: 4,
+              overflow: "hidden",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
+              background: "var(--bg-frosted)",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+            }}
+          >
+            <div
+              style={{
+                maxHeight: "60vh",
+                overflowY: "auto",
+                padding: "4px 0",
+              }}
+            >
+              {acSuggestions.map((path, i) => (
+                <button
+                  key={path}
+                  onMouseDown={(ev) => {
+                    ev.preventDefault();
+                    acInsert(path);
+                  }}
+                  onMouseEnter={() => setAcSelectedIdx(i)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    padding: "6px 12px",
+                    textAlign: "left",
+                    fontFamily: "monospace",
+                    fontSize: 12,
+                    border: "none",
+                    cursor: "pointer",
+                    background: i === acSelectedIdx ? "var(--accent-bg, var(--bg-glass-active))" : "transparent",
+                    color: i === acSelectedIdx ? "var(--text-primary)" : "var(--text-secondary)",
+                  }}
+                  title={path}
+                >
+                  {path}
+                </button>
+              ))}
+            </div>
+            <div
+              style={{
+                borderTop: "1px solid var(--border)",
+                padding: "4px 12px",
+                fontSize: 10,
+                color: "var(--text-dim)",
+              }}
+            >
+              ↑↓ navigate · Enter/Tab insert · Esc close
+            </div>
+          </div>
+        )}
+
         {/* Image preview thumbnails */}
         {images.length > 0 && (
           <div className="ti-image-preview-row">
@@ -366,7 +553,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         <textarea
           ref={textareaRef}
           className="ti-input"
-          onKeyDown={handleKeyDown}
+          onKeyDown={onKeyDown}
           onPaste={handlePaste}
           onInput={handleInput}
           placeholder={
@@ -374,7 +561,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               ? "Compacting…"
               : isStreaming
                 ? "Steer the agent…"
-                : "Send a message... (/compact, /abort)"
+                : "Send a message... (/compact, /abort, !cmd, @file)"
           }
           disabled={compacting}
           rows={1}
@@ -382,6 +569,28 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
         <div className="ti-toolbar">
           <div className="ti-toolbar-left">
+            {/* Bang mode indicator */}
+            {bangMode !== undefined && (
+              <span
+                style={{
+                  fontSize: 10,
+                  color: bangMode === "local" ? "var(--accent-text)" : "var(--text-secondary)",
+                  padding: "0 6px",
+                  fontFamily: "monospace",
+                  letterSpacing: "0.5px",
+                  textTransform: "uppercase",
+                  opacity: 0.7,
+                }}
+                title={
+                  bangMode === "local"
+                    ? "!! — bash runs locally, output stays out of LLM context"
+                    : "! — bash runs, output feeds into next LLM turn"
+                }
+              >
+                {bangMode === "local" ? "!! local" : "! context"}
+              </span>
+            )}
+
             {/* Image attach button */}
             <button
               type="button"
@@ -417,8 +626,6 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" style={{ fill: showOrch ? "currentColor" : "none" }} />
               </svg>
             </button>
-
-            {/* MCP moved to header bar */}
           </div>
 
           <div className="ti-toolbar-right">
