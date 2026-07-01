@@ -18,6 +18,7 @@ import {
   setEnabledModels as saveEnabledModels,
   getVersions,
   checkSdkUpdate,
+  removeCustomProvider,
   type ProvidersResponse,
   type AuthSummaryResponse,
 } from "../lib/api-client";
@@ -26,6 +27,7 @@ import { usePreferencesStore } from "../stores/preferences-store";
 import { ExtensionsTab } from "./ExtensionsTab";
 import { SkillsTab } from "./SkillsTab";
 import { AddProviderDialog } from "./AddProviderDialog";
+import { ConfirmDialog } from "./Modal";
 
 type Tab = "appearance" | "providers" | "agent" | "general" | "extensions" | "skills";
 
@@ -224,6 +226,8 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
   const [providers, setProviders] = useState<ProvidersResponse | undefined>(undefined);
   const [auth, setAuth] = useState<AuthSummaryResponse | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [customProviders, setCustomProviders] = useState<Set<string>>(new Set());
+  const [removingProvider, setRemovingProvider] = useState<string | undefined>(undefined);
   const [editingProvider, setEditingProvider] = useState<string | undefined>(undefined);
   const [keyDraft, setKeyDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -234,9 +238,17 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
   const refresh = async (): Promise<void> => {
     onError(undefined);
     try {
-      const [p, a] = await Promise.all([fetchProviders(), getAuthSummary()]);
+      const [p, a, m] = await Promise.all([
+        fetchProviders(),
+        getAuthSummary(),
+        getModelsJson(),
+      ]);
       setProviders(p);
       setAuth(a);
+      // Identify providers that come from models.json (custom).
+      // Built-in providers won't appear in the keys of models.json's providers.
+      const custom = new Set(Object.keys(m.providers));
+      setCustomProviders(custom);
     } catch (err) {
       onError(`Failed to load providers: ${errorMsg(err)}`);
     }
@@ -349,6 +361,16 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
                     Remove
                   </button>
                 )}
+                {customProviders.has(p.provider) && !editing && (
+                  <button
+                    onClick={() => setRemovingProvider(p.provider)}
+                    disabled={busy}
+                    className="settings-btn settings-btn-danger"
+                    title="Remove from models.json"
+                  >
+                    Delete provider
+                  </button>
+                )}
               </div>
             </div>
             {editing && (
@@ -415,6 +437,29 @@ function ProvidersTab({ onError }: { onError: (msg: string | undefined) => void 
         onSaved={() => {
           void refresh();
         }}
+      />
+
+      <ConfirmDialog
+        open={removingProvider !== undefined}
+        onClose={() => setRemovingProvider(undefined)}
+        onConfirm={async () => {
+          const name = removingProvider;
+          setRemovingProvider(undefined);
+          if (name === undefined) return;
+          setBusy(true);
+          try {
+            await removeCustomProvider(name);
+            await refresh();
+          } catch (err) {
+            onError(`Remove failed: ${errorMsg(err)}`);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        title="Delete provider"
+        message={`Remove "${removingProvider ?? ""}" from models.json? This can be undone by adding it again.`}
+        primaryLabel="Delete"
+        tone="danger"
       />
 
       <div className="settings-raw-json">
