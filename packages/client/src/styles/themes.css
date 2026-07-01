@@ -2554,6 +2554,8 @@ body {
 .assistant-msg-footer {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
   padding: 0;
   margin-top: 2px;
   margin-bottom: 8px;

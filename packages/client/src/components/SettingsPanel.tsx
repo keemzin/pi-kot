@@ -134,6 +134,8 @@ function AppearanceTab() {
   const [current, setCurrent] = useState(() => getSavedTheme());
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
   const setStickyUserHeader = usePreferencesStore((s) => s.setStickyUserHeader);
+  const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
+  const setShowTokenUsage = usePreferencesStore((s) => s.setShowTokenUsage);
 
   const select = (id: string) => {
     setCurrent(id);
@@ -181,6 +183,34 @@ function AppearanceTab() {
           />
           Sticky user header — pin your message at the top while scrolling
           through the assistant&rsquo;s reply
+        </label>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            userSelect: "none",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showTokenUsage}
+            onChange={(e) => setShowTokenUsage(e.target.checked)}
+            style={{
+              width: 16,
+              height: 16,
+              accentColor: "var(--accent-text)",
+              cursor: "pointer",
+            }}
+          />
+          Show token usage — display input/output/cached tokens on each assistant message
         </label>
       </div>
     </div>

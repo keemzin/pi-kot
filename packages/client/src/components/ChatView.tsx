@@ -461,6 +461,33 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
   );
 }
 
+/* ── Token usage badge ── */
+
+function TokenUsageBadge({ msg }: {
+  msg?: Record<string, unknown>;
+}) {
+  const usage = msg?.usage as { input?: number; output?: number; cacheRead?: number } | undefined;
+  const input = usage?.input;
+  const output = usage?.output;
+  const cacheRead = usage?.cacheRead;
+
+  if (input == null && output == null && !(cacheRead && cacheRead > 0)) return null;
+
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      {input != null && (
+        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↑ {input.toLocaleString()} in</span>
+      )}
+      {output != null && (
+        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↓ {output.toLocaleString()} out</span>
+      )}
+      {cacheRead && cacheRead > 0 && (
+        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>⚡ {cacheRead.toLocaleString()} cached</span>
+      )}
+    </span>
+  );
+}
+
 /* ── Rewind button ── */
 
 function RewindMsgButton({ sessionId }: { sessionId: string }) {
@@ -535,6 +562,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const { rewind: rewindAvailable } = useExtensions();
 
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
+  const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
@@ -730,6 +758,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
+                {showTokenUsage && <TokenUsageBadge msg={lastAssistantMsg} />}
                 <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
               </div>
             )}
@@ -765,6 +794,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           out.push(
             <div key={`turn-${currentUserIdx}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
+              {showTokenUsage && <TokenUsageBadge msg={lastAssistantMsg} />}
               <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
             </div>,
           );
