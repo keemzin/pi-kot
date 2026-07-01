@@ -487,14 +487,14 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
     <div className="message-row user">
       <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)" }}>
         <div className="bash-exec-header" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 6 }}>
-          <span style={{ fontFamily: "monospace", fontWeight: 600, color: "var(--accent-text)" }}>
+          <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
             $ {msg.command}
           </span>
-          <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>
+          <span style={{ fontSize: 10, opacity: 0.65 }}>
             {icon} {status}
           </span>
           {msg.excludeFromContext && (
-            <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: "var(--bg-subtle)", color: "var(--text-dim)" }}>
+            <span style={{ fontSize: 9, padding: "0 4px", borderRadius: 3, background: "var(--bg-subtle)", opacity: 0.5 }}>
               local only
             </span>
           )}
@@ -509,7 +509,6 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-all",
                   margin: 0,
-                  color: "var(--text-primary)",
                   maxHeight: 400,
                   overflow: "auto",
                 }}
@@ -522,8 +521,8 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
                 onClick={() => setExpanded(true)}
                 style={{
                   fontSize: 11,
-                  color: "var(--accent-text)",
                   cursor: "pointer",
+                  opacity: 0.7,
                   background: "none",
                   border: "none",
                   padding: 0,
