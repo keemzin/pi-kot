@@ -476,7 +476,8 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 /* ── Bash execution bubble ── */
 
 function BashExecBubble({ msg }: { msg: BashExecMessage }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(msg.output.length <= 500);
+  const hasOutput = msg.output.length > 0;
   const icon = msg.cancelled ? "⛔" : msg.exitCode === 0 ? "✅" : "❌";
   const status = msg.cancelled
     ? "cancelled"
@@ -485,8 +486,26 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
       : `exit ${msg.exitCode ?? "?"}`;
   return (
     <div className="message-row user">
-      <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)" }}>
-        <div className="bash-exec-header" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, marginBottom: 6 }}>
+      <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)", maxWidth: "100%" }}>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => hasOutput && setExpanded((v) => !v)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hasOutput && setExpanded((v) => !v); } }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 12,
+            cursor: hasOutput ? "pointer" : "default",
+            userSelect: "none",
+          }}
+        >
+          {hasOutput && (
+            <span style={{ fontSize: 9, opacity: 0.5, width: 12, textAlign: "center", flexShrink: 0 }}>
+              {expanded ? "▾" : "▸"}
+            </span>
+          )}
           <span style={{ fontFamily: "monospace", fontWeight: 600 }}>
             $ {msg.command}
           </span>
@@ -498,40 +517,28 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
               local only
             </span>
           )}
+          {hasOutput && !expanded && (
+            <span style={{ fontSize: 9, opacity: 0.4, marginLeft: "auto" }}>
+              {msg.output.length < 1024
+                ? `${msg.output.length} B`
+                : `${(msg.output.length / 1024).toFixed(1)} KB`}
+            </span>
+          )}
         </div>
-        {msg.output.length > 0 && (
-          <>
-            {expanded || msg.output.length <= 500 ? (
-              <pre
-                style={{
-                  fontSize: 11,
-                  fontFamily: "monospace",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-all",
-                  margin: 0,
-                  maxHeight: 400,
-                  overflow: "auto",
-                }}
-              >
-                {msg.truncated ? msg.output + "\n…(truncated)" : msg.output}
-              </pre>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setExpanded(true)}
-                style={{
-                  fontSize: 11,
-                  cursor: "pointer",
-                  opacity: 0.7,
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                }}
-              >
-                Show output ({msg.output.length} chars)
-              </button>
-            )}
-          </>
+        {hasOutput && expanded && (
+          <pre
+            style={{
+              fontSize: 11,
+              fontFamily: "monospace",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              margin: "6px 0 0",
+              maxHeight: 400,
+              overflow: "auto",
+            }}
+          >
+            {msg.truncated ? msg.output + "\n…(truncated)" : msg.output}
+          </pre>
         )}
       </div>
     </div>
