@@ -107,6 +107,8 @@ export interface LiveSession {
   unsubscribe: () => void;
   /** The session name set via appendSessionInfo, if any. */
   name: string | undefined;
+  /** Abort handle for the currently executing !cmd / !!cmd stream. */
+  currentExecAbort: (() => void) | undefined;
 }
 
 const registry = new Map<string, LiveSession>();
@@ -261,6 +263,7 @@ export async function createSession(
     lastAgentStartIndex: undefined,
     unsubscribe: () => undefined,
     name: sessionManager.getSessionName(),
+    currentExecAbort: undefined,
   };
 
   // Wire the registry's event subscription
@@ -771,6 +774,7 @@ export async function resumeSessionById(
     lastAgentStartIndex: undefined,
     unsubscribe: () => undefined,
     name: sessionManager.getSessionName(),
+    currentExecAbort: undefined,
   };
 
   live.unsubscribe = session.subscribe((event: AgentSessionEvent) => {
@@ -879,6 +883,7 @@ export async function forkSession(
     lastAgentStartIndex: undefined,
     unsubscribe: () => undefined,
     name: forkedSM.getSessionName(),
+    currentExecAbort: undefined,
   };
 
   forkedLive.unsubscribe = session.subscribe((event: AgentSessionEvent) => {

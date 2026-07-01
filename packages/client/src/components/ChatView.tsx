@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, memo } from "react";
 import { Copy, Check, CornerUpLeft } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
-import { invokeExtensionCommand } from "../lib/api-client";
+import { invokeExtensionCommand, cancelExec } from "../lib/api-client";
 import type { CompactionEvent } from "../lib/api-client";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
@@ -475,15 +475,31 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 
 /* ── Bash execution bubble ── */
 
-function BashExecBubble({ msg }: { msg: BashExecMessage }) {
+function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: string }) {
   const [expanded, setExpanded] = useState(msg.output.length <= 500);
+  const isPending = (msg as unknown as Record<string, unknown>)._pendingExec === true;
+  const isRunning = isPending && msg.exitCode === undefined;
   const hasOutput = msg.output.length > 0;
-  const icon = msg.cancelled ? "⛔" : msg.exitCode === 0 ? "✅" : "❌";
-  const status = msg.cancelled
-    ? "cancelled"
-    : msg.exitCode === 0
-      ? "success"
-      : `exit ${msg.exitCode ?? "?"}`;
+
+  const isRunningRef = useRef(isRunning);
+  isRunningRef.current = isRunning;
+
+  let icon: string;
+  let status: string;
+  if (isRunning) {
+    icon = "⟳";
+    status = "running";
+  } else if (msg.cancelled) {
+    icon = "⛔";
+    status = "cancelled";
+  } else if (msg.exitCode === 0) {
+    icon = "✅";
+    status = "success";
+  } else {
+    icon = "❌";
+    status = `exit ${msg.exitCode ?? "?"}`;
+  }
+
   return (
     <div className="message-row user">
       <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)", maxWidth: "100%" }}>
@@ -517,7 +533,26 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
               local only
             </span>
           )}
-          {hasOutput && !expanded && (
+          {/* Cancel button on running exec */}
+          {isPending && isRunning && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); cancelExec(sessionId); }}
+              style={{
+                marginLeft: "auto",
+                background: "var(--bg-glass-active)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "1px 6px",
+                fontSize: 10,
+                cursor: "pointer",
+                color: "var(--text-secondary)",
+              }}
+            >
+              cancel
+            </button>
+          )}
+          {hasOutput && !expanded && !isRunning && (
             <span style={{ fontSize: 9, opacity: 0.4, marginLeft: "auto" }}>
               {msg.output.length < 1024
                 ? `${msg.output.length} B`
@@ -525,7 +560,24 @@ function BashExecBubble({ msg }: { msg: BashExecMessage }) {
             </span>
           )}
         </div>
-        {hasOutput && expanded && (
+        {isRunning && (
+          <pre
+            style={{
+              fontSize: 11,
+              fontFamily: "monospace",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-all",
+              margin: "6px 0 0",
+              maxHeight: 400,
+              overflow: "auto",
+              opacity: 0.85,
+            }}
+          >
+            {msg.output || ""}
+            <span style={{ animation: "blink 1s step-end infinite" }}>█</span>
+          </pre>
+        )}
+        {hasOutput && !isRunning && expanded && (
           <pre
             style={{
               fontSize: 11,
@@ -930,7 +982,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         // Bash execution messages (!cmd / !!cmd) render as standalone bubbles
         flushTurn();
         out.push(
-          <BashExecBubble key={`bash-${i}`} msg={m as unknown as BashExecMessage} />,
+          <BashExecBubble key={`bash-${i}`} msg={m as unknown as BashExecMessage} sessionId={sessionId} />,
         );
       }
     }

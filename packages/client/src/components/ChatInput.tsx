@@ -1,7 +1,7 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
 import { useSessionStore } from "../stores/session-store";
 import type { ImageContent } from "../lib/api-client";
-import { fetchSessionExtensions, execCommand, completeFiles } from "../lib/api-client";
+import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 
 interface Props {
@@ -316,7 +316,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       }
     }
 
-    // ── Bash exec dispatch: !cmd / !!cmd ──
+    // ── Bash exec dispatch: !cmd / !!cmd (streaming) ──
     if (!isStreaming && /^!!?[^!]/.test(text)) {
       const excludeFromContext = text.startsWith("!!");
       const command = text.slice(excludeFromContext ? 2 : 1).trim();
@@ -330,8 +330,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       setImages([]);
       acClose();
 
+      const { promise } = execCommandStream(sessionId, command, { excludeFromContext });
       try {
-        await execCommand(sessionId, command, { excludeFromContext });
+        await promise;
         await reloadMessages(sessionId);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

@@ -577,12 +577,74 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           case "extension_ui_input":
           case "extension_ui_notify":
           case "extension_ui_done": {
-            // Route extension UI bridge events to the dedicated store.
-            // This allows any React component to react to extension interactions
-            // without coupling SSE handling to specific component logic.
             useExtensionUIStore.getState().pushEvent(
               event as unknown as import("../stores/extension-ui-store").ExtensionUIEvent,
             );
+            break;
+          }
+          // ── Streaming exec events (!cmd / !!cmd live terminal) ──
+          case "exec_start": {
+            const { command, excludeFromContext } = event as unknown as {
+              command: string;
+              excludeFromContext: boolean;
+            };
+            // Push an optimistic bashExecution message that streams live
+            const optimisticMsg = {
+              role: "bashExecution",
+              command,
+              output: "",
+              exitCode: undefined as number | undefined, // undefined = running
+              cancelled: false,
+              truncated: false,
+              excludeFromContext,
+              timestamp: Date.now(),
+              _pendingExec: true, // marker for the UI to show cancel button
+            };
+            set((s) => ({
+              messages: [...s.messages, optimisticMsg],
+            }));
+            break;
+          }
+          case "exec_update": {
+            const { output } = event as unknown as { output: string };
+            set((s) => {
+              const msgs = [...s.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && (last as Record<string, unknown>)._pendingExec) {
+                (last as Record<string, unknown>).output = ((last as Record<string, unknown>).output as string ?? "") + output;
+              }
+              return { messages: msgs };
+            });
+            break;
+          }
+          case "exec_end": {
+            const { exitCode, output, error, cancelled: execCancelled } = event as unknown as {
+              exitCode: number | null;
+              output: string;
+              error?: string;
+              cancelled?: boolean;
+            };
+            set((s) => {
+              const msgs = [...s.messages];
+              const last = msgs[msgs.length - 1];
+              if (last && (last as Record<string, unknown>)._pendingExec) {
+                const m = last as Record<string, unknown>;
+                if (execCancelled) {
+                  m.cancelled = true;
+                  m.exitCode = exitCode; // null for killed process — fine, cancelled takes priority in UI
+                } else {
+                  m.exitCode = exitCode;
+                  m.cancelled = false;
+                }
+                m.output = error ? `${m.output as string}${output}\n\n[error] ${error}` : output;
+                m.truncated = false;
+              }
+              return { messages: msgs };
+            });
+            const sid = get().activeSessionId;
+            if (sid !== undefined) {
+              setTimeout(() => get().reloadMessages(sid), 500);
+            }
             break;
           }
         }

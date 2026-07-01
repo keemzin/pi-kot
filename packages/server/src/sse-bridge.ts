@@ -58,6 +58,10 @@ const ALLOWED_EVENT_TYPES = new Set([
   "snapshot",
   "ask_user_question",
   "ask_user_question_cancelled",
+  // Streaming exec events (!cmd / !!cmd live terminal feed)
+  "exec_start",
+  "exec_update",
+  "exec_end",
   // Extension UI bridge events
   "extension_ui_select",
   "extension_ui_confirm",

@@ -61,6 +61,7 @@ async function warmUpSession(
           lastAgentStartIndex: undefined,
           unsubscribe: () => undefined,
           name: sm.getSessionName(),
+          currentExecAbort: undefined,
         };
 
         // Wire event subscription

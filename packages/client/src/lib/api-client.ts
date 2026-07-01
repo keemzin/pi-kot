@@ -718,6 +718,53 @@ export async function execCommand(
   );
 }
 
+export function execCommandStream(
+  sessionId: string,
+  command: string,
+  opts?: { excludeFromContext?: boolean },
+): { promise: Promise<ExecResponse>; abort: () => void } {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const abortController = new AbortController();
+  const promise = fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/exec-stream`,
+    {
+      method: "POST",
+      headers,
+      signal: abortController.signal,
+      body: JSON.stringify({ command, excludeFromContext: opts?.excludeFromContext }),
+    },
+  ).then(async (res) => {
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `exec-stream failed: ${res.status}`);
+    }
+    return res.json() as Promise<ExecResponse>;
+  });
+  return {
+    promise,
+    abort: () => abortController.abort(),
+  };
+}
+
+/**
+ * Cancel the currently running streaming exec command for a session.
+ */
+export async function cancelExec(sessionId: string): Promise<void> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  // Send a body so Fastify doesn't wait for one
+  const res = await fetch(
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/exec-cancel`,
+    { method: "POST", headers, body: "{}" },
+  );
+  if (!res.ok) {
+    console.warn("cancelExec failed:", res.status);
+  }
+}
+
 export async function compactSession(
   sessionId: string,
   customInstructions?: string,
