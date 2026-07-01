@@ -32,7 +32,7 @@
  *   --help / -h
  *   --version / -v
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { homedir } from "node:os";
@@ -109,9 +109,11 @@ for (let i = 0; i < args.length; i++) {
 
 // ── Bootstrap ────────────────────────────────────────────────────────────────
 
-// Override CLIENT_DIST_PATH so the server finds the client in the flat
-// published layout (dist/client/) rather than the in-repo relative path.
-process.env.CLIENT_DIST_PATH ??= resolve(packageRoot, "dist", "client");
+// Only override CLIENT_DIST_PATH in the flat published layout.
+// In the monorepo (packages/client/dist exists), config.ts's default path is correct.
+if (!existsSync(resolve(packageRoot, "packages", "client", "dist"))) {
+  process.env.CLIENT_DIST_PATH ??= resolve(packageRoot, "dist", "client");
+}
 process.env.NODE_ENV ??= "production";
 
 // Auto-mount the current working directory as a project if it's not the
@@ -131,6 +133,16 @@ const displayHost = host === "0.0.0.0" ? "localhost" : host;
 process.stdout.write(`pi-kot v${pkg.version} starting on http://${displayHost}:${port}\n`);
 
 // Import and start the server
-const serverEntry = resolve(packageRoot, "dist", "server", "index.js");
+// Monorepo: packages/server/dist/index.js
+// Published: dist/server/index.js
+const monorepoEntry = resolve(packageRoot, "packages", "server", "dist", "index.js");
+const publishedEntry = resolve(packageRoot, "dist", "server", "index.js");
+const serverEntry = existsSync(monorepoEntry) ? monorepoEntry :
+                    existsSync(publishedEntry) ? publishedEntry :
+                    null;
+if (!serverEntry) {
+  process.stderr.write("pi-kot: cannot find server entry point\n");
+  process.exit(1);
+}
 const { start } = await import(pathToFileURL(serverEntry).href);
 await start();

@@ -76,6 +76,7 @@ export function App() {
 
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -315,6 +316,7 @@ export function App() {
   useEffect(() => {
     const unsub = onUnauthorized(() => {
       setPassword("");
+      setLoginError(undefined);
       setAuthRequired(true);
     });
     return unsub;
@@ -323,6 +325,7 @@ export function App() {
   const handleClearToken = useCallback(() => {
     clearStoredToken();
     setPassword("");
+    setLoginError(undefined);
     setAuthRequired(true);
   }, []);
 
@@ -337,10 +340,11 @@ export function App() {
   const handleLogin = async () => {
     try {
       await login(password);
+      setLoginError(undefined);
       setAuthRequired(false);
       await loadProjects();
     } catch {
-      setPassword("");
+      setLoginError("Invalid password");
     }
   };
 
@@ -414,11 +418,13 @@ export function App() {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); setLoginError(undefined); }}
             placeholder="Enter password"
             autoFocus
-            className="login-input"
+            autoComplete="new-password"
+            className={`login-input${loginError ? " login-input-error" : ""}`}
           />
+          {loginError && <div className="login-error">{loginError}</div>}
           <button type="submit" className="login-btn">Login</button>
           <button
             type="button"

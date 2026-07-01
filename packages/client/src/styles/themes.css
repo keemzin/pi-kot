@@ -3236,6 +3236,21 @@ body {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+.login-input-error {
+  border-color: var(--accent-red, #e06c75) !important;
+}
+
+.login-input-error:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-red, #e06c75) 40%, transparent) !important;
+}
+
+.login-error {
+  color: var(--accent-red, #e06c75);
+  font-size: 12px;
+  margin: -4px 0 0;
+  line-height: 1.4;
+}
+
 .login-btn {
   padding: 10px;
   border-radius: var(--radius-md);
