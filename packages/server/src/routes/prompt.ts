@@ -5,6 +5,8 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
+const ABORT_TIMEOUT_MS = 10_000;
+
 const VISION_TEMP_DIR = "/tmp/pi-kot-vision";
 
 /** SDK-compatible ImageContent shape (matches @earendil-works/pi-ai's ImageContent). */
@@ -226,9 +228,21 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "session_not_found" });
       }
       try {
-        await live.session.abort();
-      } catch {
-        // best-effort
+        // Fire the abort signal immediately, then wait for the agent to
+        // become idle with a timeout. The SDK's session.abort() calls
+        // agent.abort() (fires the AbortController) and then awaits
+        // agent.waitForIdle(). If an MCP tool (e.g. ctx_execute) is
+        // in-flight, the abort signal propagates to the MCP client, but
+        // waitForIdle() may hang if the transport doesn't reject the
+        // pending call in time. A timeout ensures the route returns to
+        // the client promptly — the agent loop will clean up in the
+        // background.
+        await withTimeout(live.session.abort(), ABORT_TIMEOUT_MS, "session.abort");
+      } catch (err) {
+        if (err instanceof TimeoutError) {
+          req.log.warn({ sessionId: req.params.id }, "abort timed out after " + ABORT_TIMEOUT_MS + "ms");
+        }
+        // best-effort — abort signal was already fired
       }
       return { aborted: true };
     },
@@ -305,3 +319,29 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 };
+
+/**
+ * Wrap a Promise in a timeout.
+ * Pattern from control.ts withTimeout.
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new TimeoutError(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TimeoutError";
+  }
+}
+
