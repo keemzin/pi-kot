@@ -767,7 +767,11 @@ export function App() {
             />
             <button
               type="button"
-              onClick={() => setExplorerTab(explorerTab === "files" ? undefined : "files")}
+              onClick={() => {
+              const opening = explorerTab === undefined;
+              setExplorerTab(explorerTab === "files" ? undefined : "files");
+              if (opening) setSidebarCollapsed(true);
+            }}
               title="File explorer"
               style={{
                 background: "none",
@@ -784,7 +788,7 @@ export function App() {
             </button>
             <button
               type="button"
-              onClick={() => setShowTerminal(true)}
+              onClick={() => { setShowTerminal(true); setSidebarCollapsed(true); }}
               title="Terminal"
               style={{
                 background: "none",
