@@ -21,7 +21,7 @@ export function Modal({
   onClose,
   title,
   children,
-  width = "max-w-sm",
+  width,
   initialFocusRef,
 }: {
   open: boolean;
@@ -128,7 +128,7 @@ export function Modal({
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="modal-overlay"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -136,20 +136,21 @@ export function Modal({
     >
       <div
         ref={dialogRef}
-        className={`w-full ${width} rounded-lg border border-neutral-800 bg-neutral-900 shadow-xl`}
+        className="modal-dialog"
+        style={width !== undefined ? { maxWidth: width } : undefined}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-neutral-800 px-4 py-2">
-          <h2 id={titleId} className="text-sm font-medium text-neutral-100">
+        <header className="modal-header">
+          <h2 id={titleId} className="modal-title">
             {title}
           </h2>
           <button
             onClick={onClose}
-            className="rounded p-2 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
+            className="modal-close-btn"
             title="Close (Esc)"
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </header>
         {children}
@@ -205,31 +206,31 @@ export function PromptDialog({
           e.preventDefault();
           submit();
         }}
-        className="flex flex-col gap-3 px-4 py-3"
+        className="prompt-form modal-body"
       >
-        <label className="block space-y-1.5">
-          <span className="text-xs text-neutral-300">{label}</span>
+        <label className="prompt-label">
+          <span className="prompt-label-text">{label}</span>
           <input
             ref={inputRef}
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
-            className="w-full rounded-md border border-neutral-700 bg-neutral-950 px-3 py-1.5 text-sm text-neutral-100 outline-none focus:border-neutral-500"
+            className="prompt-input"
           />
         </label>
-        <footer className="flex justify-end gap-2 pt-1">
+        <footer className="confirm-footer">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+            className="confirm-btn-cancel"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={trimmed.length === 0}
-            className="rounded-md bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+            className="confirm-btn-primary"
           >
             {primaryLabel}
           </button>
@@ -263,24 +264,20 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      <div className="flex flex-col gap-3 px-4 py-3">
-        <p className="text-xs text-neutral-300">{message}</p>
-        <footer className="flex justify-end gap-2 pt-1">
+      <div className="modal-body">
+        <p className="confirm-message">{message}</p>
+        <footer className="confirm-footer">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-200 hover:bg-neutral-800"
+            className="confirm-btn-cancel"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className={
-              tone === "danger"
-                ? "rounded-md bg-red-700 px-3 py-1 text-xs font-medium text-red-50 hover:bg-red-600"
-                : "rounded-md bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-900 hover:bg-white"
-            }
+            className={tone === "danger" ? "confirm-btn-danger" : "confirm-btn-primary"}
           >
             {primaryLabel}
           </button>
