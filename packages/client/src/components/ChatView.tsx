@@ -480,6 +480,10 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
   const [cancelling, setCancelling] = useState(false);
   const [cancelFailed, setCancelFailed] = useState(false);
 
+  const isPending = (msg as unknown as Record<string, unknown>)._pendingExec === true;
+  const isRunning = isPending && msg.exitCode === undefined;
+  const hasOutput = msg.output.length > 0;
+
   // Auto-expand when command transitions from running → finished.
   // On fresh mount (page refresh/reloadMessages), stays collapsed.
   const wasRunning = useRef(isRunning);
@@ -501,9 +505,6 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
     }, 3000);
     return () => clearTimeout(timeout);
   }, [cancelling]);
-  const isPending = (msg as unknown as Record<string, unknown>)._pendingExec === true;
-  const isRunning = isPending && msg.exitCode === undefined;
-  const hasOutput = msg.output.length > 0;
 
   let icon: string;
   let status: string;
