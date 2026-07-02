@@ -480,6 +480,16 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
   const [cancelling, setCancelling] = useState(false);
   const [cancelFailed, setCancelFailed] = useState(false);
 
+  // Auto-expand when command transitions from running → finished.
+  // On fresh mount (page refresh/reloadMessages), stays collapsed.
+  const wasRunning = useRef(isRunning);
+  useEffect(() => {
+    if (wasRunning.current && !isRunning) {
+      setExpanded(true);
+    }
+    wasRunning.current = isRunning;
+  }, [isRunning]);
+
   // Safety timeout: if we've been in cancelling state for 3s without
   // the command actually stopping (no exec_end SSE), force-show an
   // error so the user isn't stuck forever.
