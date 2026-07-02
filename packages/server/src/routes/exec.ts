@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
 import type { FastifyPluginAsync } from "fastify";
 import type { BashOperations } from "@earendil-works/pi-coding-agent";
 import { errorSchema } from "./_schemas.js";
@@ -43,6 +43,7 @@ function createBashOps(
   return {
     exec: (command, _cwd, options) => {
       return new Promise<{ exitCode: number | null }>((resolve, reject) => {
+        const isWin = process.platform === "win32";
         const proc = spawn(shellConfig.shell, shellConfig.argsTemplate(command), {
           cwd: workspacePath,
           env: {
@@ -50,25 +51,52 @@ function createBashOps(
             PI_API_KEY: undefined,
           },
           stdio: ["ignore", "pipe", "pipe"],
-          // Detach so the shell+command become their own process group.
-          // Killing the group leader with a negative PID terminates
-          // ALL descendants (ping, long-running tools, etc.), not just
-          // the shell wrapper.
-          detached: true,
+          // On Unix: detach so the shell+command become their own
+          // process group. Killing the group leader with a negative
+          // PID terminates ALL descendants (ping, long-running tools,
+          // etc.), not just the shell wrapper.
+          // On Windows: detached:true would create a new console window
+          // AND disconnect stdout/stderr pipes from the parent (so the
+          // SDK never receives any output). We skip detached on Windows
+          // and fall back to proc.kill() directly.
+          detached: !isWin,
+          windowsHide: true,
         });
 
         const kill = (): void => {
-          const pgid = proc.pid;
-          if (pgid === undefined) return;
-          try {
-            // Negative PID = signal the entire process group
-            process.kill(-pgid, "SIGTERM");
-          } catch { /* best-effort (process may already be dead) */ }
-          setTimeout(() => {
+          if (isWin) {
+            // Windows: use execSync for taskkill so the command runs
+            // to completion (synchronously) before we proceed. The
+            // async spawn() path lets the orphan process survive.
+            try { proc.kill("SIGTERM"); } catch {}
             try {
-              process.kill(-pgid, "SIGKILL");
-            } catch { /* best-effort */ }
-          }, 2000);
+              execSync(`taskkill /F /T /PID ${proc.pid!} 2>nul`, {
+                windowsHide: true,
+                timeout: 5000,
+              });
+            } catch {}
+            setTimeout(() => {
+              try { proc.kill("SIGKILL"); } catch {}
+              try {
+                execSync(`taskkill /F /T /PID ${proc.pid!} 2>nul`, {
+                  windowsHide: true,
+                  timeout: 5000,
+                });
+              } catch {}
+            }, 2000);
+          } else {
+            // Unix: process group kill via negative PID
+            const pgid = proc.pid;
+            if (pgid === undefined) return;
+            try {
+              process.kill(-pgid, "SIGTERM");
+            } catch {}
+            setTimeout(() => {
+              try {
+                process.kill(-pgid, "SIGKILL");
+              } catch {}
+            }, 2000);
+          }
         };
 
         const signal = options.signal ?? timeoutSignal;
@@ -243,6 +271,8 @@ export const execRoutes: FastifyPluginAsync = async (fastify) => {
       const workspacePath = live.workspacePath;
       const timeoutController = new AbortController();
       const timer = setTimeout(() => timeoutController.abort(), DEFAULT_TIMEOUT_MS);
+      let execReject: ((err: Error) => void) | undefined;
+      let cancelTimer: ReturnType<typeof setTimeout> | undefined;
 
       try {
         // Send exec_start to SSE
@@ -256,14 +286,6 @@ export const execRoutes: FastifyPluginAsync = async (fastify) => {
             });
           } catch { /* best-effort */ }
         });
-
-        // Register cancel: shorten the timeout to 1s instead of 30s.
-        // This uses the exact same mechanism that the 30s timeout uses
-        // (which we know works), just with a shorter duration.
-        live.currentExecAbort = () => {
-          clearTimeout(timer);
-          setTimeout(() => timeoutController.abort(), 1000);
-        };
 
         // Run the command with a wrapper that fans stdout chunks to SSE.
         const baseOps = createBashOps(workspacePath, timeoutController.signal);
@@ -285,9 +307,40 @@ export const execRoutes: FastifyPluginAsync = async (fastify) => {
             return baseOps.exec(cmd, cwd, options);
           },
         };
-        const result = await live.session.executeBash(command, undefined, {
+
+        // ── Cancel / abort handling ──
+        //
+        // Three-layer strategy, in order:
+        //   1. abortBash()   — SDK's official bash abort
+        //   2. taskkill /F/T — brute-force process tree kill
+        //   3. Force reject  — if the process genuinely won't die
+        //      (antivirus / permissions / Win quirk), a 3s
+        //      fallback promise rejects so the route handler can
+        //      send exec_end and return immediately.
+        //
+        live.currentExecAbort = () => {
+          // Layer 1: SDK abort (aborts _bashAbortController signal)
+          try { live.session.abortBash(); } catch {}
+          // Layer 2: timeout abort (triggers kill() via AbortSignal)
+          try { timeoutController.abort(); } catch {}
+          // Layer 3: force-reject after 3s if process won't die
+          cancelTimer = setTimeout(() => {
+            execReject?.(new Error("exec cancel timed out — process may still be alive"));
+          }, 3000);
+        };
+
+        // Race executeBash against the cancel fallback
+        const execPromise = live.session.executeBash(command, undefined, {
           excludeFromContext,
           operations: streamingOps,
+        });
+        const result = await new Promise<
+          Awaited<typeof execPromise>
+        >((resolve, reject) => {
+          execReject = reject;
+          execPromise.then(resolve).catch(reject);
+        }).finally(() => {
+          clearTimeout(cancelTimer);
         });
 
         const durationMs = Date.now() - started;
@@ -341,6 +394,7 @@ export const execRoutes: FastifyPluginAsync = async (fastify) => {
         });
       } finally {
         clearTimeout(timer);
+        clearTimeout(cancelTimer);
         live.currentExecAbort = undefined;
       }
     },

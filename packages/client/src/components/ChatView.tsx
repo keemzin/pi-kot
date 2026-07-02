@@ -476,22 +476,39 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 /* ── Bash execution bubble ── */
 
 function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: string }) {
-  const [expanded, setExpanded] = useState(msg.output.length <= 500);
+  const [expanded, setExpanded] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelFailed, setCancelFailed] = useState(false);
+
+  // Safety timeout: if we've been in cancelling state for 3s without
+  // the command actually stopping (no exec_end SSE), force-show an
+  // error so the user isn't stuck forever.
+  useEffect(() => {
+    if (!cancelling) return;
+    const timeout = setTimeout(() => {
+      setCancelling(false);
+      setCancelFailed(true);
+    }, 3000);
+    return () => clearTimeout(timeout);
+  }, [cancelling]);
   const isPending = (msg as unknown as Record<string, unknown>)._pendingExec === true;
   const isRunning = isPending && msg.exitCode === undefined;
   const hasOutput = msg.output.length > 0;
 
-  const isRunningRef = useRef(isRunning);
-  isRunningRef.current = isRunning;
-
   let icon: string;
   let status: string;
-  if (isRunning) {
-    icon = "⟳";
-    status = "running";
-  } else if (msg.cancelled) {
+  if (msg.cancelled) {
     icon = "⛔";
     status = "cancelled";
+  } else if (cancelFailed) {
+    icon = "⚠️";
+    status = "cancel timed out";
+  } else if (cancelling) {
+    icon = "⏳";
+    status = "cancelling…";
+  } else if (isRunning) {
+    icon = "⟳";
+    status = "running";
   } else if (msg.exitCode === 0) {
     icon = "✅";
     status = "success";
@@ -504,20 +521,20 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
     <div className="message-row user">
       <div className="message-bubble user" style={{ borderLeft: "3px solid var(--accent-text)", maxWidth: "100%" }}>
         <div
-          role="button"
-          tabIndex={0}
-          onClick={() => hasOutput && setExpanded((v) => !v)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); hasOutput && setExpanded((v) => !v); } }}
+          role={hasOutput ? "button" : undefined}
+          tabIndex={hasOutput ? 0 : undefined}
+          onClick={() => { if (!isRunning && hasOutput) setExpanded((v) => !v); }}
+          onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !isRunning && hasOutput) { e.preventDefault(); setExpanded((v) => !v); } }}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 6,
             fontSize: 12,
-            cursor: hasOutput ? "pointer" : "default",
+            cursor: hasOutput && !isRunning ? "pointer" : "default",
             userSelect: "none",
           }}
         >
-          {hasOutput && (
+          {hasOutput && !isRunning && (
             <span style={{ fontSize: 9, opacity: 0.5, width: 12, textAlign: "center", flexShrink: 0 }}>
               {expanded ? "▾" : "▸"}
             </span>
@@ -534,10 +551,10 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
             </span>
           )}
           {/* Cancel button on running exec */}
-          {isPending && isRunning && (
+          {isPending && isRunning && !cancelling && (
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); cancelExec(sessionId); }}
+              onClick={(e) => { e.stopPropagation(); setCancelling(true); cancelExec(sessionId); }}
               style={{
                 marginLeft: "auto",
                 background: "var(--bg-glass-active)",
@@ -552,6 +569,13 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
               cancel
             </button>
           )}
+          {/* Cancelling feedback while server shortens the timeout */}
+          {cancelling && isPending && (
+            <span style={{ fontSize: 9, opacity: 0.5, marginLeft: "auto" }}>
+              cancelling…
+            </span>
+          )}
+          {/* Byte size when collapsed */}
           {hasOutput && !expanded && !isRunning && (
             <span style={{ fontSize: 9, opacity: 0.4, marginLeft: "auto" }}>
               {msg.output.length < 1024
@@ -560,6 +584,7 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
             </span>
           )}
         </div>
+        {/* Live output — always visible when running */}
         {isRunning && (
           <pre
             style={{
@@ -577,7 +602,8 @@ function BashExecBubble({ msg, sessionId }: { msg: BashExecMessage; sessionId: s
             <span style={{ animation: "blink 1s step-end infinite" }}>█</span>
           </pre>
         )}
-        {hasOutput && !isRunning && expanded && (
+        {/* Final output — collapsible */}
+        {!isRunning && hasOutput && expanded && (
           <pre
             style={{
               fontSize: 11,
