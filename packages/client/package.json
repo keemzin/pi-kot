@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsgo && vite build",
-    "check": "tsgo --noEmit"
+    "check": "tsgo --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -39,6 +40,7 @@
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "vitest": "^4.1.10",
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
     "zustand": "^5.0.3"

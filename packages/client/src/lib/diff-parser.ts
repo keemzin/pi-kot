@@ -17,7 +17,7 @@
  * single marker at the new-file line that took the deletion's slot.
  *
  * Pure function — no DOM, no async, no side effects. Easy to unit-test
- * (see `tests/test-diff-parser.ts`).
+ * (see `diff-parser.test.ts`).
  */
 
 export type DiffLineKind = "added" | "modified" | "deletedAbove";
@@ -34,7 +34,10 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
   if (diff.length === 0) return [];
   // newLine = the new-file line about to be processed when we hit a
   // ' ' (context) or '+' (addition). Set by every hunk header.
+  // Once a hunk is seen (seenHunk = true), processing continues even
+  // when newLine is 0, which happens for pure-deletion hunks (+0,0).
   let newLine = 0;
+  let seenHunk = false;
   // Counter of `-` lines waiting to be paired with `+` lines in the
   // same run. Reset whenever the run breaks (context line, or hunk
   // boundary, or end of file).
@@ -55,11 +58,12 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
   // Flush a pending-delete run as a single deletedAbove marker at the
   // current new-file line. Used at context boundaries, hunk
   // boundaries, and end of input. If we're past the last line of the
-  // file (deletion at EOF), the gutter renderer clamps to the last
-  // line — emit at newLine and let the consumer handle clamping.
+  // file (deletion at EOF) or the hunk was a pure deletion (+0,0),
+  // fall back to line 1 — the gutter renderer will clamp to the last
+  // remaining line.
   const flushPendingDeletes = (): void => {
     if (pendingDeletes === 0) return;
-    emit(newLine, "deletedAbove");
+    emit(newLine || 1, "deletedAbove");
     pendingDeletes = 0;
   };
 
@@ -71,6 +75,7 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
       // m[1] is the +newStart. Set newLine to the first new-file line
       // in this hunk; subsequent ' ' / '+' lines will increment it.
       newLine = Number.parseInt(m[1] ?? "0", 10);
+      seenHunk = true;
       pendingDeletes = 0;
       continue;
     }
@@ -81,11 +86,11 @@ export function parseUnifiedDiff(diff: string): DiffLine[] {
     }
     // Lines that aren't part of any hunk (file headers like
     // `diff --git`, `index`, `---`, `+++`, blank lines between
-    // multi-file diffs) appear before the first hunk header. Once
-    // newLine === 0 we know we haven't entered a hunk yet and should
-    // skip them all. After the first hunk, the only first-char prefixes
-    // we expect are space/+/-/@/\.
-    if (newLine === 0) continue;
+    // multi-file diffs) appear before the first hunk header. Before
+    // we've seen a hunk, newLine is 0 and we skip them. After the
+    // first hunk, even if newLine is 0 (pure-deletion hunk), we
+    // process the lines.
+    if (newLine === 0 && !seenHunk) continue;
     const prefix = raw.charAt(0);
     if (prefix === " ") {
       flushPendingDeletes();

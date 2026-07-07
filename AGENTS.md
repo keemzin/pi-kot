@@ -79,6 +79,38 @@ When in doubt: run code in ctx_execute, print only the answer.
 - **Still valid**: If the user says "store this in Qdrant" or "search Qdrant for...", use it. Otherwise ignore.
 - **Collection**: `pi-kot-codebase` if used.
 
+## 🧪 Testing Workflow (Vitest)
+
+Tests live alongside source files as `*.test.ts`. The test runner is Vitest.
+
+### Running tests
+```bash
+npm test                          # all workspaces
+npm -w packages/client test       # client only
+npm -w packages/server test       # server only
+npx vitest                        # watch mode — re-runs on save
+```
+
+### When to update tests
+| Situation | Action |
+|-----------|--------|
+| **Bug fix** | Add the test that would have caught the bug (regression guard) |
+| **New feature** | Add tests covering the new paths and edge cases |
+| **Refactor** (no behavior change) | Tests should pass unchanged. If they don't, you accidentally changed behavior |
+
+### Agent can handle tests
+Just ask: *"update the tests for this change"* or *"add tests for this new function"*. The agent writes them, runs them, and fixes any failures.
+
+### Example
+```bash
+# After changing a function:
+npm test          # 233ms — instant feedback
+# All green → good to commit
+# Red → fix before committing
+```
+
+---
+
 ## 💬 Communication Style
 - Keep responses short, technical, and direct. 
 - State your terminal or code action in exactly one sentence, then execute it. No fluff.

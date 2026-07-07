@@ -13,6 +13,7 @@
     "start": "node bin/pi-kot.mjs",
     "dev:server": "cross-env PIKOT_MODE=dev PORT=3332 npm run dev -w packages/server",
     "dev:client": "cross-env VITE_API_PORT=3332 npm run dev -w packages/client",
+    "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run check --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
