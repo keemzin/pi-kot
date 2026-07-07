@@ -34,7 +34,7 @@ function loadCompressImages(): boolean {
   }
 }
 
-interface PreferencesState {
+export interface PreferencesState {
   stickyUserHeader: boolean;
   setStickyUserHeader: (enabled: boolean) => void;
   showTokenUsage: boolean;

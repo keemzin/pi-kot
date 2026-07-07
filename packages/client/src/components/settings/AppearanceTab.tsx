@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
-import { getSavedTheme, applyTheme, themes } from "../lib/theme";
-import { usePreferencesStore } from "../stores/preferences-store";
+import { getSavedTheme, applyTheme, themes } from "../../lib/theme";
+import { usePreferencesStore, type PreferencesState } from "../../stores/preferences-store";
 
 export function AppearanceTab() {
   const [current, setCurrent] = useState(() => getSavedTheme());
-  const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
-  const setStickyUserHeader = usePreferencesStore((s) => s.setStickyUserHeader);
-  const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
-  const setShowTokenUsage = usePreferencesStore((s) => s.setShowTokenUsage);
-  const compressImages = usePreferencesStore((s) => s.compressImages);
-  const setCompressImages = usePreferencesStore((s) => s.setCompressImages);
+  const stickyUserHeader = usePreferencesStore((s: PreferencesState) => s.stickyUserHeader);
+  const setStickyUserHeader = usePreferencesStore((s: PreferencesState) => s.setStickyUserHeader);
+  const showTokenUsage = usePreferencesStore((s: PreferencesState) => s.showTokenUsage);
+  const setShowTokenUsage = usePreferencesStore((s: PreferencesState) => s.setShowTokenUsage);
+  const compressImages = usePreferencesStore((s: PreferencesState) => s.compressImages);
+  const setCompressImages = usePreferencesStore((s: PreferencesState) => s.setCompressImages);
 
   const select = (id: string) => {
     setCurrent(id);
