@@ -111,6 +111,25 @@ npm test          # 233ms — instant feedback
 
 ---
 
+## 📁 Modular Components Pattern
+
+Settings panels and other complex components live in `components/<name>/` with one file per tab/section. This keeps files small (<200 lines), makes each tab independently editable, and lets agents target specific files without reading unrelated code.
+
+```
+components/
+  SettingsPanel.tsx          ← shell (tabs + nav only)
+  settings/
+    shared.tsx               ← shared sub-components
+    AppearanceTab.tsx
+    ProvidersTab.tsx
+    AgentTab.tsx
+    GeneralTab.tsx
+```
+
+New tabs just drop in as new files — no need to modify the shell beyond adding the import and tab entry.
+
+---
+
 ## 💬 Communication Style
 - Keep responses short, technical, and direct. 
 - State your terminal or code action in exactly one sentence, then execute it. No fluff.
