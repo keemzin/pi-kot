@@ -698,4 +698,46 @@ function friendlySourceName(src: string): string {
       return { ok: true };
     },
   );
+
+  // ── UI Settings — persisted frontend preferences ───────────────────────
+  fastify.get(
+    "/config/ui-settings",
+    {
+      schema: {
+        description: "Read user-facing UI preferences (theme, toggles).",
+        tags: ["config"],
+        response: { 200: { type: "object" }, 500: errorSchema },
+      },
+    },
+    async (_req, reply) => {
+      try {
+        const { uiSettings } = await import("../ui-settings-store.js");
+        return uiSettings.read();
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
+
+  fastify.put<{ Body: Record<string, unknown> }>(
+    "/config/ui-settings",
+    {
+      schema: {
+        description: "Partial-update UI preferences (patch).",
+        tags: ["config"],
+        body: { type: "object" },
+        response: { 200: { type: "object" }, 500: errorSchema },
+      },
+    },
+    async (req, reply) => {
+      try {
+        const { uiSettings } = await import("../ui-settings-store.js");
+        return uiSettings.patch(req.body);
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
+    },
+  );
 };

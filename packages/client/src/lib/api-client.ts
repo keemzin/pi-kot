@@ -734,6 +734,17 @@ export async function updateSettings(
   return request<Record<string, unknown>>("PUT", "/api/v1/config/settings", patch);
 }
 
+/** UI preferences (theme, toggles) — persisted server-side */
+export async function getUiSettings(): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>("GET", "/api/v1/config/ui-settings");
+}
+
+export async function updateUiSettings(
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>("PUT", "/api/v1/config/ui-settings", patch);
+}
+
 export async function getModelsJson(): Promise<{ providers: Record<string, unknown> }> {
   return request("GET", "/api/v1/config/models");
 }

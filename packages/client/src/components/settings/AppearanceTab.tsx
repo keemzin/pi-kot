@@ -1,24 +1,113 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSavedTheme, applyTheme, themes } from "../../lib/theme";
-import { usePreferencesStore, type PreferencesState } from "../../stores/preferences-store";
+import {
+  usePreferencesStore,
+  type PreferencesState,
+} from "../../stores/preferences-store";
+import { getUiSettings, updateUiSettings } from "../../lib/api-client";
+
+type UiSettings = {
+  theme?: string;
+  stickyUserHeader?: boolean;
+  showTokenUsage?: boolean;
+  compressImages?: boolean;
+};
 
 export function AppearanceTab() {
   const [current, setCurrent] = useState(() => getSavedTheme());
-  const stickyUserHeader = usePreferencesStore((s: PreferencesState) => s.stickyUserHeader);
-  const setStickyUserHeader = usePreferencesStore((s: PreferencesState) => s.setStickyUserHeader);
-  const showTokenUsage = usePreferencesStore((s: PreferencesState) => s.showTokenUsage);
-  const setShowTokenUsage = usePreferencesStore((s: PreferencesState) => s.setShowTokenUsage);
-  const compressImages = usePreferencesStore((s: PreferencesState) => s.compressImages);
-  const setCompressImages = usePreferencesStore((s: PreferencesState) => s.setCompressImages);
+  const [serverSynced, setServerSynced] = useState(false);
+
+  const stickyUserHeader = usePreferencesStore(
+    (s: PreferencesState) => s.stickyUserHeader,
+  );
+  const setStickyUserHeader = usePreferencesStore(
+    (s: PreferencesState) => s.setStickyUserHeader,
+  );
+  const showTokenUsage = usePreferencesStore(
+    (s: PreferencesState) => s.showTokenUsage,
+  );
+  const setShowTokenUsage = usePreferencesStore(
+    (s: PreferencesState) => s.setShowTokenUsage,
+  );
+  const compressImages = usePreferencesStore(
+    (s: PreferencesState) => s.compressImages,
+  );
+  const setCompressImages = usePreferencesStore(
+    (s: PreferencesState) => s.setCompressImages,
+  );
+
+  // ── Load server-persisted settings on mount ────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    getUiSettings()
+      .then((server: UiSettings) => {
+        if (cancelled) return;
+        setServerSynced(true);
+
+        // Apply server theme if present
+        if (server.theme && server.theme !== current) {
+          setCurrent(server.theme);
+          applyTheme(server.theme);
+        }
+
+        // Apply server toggles (zustand handles localStorage sync)
+        if (typeof server.stickyUserHeader === "boolean") {
+          setStickyUserHeader(server.stickyUserHeader);
+        }
+        if (typeof server.showTokenUsage === "boolean") {
+          setShowTokenUsage(server.showTokenUsage);
+        }
+        if (typeof server.compressImages === "boolean") {
+          setCompressImages(server.compressImages);
+        }
+      })
+      .catch(() => {
+        // Server not available — fall back to localStorage/zustand (no-op)
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Persist both locally and server-side ────────────────────────────────
+  const persist = useCallback(
+    (patch: UiSettings) => {
+      // Fire-and-forget server sync (best-effort)
+      updateUiSettings(patch).catch(() => {});
+    },
+    [],
+  );
 
   const select = (id: string) => {
     setCurrent(id);
     applyTheme(id);
+    persist({ theme: id });
+  };
+
+  const handleStickyChange = (checked: boolean) => {
+    setStickyUserHeader(checked);
+    persist({ stickyUserHeader: checked });
+  };
+
+  const handleTokenUsageChange = (checked: boolean) => {
+    setShowTokenUsage(checked);
+    persist({ showTokenUsage: checked });
+  };
+
+  const handleCompressChange = (checked: boolean) => {
+    setCompressImages(checked);
+    persist({ compressImages: checked });
   };
 
   return (
     <div className="settings-fields">
-      <p className="settings-hint">Choose a theme. Saved to localStorage.</p>
+      <p className="settings-hint">
+        Choose a theme. 
+        {serverSynced
+          ? " Preferences saved server-side (survives cache clears)."
+          : " Server offline — saved locally only."}
+      </p>
       <div className="settings-theme-grid">
         {themes.map((t: { id: string; name: string }) => (
           <button
@@ -47,7 +136,7 @@ export function AppearanceTab() {
           <input
             type="checkbox"
             checked={stickyUserHeader}
-            onChange={(e) => setStickyUserHeader(e.target.checked)}
+            onChange={(e) => handleStickyChange(e.target.checked)}
             style={{
               width: 16,
               height: 16,
@@ -76,7 +165,7 @@ export function AppearanceTab() {
           <input
             type="checkbox"
             checked={showTokenUsage}
-            onChange={(e) => setShowTokenUsage(e.target.checked)}
+            onChange={(e) => handleTokenUsageChange(e.target.checked)}
             style={{
               width: 16,
               height: 16,
@@ -84,7 +173,8 @@ export function AppearanceTab() {
               cursor: "pointer",
             }}
           />
-          Show token usage — display input/output/cached tokens on each assistant message
+          Show token usage — display input/output/cached tokens on each
+          assistant message
         </label>
       </div>
 
@@ -104,7 +194,7 @@ export function AppearanceTab() {
           <input
             type="checkbox"
             checked={compressImages}
-            onChange={(e) => setCompressImages(e.target.checked)}
+            onChange={(e) => handleCompressChange(e.target.checked)}
             style={{
               width: 16,
               height: 16,
@@ -112,7 +202,8 @@ export function AppearanceTab() {
               cursor: "pointer",
             }}
           />
-          Compress images — downscale large images before sending (saves bandwidth, reduces token cost)
+          Compress images — downscale large images before sending (saves
+          bandwidth, reduces token cost)
         </label>
       </div>
     </div>
