@@ -1,6 +1,7 @@
 # pi-kot
 
-<img src="screenshot_placeholder_01.png" alt="pi-kot screenshot" width="800"/>
+<img width="2560" height="1440" alt="New Project" src="https://github.com/user-attachments/assets/fa6a4dd8-c61e-43e4-ba36-4b5bf2640745" />
+
 
 > A browser-based UI wrapper for the [pi coding agent](https://pi.dev)
 
