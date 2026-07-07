@@ -144,8 +144,11 @@ describe("splitAssistantToolSegments", () => {
     expect(segments).toHaveLength(1);
     expect(segments?.[0]?.kind).toBe("tools");
     expect(segments?.[0]?.entries).toHaveLength(1);
-    expect(segments?.[0]?.entries?.[0]?.kind).toBe("tool");
-    expect(segments?.[0]?.entries?.[0]?.result?.content).toBe("ok");
+    const entry = segments?.[0]?.entries?.[0];
+    expect(entry?.kind).toBe("tool");
+    if (entry?.kind === "tool") {
+      expect(entry?.result?.content).toBe("ok");
+    }
   });
 
   it("groups consecutive batchable tool calls", () => {
