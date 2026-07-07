@@ -27,6 +27,7 @@ This project was built out of **love and curiosity**.
 | **🖥️ Terminal** | Multi-tab xterm.js terminal with persistent PTY sessions, **touch gestures** (long-press+drag arrows, double-tap Tab, 3-finger paste), and a mobile quick-keys bar |
 | **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
 | **🔧 MCP Support** | Add, configure, and toggle MCP servers with a full settings UI |
+| **💾 Persistent UI Prefs** | Theme, sticky header, token usage toggle, and image compression — saved **server-side** in `~/.pi/agent/ui-settings.json`. Survives browser cache clears and device switches |
 | **🧩 Orchestration** | Multi-agent workflows — supervise sub-agents, delegate tasks, inspect results |
 | **🔐 Auth** | Password-based login, API key support, JWT sessions |
 | **📱 Mobile-friendly** | PWA-ready, adaptive layout, touch gestures, virtual keyboard support |
@@ -208,15 +209,15 @@ The Git panel shows the current repository's status — modified files, staged c
 
 Access settings via the **⚙** icon in the header.
 
-| Section | What you can configure |
+| Tab | What you can configure |
 |---|---|
-| **General** | Theme (light/dark), font size, model defaults, image compression toggle |
-| **Tunnel** | Tunnel provider install check, diagnostics, start/stop tunnel, copy public URL |
-| **MCP** | MCP server registry, tool enable/disable |
-| **Extensions** | Install/manage pi extensions — **install the recommended ones to unlock features** |
+| **Appearance** | Theme picker, sticky user header, show token usage, image compression — all **persisted server-side** |
+| **Providers** | View configured providers, add/remove API keys, add custom providers, raw models.json editor |
+| **Agent** | Default provider, default model, thinking level, model scope (hide unused models), orchestrator model |
+| **General** | Server & SDK versions, update check, reload page |
+| **Extensions ⚗️** | Install/manage pi extensions — **install the recommended ones to unlock features** |
 | **Skills** | Enable/disable agent skills |
-| **Auth** | Password change, API key management |
-| **About** | Version, credits, links |
+| **Tunnel 🚇** | Tunnel provider install check, diagnostics, start/stop tunnel, copy public URL |
 
 ### Image compression
 

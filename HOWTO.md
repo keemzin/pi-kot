@@ -273,15 +273,15 @@ The Git panel shows the current repository's status — modified files, staged c
 
 Access settings via the **⚙** icon in the header.
 
-| Section | What you can configure |
+| Tab | What you can configure |
 |---|---|
-| **General** | Theme (light/dark), font size, model defaults, image compression toggle |
-| **Tunnel** | Install check, diagnostics, start/stop tunnel, copy public URL |
-| **MCP** | MCP server registry, tool enable/disable |
-| **Extensions** | Install/manage pi extensions — **install the recommended ones to unlock features like revert & vision agent** |
+| **Appearance** | Theme picker, sticky user header, show token usage, image compression — all **persisted server-side** in `~/.pi/agent/ui-settings.json` so they survive browser cache clears |
+| **Providers** | View configured providers, add/remove API keys, add custom providers, raw models.json editor |
+| **Agent** | Default provider, default model, thinking level, model scope (hide unused models), orchestrator model |
+| **General** | Server & SDK versions, update check, reload page |
+| **Extensions ⚗️** | Install/manage pi extensions — **install the recommended ones to unlock features** |
 | **Skills** | Enable/disable agent skills |
-| **Auth** | Password change, API key management |
-| **About** | Version, credits, links |
+| **Tunnel 🚇** | Tunnel provider install check, diagnostics, start/stop tunnel, copy public URL |
 
 ---
 

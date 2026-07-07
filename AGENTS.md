@@ -128,6 +128,15 @@ components/
 
 New tabs just drop in as new files — no need to modify the shell beyond adding the import and tab entry.
 
+### Server-Side UI Settings Persistence
+
+UI preferences (theme, toggles) follow pi-web's pattern:
+- **`packages/server/src/ui-settings-store.ts`** — typed schema (`UiSettings`), atomic writes (`writeFile` + `rename`), cached reads, patch with normalization
+- **`GET/PUT /config/ui-settings`** — Fastify routes for read/patch
+- **`api-client.ts`** — `getUiSettings()` / `updateUiSettings()`
+- Settings saved to `~/.pi/agent/ui-settings.json`; falls back to localStorage when server is unreachable
+- Adding a new persisted preference: add property to `UiSettings` type + default in `DEFAULTS` + handler in `normalize()` — no route changes needed
+
 ---
 
 ## 💬 Communication Style
