@@ -34,5 +34,18 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("katex")) return "vendor-katex";
+          if (id.includes("@codemirror") || id.includes("codemirror")) return "vendor-codemirror";
+          if (id.includes("@xterm") || id.includes("xterm")) return "vendor-xterm";
+          if (id.includes("react-markdown") || id.includes("rehype-") || id.includes("remark-")) return "vendor-markdown";
+          if (id.includes("lucide-react")) return "vendor-icons";
+          if (id.includes("prism-react-renderer")) return "vendor-prism";
+        },
+      },
+    },
   },
 });
