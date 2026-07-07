@@ -1,0 +1,65 @@
+# Npm artifacts
+*.tgz
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+publish/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Windows reserved device name (accidentally created by tools/redirects)
+nul
+
+# Editor / IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Git worktrees (created by 'Try this commit' UI)
+.git-worktrees/
+
+# Temp / cache
+.tmp/
+.cache/
+.turbo/
+.eslintcache
+
+PUBLISH.md
+REF/
+refs/
+scripts/

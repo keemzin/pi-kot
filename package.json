@@ -1,0 +1,34 @@
+{
+  "name": "pi-kot-monorepo",
+  "version": "0.1.20",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "build:publish": "node scripts/build-publish-dir.mjs",
+    "dev": "cross-env PIKOT_MODE=dev PORT=3332 concurrently --kill-others \"cross-env PIKOT_MODE=dev PORT=3332 npm run dev -w packages/server\" \"wait-on tcp:3332 && cross-env PIKOT_MODE=dev VITE_API_PORT=3332 npm run dev -w packages/client\"",
+    "start": "node bin/pi-kot.mjs",
+    "dev:server": "cross-env PIKOT_MODE=dev PORT=3332 npm run dev -w packages/server",
+    "dev:client": "cross-env VITE_API_PORT=3332 npm run dev -w packages/client",
+    "typecheck": "npm run check --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@typescript/native-preview": "^7.0.0-dev.20260627.2",
+    "concurrently": "^10.0.0",
+    "cross-env": "^10.1.0",
+    "prettier": "^3.5.3",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "wait-on": "^9.0.10"
+  },
+  "dependencies": {
+    "@ayulab/pi-rewind": "^0.3.1",
+    "@earendil-works/pi-coding-agent": "^0.80.2"
+  }
+}
