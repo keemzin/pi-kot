@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 
-export type ExplorerTab = "files" | "git";
+export type ExplorerTab = "files" | "git" | "system-prompt";
 export type PanelName = "settings" | "mcp" | "terminal" | "tree" | "orch";
 
 export interface ViewerTab {

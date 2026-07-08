@@ -348,6 +348,26 @@ export async function deleteProjectAPI(
   );
 }
 
+export async function getProjectSystemPrompt(
+  projectId: string,
+): Promise<{ addendum: string }> {
+  return request<{ addendum: string }>(
+    "GET",
+    `/api/v1/projects/${encodeURIComponent(projectId)}/system-prompt`,
+  );
+}
+
+export async function setProjectSystemPrompt(
+  projectId: string,
+  addendum: string,
+): Promise<{ addendum: string }> {
+  return request<{ addendum: string }>(
+    "PUT",
+    `/api/v1/projects/${encodeURIComponent(projectId)}/system-prompt`,
+    { addendum },
+  );
+}
+
 // ---- Filesystem (browsing for Add Project dialog) ----
 
 export interface FsEntry {

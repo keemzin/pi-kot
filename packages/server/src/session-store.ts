@@ -12,11 +12,11 @@ import { createPlanModeQuestionTool } from "./ask-user-question/plan-mode-questi
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
+import { getProjectSystemPromptAddendum } from "./system-prompt-overrides.js";
 
 /**
- * Build a DefaultResourceLoader with pi-kot's always-on extensions.
- * Currently registers the compaction continuation extension that nudges
- * the model to keep working after an overflow-driven auto-compaction.
+ * Build a DefaultResourceLoader with pi-kot's always-on extensions and
+ * the project's system prompt addendum (if any).
  * Pass the result as `resourceLoader` to createAgentSession().
  *
  * Must call reload() before passing to the SDK so the loader is
@@ -25,11 +25,20 @@ import { isOrchestrationEnabled } from "./orchestration/config.js";
  */
 export async function buildResourceLoader(
   cwd: string,
+  projectId?: string,
 ): Promise<DefaultResourceLoader> {
+  const appendSystemPrompt: string[] = [];
+  if (projectId !== undefined) {
+    const addendum = await getProjectSystemPromptAddendum(projectId);
+    if (addendum.length > 0) {
+      appendSystemPrompt.push(addendum);
+    }
+  }
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: config.piConfigDir,
     extensionFactories: [compactionContinuationExtension],
+    appendSystemPrompt,
   });
   await loader.reload();
   return loader;
@@ -236,7 +245,7 @@ export async function createSession(
     ...orchestrationTools,
   ];
 
-  const resourceLoader = await buildResourceLoader(workspacePath);
+  const resourceLoader = await buildResourceLoader(workspacePath, projectId);
   const { session } = await createAgentSession({
     cwd: workspacePath,
     sessionManager,
@@ -580,7 +589,7 @@ export async function rebuildSessionTools(
   } catch { /* ignore */ }
 
   // Create new AgentSession with same SessionManager but updated tools
-  const resourceLoader = await buildResourceLoader(live.workspacePath);
+  const resourceLoader = await buildResourceLoader(live.workspacePath, live.projectId);
   const toolsAllowlist = await buildToolsAllowlist(
     customTools,
     live.projectId,
@@ -750,7 +759,7 @@ export async function resumeSessionById(
     ...orchestrationTools,
   ];
 
-  const resourceLoader = await buildResourceLoader(loc.workspacePath);
+  const resourceLoader = await buildResourceLoader(loc.workspacePath, loc.projectId);
   const { session } = await createAgentSession({
     cwd: loc.workspacePath,
     sessionManager,
@@ -860,7 +869,7 @@ export async function forkSession(
     ...orchestrationTools,
   ];
 
-  const resourceLoader = await buildResourceLoader(sourceLive.workspacePath);
+  const resourceLoader = await buildResourceLoader(sourceLive.workspacePath, sourceLive.projectId);
   const { session } = await createAgentSession({
     cwd: sourceLive.workspacePath,
     sessionManager: forkedSM,

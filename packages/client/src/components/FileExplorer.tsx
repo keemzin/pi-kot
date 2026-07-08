@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
+import { SystemPromptTab } from "./SystemPromptTab";
 import { ConfirmDialog } from "./Modal";
 import { FileEditor } from "./FileEditor";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
@@ -78,7 +79,7 @@ async function collectDroppedUploadFiles(dataTransfer: DataTransfer): Promise<Fi
   return files;
 }
 
-export type ExplorerTab = "files" | "git";
+export type ExplorerTab = "files" | "git" | "system-prompt";
 
 interface Props {
   projectId: string;
@@ -811,12 +812,30 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         >
           ⎇ Git
         </button>
+        <button
+          onClick={() => setTab("system-prompt")}
+          style={{
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
+            background: tab === "system-prompt" ? "var(--bg-solid)" : "transparent",
+            color: tab === "system-prompt" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "system-prompt" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          ✦ Prompt
+        </button>
 
       </div>
 
       {/* ── Git tab ── */}
       {tab === "git" && (
         <GitPanel projectId={projectId} />
+      )}
+
+      {/* ── System Prompt tab ── */}
+      {tab === "system-prompt" && (
+        <SystemPromptTab projectId={projectId} />
       )}
 
       {/* ── Files tab ── */}
