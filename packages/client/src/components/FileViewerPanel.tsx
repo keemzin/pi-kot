@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CodeMirrorEditor } from "./CodeMirrorEditor";
-import { RenderedView } from "./RenderedView";
+import { FileEditor } from "./FileEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
@@ -23,8 +22,6 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
-  const [wordWrap, setWordWrap] = useState(true);
-  const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [pendingConfirm, setPendingConfirm] = useState<
     { kind: "close-tab"; path: string; name: string } | { kind: "close-all" } | undefined
   >(undefined);
@@ -304,189 +301,19 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
               </div>
             ) : activeFile ? (
               <>
-                {/* Toolbar — just path + raw/rendered toggle */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "6px",
-                    padding: "3px 10px",
-                    fontSize: "10px",
-                    color: "var(--text-dim)",
-                    borderBottom: "1px solid var(--border)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      flex: 1,
-                    }}
-                    title={activeFile.path}
-                  >
-                    {activeFile.path}
-                  </span>
-
-                  {/* Raw / Rendered toggle */}
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: "1px",
-                      background: "var(--bg-glass)",
-                      borderRadius: "var(--radius-sm)",
-                      padding: "1px",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <button
-                      onClick={() => setEditorMode("raw")}
-                      style={{
-                        background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                        fontSize: "10px",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                      type="button"
-                    >
-                      Raw
-                    </button>
-                    <button
-                      onClick={() => setEditorMode("rendered")}
-                      style={{
-                        background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                        fontSize: "10px",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                      type="button"
-                    >
-                      Rendered
-                    </button>
-                  </div>
-
-                  {/* Wrap toggle — only in raw mode */}
-                  {editorMode === "raw" && (
-                    <button
-                      onClick={() => setWordWrap((w) => !w)}
-                      title="Toggle word wrap"
-                      style={{
-                        padding: "2px 6px",
-                        fontSize: "9px",
-                        fontWeight: 600,
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-sm)",
-                        background: wordWrap ? "var(--accent-bg)" : "transparent",
-                        color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                      }}
-                      type="button"
-                    >
-                      {wordWrap ? "wrap" : "no wrap"}
-                    </button>
-                  )}
-                </div>
-
                 {/* Editor body */}
-                {editorMode === "raw" ? (
-                  <CodeMirrorEditor
-                    key={`viewer-${activeFile.path}`}
-                    value={content}
-                    onChange={handleContentChange}
-                    onSave={handleSave}
-                    fileName={activeFile.name}
-                    wordWrap={wordWrap}
-                  />
-                ) : (
-                  <RenderedView
-                    content={content}
-                    fileName={activeFile.name}
-                  />
-                )}
-
-                {/* Status bar — language, wrap toggle, save status, save button */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                    padding: "2px 10px",
-                    fontSize: "10px",
-                    color: "var(--text-dim)",
-                    borderTop: "1px solid var(--border)",
-                    background: "var(--bg-glass)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {/* Left: language label */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {language && (
-                      <span
-                        style={{
-                          fontFamily: "var(--font-mono, monospace)",
-                          fontSize: "10px",
-                          color: "var(--text-dim)",
-                        }}
-                      >
-                        {language}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Right: status label + save button */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {/* Status label */}
-                    {(() => {
-                      if (saving) {
-                        return <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>Saving…</span>;
-                      }
-                      if (error) {
-                        return <span style={{ color: "var(--error, #e06c75)" }}>Save failed</span>;
-                      }
-                      if (isDirty) {
-                        return <span style={{ color: "var(--accent-text, #d19a66)" }}>Unsaved changes</span>;
-                      }
-                      if (savedAt) {
-                        return <span style={{ color: "#98c379" }}>Saved {savedAt.toLocaleTimeString()}</span>;
-                      }
-                      return <span>Up to date</span>;
-                    })()}
-
-                    <button
-                      onClick={handleSave}
-                      disabled={!isDirty || saving}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "3px",
-                        padding: "2px 8px",
-                        fontSize: "10px",
-                        fontWeight: 600,
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-sm)",
-                        background: isDirty ? "var(--accent-bg)" : "transparent",
-                        color: isDirty ? "var(--accent-text)" : "var(--text-dim)",
-                        cursor: isDirty && !saving ? "pointer" : "default",
-                        opacity: isDirty ? 1 : 0.5,
-                      }}
-                      type="button"
-                    >
-                      {saving ? "Saving…" : isDirty ? "Save" : "Saved"}
-                    </button>
-                  </div>
-                </div>
+                <FileEditor
+                  path={activeFile.path}
+                  fileName={activeFile.name}
+                  content={content}
+                  language={language}
+                  saving={saving}
+                  dirty={isDirty}
+                  onChange={handleContentChange}
+                  onSave={handleSave}
+                  savedAt={savedAt}
+                  error={error}
+                />
               </>
             ) : null}
           </div>

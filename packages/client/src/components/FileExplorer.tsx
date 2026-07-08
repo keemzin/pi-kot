@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
 import { ConfirmDialog } from "./Modal";
+import { FileEditor } from "./FileEditor";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
@@ -163,10 +163,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       if (initialTab === "files") setView("tree");
     }
   }, [initialTab]);
-  const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
-  const [wordWrap, setWordWrap] = useState(true);
   const [pendingCloseTab, setPendingCloseTab] = useState<string | undefined>(undefined);
-
   // ── Context menu for right-click / long-press ──
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -1168,130 +1165,23 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
           {/* Active editor */}
           {activeFile ? (
-            <>
-              {/* Editor toolbar */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px",
-                padding: "3px 10px", fontSize: "10px", color: "var(--text-dim)",
-                borderBottom: "1px solid var(--border)",
-              }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {activeFile.path}
-                </span>
-
-                {/* Raw / Rendered toggle */}
-                <div style={{
-                  display: "flex", gap: "1px",
-                  background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
-                  padding: "1px", flexShrink: 0,
-                }}>
-                  <button
-                    onClick={() => setEditorMode("raw")}
-                    style={{
-                      background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                      border: "none", cursor: "pointer",
-                      color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                      fontSize: "10px", fontWeight: 600,
-                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                    }}
-                    type="button"
-                  >
-                    Raw
-                  </button>
-                  <button
-                    onClick={() => setEditorMode("rendered")}
-                    style={{
-                      background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                      border: "none", cursor: "pointer",
-                      color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                      fontSize: "10px", fontWeight: 600,
-                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                    }}
-                    type="button"
-                  >
-                    Rendered
-                  </button>
-                </div>
-
-                {/* Word wrap toggle */}
-                {editorMode === "raw" && (
-                  <button
-                    onClick={() => setWordWrap((w) => !w)}
-                    title="Toggle word wrap"
-                    style={{
-                      padding: "2px 6px", fontSize: "9px", fontWeight: 600,
-                      border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                      background: wordWrap ? "var(--accent-bg)" : "transparent",
-                      color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
-                      cursor: "pointer", flexShrink: 0,
-                    }}
-                    type="button"
-                  >
-                    WRAP
-                  </button>
-                )}
-
-                <button
-                  onClick={handleSave}
-                  disabled={!activeFile.dirty || activeFile.saving}
-                  style={{
-                    padding: "2px 8px", fontSize: "10px", fontWeight: 600, flexShrink: 0,
-                    border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                    background: activeFile.dirty ? "var(--accent-bg)" : "transparent",
-                    color: activeFile.dirty ? "var(--accent-text)" : "var(--text-dim)",
-                    cursor: activeFile.dirty && !activeFile.saving ? "pointer" : "default",
-                  }}
-                  type="button"
-                >
-                  {activeFile.saving ? "Saving…" : activeFile.dirty ? "Save" : "Saved"}
-                </button>
-              </div>
-
-              {editorMode === "raw" ? (
-                <CodeMirrorEditor
-                  key={`editor-${activeFile.path}`}
-                  value={activeFile.content}
-                  onChange={(val) => handleContentChange(val)}
-                  onSave={handleSave}
-                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                  wordWrap={wordWrap}
-                />
-              ) : (
-                <RenderedView
-                  content={activeFile.content}
-                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                />
-              )}
-            </>
+            <FileEditor
+              path={activeFile.path}
+              fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+              content={activeFile.content}
+              language={activeFile.language}
+              saving={activeFile.saving}
+              dirty={activeFile.dirty}
+              onChange={handleContentChange}
+              onSave={handleSave}
+              error={error}
+            />
           ) : (
             <div style={{
               flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "12px", color: "var(--text-dim)",
             }}>
               No file selected
-            </div>
-          )}
-
-          {/* ── Status footer ── */}
-          {activeFile && (
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: "8px", padding: "2px 10px", fontSize: "10px",
-              color: "var(--text-dim)", borderTop: "1px solid var(--border)",
-              background: "var(--bg-glass)", flexShrink: 0,
-            }}>
-              <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "10px" }}>
-                {activeFile.language || ""}
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                {activeFile.saving ? (
-                  <span style={{ fontStyle: "italic" }}>Saving…</span>
-                ) : activeFile.dirty ? (
-                  <span style={{ color: "var(--accent-text, #d19a66)" }}>Unsaved changes</span>
-                ) : (
-                  <span>Up to date</span>
-                )}
-              </div>
             </div>
           )}
         </>
