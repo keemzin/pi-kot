@@ -48,8 +48,13 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
       .then((data) => {
         if (cancelled) return;
         const c = data.binary ? "(binary file)" : data.content ?? "";
-        setContent(c);
-        setSavedContent(c);
+        // CM6 always terminates documents with \n — normalize so
+        // the onChange callback doesn't fire after the sync sync
+        // effect, which would make content !== savedContent and
+        // mark a freshly opened file as dirty.
+        const normalized = c === "" || c.endsWith("\n") ? c : c + "\n";
+        setContent(normalized);
+        setSavedContent(normalized);
         setLanguage(data.language);
         setFileName(activeFile.name);
         setSavedAt(undefined);

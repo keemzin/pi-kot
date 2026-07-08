@@ -3,6 +3,7 @@ import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
+import { ConfirmDialog } from "./Modal";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
@@ -164,6 +165,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   }, [initialTab]);
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
+  const [pendingCloseTab, setPendingCloseTab] = useState<string | undefined>(undefined);
 
   // ── Context menu for right-click / long-press ──
   const [contextMenu, setContextMenu] = useState<{
@@ -408,7 +410,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
     try {
       const data = await filesRead(projectId, path);
-      const content = data.binary ? "(binary file)" : data.content ?? "";
+      const raw = data.binary ? "(binary file)" : data.content ?? "";
+      // CM6 always terminates documents with \n — normalize so the
+      // onChange callback doesn't fire on first render and mark a
+      // freshly opened file as dirty (same fix as FileViewerPanel).
+      const content = raw === "" || raw.endsWith("\n") ? raw : raw + "\n";
       setOpenFiles((prev) =>
         prev.map((f) =>
           f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
@@ -423,12 +429,29 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   }, [openFiles, activePath, projectId]);
 
   const handleTabClose = useCallback((path: string) => {
+    // Check if file is dirty before closing
+    const file = openFiles.find((f) => f.path === path);
+    if (file?.dirty) {
+      setPendingCloseTab(path);
+      return;
+    }
+
     setOpenFiles((prev) => prev.filter((f) => f.path !== path));
     setActivePath((prev) => {
       if (prev !== path) return prev;
       const remaining = openFiles.filter((f) => f.path !== path);
       return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
     });
+  }, [openFiles]);
+
+  const confirmTabClose = useCallback((path: string) => {
+    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
+    setActivePath((prev) => {
+      if (prev !== path) return prev;
+      const remaining = openFiles.filter((f) => f.path !== path);
+      return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
+    });
+    setPendingCloseTab(undefined);
   }, [openFiles]);
 
   const handleSave = async () => {
@@ -1248,6 +1271,29 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               No file selected
             </div>
           )}
+
+          {/* ── Status footer ── */}
+          {activeFile && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              gap: "8px", padding: "2px 10px", fontSize: "10px",
+              color: "var(--text-dim)", borderTop: "1px solid var(--border)",
+              background: "var(--bg-glass)", flexShrink: 0,
+            }}>
+              <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "10px" }}>
+                {activeFile.language || ""}
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {activeFile.saving ? (
+                  <span style={{ fontStyle: "italic" }}>Saving…</span>
+                ) : activeFile.dirty ? (
+                  <span style={{ color: "var(--accent-text, #d19a66)" }}>Unsaved changes</span>
+                ) : (
+                  <span>Up to date</span>
+                )}
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1407,6 +1453,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           </div>
         </>
       )}
+
+      {/* ── Unsaved changes confirmation dialog ── */}
+      <ConfirmDialog
+        open={pendingCloseTab !== undefined}
+        onClose={() => setPendingCloseTab(undefined)}
+        onConfirm={() => {
+          if (pendingCloseTab) confirmTabClose(pendingCloseTab);
+        }}
+        title="Unsaved changes"
+        message={`Close "${pendingCloseTab?.split("/").pop() ?? ""}"? Unsaved changes will be lost.`}
+        primaryLabel="Discard & close"
+        tone="danger"
+      />
     </div>
   );
 }

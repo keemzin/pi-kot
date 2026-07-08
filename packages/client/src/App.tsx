@@ -961,7 +961,7 @@ export function App() {
           </div>
 
           {/* File viewer — slides in when a file is opened */}
-          {activeProjectId !== undefined && !isMobile && (
+          {activeProjectId !== undefined && (
             <FileViewerPanel projectId={activeProjectId} />
           )}
 

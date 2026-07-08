@@ -85,7 +85,12 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   explorerTab: undefined,
   viewerTabs: [],
   viewerActivePath: undefined,
-  viewerWidth: VIEWER_DEFAULT_WIDTH,
+  // On mobile the 480px default overflows the screen — clamp to
+  // viewport minus a 40px gutter for the chat column.
+  viewerWidth:
+    typeof window !== "undefined" && window.innerWidth <= 600
+      ? Math.max(VIEWER_MIN_WIDTH, Math.min(VIEWER_DEFAULT_WIDTH, window.innerWidth - 40))
+      : VIEWER_DEFAULT_WIDTH,
   isMobile: typeof window !== "undefined" ? window.innerWidth <= 600 : false,
 
   /* ── Sidebar actions ── */
