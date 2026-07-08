@@ -696,12 +696,10 @@ strong {
   transform: translateX(0);
   will-change: transform;
   overflow: hidden;
-  box-shadow: 4px 0 32px rgba(0,0,0,0.18);
 }
 
 .sidebar.collapsed {
   transform: translateX(calc(var(--sidebar-width) * -1));
-  box-shadow: none;
 }
 
 /* ── Mobile sidebar polish ── */
@@ -709,58 +707,78 @@ strong {
   .sidebar {
     /* Start off-screen on mobile — user opens with burger */
     transform: translateX(calc(var(--sidebar-width) * -1));
-    box-shadow: none;
   }
 
   .sidebar:not(.collapsed) {
     transform: translateX(0);
-    box-shadow: 4px 0 48px rgba(0, 0, 0, 0.5);
   }
 
   /* Moderate touch targets for mobile */
   .session-item {
-    padding: 8px 12px !important;
-    font-size: 13px !important;
-    border-radius: var(--radius-xs) !important;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: var(--radius-xs);
   }
 
   .project-sublist .session-item {
-    padding: 6px 10px !important;
-    font-size: 12px !important;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 
   /* Project headers */
   .project-row {
-    padding: 6px 8px !important;
-    font-size: 13px !important;
+    padding: 6px 8px;
+    font-size: 13px;
   }
 
   /* Sidebar header */
   .sidebar-header {
-    padding: 12px 12px 8px !important;
-    font-size: 14px !important;
+    padding: 12px 12px 8px;
+    font-size: 14px;
   }
 
   /* Add project button */
   .add-project-toggle {
-    padding: 8px 10px !important;
-    font-size: 12px !important;
+    padding: 8px 10px;
+    font-size: 12px;
   }
 
   .new-session-mini {
-    padding: 6px 10px !important;
-    font-size: 12px !important;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }
 
 .sidebar-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 10px 12px 6px;
   font-weight: 700;
   font-size: 14px;
   color: var(--accent-text);
   letter-spacing: -0.02em;
+}
+
+/* Add project button in sidebar header */
+.sidebar-add-project {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.sidebar-add-project:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
 }
 
 /* ═══ Project Tree ═══ */
@@ -849,7 +867,7 @@ strong {
 /* Session items in project tree — compact, dense */
 .project-sublist .session-item {
   font-size: 12px;
-  padding: 3px 10px;
+  padding: 5px 12px;
   border-radius: var(--radius-xs);
   cursor: pointer;
   color: var(--text-secondary);
@@ -908,8 +926,10 @@ strong {
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 11px;
-  padding: 2px;
+  font-size: 12px;
+  padding: 2px 4px;
+  min-width: 20px;
+  min-height: 20px;
   border-radius: var(--radius-xs);
   line-height: 1;
   margin-left: auto;
@@ -938,8 +958,10 @@ strong {
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 11px;
-  padding: 0 2px;
+  font-size: 12px;
+  padding: 2px 4px;
+  min-width: 20px;
+  min-height: 20px;
   border-radius: var(--radius-xs);
   line-height: 1;
   flex-shrink: 0;
@@ -989,6 +1011,16 @@ strong {
   margin: 1px 10px 2px;
   background: var(--border);
   opacity: 0.3;
+}
+
+.session-item.archived {
+  opacity: 0.55;
+  font-style: italic;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.session-item.archived:hover {
+  opacity: 0.85;
 }
 
 /* Restore button on archived session items */
@@ -1081,6 +1113,16 @@ strong {
 .project-actions-right {
   display: flex;
   align-items: center;
+}
+
+/* New session (+) always faintly visible — no need to hover to discover */
+.project-actions-right .project-action-btn {
+  opacity: 0.35;
+  pointer-events: auto;
+}
+
+.project-row:hover .project-actions-right .project-action-btn {
+  opacity: 1;
 }
 
 .project-action-btn {

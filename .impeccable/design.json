@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-08T00:00:00.000Z",
+  "title": "Design System: pi-kot",
+  "extensions": {
+    "colorMeta": {
+      "bg-solid": { "role": "neutral-bg", "displayName": "Surface Solid", "canonical": "#212121", "tonalRamp": ["#0a0a0a", "#151515", "#212121", "#2a2a2a", "#353535", "#4a4a4a", "#666666", "#888888"] },
+      "bg-frosted": { "role": "surface", "displayName": "Surface Frosted", "canonical": "rgba(33,33,33,0.85)", "tonalRamp": [] },
+      "text-primary": { "role": "text", "displayName": "Text Primary", "canonical": "rgba(255,255,255,0.88)", "tonalRamp": [] },
+      "text-secondary": { "role": "text-secondary", "displayName": "Text Secondary", "canonical": "rgba(255,255,255,0.60)", "tonalRamp": [] },
+      "accent": { "role": "primary", "displayName": "Accent Gray", "canonical": "#a0a0a0", "tonalRamp": ["#555555", "#777777", "#999999", "#a0a0a0", "#aaaaaa", "#bbbbbb", "#cccccc", "#dddddd"] },
+      "accent-text": { "role": "primary-text", "displayName": "Accent Text", "canonical": "#c0c0c0", "tonalRamp": [] },
+      "border": { "role": "outline", "displayName": "Border Subtle", "canonical": "rgba(255,255,255,0.06)", "tonalRamp": [] },
+      "success": { "role": "positive", "displayName": "Success Green", "canonical": "#34d399", "tonalRamp": ["#0d7a5a", "#1aa87a", "#28c490", "#34d399", "#5ddbaf", "#86e3c8", "#afebdc", "#d8f3ec"] },
+      "error": { "role": "negative", "displayName": "Error Red", "canonical": "#f87171", "tonalRamp": ["#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fecaca", "#fecaca", "#fee2e2"] },
+      "warning": { "role": "caution", "displayName": "Warning Amber", "canonical": "#fbbf24", "tonalRamp": ["#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fde68a", "#fef3c7"] }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Body", "purpose": "Primary message content, settings descriptions, labels." },
+      "mono": { "displayName": "Mono", "purpose": "Code blocks, tool arguments, terminal, diffs, file paths." }
+    },
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default easing for state transitions." },
+      { "name": "ease-spring", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Bouncy overshoot for entrance animations." },
+      { "name": "duration-default", "value": "200ms", "purpose": "Standard transition time for most interactions." },
+      { "name": "blur-glass", "value": "24px", "purpose": "Backdrop blur strength for frosted panels." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "600px", "purpose": "Single column, full-width panels, stacked layout." },
+      { "name": "desktop", "value": "601px", "purpose": "Multi-panel layout with sidebar, chat, and optional panels." },
+      { "name": "sidebar-collapsed", "value": "48px", "purpose": "Icon-only sidebar mode before hover expansion." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Ghost/default button for non-primary actions in toolbars, settings, and inline controls.",
+      "html": "<button class=\"ds-btn-default\">Cancel</button>",
+      "css": ".ds-btn-default { padding: 6px 12px; border-radius: 6px; border: none; background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.88); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-default:hover { background: rgba(255,255,255,0.06); } .ds-btn-default:active { background: rgba(255,255,255,0.09); }"
+    },
+    {
+      "name": "Send Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Circular send button in the chat input toolbar.",
+      "html": "<button class=\"ds-btn-send\" aria-label=\"Send message\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#212121\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"22\" y1=\"2\" x2=\"11\" y2=\"13\"/><polygon points=\"22 2 15 22 11 13 2 9 22 2\"/></svg></button>",
+      "css": ".ds-btn-send { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.88); border: none; cursor: pointer; transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1); flex-shrink: 0; } .ds-btn-send:hover { background: #c0c0c0; transform: scale(1.05); } .ds-btn-send:active { transform: scale(0.95); } .ds-btn-send:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }"
+    },
+    {
+      "name": "Chat Input",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Multi-line text input for composing user messages to the agent.",
+      "html": "<textarea class=\"ds-input-chat\" placeholder=\"Send a message…\" rows=\"1\"></textarea>",
+      "css": ".ds-input-chat { width: 100%; padding: 0; background: transparent; border: none; color: rgba(255,255,255,0.88); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 14px; outline: none; resize: none; max-height: 160px; line-height: 1.5; } .ds-input-chat::placeholder { color: rgba(255,255,255,0.40); } .ds-input-chat:disabled { opacity: 0.4; cursor: not-allowed; }"
+    },
+    {
+      "name": "Tool Call Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "Collapsible card showing a tool execution — name, arg preview, status, and expandable detail pane.",
+      "html": "<details class=\"ds-tool-card\"><summary class=\"ds-tool-header\"><span class=\"ds-tool-icon\">⚡</span><span class=\"ds-tool-name\">bash</span><span class=\"ds-tool-arg\">npm run build</span><span class=\"ds-tool-status success\">✓ success</span><span class=\"ds-tool-toggle\">details</span></summary><div class=\"ds-tool-detail\"><div class=\"ds-tool-section-label\">input</div><pre class=\"ds-tool-code\">npm run build -- --production</pre><div class=\"ds-tool-section-label\">output</div><pre class=\"ds-tool-code\">Build completed successfully in 2.3s</pre></div></details>",
+      "css": ".ds-tool-card { border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); margin: 4px 0; overflow: hidden; } .ds-tool-header { display: flex; align-items: center; gap: 6px; padding: 8px 12px; cursor: pointer; color: #999; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 12px; user-select: none; } .ds-tool-header:hover { background: rgba(255,255,255,0.06); } .ds-tool-icon { font-size: 14px; } .ds-tool-name { font-weight: 600; color: #777; } .ds-tool-arg { color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; } .ds-tool-status.success { color: #34d399; margin-left: auto; } .ds-tool-status.error { color: #f87171; margin-left: auto; } .ds-tool-toggle { font-size: 11px; opacity: 0.5; } .ds-tool-detail { padding: 0 12px 8px; } .ds-tool-section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.40); margin: 6px 0 3px; } .ds-tool-code { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; color: rgba(255,255,255,0.88); background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; margin: 0; }"
+    },
+    {
+      "name": "User Message Bubble",
+      "kind": "card",
+      "refersTo": "user-bubble",
+      "description": "User's chat message rendered as a right-aligned bubble with optional image thumbnails.",
+      "html": "<div class=\"ds-user-msg\"><div class=\"ds-user-bubble\">Can you refactor the auth middleware to use the new session store?</div></div>",
+      "css": ".ds-user-msg { display: flex; flex-direction: row-reverse; gap: 8px; width: 100%; margin: 4px 0; } .ds-user-bubble { max-width: 75%; padding: 10px 16px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.88); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }"
+    },
+    {
+      "name": "Thinking Block",
+      "kind": "custom",
+      "refersTo": "thinking-block",
+      "description": "Collapsible accordion for the agent's internal reasoning trace.",
+      "html": "<details class=\"ds-thinking\"><summary class=\"ds-thinking-summary\">▸ Thinking…</summary><pre class=\"ds-thinking-content\">Let me analyze the request step by step. First, I need to understand the session store pattern they're using…</pre></details>",
+      "css": ".ds-thinking { margin: 4px 0; } .ds-thinking-summary { cursor: pointer; font-size: 12px; color: #888; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; user-select: none; padding: 4px 0; } .ds-thinking-summary:hover { color: #999; } .ds-thinking-content { font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace; font-size: 12px; line-height: 1.5; color: rgba(255,255,255,0.60); white-space: pre-wrap; word-break: break-word; margin: 4px 0; padding: 8px 12px; background: rgba(255,255,255,0.02); border-radius: 6px; }"
+    },
+    {
+      "name": "Settings Tab",
+      "kind": "nav",
+      "refersTo": "tab-nav",
+      "description": "Horizontal tab bar used in the settings slide-over panel.",
+      "html": "<nav class=\"ds-tab-bar\"><button class=\"ds-tab ds-tab-active\">General</button><button class=\"ds-tab\">Appearance</button><button class=\"ds-tab\">Providers</button><button class=\"ds-tab\">Agent</button></nav>",
+      "css": ".ds-tab-bar { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.06); padding: 0 16px; } .ds-tab { padding: 10px 16px; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.60); background: none; border: none; cursor: pointer; transition: color 200ms cubic-bezier(0.4, 0, 0.2, 1); border-bottom: 2px solid transparent; margin-bottom: -1px; } .ds-tab:hover { color: rgba(255,255,255,0.88); } .ds-tab-active { color: #c0c0c0; border-bottom-color: #a0a0a0; }"
+    },
+    {
+      "name": "Session Sidebar Item",
+      "kind": "nav",
+      "refersTo": "session-item",
+      "description": "Individual session entry in the project sidebar.",
+      "html": "<div class=\"ds-session-item\"><button class=\"ds-session-fav\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polygon points=\"12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2\"/></svg></button><span class=\"ds-session-name\">Refactor auth middleware</span></div>",
+      "css": ".ds-session-item { display: flex; align-items: center; gap: 6px; padding: 4px 12px 4px 16px; border-radius: 6px; cursor: pointer; font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-size: 13px; color: rgba(255,255,255,0.60); transition: background 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-session-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.88); } .ds-session-item.active { color: rgba(255,255,255,0.88); background: rgba(255,255,255,0.09); } .ds-session-fav { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; background: none; border: none; color: inherit; cursor: pointer; opacity: 0; transition: opacity 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-session-item:hover .ds-session-fav { opacity: 0.35; } .ds-session-fav:hover { opacity: 1 !important; } .ds-session-fav.favorited { opacity: 1; color: #fbbf24; } .ds-session-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Terminal Atelier",
+    "overview": "pi-kot's interface lives at the intersection of a finely tuned code editor and a modern chat surface. It's a workspace where a developer and an AI agent collaborate \u2014 not a generic chatbot wrapper. The aesthetic is dark-native with a glassy crispness: deep solid backgrounds, frosted floating panels, and an accent palette that signals state without demanding attention. Three visual dialects coexist: the chat surface (clean prose, markdown-rendered, streaming-aware), the tool execution timeline (collapsible cards with monospace detail panes), and the terminal panel (pure dark utility, xterm-native, no glass).",
+    "keyCharacteristics": [
+      "Dark-native with frosted-glass floating surfaces",
+      "Glassy but not decorative \u2014 every blur has a purpose",
+      "Smart disclosure as a design principle, not an implementation detail",
+      "Three visual dialects (chat / tools / terminal) under one token system",
+      "Subdued accent palette \u2014 grays and muted tones, not saturated primaries"
+    ],
+    "rules": [
+      { "name": "The Restraint Rule", "body": "The accent color occupies \u226410% of any given surface. Its rarity makes it meaningful. Accent is for edges, focus rings, and interactive indicators \u2014 never for large background fills or decorative gradients.", "section": "colors" },
+      { "name": "The Glass-Over-Solid Rule", "body": "Floating panels use var(--bg-frosted) with backdrop-filter blur, never opaque overlays. The solid background (var(--bg-solid)) is always visible underneath, maintaining spatial hierarchy.", "section": "colors" },
+      { "name": "The Only-Sans Rule", "body": "No display font pairing. Inter at varying weights and sizes carries the full hierarchy. One family is right for a product UI; a second display face adds noise, not signal.", "section": "typography" },
+      { "name": "The Mono-Confined Rule", "body": "Monospace is bounded to code-shaped content: tool call IO, terminal streams, diff views, file paths, and inline code spans. Prose and labels never use the mono stack.", "section": "typography" },
+      { "name": "The Zero-Shadow Rule", "body": "No drop shadows on any surface. Depth comes from blur, transparency layering, and border contrast. A shadow implies weight; pi-kot's surfaces feel weightless.", "section": "elevation" }
+    ],
+    "dos": [
+      "Use the glass-over-solid layering for panels and dialogs \u2014 the solid canvas must always be partially visible underneath.",
+      "Collapse tool call details by default. Smart disclosure keeps the chat surface readable.",
+      "Use mono for all code-shaped content: tool IO, terminal, diffs, file paths.",
+      "Tint every neutral toward the theme's brand hue. Even a barely-perceptible chroma (0.005\u20130.01) prevents gray from feeling dead.",
+      "Match accent usage to purpose: \u226410% of any given surface, reserved for interactive edges and focus indicators."
+    ],
+    "donts": [
+      "Use box shadows anywhere. Depth comes from blur and transparency, not shadows.",
+      "Apply glass effects to the terminal panel. Terminal earns a distinct visual dialect \u2014 pure solid, no blur, no frills.",
+      "Use gradient text (background-clip: text) or decorative glassmorphism. Accent is a single solid color.",
+      "Use border-left or border-right greater than 1px as a colored accent stripe.",
+      "Reuse the same card pattern across different contexts. Chat bubbles, tool calls, and settings cards each have distinct shapes and token assignments.",
+      "Use display fonts or decorative type anywhere in the UI.",
+      "Make the accent the primary action background at rest. Accent appears on hover/focus only."
+    ]
+  }
+}
