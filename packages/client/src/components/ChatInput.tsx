@@ -542,7 +542,6 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               borderRadius: "var(--radius-sm)",
               border: "1px solid var(--border)",
               background: "var(--bg-frosted)",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
             }}
           >
             <div

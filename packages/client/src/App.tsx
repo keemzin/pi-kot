@@ -476,10 +476,6 @@ export function App() {
                       : connectionState === "error"
                         ? "#e06c75"
                         : "#666",
-                boxShadow:
-                  connectionState === "connected"
-                    ? "0 0 5px rgba(76, 175, 80, 0.6)"
-                    : "none",
                 transition: "all 0.3s",
                 animation: connectionState === "connecting"
                   ? "connection-pulse 1.2s ease-in-out infinite"

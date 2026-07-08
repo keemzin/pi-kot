@@ -98,7 +98,6 @@ export function ThemePicker({ currentTheme, onChange }: Props) {
             padding: "4px",
             backdropFilter: "blur(24px) saturate(1.5)",
             zIndex: 1000,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           }}
         >
           {themes.map((t: ThemeInfo) => (
