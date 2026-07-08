@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
+import { ConfirmDialog } from "./Modal";
+import { FileEditor } from "./FileEditor";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
+import { useLayoutStore } from "../stores/layout-store";
 
 interface TreeNode {
   name: string;
@@ -83,6 +85,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialTab?: ExplorerTab;
+  /** When true, uses flex-flow width transition and delegates
+   *  file editing to a separate FileViewerPanel. */
+  flexLayout?: boolean;
 }
 
 interface SearchMatch {
@@ -115,6 +120,10 @@ const DEFAULT_EXPLORER_WIDTH = 360;
 const MIN_EXPLORER_WIDTH = 220;
 const MAX_EXPLORER_WIDTH = 800;
 
+/** When true, the editor view is delegated to FileViewerPanel
+ *  and clicking a file opens it in the separate viewer. */
+const USE_FLEX_LAYOUT = true;
+
 const CONTENT_SEARCH_DEBOUNCE_MS = 300;
 const MIN_CONTENT_SEARCH_LEN = 3;
 
@@ -128,7 +137,7 @@ function groupByPath(matches: SearchMatch[]): [string, SearchMatch[]][] {
   return Array.from(map.entries());
 }
 
-export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
+export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout = USE_FLEX_LAYOUT }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -145,6 +154,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
   const [view, setView] = useState<PaneView>("tree");
 
+  const openFileViewer = useLayoutStore((s) => s.openFileViewer);
+
   // Sync initialTab changes (e.g. when header git button clicked while panel is open)
   useEffect(() => {
     if (initialTab !== undefined && initialTab !== tab) {
@@ -152,9 +163,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
       if (initialTab === "files") setView("tree");
     }
   }, [initialTab]);
-  const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
-  const [wordWrap, setWordWrap] = useState(true);
-
+  const [pendingCloseTab, setPendingCloseTab] = useState<string | undefined>(undefined);
   // ── Context menu for right-click / long-press ──
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -374,6 +383,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   }, [renaming]);
 
   const openFile = useCallback(async (path: string) => {
+    if (flexLayout) {
+      // In flex mode, delegate file viewing to the separate FileViewerPanel
+      const name = path.split("/").pop() || path;
+      openFileViewer(path, name);
+      return;
+    }
+
     const existing = openFiles.find((f) => f.path === path);
     if (existing) {
       setActivePath(path);
@@ -391,7 +407,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
     try {
       const data = await filesRead(projectId, path);
-      const content = data.binary ? "(binary file)" : data.content ?? "";
+      const raw = data.binary ? "(binary file)" : data.content ?? "";
+      // CM6 always terminates documents with \n — normalize so the
+      // onChange callback doesn't fire on first render and mark a
+      // freshly opened file as dirty (same fix as FileViewerPanel).
+      const content = raw === "" || raw.endsWith("\n") ? raw : raw + "\n";
       setOpenFiles((prev) =>
         prev.map((f) =>
           f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
@@ -406,12 +426,29 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   }, [openFiles, activePath, projectId]);
 
   const handleTabClose = useCallback((path: string) => {
+    // Check if file is dirty before closing
+    const file = openFiles.find((f) => f.path === path);
+    if (file?.dirty) {
+      setPendingCloseTab(path);
+      return;
+    }
+
     setOpenFiles((prev) => prev.filter((f) => f.path !== path));
     setActivePath((prev) => {
       if (prev !== path) return prev;
       const remaining = openFiles.filter((f) => f.path !== path);
       return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
     });
+  }, [openFiles]);
+
+  const confirmTabClose = useCallback((path: string) => {
+    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
+    setActivePath((prev) => {
+      if (prev !== path) return prev;
+      const remaining = openFiles.filter((f) => f.path !== path);
+      return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
+    });
+    setPendingCloseTab(undefined);
   }, [openFiles]);
 
   const handleSave = async () => {
@@ -686,26 +723,44 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
   const activeFile = openFiles.find((f) => f.path === activePath);
 
+  // Flex layout: use width transition instead of translateX
+  const outStyle: React.CSSProperties = flexLayout ? {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    width: open ? panelWidth : 0,
+    minWidth: open ? MIN_EXPLORER_WIDTH : 0,
+    flexShrink: 0,
+    overflow: "hidden",
+    background: "var(--bg-solid)",
+    borderLeft: open ? "1px solid var(--border)" : "none",
+    transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+    willChange: "width",
+    userSelect: resizeRef.current !== undefined ? "none" : undefined,
+    position: "relative",
+    paddingTop: "50px",
+  } : {
+    position: "fixed",
+    top: 50,
+    right: 0,
+    bottom: 0,
+    zIndex: 120,
+    background: "var(--bg-solid)",
+    borderLeft: "1px solid var(--border)",
+    boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
+    display: "flex",
+    flexDirection: "column",
+    width: panelWidth,
+    transform: open ? "translateX(0)" : "translateX(100%)",
+    transition: "transform 0.18s ease",
+    willChange: "transform",
+    userSelect: resizeRef.current !== undefined ? "none" : undefined,
+  };
+
   return (
     <div
       className="file-explorer-panel"
-      style={{
-        position: "fixed",
-        top: 50,
-        right: 0,
-        bottom: 0,
-        zIndex: 120,
-        background: "var(--bg-solid)",
-        borderLeft: "1px solid var(--border)",
-        boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
-        display: "flex",
-        flexDirection: "column",
-        width: panelWidth,
-        transform: open ? "translateX(0)" : "translateX(100%)",
-        transition: "transform 0.18s ease",
-        willChange: "transform",
-        userSelect: resizeRef.current !== undefined ? "none" : undefined,
-      }}
+      style={outStyle}
       onClick={(e) => e.stopPropagation()}
     >
       {/* ── Resize handle ── */}
@@ -1110,101 +1165,17 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
           {/* Active editor */}
           {activeFile ? (
-            <>
-              {/* Editor toolbar */}
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px",
-                padding: "3px 10px", fontSize: "10px", color: "var(--text-dim)",
-                borderBottom: "1px solid var(--border)",
-              }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                  {activeFile.path}
-                </span>
-
-                {/* Raw / Rendered toggle */}
-                <div style={{
-                  display: "flex", gap: "1px",
-                  background: "var(--bg-glass)", borderRadius: "var(--radius-sm)",
-                  padding: "1px", flexShrink: 0,
-                }}>
-                  <button
-                    onClick={() => setEditorMode("raw")}
-                    style={{
-                      background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                      border: "none", cursor: "pointer",
-                      color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                      fontSize: "10px", fontWeight: 600,
-                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                    }}
-                    type="button"
-                  >
-                    Raw
-                  </button>
-                  <button
-                    onClick={() => setEditorMode("rendered")}
-                    style={{
-                      background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                      border: "none", cursor: "pointer",
-                      color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                      fontSize: "10px", fontWeight: 600,
-                      padding: "2px 8px", borderRadius: "var(--radius-sm)",
-                    }}
-                    type="button"
-                  >
-                    Rendered
-                  </button>
-                </div>
-
-                {/* Word wrap toggle */}
-                {editorMode === "raw" && (
-                  <button
-                    onClick={() => setWordWrap((w) => !w)}
-                    title="Toggle word wrap"
-                    style={{
-                      padding: "2px 6px", fontSize: "9px", fontWeight: 600,
-                      border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                      background: wordWrap ? "var(--accent-bg)" : "transparent",
-                      color: wordWrap ? "var(--accent-text)" : "var(--text-dim)",
-                      cursor: "pointer", flexShrink: 0,
-                    }}
-                    type="button"
-                  >
-                    WRAP
-                  </button>
-                )}
-
-                <button
-                  onClick={handleSave}
-                  disabled={!activeFile.dirty || activeFile.saving}
-                  style={{
-                    padding: "2px 8px", fontSize: "10px", fontWeight: 600, flexShrink: 0,
-                    border: "1px solid var(--border)", borderRadius: "var(--radius-sm)",
-                    background: activeFile.dirty ? "var(--accent-bg)" : "transparent",
-                    color: activeFile.dirty ? "var(--accent-text)" : "var(--text-dim)",
-                    cursor: activeFile.dirty && !activeFile.saving ? "pointer" : "default",
-                  }}
-                  type="button"
-                >
-                  {activeFile.saving ? "Saving…" : activeFile.dirty ? "Save" : "Saved"}
-                </button>
-              </div>
-
-              {editorMode === "raw" ? (
-                <CodeMirrorEditor
-                  key={`editor-${activeFile.path}`}
-                  value={activeFile.content}
-                  onChange={(val) => handleContentChange(val)}
-                  onSave={handleSave}
-                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                  wordWrap={wordWrap}
-                />
-              ) : (
-                <RenderedView
-                  content={activeFile.content}
-                  fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-                />
-              )}
-            </>
+            <FileEditor
+              path={activeFile.path}
+              fileName={activeFile.path.split("/").pop() ?? activeFile.path}
+              content={activeFile.content}
+              language={activeFile.language}
+              saving={activeFile.saving}
+              dirty={activeFile.dirty}
+              onChange={handleContentChange}
+              onSave={handleSave}
+              error={error}
+            />
           ) : (
             <div style={{
               flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
@@ -1372,6 +1343,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
           </div>
         </>
       )}
+
+      {/* ── Unsaved changes confirmation dialog ── */}
+      <ConfirmDialog
+        open={pendingCloseTab !== undefined}
+        onClose={() => setPendingCloseTab(undefined)}
+        onConfirm={() => {
+          if (pendingCloseTab) confirmTabClose(pendingCloseTab);
+        }}
+        title="Unsaved changes"
+        message={`Close "${pendingCloseTab?.split("/").pop() ?? ""}"? Unsaved changes will be lost.`}
+        primaryLabel="Discard & close"
+        tone="danger"
+      />
     </div>
   );
 }

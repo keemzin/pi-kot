@@ -10,6 +10,7 @@ import { MCPPanel } from "./components/MCPPanel";
 import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
+import { FileViewerPanel } from "./components/FileViewerPanel";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { NotificationToast } from "./components/NotificationToast";
@@ -808,6 +809,7 @@ export function App() {
             >
               📂
             </button>
+
             <button
               type="button"
               onClick={() => { setShowTerminal(true); setSidebarCollapsed(true); }}
@@ -903,20 +905,42 @@ export function App() {
           </div>
         )}
 
-        {activeSessionId !== undefined ? (
-          <>
-            <ErrorBoundary label="ChatView" compact>
-              <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
-            </ErrorBoundary>
-            <ErrorBoundary label="OrchestrationPanel" compact>
-              <OrchestrationPanel
-                sessionId={activeSessionId}
-                open={showOrch}
-                onClose={() => setShowOrch(false)}
-              />
-            </ErrorBoundary>
-            <AskUserQuestionPanel sessionId={activeSessionId} />
-            <ChatInput
+        {/* ── Flex row: chat | file viewer | file tree ── */}
+        <div
+          className="main-content-row"
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "row",
+            minHeight: 0,
+            overflow: "hidden",
+            position: "relative",
+          }}
+        >
+          <div
+            className="chat-column"
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              minWidth: 0,
+              overflow: "hidden",
+            }}
+          >
+            {activeSessionId !== undefined ? (
+              <>
+                <ErrorBoundary label="ChatView" compact>
+                  <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
+                </ErrorBoundary>
+                <ErrorBoundary label="OrchestrationPanel" compact>
+                  <OrchestrationPanel
+                    sessionId={activeSessionId}
+                    open={showOrch}
+                    onClose={() => setShowOrch(false)}
+                  />
+                </ErrorBoundary>
+                <AskUserQuestionPanel sessionId={activeSessionId} />
+                <ChatInput
       sessionId={activeSessionId}
       showOrch={showOrch}
       setShowOrch={setShowOrch}
@@ -924,17 +948,50 @@ export function App() {
       onModelSelect={handleModelSelect}
       onModelError={handleModelError}
     />
-          </>
-        ) : (
-          <div className="centered" style={{ height: "100%" }}>
-            <div className="welcome">
-              <div className="welcome-icon">⌨️</div>
-              <div className="welcome-text">Select or create a session</div>
-              <div className="welcome-hint">to start chatting with the coding agent</div>
-            </div>
+              </>
+            ) : (
+              <div className="centered" style={{ height: "100%" }}>
+                <div className="welcome">
+                  <div className="welcome-icon">⌨️</div>
+                  <div className="welcome-text">Select or create a session</div>
+                  <div className="welcome-hint">to start chatting with the coding agent</div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* File viewer — slides in when a file is opened */}
+          {activeProjectId !== undefined && (
+            <FileViewerPanel projectId={activeProjectId} />
+          )}
+
+          {/* File tree / git panel — slides in */}
+          {activeProjectId !== undefined && !isMobile && (
+            <ErrorBoundary label="FileExplorer" compact>
+              <FileExplorer
+                projectId={activeProjectId}
+                open={explorerTab !== undefined}
+                onClose={() => setExplorerTab(undefined)}
+                initialTab={explorerTab}
+                flexLayout
+              />
+            </ErrorBoundary>
+          )}
+        </div>
       </div>
+
+      {/* Mobile explorer: use overlay (fixed position) instead of flex layout */}
+      {activeProjectId !== undefined && isMobile && (
+        <ErrorBoundary label="FileExplorer" compact>
+          <FileExplorer
+            projectId={activeProjectId}
+            open={explorerTab !== undefined}
+            onClose={() => setExplorerTab(undefined)}
+            initialTab={explorerTab}
+            flexLayout={false}
+          />
+        </ErrorBoundary>
+      )}
 
       {/* Session Tree Panel overlay */}
       {activeSessionId !== undefined && activeProjectId !== undefined && (
@@ -944,18 +1001,6 @@ export function App() {
             projectId={activeProjectId}
             open={showTreePanel}
             onClose={() => setShowTreePanel(false)}
-          />
-        </ErrorBoundary>
-      )}
-
-      {/* Explorer panel (Files + Git tabs) */}
-      {activeProjectId !== undefined && (
-        <ErrorBoundary label="FileExplorer" compact>
-          <FileExplorer
-            projectId={activeProjectId}
-            open={explorerTab !== undefined}
-            onClose={() => setExplorerTab(undefined)}
-            initialTab={explorerTab}
           />
         </ErrorBoundary>
       )}
