@@ -4,6 +4,7 @@ import { RenderedView } from "./RenderedView";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
+import { ConfirmDialog } from "./Modal";
 
 export function FileViewerPanel({ projectId }: { projectId: string }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
@@ -11,15 +12,22 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
   const viewerWidth = useLayoutStore((s) => s.viewerWidth);
   const setViewerActivePath = useLayoutStore((s) => s.setViewerActivePath);
   const closeFileViewerTab = useLayoutStore((s) => s.closeFileViewerTab);
+  const closeAllViewerTabs = useLayoutStore((s) => s.closeAllViewerTabs);
   const setViewerWidth = useLayoutStore((s) => s.setViewerWidth);
 
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [language, setLanguage] = useState<string | undefined>();
+  const [savedAt, setSavedAt] = useState<Date | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [wordWrap, setWordWrap] = useState(true);
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: "close-tab"; path: string; name: string } | { kind: "close-all" } | undefined
+  >(undefined);
   const resizeRef = useRef<{ startX: number; startW: number } | undefined>(undefined);
 
   const activeFile = viewerTabs.find((t) => t.path === viewerActivePath);
@@ -42,6 +50,9 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         const c = data.binary ? "(binary file)" : data.content ?? "";
         setContent(c);
         setSavedContent(c);
+        setLanguage(data.language);
+        setFileName(activeFile.name);
+        setSavedAt(undefined);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -62,6 +73,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
     try {
       await filesWrite(projectId, activeFile.path, content);
       setSavedContent(content);
+      setSavedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "save failed");
     } finally {
@@ -155,6 +167,28 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
               minHeight: "38px",
             }}
           >
+            {viewerTabs.length > 1 && (
+              <button
+                onClick={() => {
+                  if (isDirty) { setPendingConfirm({ kind: "close-all" }); return; }
+                  closeAllViewerTabs();
+                }}
+                title="Close all tabs"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  fontSize: "11px",
+                  borderRadius: "var(--radius-xs)",
+                  flexShrink: 0,
+                }}
+                type="button"
+              >
+                ✕✕
+              </button>
+            )}
             {viewerTabs.map((tab) => {
               const isActive = tab.path === viewerActivePath;
               return (
@@ -178,6 +212,21 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                     transition: "all 0.12s ease",
                   }}
                 >
+                  {/* Dirty dot indicator — only for the active tab */}
+                  {isActive && isDirty && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        background: "var(--accent-text, #e8a838)",
+                        flexShrink: 0,
+                      }}
+                      aria-label="Unsaved changes"
+                      title="Unsaved changes"
+                    />
+                  )}
                   <button
                     onClick={() => setViewerActivePath(tab.path)}
                     style={{
@@ -199,6 +248,10 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (isActive && isDirty) {
+                        setPendingConfirm({ kind: "close-tab", path: tab.path, name: tab.name });
+                        return;
+                      }
                       closeFileViewerTab(tab.path);
                     }}
                     title="Close"
@@ -246,7 +299,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
               </div>
             ) : activeFile ? (
               <>
-                {/* Toolbar */}
+                {/* Toolbar — just path + raw/rendered toggle */}
                 <div
                   style={{
                     display: "flex",
@@ -317,7 +370,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                     </button>
                   </div>
 
-                  {/* Word wrap toggle */}
+                  {/* Wrap toggle — only in raw mode */}
                   {editorMode === "raw" && (
                     <button
                       onClick={() => setWordWrap((w) => !w)}
@@ -335,28 +388,9 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                       }}
                       type="button"
                     >
-                      WRAP
+                      {wordWrap ? "wrap" : "no wrap"}
                     </button>
                   )}
-
-                  <button
-                    onClick={handleSave}
-                    disabled={!isDirty || saving}
-                    style={{
-                      padding: "2px 8px",
-                      fontSize: "10px",
-                      fontWeight: 600,
-                      flexShrink: 0,
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      background: isDirty ? "var(--accent-bg)" : "transparent",
-                      color: isDirty ? "var(--accent-text)" : "var(--text-dim)",
-                      cursor: isDirty && !saving ? "pointer" : "default",
-                    }}
-                    type="button"
-                  >
-                    {saving ? "Saving…" : isDirty ? "Save" : "Saved"}
-                  </button>
                 </div>
 
                 {/* Editor body */}
@@ -375,11 +409,106 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                     fileName={activeFile.name}
                   />
                 )}
+
+                {/* Status bar — language, wrap toggle, save status, save button */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "8px",
+                    padding: "2px 10px",
+                    fontSize: "10px",
+                    color: "var(--text-dim)",
+                    borderTop: "1px solid var(--border)",
+                    background: "var(--bg-glass)",
+                    flexShrink: 0,
+                  }}
+                >
+                  {/* Left: language label */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {language && (
+                      <span
+                        style={{
+                          fontFamily: "var(--font-mono, monospace)",
+                          fontSize: "10px",
+                          color: "var(--text-dim)",
+                        }}
+                      >
+                        {language}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Right: status label + save button */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {/* Status label */}
+                    {(() => {
+                      if (saving) {
+                        return <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>Saving…</span>;
+                      }
+                      if (error) {
+                        return <span style={{ color: "var(--error, #e06c75)" }}>Save failed</span>;
+                      }
+                      if (isDirty) {
+                        return <span style={{ color: "var(--accent-text, #d19a66)" }}>Unsaved changes</span>;
+                      }
+                      if (savedAt) {
+                        return <span style={{ color: "#98c379" }}>Saved {savedAt.toLocaleTimeString()}</span>;
+                      }
+                      return <span>Up to date</span>;
+                    })()}
+
+                    <button
+                      onClick={handleSave}
+                      disabled={!isDirty || saving}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        padding: "2px 8px",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        background: isDirty ? "var(--accent-bg)" : "transparent",
+                        color: isDirty ? "var(--accent-text)" : "var(--text-dim)",
+                        cursor: isDirty && !saving ? "pointer" : "default",
+                        opacity: isDirty ? 1 : 0.5,
+                      }}
+                      type="button"
+                    >
+                      {saving ? "Saving…" : isDirty ? "Save" : "Saved"}
+                    </button>
+                  </div>
+                </div>
               </>
             ) : null}
           </div>
         </>
       )}
+
+      {/* Theme confirmation dialog — replaces browser confirm() */}
+      <ConfirmDialog
+        open={pendingConfirm !== undefined}
+        onClose={() => setPendingConfirm(undefined)}
+        onConfirm={() => {
+          if (pendingConfirm?.kind === "close-tab") {
+            closeFileViewerTab(pendingConfirm.path);
+          } else if (pendingConfirm?.kind === "close-all") {
+            closeAllViewerTabs();
+          }
+          setPendingConfirm(undefined);
+        }}
+        title="Unsaved changes"
+        message={
+          pendingConfirm?.kind === "close-tab"
+            ? `Close “${pendingConfirm.name}”? Unsaved changes will be lost.`
+            : `Close all ${viewerTabs.length} tabs? Unsaved changes in the active tab will be lost.`
+        }
+        primaryLabel="Discard & close"
+        tone="danger"
+      />
     </div>
   );
 }

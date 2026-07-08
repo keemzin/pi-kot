@@ -60,6 +60,7 @@ interface LayoutState {
   /* ── File viewer actions ── */
   openFileViewer: (path: string, name: string) => void;
   closeFileViewerTab: (path: string) => void;
+  closeAllViewerTabs: () => void;
   setViewerActivePath: (path: string | undefined) => void;
   setViewerWidth: (width: number) => void;
 
@@ -142,6 +143,8 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       });
     }
   },
+
+  closeAllViewerTabs: () => set({ viewerTabs: [], viewerActivePath: undefined }),
 
   closeFileViewerTab: (path) => {
     const { viewerTabs, viewerActivePath } = get();
