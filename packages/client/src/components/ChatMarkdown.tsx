@@ -150,7 +150,7 @@ const components: Components = {
   th: ({ children }) => <th className="md-th">{children}</th>,
   td: ({ children }) => <td className="md-td">{children}</td>,
 
-  strong: ({ children }) => <strong>{children}</strong>,
+  strong: ({ children }) => <strong className="md-strong">{children}</strong>,
   em: ({ children }) => <em>{children}</em>,
 
   code: ThemeAwareCode,

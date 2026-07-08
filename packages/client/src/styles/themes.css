@@ -603,13 +603,20 @@
 
 /* ═══ Base Body ═══ */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   background: var(--bg-solid);
   color: var(--text-primary);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 16px;
+}
+
+/* ═══ Bold text — refined, not heavy ═══ */
+strong {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* ═══ Scrollbar ═══ */
@@ -2996,7 +3003,11 @@ body {
 /* ═══ Assistant markdown inside bubble (tau parity) ═══ */
 .message-bubble.assistant .md-p { margin-bottom: 8px; }
 .message-bubble.assistant .md-p:last-child { margin-bottom: 0; }
-.message-bubble.assistant .md-strong { font-weight: 600; }
+.message-bubble.assistant .md-strong {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
 .message-bubble.assistant .md-em { font-style: italic; color: var(--text-secondary); }
 .message-bubble.assistant .md-link { color: var(--accent-text); text-decoration: none; border-bottom: 1px solid var(--accent-subtle); }
 .message-bubble.assistant .md-link:hover { border-color: var(--accent-text); }
