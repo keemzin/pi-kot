@@ -718,6 +718,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     willChange: "width",
     userSelect: resizeRef.current !== undefined ? "none" : undefined,
     position: "relative",
+    paddingTop: "50px",
   } : {
     position: "fixed",
     top: 50,

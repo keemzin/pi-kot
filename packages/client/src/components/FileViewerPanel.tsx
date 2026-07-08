@@ -119,6 +119,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         background: "var(--bg-solid)",
         transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         willChange: "width",
+        paddingTop: "50px",
       }}
     >
       {hasViewer && (

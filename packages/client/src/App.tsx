@@ -809,23 +809,7 @@ export function App() {
             >
               📂
             </button>
-            <button
-              type="button"
-              onClick={() => toggleExplorerTab("git")}
-              title="Git"
-              style={{
-                background: "none",
-                border: "none",
-                color: explorerTab === "git" ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
-            >
-              ⎇
-            </button>
+
             <button
               type="button"
               onClick={() => { setShowTerminal(true); setSidebarCollapsed(true); }}
