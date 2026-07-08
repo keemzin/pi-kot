@@ -4818,6 +4818,29 @@ strong {
   opacity: 1 !important;
 }
 
+/* ══ Viewer panel resize handle ── */
+.viewer-resize-handle:hover,
+.viewer-resize-handle:active {
+  background: var(--accent-bg) !important;
+  opacity: 0.35;
+}
+
+/* ══ Viewer tab close button ── */
+.viewer-tab-close:hover {
+  opacity: 1 !important;
+  background: var(--bg-glass);
+}
+
+/* ══ Main content row (chat + viewer + explorer) ── */
+.main-content-row {
+  scrollbar-width: thin;
+}
+
+/* ══ Chat column inside flex row ── */
+.chat-column {
+  scrollbar-width: thin;
+}
+
 /* ═══════════════════════════════════════════════════════
    Mobile / Git Panel Polish
    ═══════════════════════════════════════════════════════ */

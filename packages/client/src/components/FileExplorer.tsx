@@ -5,6 +5,7 @@ import { RenderedView } from "./RenderedView";
 import { GitPanel } from "./GitPanel";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
+import { useLayoutStore } from "../stores/layout-store";
 
 interface TreeNode {
   name: string;
@@ -83,6 +84,9 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialTab?: ExplorerTab;
+  /** When true, uses flex-flow width transition and delegates
+   *  file editing to a separate FileViewerPanel. */
+  flexLayout?: boolean;
 }
 
 interface SearchMatch {
@@ -115,6 +119,10 @@ const DEFAULT_EXPLORER_WIDTH = 360;
 const MIN_EXPLORER_WIDTH = 220;
 const MAX_EXPLORER_WIDTH = 800;
 
+/** When true, the editor view is delegated to FileViewerPanel
+ *  and clicking a file opens it in the separate viewer. */
+const USE_FLEX_LAYOUT = true;
+
 const CONTENT_SEARCH_DEBOUNCE_MS = 300;
 const MIN_CONTENT_SEARCH_LEN = 3;
 
@@ -128,7 +136,7 @@ function groupByPath(matches: SearchMatch[]): [string, SearchMatch[]][] {
   return Array.from(map.entries());
 }
 
-export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
+export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout = USE_FLEX_LAYOUT }: Props) {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -144,6 +152,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   const [activePath, setActivePath] = useState<string | undefined>();
   const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
   const [view, setView] = useState<PaneView>("tree");
+
+  const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 
   // Sync initialTab changes (e.g. when header git button clicked while panel is open)
   useEffect(() => {
@@ -374,6 +384,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
   }, [renaming]);
 
   const openFile = useCallback(async (path: string) => {
+    if (flexLayout) {
+      // In flex mode, delegate file viewing to the separate FileViewerPanel
+      const name = path.split("/").pop() || path;
+      openFileViewer(path, name);
+      return;
+    }
+
     const existing = openFiles.find((f) => f.path === path);
     if (existing) {
       setActivePath(path);
@@ -686,26 +703,43 @@ export function FileExplorer({ projectId, open, onClose, initialTab }: Props) {
 
   const activeFile = openFiles.find((f) => f.path === activePath);
 
+  // Flex layout: use width transition instead of translateX
+  const outStyle: React.CSSProperties = flexLayout ? {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    width: open ? panelWidth : 0,
+    minWidth: open ? MIN_EXPLORER_WIDTH : 0,
+    flexShrink: 0,
+    overflow: "hidden",
+    background: "var(--bg-solid)",
+    borderLeft: open ? "1px solid var(--border)" : "none",
+    transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+    willChange: "width",
+    userSelect: resizeRef.current !== undefined ? "none" : undefined,
+    position: "relative",
+  } : {
+    position: "fixed",
+    top: 50,
+    right: 0,
+    bottom: 0,
+    zIndex: 120,
+    background: "var(--bg-solid)",
+    borderLeft: "1px solid var(--border)",
+    boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
+    display: "flex",
+    flexDirection: "column",
+    width: panelWidth,
+    transform: open ? "translateX(0)" : "translateX(100%)",
+    transition: "transform 0.18s ease",
+    willChange: "transform",
+    userSelect: resizeRef.current !== undefined ? "none" : undefined,
+  };
+
   return (
     <div
       className="file-explorer-panel"
-      style={{
-        position: "fixed",
-        top: 50,
-        right: 0,
-        bottom: 0,
-        zIndex: 120,
-        background: "var(--bg-solid)",
-        borderLeft: "1px solid var(--border)",
-        boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
-        display: "flex",
-        flexDirection: "column",
-        width: panelWidth,
-        transform: open ? "translateX(0)" : "translateX(100%)",
-        transition: "transform 0.18s ease",
-        willChange: "transform",
-        userSelect: resizeRef.current !== undefined ? "none" : undefined,
-      }}
+      style={outStyle}
       onClick={(e) => e.stopPropagation()}
     >
       {/* ── Resize handle ── */}
