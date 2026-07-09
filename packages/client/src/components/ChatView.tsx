@@ -1206,7 +1206,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                   )}
                   <div className="streaming-text">
                     <ChatMarkdown text={streamText} />
-                    <span className="streaming-cursor">▊</span>
                   </div>
                 </div>
               </div>

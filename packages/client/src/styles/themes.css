@@ -3776,11 +3776,7 @@ strong {
   transform: scale(0.97);
 }
 
-/* ═══ Streaming cursor ═══ */
-.streaming-cursor {
-  animation: blink 1s infinite;
-  color: var(--accent);
-}
+
 
 /* ═══ Tool badge (streaming) ═══ */
 .tool-badge {
