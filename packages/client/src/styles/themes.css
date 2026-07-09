@@ -4319,9 +4319,8 @@ strong {
   gap: 8px;
 }
 .streaming-text {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  min-width: 0;
+  width: 100%;
 }
 .thinking-bubble {
   display: flex;
