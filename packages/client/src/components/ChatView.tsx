@@ -163,7 +163,11 @@ function getToolIcon(name: string): string {
 
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
+  const showThinking = usePreferencesStore((s) => s.showThinking);
   const [open, setOpen] = useState(false);
+
+  if (!showThinking) return null;
+
   return (
     <details
       open={open}

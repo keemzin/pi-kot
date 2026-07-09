@@ -11,6 +11,7 @@ type UiSettings = {
   stickyUserHeader?: boolean;
   showTokenUsage?: boolean;
   compressImages?: boolean;
+  showThinking?: boolean;
 };
 
 export function AppearanceTab() {
@@ -34,6 +35,12 @@ export function AppearanceTab() {
   );
   const setCompressImages = usePreferencesStore(
     (s: PreferencesState) => s.setCompressImages,
+  );
+  const showThinking = usePreferencesStore(
+    (s: PreferencesState) => s.showThinking,
+  );
+  const setShowThinking = usePreferencesStore(
+    (s: PreferencesState) => s.setShowThinking,
   );
 
   // ── Load server-persisted settings on mount ────────────────────────────
@@ -59,6 +66,9 @@ export function AppearanceTab() {
         }
         if (typeof server.compressImages === "boolean") {
           setCompressImages(server.compressImages);
+        }
+        if (typeof server.showThinking === "boolean") {
+          setShowThinking(server.showThinking);
         }
       })
       .catch(() => {
@@ -98,6 +108,11 @@ export function AppearanceTab() {
   const handleCompressChange = (checked: boolean) => {
     setCompressImages(checked);
     persist({ compressImages: checked });
+  };
+
+  const handleShowThinkingChange = (checked: boolean) => {
+    setShowThinking(checked);
+    persist({ showThinking: checked });
   };
 
   return (
@@ -204,6 +219,35 @@ export function AppearanceTab() {
           />
           Compress images — downscale large images before sending (saves
           bandwidth, reduces token cost)
+        </label>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            userSelect: "none",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showThinking}
+            onChange={(e) => handleShowThinkingChange(e.target.checked)}
+            style={{
+              width: 16,
+              height: 16,
+              accentColor: "var(--accent-text)",
+              cursor: "pointer",
+            }}
+          />
+          Show thinking blocks — display the model&rsquo;s internal reasoning
+          (hidden by default)
         </label>
       </div>
     </div>

@@ -3,6 +3,7 @@ import { create } from "zustand";
 const LS_STICKY_USER_HEADER = "pi-kot/sticky-user-header";
 const LS_SHOW_TOKEN_USAGE = "pi-kot/show-token-usage";
 const LS_COMPRESS_IMAGES = "pi-kot/compress-images";
+const LS_SHOW_THINKING = "pi-kot/show-thinking";
 
 function loadStickyUserHeader(): boolean {
   if (typeof window === "undefined") return false;
@@ -34,6 +35,16 @@ function loadCompressImages(): boolean {
   }
 }
 
+function loadShowThinking(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const v = localStorage.getItem(LS_SHOW_THINKING);
+    return v === null ? false : v === "true";
+  } catch {
+    return false;
+  }
+}
+
 export interface PreferencesState {
   stickyUserHeader: boolean;
   setStickyUserHeader: (enabled: boolean) => void;
@@ -41,6 +52,8 @@ export interface PreferencesState {
   setShowTokenUsage: (enabled: boolean) => void;
   compressImages: boolean;
   setCompressImages: (enabled: boolean) => void;
+  showThinking: boolean;
+  setShowThinking: (enabled: boolean) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>((set) => ({
@@ -74,5 +87,16 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
       // private mode
     }
     set({ compressImages: enabled });
+  },
+
+  showThinking: loadShowThinking(),
+
+  setShowThinking: (enabled) => {
+    try {
+      localStorage.setItem(LS_SHOW_THINKING, String(enabled));
+    } catch {
+      // private mode
+    }
+    set({ showThinking: enabled });
   },
 }));
