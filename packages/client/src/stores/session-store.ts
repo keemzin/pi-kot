@@ -1,5 +1,14 @@
 import { create } from "zustand";
 import {
+  normalizeMessages,
+  normalizePartialMessage,
+  normalizeUserMessage,
+  finalizeMessage,
+  attachToolResult,
+  updateToolCallState,
+  type UIMessage,
+} from "../lib/normalize";
+import {
   type SessionSummary,
   type Project,
   type ImageContent,
@@ -69,6 +78,13 @@ interface StreamState {
   isStreaming: boolean;
 }
 
+/** Normalized UI-ready messages (parts model). */
+interface NormalizedState {
+  partsMessages: UIMessage[];
+  streamingMessage: UIMessage | undefined;
+  isStreaming: boolean;
+}
+
 interface SessionState {
   /** All known projects. */
   projects: Project[];
@@ -92,6 +108,12 @@ interface SessionState {
   queuedBySession: Record<string, { steering: string[]; followUp: string[] } | undefined>;
   /** Streaming state per session. */
   streamState: StreamState;
+  /** Normalized messages for parts-based rendering. */
+  partsMessages: UIMessage[];
+  /** In-progress streaming message with parts. */
+  streamingMessage: UIMessage | undefined;
+  /** True while agent is running (for abort button). */
+  isStreaming: boolean;
   /** Whether we're loading. */
   loading: boolean;
   /** Error message, if any. */
@@ -139,6 +161,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   compactionEndCountBySession: {},
   queuedBySession: {},
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
+  partsMessages: [],
+  streamingMessage: undefined,
+  isStreaming: false,
   loading: false,
   error: undefined,
   sseClient: undefined,
@@ -254,6 +279,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       activeSessionId: id,
       messages: [],
       streamState: { text: "", activeToolName: undefined, isStreaming: false },
+      partsMessages: [],
+      streamingMessage: undefined,
+      isStreaming: false,
       queuedBySession: {},
       error: undefined,
     });
@@ -287,6 +315,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         streamState: {
           ...s.streamState,
           text: s.streamState.text + text,
+        },
+      }));
+    };
+
+    // RAF-coalesced partial normalization for parts model
+    let pendingPartial: Record<string, unknown> | undefined;
+    let rafPartialId: number | undefined;
+    const flushPartial = () => {
+      rafPartialId = undefined;
+      const partial = pendingPartial;
+      if (partial === undefined) return;
+      pendingPartial = undefined;
+      const uiMsg = normalizePartialMessage(partial, -1);
+      set((s) => ({
+        streamingMessage: uiMsg,
+        isStreaming: true,
+        // Keep old field in sync
+        streamState: {
+          ...s.streamState,
+          isStreaming: true,
         },
       }));
     };
@@ -327,12 +375,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         switch (event.type) {
           case "snapshot": {
             const msgs = (event.messages as unknown[]) ?? [];
+            const isStreaming = event.isStreaming === true;
             set({
               messages: msgs,
+              partsMessages: normalizeMessages(msgs as Record<string, unknown>[]),
+              streamingMessage: undefined,
+              isStreaming,
               streamState: {
                 text: "",
                 activeToolName: undefined,
-                isStreaming: event.isStreaming === true,
+                isStreaming,
               },
             });
             break;
@@ -344,45 +396,63 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 activeToolName: undefined,
                 isStreaming: true,
               },
+              isStreaming: true,
+              streamingMessage: undefined,
             });
             break;
           }
           case "message_update": {
+            // Normalize the partial for parts-based rendering
+            const msg = (event as Record<string, unknown>).message as Record<string, unknown> | undefined;
+            if (msg !== undefined && typeof msg === "object") {
+              pendingPartial = msg;
+              if (rafPartialId === undefined) {
+                rafPartialId = requestAnimationFrame(flushPartial);
+              }
+            }
+
+            // Legacy text delta accumulation (kept for streamState compat)
             const assistantEvent = event.assistantMessageEvent as Record<string, unknown> | undefined;
             if (assistantEvent?.type === "text_delta") {
               const delta = assistantEvent.delta as string;
               if (delta) {
-                // RAF-coalesce like forge: accumulate, flush once per frame
                 pendingDelta += delta;
                 if (rafId === undefined) {
                   rafId = requestAnimationFrame(flushDelta);
                 }
               }
             }
-            // tool_use_start etc are handled by refetching messages —
-            // the SDK finalizes the assistant message with toolCall
-            // blocks before emitting tool_execution_start.
             break;
           }
           case "tool_execution_start": {
+            const toolName = event.toolName as string;
+            const toolCallId = event.toolCallId as string;
             set((s) => ({
               streamState: {
                 ...s.streamState,
-                activeToolName: event.toolName as string | undefined,
+                activeToolName: toolName,
               },
+              streamingMessage: s.streamingMessage && toolCallId
+                ? updateToolCallState(s.streamingMessage, toolCallId, "running")
+                : s.streamingMessage,
             }));
-            // Refetch so the toolCall block appears in messages immediately
             refetchMessages();
             break;
           }
           case "tool_execution_end": {
+            const execEndEv = event as Record<string, unknown>;
+            const toolCallId = execEndEv.toolCallId as string | undefined;
+            const result = execEndEv.result;
+            const isError = execEndEv.isError === true;
             set((s) => ({
               streamState: {
                 ...s.streamState,
                 activeToolName: undefined,
               },
+              streamingMessage: s.streamingMessage && toolCallId
+                ? attachToolResult(s.streamingMessage, toolCallId, result, isError)
+                : s.streamingMessage,
             }));
-            // Refetch so the toolResult appears in messages
             refetchMessages();
             break;
           }
@@ -461,58 +531,54 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             break;
           }
           case "agent_end": {
-            // Flush any remaining text delta
             if (rafId !== undefined) {
               cancelAnimationFrame(rafId);
               rafId = undefined;
             }
+            if (rafPartialId !== undefined) {
+              cancelAnimationFrame(rafPartialId);
+              rafPartialId = undefined;
+            }
             flushDelta();
+            flushPartial();
 
             const agentEndEv = event as Record<string, unknown>;
             const willRetry = agentEndEv.willRetry === true;
+            const finalMsgs = agentEndEv.messages as unknown[] | undefined;
 
             if (willRetry) {
-              // SDK auto-retry will restart the agent — keep isStreaming true
-              // so the abort button stays visible throughout the retry cycle.
-              // Without this, isStreaming toggles off then immediately on
-              // (agent_end → agent_start), causing the UI buttons to flicker.
               set((s) => ({
                 streamState: {
                   ...s.streamState,
                   text: "",
                 },
+                streamingMessage: undefined,
+                // Keep isStreaming true during retry
               }));
             } else {
-              // Surface error from the final failed attempt, if any.
-              // The SDK puts errorMessage at the event top level only for
-              // synthetic agent_end (promise rejection). For real agent_end
-              // events, it's in the last assistant message's errorMessage.
               let errorMessage = agentEndEv.errorMessage as string | undefined;
-              if (!errorMessage) {
-                const msgs = agentEndEv.messages as unknown[] | undefined;
-                if (msgs && msgs.length > 0) {
-                  const last = msgs[msgs.length - 1] as Record<string, unknown> | undefined;
-                  if (last?.role === "assistant" && last?.stopReason === "error") {
-                    errorMessage = last.errorMessage as string | undefined;
-                  }
+              if (!errorMessage && finalMsgs && finalMsgs.length > 0) {
+                const last = finalMsgs[finalMsgs.length - 1] as Record<string, unknown> | undefined;
+                if (last?.role === "assistant" && last?.stopReason === "error") {
+                  errorMessage = last.errorMessage as string | undefined;
                 }
               }
 
-              // Stop streaming
-              set({
+              set((s) => ({
                 streamState: {
                   text: "",
                   activeToolName: undefined,
                   isStreaming: false,
                 },
-              });
+                partsMessages: finalMsgs ? normalizeMessages(finalMsgs as Record<string, unknown>[]) : s.partsMessages,
+                streamingMessage: undefined,
+                isStreaming: false,
+              }));
 
-              // Show error from failed LLM calls (out of credit, etc.)
               if (errorMessage) {
                 set({ error: errorMessage });
               }
 
-              // Clear queued on final agent end
               set((s) => ({
                 queuedBySession: { ...s.queuedBySession, [sessionId]: undefined },
               }));
@@ -522,22 +588,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             break;
           }
           case "message_end": {
-            // Flush any remaining text delta, then clear stream text
-            // so the next assistant message starts with a fresh buffer.
-            // Without this, text from multiple messages accumulates into
-            // one blob in the streaming bubble at the bottom, making it
-            // look like all agent text "bleeds into 1" across tool calls.
             if (rafId !== undefined) {
               cancelAnimationFrame(rafId);
               rafId = undefined;
             }
+            if (rafPartialId !== undefined) {
+              cancelAnimationFrame(rafPartialId);
+              rafPartialId = undefined;
+            }
             flushDelta();
-            set((s) => ({
-              streamState: {
-                ...s.streamState,
-                text: "",
-              },
-            }));
+            flushPartial();
+            set((s) => {
+              const msgs = s.streamingMessage
+                ? [...s.partsMessages, finalizeMessage(s.streamingMessage)]
+                : s.partsMessages;
+              return {
+                partsMessages: msgs,
+                streamingMessage: undefined,
+                streamState: {
+                  ...s.streamState,
+                  text: "",
+                },
+              };
+            });
             refetchMessages();
             break;
           }
@@ -687,11 +760,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     }
 
+    // Normalized optimistic entry
+    const optimisticUIMsg = normalizeUserMessage(
+      { role: "user", content: optimisticContent } as unknown as Record<string, unknown>,
+      -1,
+    );
+
     set((s) => ({
       messages: [
         ...s.messages,
         { role: "user", content: optimisticContent },
       ],
+      partsMessages: s.isStreaming
+        ? [...s.partsMessages, optimisticUIMsg]
+        : s.partsMessages,
     }));
 
     try {
@@ -724,12 +806,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     }
 
-    // Add user message immediately with metadata.steer=true
+    // Normalized optimistic entry
+    const optimisticUIMsg = normalizeUserMessage(
+      { role: "user", content: optimisticContent, metadata: { steer: true } } as unknown as Record<string, unknown>,
+      -1,
+    );
+
     set((s) => ({
       messages: [
         ...s.messages,
         { role: "user", content: optimisticContent, metadata: { steer: true } },
       ],
+      partsMessages: s.isStreaming
+        ? [...s.partsMessages, optimisticUIMsg]
+        : s.partsMessages,
     }));
 
     try {
@@ -758,6 +848,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         activeToolName: undefined,
         isStreaming: false,
       },
+      streamingMessage: undefined,
+      isStreaming: false,
     });
 
     try {
@@ -871,7 +963,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const { getSessionMessages } = await import("../lib/api-client");
       const { messages } = await getSessionMessages(sessionId);
-      set({ messages });
+      set({
+        messages,
+        partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
+      });
     } catch {
       // silently fail — next SSE snapshot will fix it
     }
