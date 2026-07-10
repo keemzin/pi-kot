@@ -135,6 +135,52 @@ Never bypass `normalize.ts` by reading SDK types directly in ChatView. If you ne
 git checkout 1a37982 -- packages/client/src/
 ```
 
+## 🧩 Tool Renderer Registry (`toolRegistry.tsx`)
+
+**`packages/client/src/lib/tool-registry.tsx`** — A registry that maps tool names to custom React renderer components, replacing hardcoded `if/else` chains in `ChatView.tsx`.
+
+### Architecture
+```
+tool-call part  ──>  toolRegistry.get(toolName)  ──>  found? → CustomRenderer
+                                                    └─> not found? → ToolCallBatchCard (default)
+```
+
+### Key files
+| File | Role |
+|------|------|
+| `packages/client/src/lib/tool-registry.tsx` | Defines `ToolRegistry` class + singleton `toolRegistry` export |
+| `packages/client/src/components/ChatView.tsx` | Calls `toolRegistry.get(part.toolName)` and renders custom components |
+
+### API
+```typescript
+import { toolRegistry } from "../lib/tool-registry";
+
+// Register a custom renderer for any tool
+toolRegistry.register("javascript_repl", ({ part, messageId }) => (
+  <ReplSandbox
+    code={(part.args?.code as string) ?? ""}
+    title={(part.args?.title as string) ?? ""}
+    isRunning={part.state === "running"}
+  />
+));
+```
+
+### Behavior
+- **If a tool is registered**: `ChatView` renders it as a standalone message bubble (flushes any pending `ToolCallBatchCard` first).
+- **If a tool is NOT registered**: Falls through to `ToolCallBatchCard` (default tool card). **No behavior changes** — all existing tools work exactly as before.
+- **Registration can happen anywhere**: At the top of `ChatView.tsx`, in a separate module, or loaded dynamically from an extension bundle.
+
+### When adding a new custom renderer
+1. Create a React component that accepts `ToolRendererProps` (`{ part: ToolCallPart, messageId: string }`).
+2. Register it with `toolRegistry.register("tool_name", MyComponent)`.
+3. Done. **Do NOT modify `ChatView.tsx`.**
+
+### Extension auto-loading (future)
+This registry enables a future pipeline where server extensions ship a `clientScript` bundle that registers renderers on load:
+```
+Extension installed  →  Server serves client bundle  →  App loads bundle  →  toolRegistry.register() fires  →  ChatView renders custom UI
+```
+
 ## 🔍 context-mode First Code Lookup (CRITICAL)
 - **Use context-mode tools for all code exploration, file analysis, and multi-command research.** Refer to the tool hierarchy below.
 - **`ctx_search` (knowledge base)**: First stop for any codebase query. Searches previously indexed content, auto-captured session events (decisions, errors, blockers, plans), and documentation. Use 2-4 specific technical terms per query.

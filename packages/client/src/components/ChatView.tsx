@@ -6,7 +6,23 @@ import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
+
+// Register custom tool renderers
+toolRegistry.register("javascript_repl", ({ part }) => (
+  <ReplSandbox
+    code={(part.args?.code as string) ?? ""}
+    title={(part.args?.title as string) ?? ""}
+    serverOutput={
+      part.state !== "input-available" && part.state !== "running"
+        ? part.output ?? ""
+        : undefined
+    }
+    isRunning={part.state === "running"}
+    isError={part.state === "error"}
+  />
+));
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -1081,25 +1097,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             flushProse(m.id, prose);
             prose.length = 0;
 
-            // javascript_repl gets its own individual render (needs sandbox)
-            if (part.toolName === "javascript_repl") {
-              flushToolBatch(`prerepl-${m.id}`);
-              const code = (part.args?.code as string) ?? "";
-              const title = (part.args?.title as string) ?? "";
+            const CustomRenderer = toolRegistry.get(part.toolName);
+
+            if (CustomRenderer) {
+              flushToolBatch(`precustom-${m.id}-${part.toolCallId}`);
               elements.push(
-                <div key={`repl-${m.id}-${part.toolCallId}`} className="message-row assistant">
+                <div key={`custom-${m.id}-${part.toolCallId}`} className="message-row assistant">
                   <div className="message-bubble assistant">
-                    <ReplSandbox
-                      code={code}
-                      title={title}
-                      serverOutput={
-                        part.state !== "input-available" && part.state !== "running"
-                          ? part.output ?? ""
-                          : undefined
-                      }
-                      isRunning={part.state === "running"}
-                      isError={part.state === "error"}
-                    />
+                    <CustomRenderer part={part} messageId={m.id} />
                   </div>
                 </div>,
               );
