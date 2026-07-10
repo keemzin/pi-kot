@@ -6,20 +6,50 @@ import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { toolRegistry } from "../lib/tool-registry";
+import { ReplSandbox } from "./ReplSandbox";
+
+// Register custom tool renderers
+toolRegistry.register("javascript_repl", ({ part }) => (
+  <ReplSandbox
+    code={(part.args?.code as string) ?? ""}
+    title={(part.args?.title as string) ?? ""}
+    serverOutput={
+      part.state !== "input-available" && part.state !== "running"
+        ? part.output ?? ""
+        : undefined
+    }
+    isRunning={part.state === "running"}
+    isError={part.state === "error"}
+  />
+));
+import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
+import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 import {
-  buildToolCallPairing,
-  splitAssistantToolSegments,
-  isPairedToolResult,
-  getToolCallId,
-  toolPreviewFromArgs,
-  countDiffLines,
-  type PairableMessage,
-  type ToolCallPairing,
-  type ToolBatchEntry,
-  type AssistantRenderSegment,
-} from "../lib/tool-call-pairing";
+  type UIMessage,
+  type UIPart,
+  type TextPart,
+  type ThinkingPart,
+  type ToolCallPart,
+  type BashExecPart,
+  type ImagePart,
+} from "../lib/normalize";
+
+/** Local mirror of old tool-call-pairing types (for ToolCallEntry/ToolCallBatchCard compat). */
+interface PairableMessage {
+  role?: string;
+  type?: string;
+  content?: unknown;
+  toolCallId?: unknown;
+  [key: string]: unknown;
+}
+interface ToolBatchEntry {
+  kind: "tool" | "thinking";
+  block: Record<string, unknown>;
+  result?: PairableMessage | undefined;
+}
 
 /** Shape of a bash execution message from the SDK. */
 interface BashExecMessage {
@@ -163,7 +193,11 @@ function getToolIcon(name: string): string {
 
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
+  const showThinking = usePreferencesStore((s) => s.showThinking);
   const [open, setOpen] = useState(false);
+
+  if (!showThinking) return null;
+
   return (
     <details
       open={open}
@@ -313,49 +347,7 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 }
 
 /** Render an assistant prose/thinking block. */
-function AssistantBlock({ block }: { block: Record<string, unknown> }) {
-  const type = block.type;
-  if (type === "text" && typeof block.text === "string") {
-    return <ChatMarkdown text={block.text} />;
-  }
-  if (type === "thinking" && typeof block.thinking === "string") {
-    return <ThinkingBlock text={block.thinking} />;
-  }
-  return null;
-}
 
-/** Choose rendering strategy for an assistant render segment. */
-function AssistantRenderSegmentView({
-  segment,
-}: {
-  segment: AssistantRenderSegment;
-}) {
-  if (segment.kind === "assistant" && segment.content !== undefined) {
-    const blocks = segment.content;
-    return (
-      <div className="assistant-blocks">
-        {blocks.map((block: Record<string, unknown>, i: number) => (
-          <AssistantBlock key={i} block={block} />
-        ))}
-      </div>
-    );
-  }
-
-  const entries = segment.entries;
-  if (!entries) return null;
-  const toolEntry = entries.find((entry: ToolBatchEntry) => entry.kind === "tool");
-  const hasThinking = entries.some((entry: ToolBatchEntry) => entry.kind === "thinking");
-  const toolCount = entries.filter((e: ToolBatchEntry) => e.kind === "tool").length;
-
-  if (toolCount === 1 && !hasThinking && toolEntry !== undefined) {
-    return (
-      <div className="tool-timeline">
-        <ToolCallEntry block={toolEntry.block} result={toolEntry.result} />
-      </div>
-    );
-  }
-  return <ToolCallBatchCard entries={entries} />;
-}
 
 /* ── Sticky user message component ── */
 
@@ -581,16 +573,27 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
         quality: 1,
         pixelRatio: 3,
         backgroundColor: bgColor,
+        // Skip web font embedding — html-to-image can't read CSS rules
+        // from cross-origin stylesheets (Google Fonts via fonts.googleapis.com).
+        // The PNG will use system fallback fonts, which is fine for screenshots.
+        skipFonts: true,
       });
 
       document.body.removeChild(wrapper);
 
+      // Convert data URL to blob to avoid Chromium's
+      // "loaded over an insecure connection" warning for HTTP origins.
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
       link.download = `message-${Date.now()}.png`;
-      link.href = dataUrl;
+      link.href = blobUrl;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
     } catch (err) {
       console.error("Failed to save message as PNG:", err);
     } finally {
@@ -855,18 +858,18 @@ function ModelBadge({ msg, fallbackModel, fallbackProvider }: {
 const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
-  const messages = useSessionStore((s) => s.messages);
+  const partsMessages = useSessionStore((s) => s.partsMessages);
+  const streamingMessage = useSessionStore((s) => s.streamingMessage);
+  const isStreaming = useSessionStore((s) => s.isStreaming);
   const rawCompactions = useSessionStore((s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS);
   // Only show compaction cards when the current leaf is AT a compaction
   // point (messages[0] is the SDK-synthesized compactionSummary). If you
   // navigate to a pre-compaction leaf, messages[0] is a normal user
   // message and compaction cards should be hidden.
-  const compactions = (messages as PairableMessage[])[0]?.role === "compactionSummary"
+  const rawMessages = useSessionStore((s) => s.messages);
+  const compactions = (rawMessages as Record<string, unknown>[])[0]?.role === "compactionSummary"
     ? rawCompactions
     : EMPTY_COMPACTIONS;
-  const streamText = useSessionStore((s) => s.streamState.text);
-  const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
-  const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const queued = useSessionStore((s) => s.queuedBySession[sessionId]);
   const error = useSessionStore((s) => s.error);
   const clearError = useSessionStore((s) => s.clearError);
@@ -875,6 +878,86 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
   const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
+
+  // Push artifacts to the Artifacts Panel — scans both tool outputs AND
+  // assistant text (fenced code blocks like ```svg, ```html, ```json, ```md)
+  const pushArtifact = useLayoutStore((s) => s.pushArtifact);
+  const seenArtifactIds = useRef(new Set<string>());
+  useEffect(() => {
+    const allMsgs = [...partsMessages, ...(streamingMessage ? [streamingMessage] : [])];
+    for (const msg of allMsgs) {
+      for (const part of msg.parts) {
+        // ── Tool outputs ──
+        if (part.type === "tool-call") {
+          if (part.state === "running" || part.state === "input-available") continue;
+          if (seenArtifactIds.current.has(part.toolCallId)) continue;
+          const output = part.output ?? "";
+          const trimmed = output.trim();
+
+          // Detect artifact type from tool output content
+          let artType: string | undefined;
+          let artTitle: string = part.toolName === "javascript_repl"
+            ? ((part.args?.title as string) || "REPL Output")
+            : part.toolName;
+
+          if (/^\s*<!doctype\s+html/i.test(trimmed) || /^\s*<html/i.test(trimmed)) {
+            artType = "html";
+          } else if (/^\s*<svg/i.test(trimmed) && trimmed.includes("</svg>")) {
+            artType = "svg";
+          } else if (/^data:image\//.test(trimmed)) {
+            artType = "image";
+          } else if (/^\s*[\[\{]/.test(trimmed)) {
+            try { JSON.parse(trimmed); artType = "json"; } catch {}
+          }
+
+          if (artType) {
+            seenArtifactIds.current.add(part.toolCallId);
+            pushArtifact({ title: artTitle, type: artType as any, content: output, sessionId });
+            if (isStreaming) {
+              useLayoutStore.getState().setExplorerTab("artifacts");
+            }
+          }
+        }
+        // ── Assistant text — extract fenced code blocks ──
+        if (part.type === "text") {
+          const fenceRe = /```(svg|html|json|markdown|md|text|plain|txt|image)\s*\n([\s\S]*?)```/gi;
+          let match: RegExpExecArray | null;
+          while ((match = fenceRe.exec(part.text)) !== null) {
+            const rawLang = match[1].toLowerCase();
+            const content = match[2].trim();
+            const artifactId = `${msg.id}-text-${match.index}`;
+            if (seenArtifactIds.current.has(artifactId)) continue;
+            seenArtifactIds.current.add(artifactId);
+
+            // Normalize language to artifact type
+            let type: string;
+            let title: string;
+            switch (rawLang) {
+              case "svg":
+                type = "svg"; title = "SVG"; break;
+              case "html":
+                type = "html"; title = "HTML"; break;
+              case "json":
+                type = "json"; title = "JSON"; break;
+              case "markdown": case "md":
+                type = "markdown"; title = "Markdown"; break;
+              case "text": case "plain": case "txt":
+                type = "text"; title = "Text"; break;
+              case "image":
+                type = "image"; title = "Image"; break;
+              default:
+                type = "text"; title = "Text";
+            }
+
+            pushArtifact({ title, type: type as any, content, sessionId });
+            if (isStreaming) {
+              useLayoutStore.getState().setExplorerTab("artifacts");
+            }
+          }
+        }
+      }
+    }
+  }, [partsMessages, streamingMessage, pushArtifact, sessionId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
@@ -892,31 +975,30 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   };
 
   // Layout effect: runs before paint, so scroll-to-bottom happens
-  // before the user sees anything. Fires on every message/streaming
-  // change — not just session switches. When the user has scrolled up,
-  // restores scrollTop to prevent browser scroll anchoring from
-  // nudging the viewport when content below them changes.
+  // before the user sees anything.
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (el === null || messages.length === 0) return;
+    const hasContent = partsMessages.length > 0 || streamingMessage !== undefined;
+    if (el === null || !hasContent) return;
     if (isFollowingBottomRef.current) {
       el.scrollTop = el.scrollHeight;
       lastScrollTopRef.current = el.scrollTop;
     } else {
-      // User scrolled up — restore position to prevent browser nudge
       el.scrollTop = lastScrollTopRef.current;
     }
-  }, [messages, streamText]);
+  }, [partsMessages, streamingMessage]);
 
-  // Build tool pairing once per render cycle
-  const pairing = useMemo(() => buildToolCallPairing(messages as PairableMessage[]), [messages]);
+  // Derive active tool name from the streaming message's running tool calls
+  const activeToolName = useMemo(() => {
+    if (!streamingMessage) return undefined;
+    const running = streamingMessage.parts.find(
+      (p): p is ToolCallPart => p.type === "tool-call" && p.state === "running",
+    );
+    return running?.toolName;
+  }, [streamingMessage]);
 
   // Render loop: iterate messages by flat index so
-  // CompactionCards splice at arbitrary insertBeforeIndex positions,
-  // not just at user message boundaries. Preserves turn-grouped
-  // visual layout (sticky user header, copy/rewind buttons).
   const renderedRows = useMemo(() => {
-    const { toolResultsById } = pairing;
     const out: React.ReactNode[] = [];
 
     // Group compactions by insertBeforeIndex for O(1) lookup.
@@ -927,113 +1009,194 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       compactionsAt.set(ev.insertBeforeIndex, list);
     }
 
-    // Helper: push all compaction cards for a given index.
-    const pushCardsAt = (idx: number): void => {
-      const events = compactionsAt.get(idx);
+    const renderArchived = (ev: CompactionEvent): React.ReactNode => (
+      <ArchivedMessages messages={ev.archivedMessages} />
+    );
+
+    // Push all compaction cards for a given raw message index.
+    const pushCardsAt = (rawIdx: number): void => {
+      const events = compactionsAt.get(rawIdx);
       if (events === undefined) return;
       for (const ev of events) {
-        out.push(<CompactionCard key={`compaction-${ev.id}`} event={ev} />);
+        out.push(<CompactionCard key={`compaction-${ev.id}`} event={ev} renderArchived={() => renderArchived(ev)} />);
       }
     };
 
-    // Kept-window range: messages in [1, latestCard.insertBeforeIndex)
-    // are hidden from inline bubbles; they appear inside the latest
-    // CompactionCard's expand drawer instead.
+    // Kept-window: messages with rawIndex in [1, latestCard.insertBeforeIndex)
+    // are hidden from inline rendering (shown inside CompactionCard expand).
     const latestCard =
       compactions.length > 0 ? compactions[compactions.length - 1] : undefined;
     const keptWindowEnd = latestCard?.insertBeforeIndex ?? 0;
 
-    // Helper: extract images from a user message's content
-    const userImages = (m: PairableMessage) => extractImages(m.content);
+    // Extract images from a UIMessage's parts
+    const userImagesFromMsg = (msg: UIMessage): { mimeType: string; data: string; __blobUrl?: boolean }[] =>
+      msg.parts
+        .filter((p): p is ImagePart => p.type === "image")
+        .map((p) => ({ mimeType: p.mimeType, data: p.data, __blobUrl: p.__blobUrl }));
 
-    // Common helper: assistant message rendering (tool batching etc.)
-    const renderAssistantMsgs = (msgs: PairableMessage[], turnIdx: number) => {
+    // Combine text from text parts
+    const combineText = (parts: UIPart[]): string =>
+      parts
+        .filter((p): p is TextPart => p.type === "text")
+        .map((p) => p.text)
+        .join("\n\n");
+
+    // Render a list of assistant messages by their parts.
+    // Matches the old code's accumulation pattern from 1a37982:
+    //   - Thinking blocks are pushed to prose, then TRAILING thinking
+    //     before a tool call is extracted and bundled INTO the tool batch
+    //   - Tools accumulate across messages via toolEntries
+    //   - Prose segments flush the tool batch first (tools before text)
+    const renderAssistantParts = (msgs: UIMessage[]): React.ReactNode[] => {
       const elements: React.ReactNode[] = [];
-      const pendingBatch: ToolBatchEntry[] = [];
-      let renderedBatchSerial = 0;
+      const toolEntries: ToolBatchEntry[] = [];
+      let contentSerial = 0;
 
-      const flushPendingBatch = () => {
-        if (pendingBatch.length === 0) return;
-        const chunk = [...pendingBatch];
-        pendingBatch.length = 0;
-        const batchKey = `turn-${turnIdx}-batch-${renderedBatchSerial}`;
+      const flushToolBatch = (key: string) => {
+        if (toolEntries.length === 0) return;
+        const snapshot = toolEntries.slice();
         elements.push(
-          <div key={batchKey}>
-            <ToolCallBatchCard entries={chunk} />
+          <div key={key} className="message-row assistant">
+            <div className="message-bubble assistant">
+              <ToolCallBatchCard entries={snapshot as any} />
+            </div>
           </div>,
         );
-        renderedBatchSerial += 1;
+        toolEntries.length = 0;
+      };
+
+      // Render a group of text/thinking parts inside a single bubble.
+      // Flushes accumulated tools BEFORE rendering prose (matching old
+      // splitAssistantToolSegments: tools segments come before prose).
+      const flushProse = (msgId: string, parts: (TextPart | ThinkingPart)[]) => {
+        if (parts.length === 0) return;
+        flushToolBatch(`pretool-${msgId}-${contentSerial}`);
+        const serial = contentSerial++;
+        elements.push(
+          <div key={`prose-${msgId}-${serial}`} className="message-row assistant">
+            <div className="message-bubble assistant">
+              <div className="assistant-blocks">
+                {parts.map((p, i) =>
+                  p.type === "text" ? (
+                    <ChatMarkdown key={i} text={p.text} />
+                  ) : (
+                    <ThinkingBlock key={i} text={p.text} />
+                  ),
+                )}
+              </div>
+            </div>
+          </div>,
+        );
+      };
+
+      // Extract trailing thinking blocks from prose (matching old
+      // takeTrailingToolRunContext). These get bundled INTO the tool batch.
+      const extractTrailingThinking = (prose: (TextPart | ThinkingPart)[]): ToolBatchEntry[] => {
+        const result: ToolBatchEntry[] = [];
+        while (prose.length > 0) {
+          const last = prose[prose.length - 1]!;
+          if (last.type !== "thinking") break;
+          prose.pop();
+          result.unshift({ kind: "thinking", block: { type: "thinking", thinking: last.text } as Record<string, unknown> });
+        }
+        return result;
       };
 
       for (const m of msgs) {
-        if (Array.isArray(m.content)) {
-          const segments = splitAssistantToolSegments(
-            m.content as Record<string, unknown>[],
-            toolResultsById,
-          );
-          if (segments !== undefined) {
-            for (const seg of segments) {
-              if (seg.kind === "tools" && seg.entries) {
-                pendingBatch.push(...seg.entries);
-                continue;
-              }
-              flushPendingBatch();
+        const prose: (TextPart | ThinkingPart)[] = [];
+
+        for (const part of m.parts) {
+          if (part.type === "bash-exec") {
+            flushProse(m.id, prose);
+            prose.length = 0;
+            flushToolBatch(`prebash-${m.id}`);
+
+            const msgForBubble: BashExecMessage & { _pendingExec?: boolean } = {
+              role: "bashExecution",
+              command: part.command,
+              output: part.output,
+              exitCode: part.exitCode,
+              cancelled: part.cancelled,
+              truncated: part.truncated,
+              timestamp: Date.now(),
+              _pendingExec: part.state === "running",
+            };
+            elements.push(
+              <BashExecBubble key={`bash-${m.id}`} msg={msgForBubble} sessionId={sessionId} />,
+            );
+          } else if (part.type === "tool-call") {
+            // Extract trailing thinking from prose (bundles INTO batch)
+            const trailing = extractTrailingThinking(prose);
+            // Flush remaining text-only prose (flushes tools first)
+            flushProse(m.id, prose);
+            prose.length = 0;
+
+            const CustomRenderer = toolRegistry.get(part.toolName);
+
+            if (CustomRenderer) {
+              flushToolBatch(`precustom-${m.id}-${part.toolCallId}`);
               elements.push(
-                <div key={`turn-${turnIdx}-seg-${elements.length}`} className="message-row assistant">
+                <div key={`custom-${m.id}-${part.toolCallId}`} className="message-row assistant">
                   <div className="message-bubble assistant">
-                    <AssistantRenderSegmentView segment={seg} />
+                    <CustomRenderer part={part} messageId={m.id} />
                   </div>
                 </div>,
               );
+              continue;
             }
-            continue;
+
+            // Add trailing thinking + tool to accumulated entries
+            toolEntries.push(...trailing);
+            toolEntries.push({
+              kind: "tool",
+              block: {
+                name: part.toolName,
+                arguments: part.args,
+                id: part.toolCallId,
+              } as Record<string, unknown>,
+              result:
+                part.state !== "input-available" && part.state !== "running"
+                  ? ({
+                      content: [{ type: "text", text: part.output ?? "" }],
+                      isError: part.state === "error",
+                    } as unknown as Record<string, unknown>)
+                  : undefined,
+            } as ToolBatchEntry);
+          } else {
+            // text or thinking — accumulate in prose array
+            prose.push(part as TextPart | ThinkingPart);
           }
         }
 
-        flushPendingBatch();
-        const text = extractText(m.content);
-        if (text.length > 0) {
-          elements.push(
-            <div key={`turn-${turnIdx}-text-${elements.length}`} className="message-row assistant">
-              <div className="message-bubble assistant">
-                <ChatMarkdown text={text} />
-              </div>
-            </div>,
-          );
-        }
+        // Flush remaining prose at message boundary (flushes tools first)
+        flushProse(m.id, prose);
+        // Tools are NOT flushed here — they accumulate across messages
       }
-      flushPendingBatch();
+
+      // Flush remaining tools at end of turn
+      flushToolBatch(`toolbatch-end`);
       return elements;
     };
 
-    // Turn-grouped rendering helpers (for sticky user header mode)
-    // Collect messages by turn during flat iteration, then flush
-    // the accumulated turn as a grouped container.
-    let currentUserIdx = -1;
-    let currentUserMsg: PairableMessage | undefined;
-    const currentAssistantMsgs: PairableMessage[] = [];
+    // ── Turn-grouped rendering ──
+    let currentUser: UIMessage | undefined;
+    let currentAssistants: UIMessage[] = [];
 
     const flushTurn = (): void => {
-      if (currentUserMsg === undefined) return;
-      const text = extractText(currentUserMsg.content);
-      const combinedAssistantText = currentAssistantMsgs
-        .map(m => extractText(m.content))
-        .filter(t => t.length > 0)
+      if (currentUser === undefined) return;
+      const text = combineText(currentUser.parts);
+      const combinedAssistantText = currentAssistants
+        .map((m) => combineText(m.parts))
+        .filter((t) => t.length > 0)
         .join("\n\n");
 
-      const isSteer = (currentUserMsg.metadata as { steer?: boolean } | undefined)?.steer === true;
-
-      // Read model info from the LAST assistant message in this turn
-      // so the badge reflects the actual generating model, not the
-      // currently-selected one. Falls back to the global props if the
-      // message object doesn't carry model info (older sessions).
-      const lastAssistantMsg = currentAssistantMsgs.length > 0
-        ? (currentAssistantMsgs[currentAssistantMsgs.length - 1] as Record<string, unknown>)
-        : undefined;
+      const isSteer =
+        (currentUser.metadata as { steer?: boolean } | undefined)?.steer === true;
+      const lastAssistant = currentAssistants[currentAssistants.length - 1];
 
       if (stickyUserHeader && text.length > 0) {
         out.push(
-          <div key={`turn-${currentUserIdx}`} style={{ position: "relative" }}>
+          <div key={`turn-${currentUser.id}`} style={{ position: "relative" }}>
             <div
               style={{
                 position: "sticky",
@@ -1043,7 +1206,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 overflowAnchor: "none",
               }}
             >
-              <UserMessageBubble text={text} isSteer={isSteer} images={userImages(currentUserMsg)} />
+              <UserMessageBubble text={text} isSteer={isSteer} images={userImagesFromMsg(currentUser)} />
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
@@ -1065,116 +1228,115 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 }}
               />
             </div>
-            {currentAssistantMsgs.length > 0 &&
-              renderAssistantMsgs(currentAssistantMsgs, currentUserIdx)}
+            {renderAssistantParts(currentAssistants)}
             {combinedAssistantText.length > 0 && (
               <div className="assistant-msg-footer">
                 <CopyMsgButton getText={() => combinedAssistantText} />
                 <SaveAsPngButton getText={() => combinedAssistantText} />
-                {showTokenUsage && <TokenUsageBadge msg={lastAssistantMsg} />}
-                <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
+                {showTokenUsage && (
+                  <TokenUsageBadge msg={lastAssistant as unknown as Record<string, unknown>} />
+                )}
+                <ModelBadge
+                  msg={lastAssistant as unknown as Record<string, unknown>}
+                  fallbackModel={modelName}
+                  fallbackProvider={providerName}
+                />
               </div>
             )}
           </div>,
         );
       } else {
-        // Non-sticky mode: render user message normally
+        // Non-sticky mode
         out.push(
           <div
-            key={`user-${currentUserIdx}`}
+            key={`user-${currentUser.id}`}
             className="message-row user"
-            data-message-index={currentUserIdx}
+            data-message-raw-index={currentUser.rawIndex}
           >
             <div className="message-bubble user">
               {isSteer && <span className="steer-tag">steer</span>}
-              <UserImages images={userImages(currentUserMsg)} />
+              <UserImages images={userImagesFromMsg(currentUser)} />
               {text}
             </div>
           </div>,
         );
         if (text.length > 0) {
           out.push(
-            <div key={`user-${currentUserIdx}-copy`} className="assistant-msg-footer user">
+            <div key={`user-${currentUser.id}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
               {rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
             </div>,
           );
         }
-        if (currentAssistantMsgs.length > 0) {
-          out.push(...renderAssistantMsgs(currentAssistantMsgs, currentUserIdx));
-        }
+        if (currentAssistants.length > 0) out.push(...renderAssistantParts(currentAssistants));
         if (combinedAssistantText.length > 0) {
           out.push(
-            <div key={`turn-${currentUserIdx}-copy`} className="assistant-msg-footer">
+            <div key={`turn-${currentUser.id}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
               <SaveAsPngButton getText={() => combinedAssistantText} />
-              {showTokenUsage && <TokenUsageBadge msg={lastAssistantMsg} />}
-              <ModelBadge msg={lastAssistantMsg} fallbackModel={modelName} fallbackProvider={providerName} />
+              {showTokenUsage && (
+                <TokenUsageBadge msg={lastAssistant as unknown as Record<string, unknown>} />
+              )}
+              <ModelBadge
+                msg={lastAssistant as unknown as Record<string, unknown>}
+                fallbackModel={modelName}
+                fallbackProvider={providerName}
+              />
             </div>,
           );
         }
       }
 
-      currentUserMsg = undefined;
-      currentAssistantMsgs.length = 0;
+      currentUser = undefined;
+      currentAssistants = [];
     };
 
-    // ── Flat index iteration ──
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i] as PairableMessage;
+    // ── Iterate normalized parts messages ──
+    // 🔔 Insert compaction cards at rawIndex=0 (compactionSummary was
+    // filtered out by normalizeMessages, so no msg has rawIndex=0).
+    pushCardsAt(0);
+    for (const msg of partsMessages) {
+      // Insert compaction cards based on the raw message index
+      pushCardsAt(msg.rawIndex);
 
-      // Compaction cards render BEFORE the message at index i.
-      pushCardsAt(i);
-
-      // Tool results are rendered inline with their tool call.
-      if (isPairedToolResult(pairing, m)) continue;
-
-      // Skip the SDK-synthesized compactionSummary — the same text
-      // is inside our CompactionCard.
-      if (m.role === "compactionSummary") {
+      // Kept-window: messages with rawIndex in [1, keptWindowEnd) are archived
+      if (latestCard !== undefined && msg.rawIndex >= 1 && msg.rawIndex < keptWindowEnd) {
         continue;
       }
 
-      // Kept-window suppression: messages between index 1 and
-      // keptWindowEnd were kept verbatim by the latest compaction
-      // and appear inside that card's expand drawer.
-      if (latestCard !== undefined && i >= 1 && i < keptWindowEnd) {
-        continue;
-      }
-
-      if (m.role === "user") {
+      if (msg.role === "user") {
         flushTurn();
-        currentUserIdx = i;
-        currentUserMsg = m;
-      } else if (m.role === "assistant") {
-        if (currentUserMsg !== undefined) {
-          currentAssistantMsgs.push(m);
+        currentUser = msg;
+      } else {
+        // Assistant message (may contain bash-exec, text, thinking, tool-call parts)
+        if (currentUser !== undefined) {
+          currentAssistants.push(msg);
         } else {
-          // Orphan assistant message (kept-window boundary case where
-          // the preceding user was hidden). Render standalone.
-          out.push(<div key={`orphan-${i}`} data-message-index={i}>
-            {renderAssistantMsgs([m], i)}
-          </div>);
+          // Orphan assistant (kept-window edge case)
+          out.push(...renderAssistantParts([msg]));
         }
-      } else if (m.role === "bashExecution") {
-        // Bash execution messages (!cmd / !!cmd) render as standalone bubbles
-        flushTurn();
-        out.push(
-          <BashExecBubble key={`bash-${i}`} msg={m as unknown as BashExecMessage} sessionId={sessionId} />,
-        );
       }
     }
 
-    // Flush the last accumulated turn.
     flushTurn();
 
-    // Trailing cards: insertBeforeIndex === messages.length means
-    // the entire current context was archived with no new messages
-    // yet. Render the card at the bottom.
-    pushCardsAt(messages.length);
+    // Trailing compaction cards
+    const lastRawIdx =
+      partsMessages.length > 0
+        ? partsMessages[partsMessages.length - 1].rawIndex + 1
+        : rawMessages.length;
+    pushCardsAt(lastRawIdx);
 
     return out;
-  }, [messages, pairing, stickyUserHeader, compactions, sessionId, rewindAvailable]);
+  }, [
+    partsMessages,
+    streamingMessage,
+    stickyUserHeader,
+    compactions,
+    sessionId,
+    rewindAvailable,
+    rawMessages,
+  ]);
 
   return (
     <div className="messages-container" style={stickyUserHeader ? { paddingTop: 50 } : undefined}>
@@ -1184,7 +1346,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         </div>
       )}
 
-      {messages.length === 0 && !isStreaming ? (
+      {partsMessages.length === 0 && !isStreaming ? (
         <div className="welcome">
           <div className="welcome-icon">💬</div>
           <div className="welcome-text">Send a message to start chatting</div>
@@ -1195,7 +1357,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           <div className="chat-message-list">
             {renderedRows}
 
-            {isStreaming && streamText.length > 0 && (
+            {isStreaming && streamingMessage !== undefined && (
               <div className="message-row assistant streaming-row">
                 <div className="message-bubble assistant streaming-bubble">
                   {activeToolName && (
@@ -1204,15 +1366,20 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                       {activeToolName}
                     </div>
                   )}
-                  <div className="streaming-text">
-                    <ChatMarkdown text={streamText} />
-                    <span className="streaming-cursor">▊</span>
-                  </div>
+                  {streamingMessage.parts.map((part, i) => {
+                    if (part.type === "text") {
+                      return <ChatMarkdown key={i} text={(part as TextPart).text} />;
+                    }
+                    if (part.type === "thinking") {
+                      return <ThinkingBlock key={i} text={(part as ThinkingPart).text} />;
+                    }
+                    return null;
+                  })}
                 </div>
               </div>
             )}
 
-            {isStreaming && streamText.length === 0 && (
+            {isStreaming && streamingMessage === undefined && (
               <div className="message-row assistant streaming-row">
                 <div className="message-bubble assistant thinking-bubble">
                   {activeToolName ? (

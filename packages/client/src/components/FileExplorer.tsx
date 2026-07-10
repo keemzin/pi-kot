@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
+import { SystemPromptTab } from "./SystemPromptTab";
+import { ArtifactsPanel } from "./ArtifactsPanel";
 import { ConfirmDialog } from "./Modal";
 import { FileEditor } from "./FileEditor";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
@@ -78,7 +80,7 @@ async function collectDroppedUploadFiles(dataTransfer: DataTransfer): Promise<Fi
   return files;
 }
 
-export type ExplorerTab = "files" | "git";
+export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt";
 
 interface Props {
   projectId: string;
@@ -747,7 +749,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     zIndex: 120,
     background: "var(--bg-solid)",
     borderLeft: "1px solid var(--border)",
-    boxShadow: "-10px 0 28px rgba(0,0,0,0.35)",
     display: "flex",
     flexDirection: "column",
     width: panelWidth,
@@ -811,12 +812,49 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         >
           ⎇ Git
         </button>
-
+        <button
+          onClick={() => setTab("system-prompt")}
+          style={{
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
+            background: tab === "system-prompt" ? "var(--bg-solid)" : "transparent",
+            color: tab === "system-prompt" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "system-prompt" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          ✦ Prompt
+        </button>
+        <button
+          onClick={() => setTab("artifacts")}
+          style={{
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
+            background: tab === "artifacts" ? "var(--bg-solid)" : "transparent",
+            color: tab === "artifacts" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "artifacts" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          🎨 Artifacts
+        </button>
       </div>
 
       {/* ── Git tab ── */}
       {tab === "git" && (
         <GitPanel projectId={projectId} />
+      )}
+
+      {/* ── System Prompt tab ── */}
+      {tab === "system-prompt" && (
+        <SystemPromptTab projectId={projectId} />
+      )}
+
+      {/* ── Artifacts tab ── */}
+      {tab === "artifacts" && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+          <ArtifactsPanel />
+        </div>
       )}
 
       {/* ── Files tab ── */}
@@ -834,7 +872,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             ref={uploadFolderRef}
             type="file"
             /* @ts-ignore — webkitdirectory is a webkit extension but works in all major browsers */
-            webkitdirectory
+            webkitdirectory="true"
             style={{ display: "none" }}
             onChange={(e) => { handleUpload(e.target.files ? Array.from(e.target.files) : null); e.target.value = ""; }}
           />
@@ -1209,7 +1247,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               background: "var(--bg-solid)",
               border: "1px solid var(--border-bright)",
               borderRadius: "var(--radius-sm)",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
               padding: "4px 0",
               fontSize: "12px",
               userSelect: "none",

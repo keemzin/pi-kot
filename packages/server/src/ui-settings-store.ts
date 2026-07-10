@@ -18,6 +18,7 @@ export type UiSettings = {
   stickyUserHeader: boolean;
   showTokenUsage: boolean;
   compressImages: boolean;
+  showThinking: boolean;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -25,9 +26,10 @@ export type UiSettings = {
 const DEFAULTS: UiSettings = {
   version: 1,
   theme: undefined,
-  stickyUserHeader: false,
+  stickyUserHeader: true,
   showTokenUsage: false,
   compressImages: true,
+  showThinking: false,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ function normalize(value: unknown): UiSettings {
   if (typeof v.stickyUserHeader === "boolean") settings.stickyUserHeader = v.stickyUserHeader;
   if (typeof v.showTokenUsage === "boolean") settings.showTokenUsage = v.showTokenUsage;
   if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
+  if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
 
   return settings;
 }

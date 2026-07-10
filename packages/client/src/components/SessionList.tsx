@@ -4,7 +4,7 @@ import { useSessionStore } from "../stores/session-store";
 import { useFavoriteStore } from "../stores/favorite-store";
 
 const PAGE_SIZE = 8; // sessions shown before "Show more"
-const SEARCH_THRESHOLD = 10; // show search input once a project has this many sessions
+const SEARCH_THRESHOLD = 0; // show search input once a project has this many sessions
 
 interface Props {
   projectId: string;
@@ -202,7 +202,7 @@ export function SessionList({
       {/* ── Empty states ── */}
       {supervisors.length === 0 && workers.length === 0 && (
         <div style={{ padding: "6px 12px 2px", fontSize: "11px", color: "var(--text-dim)", fontStyle: "italic" }}>
-          No sessions yet
+          No sessions yet — click + to start one
         </div>
       )}
       {q && filteredSupervisors.length === 0 && (

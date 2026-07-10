@@ -20,6 +20,12 @@ import {
 import { join, resolve } from "node:path";
 import { mkdir } from "node:fs/promises";
 import { config } from "../config.js";
+import {
+  getProjectSystemPromptAddendum,
+  setProjectSystemPromptAddendum,
+  clearProjectSystemPromptAddendum,
+  MAX_ADDENDUM_BYTES,
+} from "../system-prompt-overrides.js";
 
 export const projectRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /api/v1/projects — list all projects
@@ -324,6 +330,8 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       try {
         await deleteProject(req.params.id);
+        // Clean up system-prompt addendum so orphaned entries don't accumulate
+        await clearProjectSystemPromptAddendum(req.params.id).catch(() => undefined);
         return { deleted: true };
       } catch (err) {
         if (err instanceof ProjectNotFoundError) {
@@ -331,6 +339,107 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
         }
         throw err;
       }
+    },
+  );
+
+  // GET /api/v1/projects/:id/system-prompt — get the project's system prompt addendum
+  fastify.get<{
+    Params: { id: string };
+  }>(
+    "/projects/:id/system-prompt",
+    {
+      schema: {
+        description:
+          "Return the project's system-prompt addendum — free-form text " +
+          "appended to the agent's base system prompt for every session in " +
+          "this project.",
+        tags: ["projects"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["addendum"],
+            properties: { addendum: { type: "string" } },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await getProject(req.params.id);
+      if (project === undefined) {
+        return reply.code(404).send({ error: "project_not_found" });
+      }
+      const addendum = await getProjectSystemPromptAddendum(req.params.id);
+      return { addendum };
+    },
+  );
+
+  // PUT /api/v1/projects/:id/system-prompt — set the project's system prompt addendum
+  fastify.put<{
+    Params: { id: string };
+    Body: { addendum: string };
+  }>(
+    "/projects/:id/system-prompt",
+    {
+      schema: {
+        description:
+          "Replace the project's system-prompt addendum. Pass an empty " +
+          "string to clear it. Capped at 20KB.",
+        tags: ["projects"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          required: ["addendum"],
+          properties: {
+            addendum: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["addendum"],
+            properties: { addendum: { type: "string" } },
+          },
+          400: {
+            type: "object",
+            properties: { error: { type: "string" }, message: { type: "string" } },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await getProject(req.params.id);
+      if (project === undefined) {
+        return reply.code(404).send({ error: "project_not_found" });
+      }
+      const { addendum } = req.body;
+      if (typeof addendum !== "string") {
+        return reply.code(400).send({ error: "invalid_body", message: "addendum must be a string" });
+      }
+      if (Buffer.byteLength(addendum, "utf8") > MAX_ADDENDUM_BYTES) {
+        return reply.code(400).send({
+          error: "addendum_too_large",
+          message: `Addendum exceeds ${MAX_ADDENDUM_BYTES.toLocaleString()} byte limit`,
+        });
+      }
+      await setProjectSystemPromptAddendum(req.params.id, addendum);
+      return { addendum };
     },
   );
 

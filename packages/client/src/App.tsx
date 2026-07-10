@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { FileViewerPanel } from "./components/FileViewerPanel";
 import { TerminalPanel } from "./components/TerminalPanel";
+import { ArtifactsPanel } from "./components/ArtifactsPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { NotificationToast } from "./components/NotificationToast";
 import { SessionList } from "./components/SessionList";
@@ -442,7 +443,7 @@ export function App() {
       )}
       {/* Sidebar — collapsible */}
       <div className={`sidebar${sidebarCollapsed ? " collapsed" : ""}`}>
-        <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="sidebar-header">
           <span
             style={{
               fontSize: "14px",
@@ -476,10 +477,6 @@ export function App() {
                       : connectionState === "error"
                         ? "#e06c75"
                         : "#666",
-                boxShadow:
-                  connectionState === "connected"
-                    ? "0 0 5px rgba(76, 175, 80, 0.6)"
-                    : "none",
                 transition: "all 0.3s",
                 animation: connectionState === "connecting"
                   ? "connection-pulse 1.2s ease-in-out infinite"
@@ -491,28 +488,7 @@ export function App() {
           <button
             onClick={() => setShowAddProjectDialog(true)}
             title="Add a new project"
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-              fontSize: '11px',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              cursor: 'pointer',
-              lineHeight: 1,
-              padding: '4px 8px',
-              borderRadius: 'var(--radius-sm)',
-              transition: 'all var(--duration) var(--ease)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.color = 'var(--text-primary)';
-              e.currentTarget.style.background = 'var(--bg-glass-hover)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.color = 'var(--text-secondary)';
-              e.currentTarget.style.background = 'transparent';
-            }}
+            className="sidebar-add-project"
           >
             Add Project
           </button>
@@ -680,7 +656,7 @@ export function App() {
             {showArchived === activeProjectId && (() => {
               const archived = useSessionStore.getState().archivedSessions[activeProjectId];
               if (archived === undefined) return <div className="archived-status"><LoadingSkeleton variant="list" count={2} /></div>;
-              if (archived.length === 0) return <div className="archived-status">No archived sessions</div>;
+              if (archived.length === 0) return <div className="archived-status">No archived sessions — they appear here once archived</div>;
               return (
                 <div className="session-list project-sublist archived-list">
                   {archived.map((s: SessionSummary) => (
