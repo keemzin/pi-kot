@@ -20,8 +20,8 @@ export interface ViewerTab {
 export interface ArtifactItem {
   id: string;
   title: string;
-  /** "html" | "svg" — determines how it's wrapped before display */
-  type: "html" | "svg";
+  /** Determines how the artifact is displayed */
+  type: "html" | "svg" | "markdown" | "json" | "text" | "image";
   content: string;
   /** session that produced this artifact */
   sessionId: string;

@@ -135,6 +135,49 @@ Never bypass `normalize.ts` by reading SDK types directly in ChatView. If you ne
 git checkout 1a37982 -- packages/client/src/
 ```
 
+## 🎨 Artifacts Panel — Multi-Format Support
+
+**`packages/client/src/components/ArtifactsPanel.tsx`** — Artifacts panel that renders tool outputs and fenced code blocks from the chat as rich previews.
+
+### Supported formats
+
+| Format | Source | Renderer |
+|--------|--------|----------|
+| `html` | ` ```html`, tool output starting with `<!DOCTYPE html>` or `<html>` | Sandboxed iframe |
+| `svg` | ` ```svg`, tool output starting with `<svg>` | Sandboxed iframe (wrapped in HTML doc) |
+| `markdown` | ` ```markdown`, ` ```md` | `ChatMarkdown` (react-markdown + GFM + KaTeX) |
+| `json` | ` ```json`, tool output starting with `{` or `[` (valid JSON) | Syntax-highlighted with prism |
+| `text` | ` ```text`, ` ```plain`, ` ```txt` | Monospace pre (word-wrapped) |
+| `image` | ` ```image`, tool output starting with `data:image/` | `<img>` tag with max-width containment |
+
+### Detection logic (`ChatView.tsx`)
+
+**Tool outputs**: Heuristic detection based on content prefix:
+- `<!DOCTYPE html>` / `<html>` → `html`
+- `<svg>...</svg>` → `svg`
+- `data:image/...` → `image`
+- `{` / `[` that parses as JSON → `json`
+
+**Assistant text**: Fenced code blocks are detected by language tag:
+```
+```html ... ```       → html
+```svg ... ```        → svg
+```json ... ```       → json
+```markdown / ```md   → markdown
+```text / ```plain    → text
+```image ... ```      → image
+```
+
+### Key files
+| File | Role |
+|------|------|
+| `packages/client/src/stores/layout-store.ts` | `ArtifactItem` type + `pushArtifact()` action |
+| `packages/client/src/components/ChatView.tsx` | Scans parts for artifacts on every render |
+| `packages/client/src/components/ArtifactsPanel.tsx` | Renders artifacts by type |
+
+### Non-goal
+Artifacts only capture content that passes **through the chat** (tool outputs, assistant text). Files written to disk via `write`/`edit` tools never become artifacts — they produce text output that renders in `ToolCallBatchCard`.
+
 ## 🧩 Tool Renderer Registry (`toolRegistry.tsx`)
 
 **`packages/client/src/lib/tool-registry.tsx`** — A registry that maps tool names to custom React renderer components, replacing hardcoded `if/else` chains in `ChatView.tsx`.

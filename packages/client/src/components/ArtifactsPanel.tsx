@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLayoutStore, type ArtifactItem } from "../stores/layout-store";
 import { displayInSandbox } from "../lib/sandbox";
+import { ChatMarkdown } from "./ChatMarkdown";
+import { Highlight, themes as prismThemes } from "prism-react-renderer";
 
 const ARTIFACT_MIN_WIDTH = 280;
 const ARTIFACT_MAX_WIDTH = 900;
 
-function ArtifactPreview({ item }: { item: ArtifactItem }) {
+/** HTML/SVG: sandboxed iframe */
+function SandboxPreview({ item }: { item: ArtifactItem }) {
   const containerRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    // Wrap SVG in a full HTML doc so it renders properly
     const html =
       item.type === "svg"
         ? `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -24,12 +25,91 @@ function ArtifactPreview({ item }: { item: ArtifactItem }) {
     return cleanup;
   }, [item]);
 
+  return <div ref={containerRef} style={{ flex: 1, minHeight: 0, overflow: "hidden" }} />;
+}
+
+/** JSON: syntax-highlighted code block */
+function JsonPreview({ content }: { content: string }) {
+  let formatted: string;
+  try {
+    formatted = JSON.stringify(JSON.parse(content), null, 2);
+  } catch {
+    formatted = content;
+  }
   return (
-    <div
-      ref={containerRef}
-      style={{ flex: 1, minHeight: 0, overflow: "hidden" }}
-    />
+    <Highlight theme={prismThemes.nightOwl} code={formatted} language="json">
+      {({ tokens, getLineProps, getTokenProps }) => (
+        <pre style={{ margin: 0, padding: "12px 16px", fontSize: 13, overflow: "auto", flex: 1 }}>
+          {tokens.map((line, i) => (
+            <div key={i} {...getLineProps({ line })}>
+              {line.map((token, j) => (
+                <span key={j} {...getTokenProps({ token })} />
+              ))}
+            </div>
+          ))}
+        </pre>
+      )}
+    </Highlight>
   );
+}
+
+/** Plain text / log output */
+function TextPreview({ content }: { content: string }) {
+  return (
+    <pre
+      style={{
+        margin: 0, padding: "12px 16px", fontSize: 12,
+        fontFamily: "'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace",
+        overflow: "auto", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word",
+        color: "var(--text-primary)", lineHeight: 1.5,
+      }}
+    >
+      {content}
+    </pre>
+  );
+}
+
+/** Image: raw render */
+function ImagePreview({ content }: { content: string }) {
+  const isDataUri = /^data:image\//.test(content);
+  return (
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 16, overflow: "auto" }}>
+      <img
+        src={isDataUri ? content : `data:image/png;base64,${content}`}
+        alt="artifact"
+        style={{ maxWidth: "100%", maxHeight: "100%", borderRadius: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}
+      />
+    </div>
+  );
+}
+
+const ARTIFACT_ICONS: Record<string, string> = {
+  html: "◈",
+  svg: "◇",
+  markdown: "📝",
+  json: "{}",
+  text: "¶",
+  image: "🖼",
+};
+
+function ArtifactPreview({ item }: { item: ArtifactItem }) {
+  switch (item.type) {
+    case "html":
+    case "svg":
+      return <SandboxPreview item={item} />;
+    case "markdown":
+      return (
+        <div style={{ flex: 1, overflow: "auto", padding: "16px 20px", background: "var(--bg-primary)" }}>
+          <ChatMarkdown text={item.content} />
+        </div>
+      );
+    case "json":
+      return <JsonPreview content={item.content} />;
+    case "image":
+      return <ImagePreview content={item.content} />;
+    default:
+      return <TextPreview content={item.content} />;
+  }
 }
 
 export function ArtifactsPanel() {
@@ -50,7 +130,6 @@ export function ArtifactsPanel() {
         background: "var(--bg-primary)",
       }}
     >
-      {/* Panel content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
         {/* Header */}
         <div
@@ -74,7 +153,7 @@ export function ArtifactsPanel() {
           </span>
         </div>
 
-        {/* Tab bar — one tab per artifact */}
+        {/* Tab bar */}
         {artifactItems.length > 1 && (
           <div
             style={{
@@ -107,13 +186,13 @@ export function ArtifactsPanel() {
                 }}
                 title={item.title}
               >
-                {item.type === "svg" ? "◇" : "◈"} {item.title}
+                {ARTIFACT_ICONS[item.type] ?? "◈"} {item.title}
               </button>
             ))}
           </div>
         )}
 
-        {/* Active artifact title (single artifact) */}
+        {/* Active artifact title */}
         {artifactItems.length === 1 && activeItem && (
           <div
             style={{
@@ -125,7 +204,7 @@ export function ArtifactsPanel() {
               flexShrink: 0,
             }}
           >
-            {activeItem.type === "svg" ? "◇ SVG" : "◈ HTML"} · {activeItem.title}
+            {ARTIFACT_ICONS[activeItem.type] ?? "◈"} {activeItem.type.toUpperCase()} · {activeItem.title}
           </div>
         )}
 

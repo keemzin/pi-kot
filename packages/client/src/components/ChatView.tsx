@@ -879,8 +879,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
   const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 
-  // Push HTML/SVG to the Artifacts Panel — scans both tool outputs AND
-  // assistant text (markdown fenced code blocks like ```svg ... ```)
+  // Push artifacts to the Artifacts Panel — scans both tool outputs AND
+  // assistant text (fenced code blocks like ```svg, ```html, ```json, ```md)
   const pushArtifact = useLayoutStore((s) => s.pushArtifact);
   const seenArtifactIds = useRef(new Set<string>());
   useEffect(() => {
@@ -892,36 +892,64 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           if (part.state === "running" || part.state === "input-available") continue;
           if (seenArtifactIds.current.has(part.toolCallId)) continue;
           const output = part.output ?? "";
-          const isHtml = /^\s*<!doctype\s+html/i.test(output) || /^\s*<html/i.test(output);
-          const isSvg  = /^\s*<svg/i.test(output) && output.includes("</svg>");
-          if (isHtml || isSvg) {
+          const trimmed = output.trim();
+
+          // Detect artifact type from tool output content
+          let artType: string | undefined;
+          let artTitle: string = part.toolName === "javascript_repl"
+            ? ((part.args?.title as string) || "REPL Output")
+            : part.toolName;
+
+          if (/^\s*<!doctype\s+html/i.test(trimmed) || /^\s*<html/i.test(trimmed)) {
+            artType = "html";
+          } else if (/^\s*<svg/i.test(trimmed) && trimmed.includes("</svg>")) {
+            artType = "svg";
+          } else if (/^data:image\//.test(trimmed)) {
+            artType = "image";
+          } else if (/^\s*[\[\{]/.test(trimmed)) {
+            try { JSON.parse(trimmed); artType = "json"; } catch {}
+          }
+
+          if (artType) {
             seenArtifactIds.current.add(part.toolCallId);
-            pushArtifact({
-              title: part.toolName === "javascript_repl"
-                ? ((part.args?.title as string) || "REPL Output")
-                : part.toolName,
-              type: isSvg ? "svg" : "html",
-              content: output,
-              sessionId,
-            });
+            pushArtifact({ title: artTitle, type: artType as any, content: output, sessionId });
             if (isStreaming) {
               useLayoutStore.getState().setExplorerTab("artifacts");
             }
           }
         }
-        // ── Assistant text — extract fenced ```svg / ```html blocks ──
+        // ── Assistant text — extract fenced code blocks ──
         if (part.type === "text") {
-          const fenceRe = /```(svg|html)\s*\n([\s\S]*?)```/gi;
+          const fenceRe = /```(svg|html|json|markdown|md|text|plain|txt|image)\s*\n([\s\S]*?)```/gi;
           let match: RegExpExecArray | null;
           while ((match = fenceRe.exec(part.text)) !== null) {
-            const lang    = match[1].toLowerCase() as "svg" | "html";
+            const rawLang = match[1].toLowerCase();
             const content = match[2].trim();
-            // Use start index as a stable ID so we don't push duplicates on re-renders
             const artifactId = `${msg.id}-text-${match.index}`;
             if (seenArtifactIds.current.has(artifactId)) continue;
-            // Only push complete blocks (no dangling opening fence)
             seenArtifactIds.current.add(artifactId);
-            pushArtifact({ title: lang === "svg" ? "SVG" : "HTML", type: lang, content, sessionId });
+
+            // Normalize language to artifact type
+            let type: string;
+            let title: string;
+            switch (rawLang) {
+              case "svg":
+                type = "svg"; title = "SVG"; break;
+              case "html":
+                type = "html"; title = "HTML"; break;
+              case "json":
+                type = "json"; title = "JSON"; break;
+              case "markdown": case "md":
+                type = "markdown"; title = "Markdown"; break;
+              case "text": case "plain": case "txt":
+                type = "text"; title = "Text"; break;
+              case "image":
+                type = "image"; title = "Image"; break;
+              default:
+                type = "text"; title = "Text";
+            }
+
+            pushArtifact({ title, type: type as any, content, sessionId });
             if (isStreaming) {
               useLayoutStore.getState().setExplorerTab("artifacts");
             }
