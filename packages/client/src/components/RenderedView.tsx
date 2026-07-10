@@ -78,26 +78,30 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           }}
         >
           <code>
-            {tokens.map((line, i) => (
-              <div key={i} {...getLineProps({ line, key: i })}>
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "2ch",
-                    textAlign: "right",
-                    marginRight: "12px",
-                    userSelect: "none",
-                    opacity: 0.35,
-                    fontSize: "11px",
-                  }}
-                >
-                  {i + 1}
-                </span>
-                {line.map((token, key) => (
-                  <span key={key} {...getTokenProps({ token, key })} />
-                ))}
-              </div>
-            ))}
+            {tokens.map((line, i) => {
+              const { key: _lk, ...lineRest } = getLineProps({ line, key: i });
+              return (
+                <div key={i} {...lineRest}>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: "2ch",
+                      textAlign: "right",
+                      marginRight: "12px",
+                      userSelect: "none",
+                      opacity: 0.35,
+                      fontSize: "11px",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  {line.map((token, idx) => {
+                    const { key: _tk, ...tokenRest } = getTokenProps({ token, key: idx });
+                    return <span key={idx} {...tokenRest} />;
+                  })}
+                </div>
+              );
+            })}
           </code>
         </pre>
       )}

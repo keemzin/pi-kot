@@ -852,7 +852,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             ref={uploadFolderRef}
             type="file"
             /* @ts-ignore — webkitdirectory is a webkit extension but works in all major browsers */
-            webkitdirectory
+            webkitdirectory="true"
             style={{ display: "none" }}
             onChange={(e) => { handleUpload(e.target.files ? Array.from(e.target.files) : null); e.target.value = ""; }}
           />

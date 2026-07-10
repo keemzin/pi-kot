@@ -7,6 +7,7 @@ import {
   attachToolResult,
   updateToolCallState,
   type UIMessage,
+  type ToolCallPart,
 } from "../lib/normalize";
 import {
   type SessionSummary,
@@ -289,7 +290,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Load messages
     try {
       const { messages } = await getSessionMessages(id);
-      set({ messages });
+      set({
+        messages,
+        partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
+      });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to load messages" });
     }
@@ -328,15 +332,36 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (partial === undefined) return;
       pendingPartial = undefined;
       const uiMsg = normalizePartialMessage(partial, -1);
-      set((s) => ({
-        streamingMessage: uiMsg,
-        isStreaming: true,
-        // Keep old field in sync
-        streamState: {
-          ...s.streamState,
+      set((s) => {
+        // Preserve tool-call results from the previous streamingMessage.
+        // The SDK sends message_update events after tool_execution_end
+        // (e.g. when the assistant appends more text after tool calls),
+        // which would otherwise wipe tool results by creating a fresh
+        // partial with all tool-call parts reset to "input-available".
+        if (s.streamingMessage && s.streamingMessage.parts.length > 0) {
+          const prevParts = s.streamingMessage.parts;
+          uiMsg.parts = uiMsg.parts.map((part) => {
+            if (part.type === "tool-call") {
+              const prev = prevParts.find(
+                (p): p is ToolCallPart =>
+                  p.type === "tool-call" && p.toolCallId === part.toolCallId,
+              );
+              if (prev && prev.state !== "input-available") {
+                return { ...part, state: prev.state, output: prev.output, errorText: prev.errorText };
+              }
+            }
+            return part;
+          });
+        }
+        return {
+          streamingMessage: uiMsg,
           isStreaming: true,
-        },
-      }));
+          streamState: {
+            ...s.streamState,
+            isStreaming: true,
+          },
+        };
+      });
     };
 
     // Debounced message refetch (like forge's scheduleMessagesRefetch)
@@ -350,7 +375,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       refetchInflight = true;
       getSessionMessages(sessionId)
         .then(({ messages }) => {
-          set({ messages });
+          set({
+            messages,
+            // Rebuild partsMessages from fresh server data (same strategy as
+            // the old tool-call-pairing approach — tool results always fresh
+            // from the server, not tracked incrementally).
+            partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
+          });
         })
         .catch(() => {})
         .finally(() => {
@@ -440,17 +471,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             break;
           }
           case "tool_execution_end": {
-            const execEndEv = event as Record<string, unknown>;
-            const toolCallId = execEndEv.toolCallId as string | undefined;
-            const result = execEndEv.result;
-            const isError = execEndEv.isError === true;
             set((s) => ({
               streamState: {
                 ...s.streamState,
                 activeToolName: undefined,
               },
-              streamingMessage: s.streamingMessage && toolCallId
-                ? attachToolResult(s.streamingMessage, toolCallId, result, isError)
+              streamingMessage: s.streamingMessage && event.toolCallId
+                ? attachToolResult(s.streamingMessage, event.toolCallId as string, event.result, (event as Record<string, unknown>).isError === true)
                 : s.streamingMessage,
             }));
             refetchMessages();
@@ -570,7 +597,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                   activeToolName: undefined,
                   isStreaming: false,
                 },
-                partsMessages: finalMsgs ? normalizeMessages(finalMsgs as Record<string, unknown>[]) : s.partsMessages,
+                // Keep partsMessages built incrementally by message_update/message_end.
+                // Do NOT replace with finalMsgs — the SDK only includes the current
+                // run's messages in agent_end, not the full history.
                 streamingMessage: undefined,
                 isStreaming: false,
               }));
@@ -771,9 +800,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         ...s.messages,
         { role: "user", content: optimisticContent },
       ],
-      partsMessages: s.isStreaming
-        ? [...s.partsMessages, optimisticUIMsg]
-        : s.partsMessages,
+      partsMessages: [...s.partsMessages, optimisticUIMsg],
     }));
 
     try {
@@ -817,9 +844,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         ...s.messages,
         { role: "user", content: optimisticContent, metadata: { steer: true } },
       ],
-      partsMessages: s.isStreaming
-        ? [...s.partsMessages, optimisticUIMsg]
-        : s.partsMessages,
+      partsMessages: [...s.partsMessages, optimisticUIMsg],
     }));
 
     try {

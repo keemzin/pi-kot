@@ -3006,6 +3006,11 @@ strong {
   align-self: flex-start;
 }
 
+/* Tighter gap between consecutive assistant rows (tool batch → thinking/text from same message) */
+.message-row.assistant + .message-row.assistant {
+  margin-top: -12px;
+}
+
 .message-bubble {
   min-width: 0;
   font-size: 16px;
@@ -4678,7 +4683,7 @@ strong {
 /* Thinking block — slim variant inside timeline */
 .thinking-block {
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   padding: 3px 8px;
   font-size: 12px;
   color: var(--text-dim);

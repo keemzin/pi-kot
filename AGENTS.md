@@ -65,6 +65,76 @@ When in doubt: run code in ctx_execute, print only the answer.
 - **If the SDK emits an event** (`text_delta`, `message_end`, `tool_result`) — consume it directly instead of re-fetching or reconstructing.
 - Default: SDK. Fallback: your own code. This keeps pi-kot lean and automatically gains features when the SDK updates.
 
+## ⚠️ Parts-Based Message Architecture (normalize.ts)
+
+**This is the single most important adapter in the codebase.** Understand it before touching any chat rendering.
+
+### Architecture
+```
+SDK AssistantMessage  ──>  normalize.ts  ──>  UIMessage.parts[]  ──>  ChatView rendering
+(Transport format)           (ADAPTER)          (UI format)            (renderAssistantParts)
+```
+
+### Key files
+| File | Role |
+|------|------|
+| `packages/client/src/lib/normalize.ts` | **THE single adapter** — maps SDK types to UI parts. This is the ONLY file that reads SDK content blocks. |
+| `packages/client/src/stores/session-store.ts` | Holds `partsMessages: UIMessage[]` and `streamingMessage: UIMessage \| undefined`. SSE handlers write to these. |
+| `packages/client/src/components/ChatView.tsx` | Reads `msg.parts[]` and renders each part by type in `renderAssistantParts()`. |
+
+### UIMessage.parts[] shape
+```typescript
+parts = [
+  { type: 'text', text: '...', state: 'streaming' | 'done' },
+  { type: 'thinking', text: '...' },
+  { type: 'tool-call', toolName, toolCallId, args, state, output, errorText },
+  { type: 'image', mimeType, data },
+  { type: 'bash-exec', command, output, exitCode, ... },
+]
+```
+
+### Tool grouping logic (critical for understanding)
+Tools accumulate ACROSS assistant messages in one turn via `toolEntries[]` inside `renderAssistantParts`. They flush into a single `ToolCallBatchCard` when prose (text) appears or at the end of the turn.
+
+Thinking blocks immediately before a tool call are extracted from prose (`extractTrailingThinking`) and bundled INSIDE the tool batch as `ToolBatchEntry` entries — they render inside the batch card's expandable details, NOT as separate bubbles.
+
+### ⚠️ What to watch out for when the SDK updates
+
+The pi SDK (`@earendil-works/pi-ai`, `@earendil-works/pi-agent-core`) can change its content block types or event protocol. Here's what to check:
+
+**1. SDK adds a new content block type** (e.g., `ReasoningContent` alongside `ThinkingContent`)
+   - ONLY `normalize.ts` needs a new mapping (`normalizeAssistantContent` and `normalizePartialContent`)
+   - `ChatView.tsx` needs a new `else if (part.type === "reasoning")` branch in `renderAssistantParts`
+   - TypeScript's discriminated union tells you if you missed anything
+
+**2. SDK changes field names** (e.g., `ToolCall.arguments` → `ToolCall.args`)
+   - ONLY `normalize.ts` — update the field access in `normalizeAssistantContent`/`normalizePartialContent`
+   - No changes needed in ChatView, session-store, or any other file
+
+**3. SDK changes event protocol** (e.g., removes `message_update` events)
+   - `session-store.ts` SSE handlers need updating
+   - `normalize.ts` may need new entry points if the replacement data shape is different
+   - ChatView is usually unaffected (it only reads the already-normalized `partsMessages`)
+
+**4. SDK changes `AssistantMessage.content` type**
+   - ONLY `normalize.ts` — this is the only consumer of the raw content array
+   - All other code reads `UIMessage.parts[]` which stays stable
+
+**5. Tool result pairing breaks** (tool results not showing)
+   - Check `normalizeMessages()` in `normalize.ts` — the first pass collects tool results by `toolCallId`
+   - Check `refetchMessages()` in `session-store.ts` — it calls `normalizeMessages()` to rebuild `partsMessages`
+
+### The golden rule
+> **If a bug relates to how a message looks in the chat UI, first check what `partsMessages` contains. Then trace back through `normalize.ts` to see how the SDK data was mapped.**
+
+Never bypass `normalize.ts` by reading SDK types directly in ChatView. If you need a new field from AssistantMessage in the UI, add it to `UIMessage` and map it in `normalize.ts`.
+
+### Reverting (if ever needed)
+```bash
+# Restore the old entire client from the reference commit:
+git checkout 1a37982 -- packages/client/src/
+```
+
 ## 🔍 context-mode First Code Lookup (CRITICAL)
 - **Use context-mode tools for all code exploration, file analysis, and multi-command research.** Refer to the tool hierarchy below.
 - **`ctx_search` (knowledge base)**: First stop for any codebase query. Searches previously indexed content, auto-captured session events (decisions, errors, blockers, plans), and documentation. Use 2-4 specific technical terms per query.
