@@ -911,12 +911,16 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       compactionsAt.set(ev.insertBeforeIndex, list);
     }
 
+    const renderArchived = (ev: CompactionEvent): React.ReactNode => (
+      <ArchivedMessages messages={ev.archivedMessages} />
+    );
+
     // Push all compaction cards for a given raw message index.
     const pushCardsAt = (rawIdx: number): void => {
       const events = compactionsAt.get(rawIdx);
       if (events === undefined) return;
       for (const ev of events) {
-        out.push(<CompactionCard key={`compaction-${ev.id}`} event={ev} />);
+        out.push(<CompactionCard key={`compaction-${ev.id}`} event={ev} renderArchived={() => renderArchived(ev)} />);
       }
     };
 
@@ -1176,6 +1180,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
     };
 
     // ── Iterate normalized parts messages ──
+    // 🔔 Insert compaction cards at rawIndex=0 (compactionSummary was
+    // filtered out by normalizeMessages, so no msg has rawIndex=0).
+    pushCardsAt(0);
     for (const msg of partsMessages) {
       // Insert compaction cards based on the raw message index
       pushCardsAt(msg.rawIndex);
