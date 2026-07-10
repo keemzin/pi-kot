@@ -6,12 +6,12 @@ const LS_COMPRESS_IMAGES = "pi-kot/compress-images";
 const LS_SHOW_THINKING = "pi-kot/show-thinking";
 
 function loadStickyUserHeader(): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined") return true;
   try {
     const v = localStorage.getItem(LS_STICKY_USER_HEADER);
-    return v === null ? false : v === "true";
+    return v === null ? true : v === "true";
   } catch {
-    return false;
+    return true;
   }
 }
 

@@ -26,7 +26,7 @@ export type UiSettings = {
 const DEFAULTS: UiSettings = {
   version: 1,
   theme: undefined,
-  stickyUserHeader: false,
+  stickyUserHeader: true,
   showTokenUsage: false,
   compressImages: true,
   showThinking: false,
