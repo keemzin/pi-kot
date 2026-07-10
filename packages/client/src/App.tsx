@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { FileViewerPanel } from "./components/FileViewerPanel";
 import { TerminalPanel } from "./components/TerminalPanel";
+import { ArtifactsPanel } from "./components/ArtifactsPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { NotificationToast } from "./components/NotificationToast";
 import { SessionList } from "./components/SessionList";

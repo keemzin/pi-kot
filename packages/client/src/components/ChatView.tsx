@@ -6,6 +6,8 @@ import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { ReplSandbox } from "./ReplSandbox";
+import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
@@ -861,6 +863,52 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
   const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 
+  // Push HTML/SVG to the Artifacts Panel — scans both tool outputs AND
+  // assistant text (markdown fenced code blocks like ```svg ... ```)
+  const pushArtifact = useLayoutStore((s) => s.pushArtifact);
+  const seenArtifactIds = useRef(new Set<string>());
+  useEffect(() => {
+    const allMsgs = [...partsMessages, ...(streamingMessage ? [streamingMessage] : [])];
+    for (const msg of allMsgs) {
+      for (const part of msg.parts) {
+        // ── Tool outputs ──
+        if (part.type === "tool-call") {
+          if (part.state === "running" || part.state === "input-available") continue;
+          if (seenArtifactIds.current.has(part.toolCallId)) continue;
+          const output = part.output ?? "";
+          const isHtml = /^\s*<!doctype\s+html/i.test(output) || /^\s*<html/i.test(output);
+          const isSvg  = /^\s*<svg/i.test(output) && output.includes("</svg>");
+          if (isHtml || isSvg) {
+            seenArtifactIds.current.add(part.toolCallId);
+            pushArtifact({
+              title: part.toolName === "javascript_repl"
+                ? ((part.args?.title as string) || "REPL Output")
+                : part.toolName,
+              type: isSvg ? "svg" : "html",
+              content: output,
+              sessionId,
+            });
+          }
+        }
+        // ── Assistant text — extract fenced ```svg / ```html blocks ──
+        if (part.type === "text") {
+          const fenceRe = /```(svg|html)\s*\n([\s\S]*?)```/gi;
+          let match: RegExpExecArray | null;
+          while ((match = fenceRe.exec(part.text)) !== null) {
+            const lang    = match[1].toLowerCase() as "svg" | "html";
+            const content = match[2].trim();
+            // Use start index as a stable ID so we don't push duplicates on re-renders
+            const artifactId = `${msg.id}-text-${match.index}`;
+            if (seenArtifactIds.current.has(artifactId)) continue;
+            // Only push complete blocks (no dangling opening fence)
+            seenArtifactIds.current.add(artifactId);
+            pushArtifact({ title: lang === "svg" ? "SVG" : "HTML", type: lang, content, sessionId });
+          }
+        }
+      }
+    }
+  }, [partsMessages, streamingMessage, pushArtifact, sessionId]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
@@ -1032,6 +1080,31 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             // Flush remaining text-only prose (flushes tools first)
             flushProse(m.id, prose);
             prose.length = 0;
+
+            // javascript_repl gets its own individual render (needs sandbox)
+            if (part.toolName === "javascript_repl") {
+              flushToolBatch(`prerepl-${m.id}`);
+              const code = (part.args?.code as string) ?? "";
+              const title = (part.args?.title as string) ?? "";
+              elements.push(
+                <div key={`repl-${m.id}-${part.toolCallId}`} className="message-row assistant">
+                  <div className="message-bubble assistant">
+                    <ReplSandbox
+                      code={code}
+                      title={title}
+                      serverOutput={
+                        part.state !== "input-available" && part.state !== "running"
+                          ? part.output ?? ""
+                          : undefined
+                      }
+                      isRunning={part.state === "running"}
+                      isError={part.state === "error"}
+                    />
+                  </div>
+                </div>,
+              );
+              continue;
+            }
 
             // Add trailing thinking + tool to accumulated entries
             toolEntries.push(...trailing);

@@ -9,12 +9,23 @@
 
 import { create } from "zustand";
 
-export type ExplorerTab = "files" | "git" | "system-prompt";
+export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt";
 export type PanelName = "settings" | "mcp" | "terminal" | "tree" | "orch";
 
 export interface ViewerTab {
   path: string;
   name: string;
+}
+
+export interface ArtifactItem {
+  id: string;
+  title: string;
+  /** "html" | "svg" — determines how it's wrapped before display */
+  type: "html" | "svg";
+  content: string;
+  /** session that produced this artifact */
+  sessionId: string;
+  createdAt: number;
 }
 
 interface LayoutState {
@@ -36,6 +47,12 @@ interface LayoutState {
   viewerTabs: ViewerTab[];
   viewerActivePath: string | undefined;
   viewerWidth: number;
+
+  /* ── Artifacts panel ── */
+  artifactItems: ArtifactItem[];
+  artifactActiveId: string | undefined;
+  artifactWidth: number;
+  showArtifacts: boolean;
 
   /* ── Derived ── */
   isMobile: boolean;
@@ -64,6 +81,13 @@ interface LayoutState {
   setViewerActivePath: (path: string | undefined) => void;
   setViewerWidth: (width: number) => void;
 
+  /* ── Artifact actions ── */
+  pushArtifact: (item: Omit<ArtifactItem, "id" | "createdAt">) => void;
+  setArtifactActiveId: (id: string | undefined) => void;
+  setArtifactWidth: (width: number) => void;
+  clearArtifacts: (sessionId: string) => void;
+  setShowArtifacts: (show: boolean) => void;
+
   /** Close every panel and sidebar (useful for deep-link "reset") */
   closeAllPanels: () => void;
 
@@ -85,6 +109,13 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   explorerTab: undefined,
   viewerTabs: [],
   viewerActivePath: undefined,
+  artifactItems: [],
+  artifactActiveId: undefined,
+  artifactWidth:
+    typeof window !== "undefined" && window.innerWidth <= 600
+      ? Math.max(280, Math.min(420, window.innerWidth - 40))
+      : 420,
+  showArtifacts: false,
   // On mobile the 480px default overflows the screen — clamp to
   // viewport minus a 40px gutter for the chat column.
   viewerWidth:
@@ -175,6 +206,33 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     const clamped = Math.min(VIEWER_MAX_WIDTH, Math.max(VIEWER_MIN_WIDTH, Math.round(width)));
     set({ viewerWidth: clamped });
   },
+
+  /* ── Artifacts ── */
+
+  pushArtifact: (item) => {
+    const id = `artifact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const newItem: ArtifactItem = { ...item, id, createdAt: Date.now() };
+    set((s) => ({
+      artifactItems: [...s.artifactItems.filter((a) => a.id !== id), newItem],
+      artifactActiveId: id,
+      explorerTab: "artifacts",
+      sidebarCollapsed: true, // Auto-open the tab and close sidebar
+    }));
+  },
+
+  setArtifactActiveId: (id) => set({ artifactActiveId: id }),
+
+  setArtifactWidth: (width) =>
+    set({ artifactWidth: Math.min(900, Math.max(280, Math.round(width))) }),
+
+  clearArtifacts: (sessionId) =>
+    set((s) => ({
+      artifactItems: s.artifactItems.filter((a) => a.sessionId !== sessionId),
+      artifactActiveId: undefined,
+      showArtifacts: false,
+    })),
+
+  setShowArtifacts: (show) => set({ showArtifacts: show }),
 
   /* ── Bulk ── */
 
