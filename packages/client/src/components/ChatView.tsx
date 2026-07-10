@@ -904,6 +904,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               content: output,
               sessionId,
             });
+            if (isStreaming) {
+              useLayoutStore.getState().setExplorerTab("artifacts");
+            }
           }
         }
         // ── Assistant text — extract fenced ```svg / ```html blocks ──
@@ -919,6 +922,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             // Only push complete blocks (no dangling opening fence)
             seenArtifactIds.current.add(artifactId);
             pushArtifact({ title: lang === "svg" ? "SVG" : "HTML", type: lang, content, sessionId });
+            if (isStreaming) {
+              useLayoutStore.getState().setExplorerTab("artifacts");
+            }
           }
         }
       }

@@ -212,12 +212,17 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   pushArtifact: (item) => {
     const id = `artifact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newItem: ArtifactItem = { ...item, id, createdAt: Date.now() };
-    set((s) => ({
-      artifactItems: [...s.artifactItems.filter((a) => a.id !== id), newItem],
-      artifactActiveId: id,
-      explorerTab: "artifacts",
-      sidebarCollapsed: true, // Auto-open the tab and close sidebar
-    }));
+    set((s) => {
+      // Deduplicate by content — skip if identical artifact already exists
+      const exists = s.artifactItems.some(
+        (a) => a.title === item.title && a.content === item.content && a.type === item.type,
+      );
+      if (exists) return {};
+      return {
+        artifactItems: [...s.artifactItems, newItem],
+        artifactActiveId: id,
+      };
+    });
   },
 
   setArtifactActiveId: (id) => set({ artifactActiveId: id }),
