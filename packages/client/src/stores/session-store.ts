@@ -708,20 +708,52 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               timestamp: Date.now(),
               _pendingExec: true, // marker for the UI to show cancel button
             };
+            // Create a UIMessage for partsMessages so ChatView renders it live
+            const execRawIndex = get().messages.length;
+            const execUIMessage: UIMessage = {
+              id: `exec-${Date.now()}`,
+              role: "assistant",
+              parts: [{
+                type: "bash-exec",
+                command,
+                output: "",
+                exitCode: undefined,
+                cancelled: false,
+                truncated: false,
+                state: "running",
+              }],
+              rawIndex: execRawIndex,
+              timestamp: optimisticMsg.timestamp,
+            };
             set((s) => ({
               messages: [...s.messages, optimisticMsg],
+              partsMessages: [...s.partsMessages, execUIMessage],
             }));
             break;
           }
           case "exec_update": {
             const { output } = event as unknown as { output: string };
             set((s) => {
+              // Update messages array
               const msgs = [...s.messages];
               const last = msgs[msgs.length - 1];
               if (last && (last as Record<string, unknown>)._pendingExec) {
                 (last as Record<string, unknown>).output = ((last as Record<string, unknown>).output as string ?? "") + output;
               }
-              return { messages: msgs };
+              // Update partsMessages array
+              const parts = [...s.partsMessages];
+              const lastPart = parts[parts.length - 1];
+              if (lastPart && lastPart.parts[0]?.type === "bash-exec") {
+                const bashPart = lastPart.parts[0] as import("../lib/normalize").BashExecPart;
+                parts[parts.length - 1] = {
+                  ...lastPart,
+                  parts: [{
+                    ...bashPart,
+                    output: bashPart.output + output,
+                  }],
+                };
+              }
+              return { messages: msgs, partsMessages: parts };
             });
             break;
           }
@@ -733,6 +765,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               cancelled?: boolean;
             };
             set((s) => {
+              // Update messages array
               const msgs = [...s.messages];
               const last = msgs[msgs.length - 1];
               if (last && (last as Record<string, unknown>)._pendingExec) {
@@ -747,10 +780,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 m.output = error ? `${m.output as string}${output}\n\n[error] ${error}` : output;
                 m.truncated = false;
               }
-              return { messages: msgs };
+              // Update partsMessages array
+              const parts = [...s.partsMessages];
+              const lastPart = parts[parts.length - 1];
+              if (lastPart && lastPart.parts[0]?.type === "bash-exec") {
+                const bashPart = lastPart.parts[0] as import("../lib/normalize").BashExecPart;
+                const finalOutput = error ? `${bashPart.output}${output}\n\n[error] ${error}` : output;
+                parts[parts.length - 1] = {
+                  ...lastPart,
+                  parts: [{
+                    ...bashPart,
+                    output: finalOutput,
+                    exitCode: execCancelled ? bashPart.exitCode : (exitCode ?? undefined),
+                    cancelled: execCancelled === true,
+                    truncated: false,
+                    state: "done",
+                  }],
+                };
+              }
+              return { messages: msgs, partsMessages: parts };
             });
             const sid = get().activeSessionId;
             if (sid !== undefined) {
+              // Reload to get server-persisted version (canonical source of truth)
               setTimeout(() => get().reloadMessages(sid), 500);
             }
             break;
