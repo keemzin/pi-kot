@@ -823,6 +823,34 @@ strong {
   color: var(--accent-text);
 }
 
+.project-row.drag-over {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Mobile reorder buttons - hidden by default, shown on mobile */
+.mobile-reorder-btn {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Drag handle - hidden on mobile */
+.project-drag-handle {
+  display: flex;
+}
+
+@media (max-width: 600px) {
+  .mobile-reorder-btn {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+  .project-drag-handle {
+    display: none !important;
+  }
+}
+
 .project-icon {
   display: inline-flex;
   align-items: center;

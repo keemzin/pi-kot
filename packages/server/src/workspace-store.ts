@@ -32,6 +32,13 @@ export class DuplicatePathError extends Error {
   }
 }
 
+export class InvalidProjectOrderError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "InvalidProjectOrderError";
+  }
+}
+
 const PROJECTS_FILE = (): string => join(config.forgeDataDir, "projects.json");
 
 async function ensureDir(dir: string): Promise<void> {
@@ -181,5 +188,30 @@ export async function deleteProject(id: string): Promise<void> {
     if (idx === -1) throw new ProjectNotFoundError(id);
     projects.splice(idx, 1);
     await writeProjects(projects);
+  });
+}
+
+export async function reorderProjects(ids: string[]): Promise<Project[]> {
+  return withProjectsLock(async () => {
+    const projects = await readProjects();
+    if (ids.length !== projects.length) {
+      throw new InvalidProjectOrderError("project order must include every project exactly once");
+    }
+    const byId = new Map(projects.map((p) => [p.id, p] as const));
+    const seen = new Set<string>();
+    const next: Project[] = [];
+    for (const id of ids) {
+      if (seen.has(id)) {
+        throw new InvalidProjectOrderError("project order contains duplicate ids");
+      }
+      seen.add(id);
+      const project = byId.get(id);
+      if (project === undefined) {
+        throw new InvalidProjectOrderError("project order contains unknown ids");
+      }
+      next.push(project);
+    }
+    await writeProjects(next);
+    return next;
   });
 }

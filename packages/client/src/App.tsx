@@ -75,8 +75,13 @@ export function App() {
   const createAndActivate = useSessionStore((s) => s.createAndActivate);
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
   const refreshSessions = useSessionStore((s) => s.refreshSessions);
+  const reorderProjects = useSessionStore((s) => s.reorderProjects);
+  const moveProject = useSessionStore((s) => s.moveProject);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const connectionState = useSessionStore((s) => s.connectionState);
+
+  const [draggingProjectId, setDraggingProjectId] = useState<string | undefined>();
+  const [dragOverProjectId, setDragOverProjectId] = useState<string | undefined>();
 
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState("");
@@ -94,6 +99,29 @@ export function App() {
   const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const resetDragState = useCallback(() => {
+    setDraggingProjectId(undefined);
+    setDragOverProjectId(undefined);
+  }, []);
+
+  const handleProjectDrop = useCallback(async (targetId: string): Promise<void> => {
+    const sourceId = draggingProjectId;
+    resetDragState();
+    if (sourceId === undefined || sourceId === targetId) return;
+    const sourceIndex = projects.findIndex((p) => p.id === sourceId);
+    const targetIndex = projects.findIndex((p) => p.id === targetId);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+    const ids = projects.map((p) => p.id);
+    const [moved] = ids.splice(sourceIndex, 1);
+    if (moved === undefined) return;
+    ids.splice(targetIndex, 0, moved);
+    try {
+      await reorderProjects(ids);
+    } catch {
+      // store.error surfaces; optimistic ordering rolls back in the store.
+    }
+  }, [draggingProjectId, projects, reorderProjects, resetDragState]);
 
   const contextData = useContextData(activeSessionId);
 
@@ -500,12 +528,39 @@ export function App() {
             const isActive = project.id === activeProjectId;
             const isExpanded = expandedProjects.has(project.id);
             const pSessions = projectSessions[project.id] ?? [];
+            const isDragging = draggingProjectId === project.id;
+            const isDragOver = dragOverProjectId === project.id;
 
             return (
-              <div key={project.id} className={`project-group${isActive ? " active" : ""}`}>
+              <div
+                key={project.id}
+                className={`project-group${isActive ? " active" : ""}`}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", project.id);
+                  setDraggingProjectId(project.id);
+                }}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  if (draggingProjectId !== undefined && draggingProjectId !== project.id) {
+                    setDragOverProjectId(project.id);
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                }}
+                onDragEnd={resetDragState}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void handleProjectDrop(project.id);
+                }}
+                style={{ opacity: isDragging ? 0.6 : 1 }}
+              >
                 {/* Project header */}
                 <div
-                  className={`project-row${isActive ? " active" : ""}`}
+                  className={`project-row${isActive ? " active" : ""}${isDragOver ? " drag-over" : ""}`}
                   onClick={() => {
                     if (isActive) {
                       toggleProject(project.id);
@@ -516,6 +571,29 @@ export function App() {
                   role="button"
                   tabIndex={0}
                 >
+                  {/* Drag handle */}
+                  <span
+                    className="project-drag-handle"
+                    title="Drag to reorder projects"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      cursor: "grab",
+                      color: "var(--text-ghost)",
+                      opacity: 0.5,
+                      marginRight: "2px",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="9" cy="5" r="1"/>
+                      <circle cx="15" cy="5" r="1"/>
+                      <circle cx="9" cy="12" r="1"/>
+                      <circle cx="15" cy="12" r="1"/>
+                      <circle cx="9" cy="19" r="1"/>
+                      <circle cx="15" cy="19" r="1"/>
+                    </svg>
+                  </span>
+
                   {/* Folder icon (default) / arrow (on hover) */}
                   <span className="project-icon">
                     <svg
@@ -552,6 +630,33 @@ export function App() {
 
                   {/* Hover-reveal project menu (left group) */}
                   <div className="project-actions-left">
+                    {/* Mobile reorder buttons */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void moveProject(project.id, "up");
+                      }}
+                      className="project-action-btn mobile-reorder-btn"
+                      title="Move up"
+                      disabled={projects.indexOf(project) === 0}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="18 15 12 9 6 15" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void moveProject(project.id, "down");
+                      }}
+                      className="project-action-btn mobile-reorder-btn"
+                      title="Move down"
+                      disabled={projects.indexOf(project) === projects.length - 1}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
                     {project.name !== "Default" && (
                       <button
                         onClick={(e) => {

@@ -24,6 +24,7 @@ import {
   archiveSession as archiveSessionAPI,
   unarchiveSession as unarchiveSessionAPI,
   deleteProjectAPI,
+  reorderProjectsAPI,
   compactSession,
   getCompactions,
 } from "../lib/api-client";
@@ -145,6 +146,8 @@ interface SessionActions {
   reloadMessages: (sessionId: string) => Promise<void>;
   clearError: () => void;
   deleteProject: (id: string) => Promise<void>;
+  reorderProjects: (ids: string[]) => Promise<void>;
+  moveProject: (id: string, direction: "up" | "down") => Promise<void>;
 }
 
 type SessionStore = SessionState & SessionActions;
@@ -1091,6 +1094,37 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to delete project" });
     }
+  },
+
+  reorderProjects: async (ids: string[]) => {
+    const previous = get().projects;
+    const byId = new Map(previous.map((p) => [p.id, p] as const));
+    const next = ids.map((id) => byId.get(id)).filter((p): p is Project => p !== undefined);
+    if (next.length !== previous.length) return;
+    // Optimistic update
+    set({ projects: next, error: undefined });
+    try {
+      const { projects } = await reorderProjectsAPI(ids);
+      set({ projects });
+    } catch (err) {
+      // Rollback on error
+      set({
+        projects: previous,
+        error: err instanceof Error ? err.message : "Failed to reorder projects",
+      });
+      throw err;
+    }
+  },
+
+  moveProject: async (id: string, direction: "up" | "down") => {
+    const { projects, reorderProjects } = get();
+    const idx = projects.findIndex((p) => p.id === id);
+    if (idx === -1) return;
+    const newIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= projects.length) return;
+    const ids = projects.map((p) => p.id);
+    [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+    await reorderProjects(ids);
   },
 
   // ── Session Tree / Navigate / Fork ──

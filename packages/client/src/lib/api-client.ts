@@ -348,6 +348,12 @@ export async function deleteProjectAPI(
   );
 }
 
+export async function reorderProjectsAPI(
+  ids: string[],
+): Promise<{ projects: Project[] }> {
+  return request<{ projects: Project[] }>("PUT", "/api/v1/projects/order", { ids });
+}
+
 export async function getProjectSystemPrompt(
   projectId: string,
 ): Promise<{ addendum: string }> {
