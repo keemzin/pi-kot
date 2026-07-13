@@ -1162,6 +1162,75 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                     } as unknown as Record<string, unknown>)
                   : undefined,
             } as ToolBatchEntry);
+          } else if (part.type === "branch-summary") {
+            // Branch summary — flush any pending prose, then render summary
+            flushProse(m.id, prose);
+            prose.length = 0;
+            flushToolBatch(`prebranch-${m.id}`);
+
+            elements.push(
+              <div key={`branch-${m.id}`} className="message-row assistant">
+                <div className="message-bubble assistant">
+                  <div className="branch-summary-block">
+                    <div className="branch-summary-label">Branch Summary</div>
+                    <ChatMarkdown text={part.summary} />
+                    {part.fromId && (
+                      <div className="branch-summary-from" title={part.fromId}>
+                        from {part.fromId.slice(0, 8)}...
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>,
+            );
+          } else if (part.type === "custom") {
+            // Custom message — flush any pending prose, then render custom content
+            flushProse(m.id, prose);
+            prose.length = 0;
+            flushToolBatch(`precustom-${m.id}`);
+
+            let content: React.ReactNode;
+            if (typeof part.content === "string") {
+              content = <ChatMarkdown text={part.content} />;
+            } else if (Array.isArray(part.content)) {
+              content = (
+                <div>
+                  {part.content.map((block, i) =>
+                    block.type === "text" ? (
+                      <ChatMarkdown key={i} text={block.text} />
+                    ) : block.type === "image" ? (
+                      <img
+                        key={i}
+                        src={`data:${block.mimeType};base64,${block.data}`}
+                        alt="Custom message image"
+                        style={{ maxWidth: "100%", height: "auto" }}
+                      />
+                    ) : null
+                  )}
+                </div>
+              );
+            } else {
+              content = null;
+            }
+
+            elements.push(
+              <div key={`custom-msg-${m.id}`} className="message-row assistant">
+                <div className="message-bubble assistant">
+                  <div className="custom-message-block">
+                    {part.customType !== "custom" && (
+                      <div className="custom-message-type">{part.customType}</div>
+                    )}
+                    {content}
+                    {part.details != null && (
+                      <details className="custom-message-details">
+                        <summary>Details</summary>
+                        <pre>{JSON.stringify(part.details, null, 2)}</pre>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              </div>,
+            );
           } else {
             // text or thinking — accumulate in prose array
             prose.push(part as TextPart | ThinkingPart);

@@ -68,7 +68,23 @@ export type BashExecPart = {
   state: "running" | "done";
 };
 
-export type UIPart = TextPart | ThinkingPart | ToolCallPart | ImagePart | BashExecPart;
+export type BranchSummaryPart = {
+  type: "branch-summary";
+  summary: string;
+  fromId: string;
+  timestamp?: number;
+};
+
+export type CustomMessagePart = {
+  type: "custom";
+  customType: string;
+  content: string | Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
+  display?: boolean;
+  details?: unknown;
+  timestamp?: number;
+};
+
+export type UIPart = TextPart | ThinkingPart | ToolCallPart | ImagePart | BashExecPart | BranchSummaryPart | CustomMessagePart;
 
 /* ── UI Message (what the UI renders) ──────────────────────────────────── */
 
@@ -133,6 +149,87 @@ interface SdkAgentMessage {
   toolName?: string;
   id?: string;
   [key: string]: unknown;
+}
+
+/** Normalize a branch summary message into UI parts. */
+function normalizeBranchSummaryMessage(
+  msg: SdkAgentMessage,
+  rawIndex: number,
+): UIMessage {
+  const summary = (msg.summary as string) ?? "";
+  const fromId = (msg.fromId as string) ?? "";
+  const timestamp = msg.timestamp as number | undefined;
+
+  return {
+    id: (msg.id as string) ?? `branch-summary-${rawIndex}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "branch-summary",
+        summary,
+        fromId,
+        timestamp,
+      },
+    ],
+    rawIndex,
+    timestamp,
+  };
+}
+
+/** Normalize a custom message into UI parts. */
+function normalizeCustomMessage(
+  msg: SdkAgentMessage,
+  rawIndex: number,
+): UIMessage {
+  const customType = (msg.customType as string) ?? "custom";
+  const content = msg.content as
+    | string
+    | Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>
+    | undefined;
+  const display = msg.display as boolean | undefined;
+  const details = msg.details;
+  const timestamp = msg.timestamp as number | undefined;
+
+  return {
+    id: (msg.id as string) ?? `custom-${rawIndex}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "custom",
+        customType,
+        content: content ?? "",
+        display,
+        details,
+        timestamp,
+      },
+    ],
+    rawIndex,
+    timestamp,
+  };
+}
+
+/** Normalize a compaction summary message into UI parts. */
+function normalizeCompactionSummaryMessage(
+  msg: SdkAgentMessage,
+  rawIndex: number,
+): UIMessage {
+  const summary = (msg.summary as string) ?? "";
+  const tokensBefore = (msg.tokensBefore as number) ?? 0;
+  const timestamp = msg.timestamp as number | undefined;
+
+  return {
+    id: (msg.id as string) ?? `compaction-summary-${rawIndex}`,
+    role: "assistant",
+    parts: [
+      {
+        type: "text",
+        text: `[Compaction Summary] ${summary} (tokens before: ${tokensBefore})`,
+        state: "done",
+      },
+    ],
+    rawIndex,
+    timestamp,
+  };
 }
 
 /* ── Normalize a single SDK content block into a part ──────────────────── */
@@ -361,9 +458,8 @@ export function normalizeMessages(
   for (let i = 0; i < msgs.length; i++) {
     const m = msgs[i];
 
-    // Skip tool results and compaction summaries (rendered inline/elsewhere)
+    // Skip tool results (merged into assistant messages)
     if (m.role === "toolResult") continue;
-    if (m.role === "compactionSummary") continue;
 
     if (m.role === "user") {
       result.push(normalizeUserMessage(m, i));
@@ -371,8 +467,16 @@ export function normalizeMessages(
       result.push(normalizeAssistantMessage(m, toolResults, i));
     } else if (m.type === "bashExecution" || m.role === "bashExecution") {
       result.push(normalizeBashExecMessage(m, i));
+    } else if (m.role === "branchSummary") {
+      result.push(normalizeBranchSummaryMessage(m, i));
+    } else if (m.role === "custom") {
+      result.push(normalizeCustomMessage(m, i));
+    } else if (m.role === "compactionSummary") {
+      // Compaction summaries are handled separately by CompactionCard
+      // but we still normalize them for completeness
+      result.push(normalizeCompactionSummaryMessage(m, i));
     }
-    // Other types (custom, etc.) are silently skipped
+    // Other types are silently skipped
   }
 
   return result;
