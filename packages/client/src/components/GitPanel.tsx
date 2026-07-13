@@ -584,7 +584,7 @@ export function GitPanel({ projectId }: Props) {
       )}
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         {status === undefined && (
           <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "11px" }}>Loading git status…</div>
         )}
@@ -800,6 +800,7 @@ export function GitPanel({ projectId }: Props) {
                                         borderTop: "1px solid var(--border)",
                                         background: "var(--bg-glass)",
                                         padding: "4px 8px",
+                                        overflow: "hidden",
                                       }}>
                                         <DiffBlock diff={diffEntry.value} viewType={gitViewType} />
                                       </div>
@@ -1060,7 +1061,7 @@ function FileGroup(props: FileGroupProps) {
               </div>
               {/* Inline diff */}
               {diffState !== undefined && (
-                <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px" }}>
+                <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px", overflow: "hidden" }}>
                   {diffState === "loading" ? (
                     <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>Loading diff…</div>
                   ) : diffState === "error" ? (

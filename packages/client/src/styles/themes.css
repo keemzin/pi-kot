@@ -41,41 +41,105 @@
   to { transform: rotate(360deg); }
 }
 
-/* ═══ Diff overrides — react-diff-view CSS variables ═══ */
-:root[data-theme="dark"] {
+/* ═══ Diff overrides — react-diff-view (scoped to .pi-diff-block) ═══ */
+.pi-diff-block {
+  max-width: 100%;
+  overflow-x: auto;
   --diff-background-color: transparent;
-  --diff-text-color: var(--text-secondary);
-  --diff-gutter-insert-background-color: rgba(52, 211, 153, 0.08);
-  --diff-gutter-insert-text-color: var(--text-dim);
-  --diff-gutter-delete-background-color: rgba(248, 113, 113, 0.08);
-  --diff-gutter-delete-text-color: var(--text-dim);
-  --diff-code-insert-background-color: rgba(52, 211, 153, 0.10);
-  --diff-code-insert-text-color: var(--text-primary);
-  --diff-code-delete-background-color: rgba(248, 113, 113, 0.10);
-  --diff-code-delete-text-color: var(--text-primary);
-  --diff-code-insert-edit-background-color: rgba(52, 211, 153, 0.20);
-  --diff-code-insert-edit-text-color: var(--text-primary);
-  --diff-code-delete-edit-background-color: rgba(248, 113, 113, 0.20);
-  --diff-code-delete-edit-text-color: var(--text-primary);
-  --diff-omit-gutter-line-color: var(--error);
+  --diff-text-color: #e5e5e5;
+  --diff-font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  --diff-selection-background-color: #525252;
+  --diff-gutter-insert-background-color: #14532d;
+  --diff-gutter-insert-text-color: #86efac;
+  --diff-gutter-delete-background-color: #7f1d1d;
+  --diff-gutter-delete-text-color: #fca5a5;
+  --diff-code-insert-background-color: #052e16;
+  --diff-code-insert-text-color: #bbf7d0;
+  --diff-code-insert-edit-background-color: #166534;
+  --diff-code-insert-edit-text-color: #dcfce7;
+  --diff-code-delete-background-color: #450a0a;
+  --diff-code-delete-text-color: #fecaca;
+  --diff-code-delete-edit-background-color: #991b1b;
+  --diff-code-delete-edit-text-color: #fee2e2;
+  --diff-omit-gutter-line-color: #404040;
+}
+.pi-diff-block .diff {
+  background: transparent;
+  color: #e5e5e5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+.pi-diff-block .diff-code {
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  width: 100%;
+}
+/* Split view: each side takes 50%, wrap text, backgrounds extend fully. */
+.pi-diff-split .diff {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+.pi-diff-split .diff-code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  width: 100%;
+}
+.pi-diff-split .diff-gutter {
+  position: static;
+  background: transparent;
+}
+.pi-diff-block .diff-gutter,
+.pi-diff-block .diff-line {
+  background: transparent;
+}
+.pi-diff-block .diff-gutter {
+  color: #737373;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #0a0a0a;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pi-diff-block .diff-decoration {
+  background: #171717;
+  color: #a3a3a3;
 }
 
-:root[data-theme="light"] {
-  --diff-background-color: transparent;
-  --diff-text-color: var(--text-secondary);
-  --diff-gutter-insert-background-color: rgba(52, 211, 153, 0.12);
-  --diff-gutter-insert-text-color: var(--text-dim);
-  --diff-gutter-delete-background-color: rgba(248, 113, 113, 0.12);
-  --diff-gutter-delete-text-color: var(--text-dim);
-  --diff-code-insert-background-color: rgba(52, 211, 153, 0.15);
-  --diff-code-insert-text-color: var(--text-primary);
-  --diff-code-delete-background-color: rgba(248, 113, 113, 0.15);
-  --diff-code-delete-text-color: var(--text-primary);
-  --diff-code-insert-edit-background-color: rgba(52, 211, 153, 0.28);
-  --diff-code-insert-edit-text-color: var(--text-primary);
-  --diff-code-delete-edit-background-color: rgba(248, 113, 113, 0.28);
-  --diff-code-delete-edit-text-color: var(--text-primary);
-  --diff-omit-gutter-line-color: var(--error);
+/* Light-mode overrides for the diff renderer. */
+[data-theme="light"] .pi-diff-block {
+  --diff-text-color: #0a0a0a;
+  --diff-selection-background-color: #cbd5e1;
+  --diff-gutter-insert-background-color: #bbf7d0;
+  --diff-gutter-insert-text-color: #14532d;
+  --diff-gutter-delete-background-color: #fecaca;
+  --diff-gutter-delete-text-color: #7f1d1d;
+  --diff-code-insert-background-color: #dcfce7;
+  --diff-code-insert-text-color: #14532d;
+  --diff-code-insert-edit-background-color: #86efac;
+  --diff-code-insert-edit-text-color: #052e16;
+  --diff-code-delete-background-color: #fee2e2;
+  --diff-code-delete-text-color: #7f1d1d;
+  --diff-code-delete-edit-background-color: #fca5a5;
+  --diff-code-delete-edit-text-color: #450a0a;
+  --diff-omit-gutter-line-color: #cbd5e1;
+}
+[data-theme="light"] .pi-diff-block .diff {
+  color: #0a0a0a;
+}
+[data-theme="light"] .pi-diff-block .diff-gutter {
+  color: #525252;
+  background: #ffffff;
+}
+[data-theme="light"] .pi-diff-block .diff-decoration {
+  background: #f3f4f6;
+  color: #525252;
 }
 
 /* ═══ DARK BASE — shared across all dark accents ═══ */

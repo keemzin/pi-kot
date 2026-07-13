@@ -128,7 +128,7 @@ export function TurnDiffPanel() {
           {error}
         </div>
       )}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
         {entries.length === 0 && (
           <p style={{ padding: "12px", fontStyle: "italic", color: "var(--text-dim)" }}>
             {loading
@@ -142,7 +142,7 @@ export function TurnDiffPanel() {
           const open = expanded[entry.file] ?? false;
           const name = entry.file.split("/").pop() ?? entry.file;
           return (
-            <div key={entry.file} style={{ borderBottom: "1px solid var(--border)" }}>
+            <div key={entry.file} style={{ borderBottom: "1px solid var(--border)", overflow: "hidden" }}>
               <button
                 onClick={() => setExpanded((e) => ({ ...e, [entry.file]: !open }))}
                 style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 12px", textAlign: "left", cursor: "pointer", background: "none", border: "none", color: "var(--text-secondary)" }}
