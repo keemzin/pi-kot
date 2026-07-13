@@ -913,9 +913,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           if (artType) {
             seenArtifactIds.current.add(part.toolCallId);
             pushArtifact({ title: artTitle, type: artType as any, content: output, sessionId });
-            if (isStreaming) {
-              useLayoutStore.getState().setExplorerTab("artifacts");
-            }
           }
         }
         // ── Assistant text — extract fenced code blocks ──
@@ -950,9 +947,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             }
 
             pushArtifact({ title, type: type as any, content, sessionId });
-            if (isStreaming) {
-              useLayoutStore.getState().setExplorerTab("artifacts");
-            }
           }
         }
       }
