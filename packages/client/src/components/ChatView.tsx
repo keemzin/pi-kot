@@ -173,7 +173,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
   );
 });
 
-/* ── Tool Call Components (ported from forge, styled with theme vars) ── */
+/* ── Tool Call Components ── */
 
 /** Map a tool name to a descriptive emoji icon. */
 function getToolIcon(name: string): string {
@@ -284,8 +284,8 @@ function ToolCallEntry({
   const icon = getToolIcon(name);
 
   // For `edit`, prefer the unified diff string the SDK puts on
-  // result.details over the joined text body — same logic pi-forge uses.
-  // When details.diff is absent (e.g. some providers), fall back to
+  // result.details (details.diff). When absent (e.g. some providers),
+  // fall back to
   // outputText so the diff card still renders.
   const editDiff =
     name === "edit" && result !== undefined
@@ -310,7 +310,7 @@ function ToolCallEntry({
           <span className="tool-timeline-name">{name}</span>
           {preview && <span className="tool-timeline-arg" title={preview}>{preview}</span>}
           {isRunning && <span className="tool-timeline-running" aria-label="running">running…</span>}
-          {!isRunning && outputText.length > 0 && (
+          {(argsText.length > 2 || outputText.length > 0) && (
             <button
               type="button"
               className="tool-timeline-details-btn"
@@ -334,9 +334,7 @@ function ToolCallEntry({
             {argsText.length > 2 && (
               <div>
                 <div className="tool-timeline-section-label">input</div>
-                <pre className="tool-timeline-code">
-                  {argsText.length > 2000 ? argsText.slice(0, 2000) + "\n…(truncated)" : argsText}
-                </pre>
+                <pre className="tool-timeline-code">{argsText}</pre>
               </div>
             )}
             {editDiff !== undefined && editStats !== undefined ? (
@@ -362,9 +360,7 @@ function ToolCallEntry({
                     </span>
                   )}
                 </div>
-                <pre className="tool-timeline-code">
-                  {outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}
-                </pre>
+                <pre className="tool-timeline-code">{outputText}</pre>
               </div>
             ) : null}
           </div>
@@ -1454,6 +1450,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       }
     }
 
+    // Inject streaming message into currentAssistants when it has
+    // tool-call parts, so they render inside the ToolCallBatchCard via
+    // renderAssistantParts — not as a separate card below the main list.
+    // Text/thinking parts still render via the streaming bubble to avoid
+    // duplicating live prose content.
+    if (streamingMessage !== undefined && currentUser !== undefined && isStreaming) {
+      if (streamingMessage.parts.some(p => p.type === "tool-call")) {
+        currentAssistants.push(streamingMessage);
+      }
+    }
+
     flushTurn();
 
     // Trailing compaction cards
@@ -1510,6 +1517,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                     if (part.type === "thinking") {
                       return <ThinkingBlock key={i} text={(part as ThinkingPart).text} />;
                     }
+                    // Tool-call parts render inside the ToolCallBatchCard in
+                    // the main message list (injected via currentAssistants),
+                    // not in the streaming bubble. This keeps them inside the
+                    // batch group alongside all other tools.
                     return null;
                   })}
                 </div>
