@@ -129,6 +129,29 @@ The pi SDK (`@earendil-works/pi-ai`, `@earendil-works/pi-agent-core`) can change
 
 Never bypass `normalize.ts` by reading SDK types directly in ChatView. If you need a new field from AssistantMessage in the UI, add it to `UIMessage` and map it in `normalize.ts`.
 
+### 🔍 Debugging checklist: SDK field not appearing in UI
+
+When a field from the SDK (e.g. `result.details.diff`, `message.model`, `usage`) doesn't show up in the chat UI, trace through ALL layers:
+
+```
+SDK event/object
+  ↓ (1) normalize.ts:   Does SdkToolResult / SdkAgentMessage have the field?
+  ↓ (2) normalize.ts:   Does normalizeAssistantContent / attachToolResult pass it to the part?
+  ↓ (3) normalize.ts:   Does the UIPart type (ToolCallPart / TextPart etc.) include it?
+  ↓ (4) session-store:  Does the SSE handler forward the raw event data?
+  ↓ (5) ChatView.tsx:   Does renderAssistantParts reconstruct the result with the field?
+  ↓ (6) ToolCallEntry:  Does the component read the field from the right source?
+```
+
+**Common failure modes:**
+- **Type missing** — `SdkToolResult` or `UIPart` lacks the field → add `details?: unknown`
+- **Dropped in mapping** — `normalizeAssistantContent` pairs tool results but only extracts `content`, not `details` → add `details: result.details`
+- **Dropped in attach** — `attachToolResult` only extracts `outputText` from `result.content` → also extract and forward `details`
+- **Dropped in render** — `renderAssistantParts` reconstructs the result object as `{ content, isError }` but omits `details` → add `details: part.details`
+- **Wrong source** — `ToolCallEntry` reads `result.details.diff` but the data is on `block.arguments` or `result.content` → check the actual SDK field location
+
+> **If a tool field is missing in the UI, the bug is almost certainly in normalize.ts — don't waste time in ChatView first.**
+
 ### Reverting (if ever needed)
 ```bash
 # Restore the old entire client from the reference commit:

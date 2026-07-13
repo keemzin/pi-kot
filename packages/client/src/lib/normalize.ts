@@ -48,6 +48,8 @@ export type ToolCallPart = {
   state: "input-available" | "running" | "success" | "error";
   output?: string;
   errorText?: string;
+  /** SDK-provided details (e.g. unified diff string for edit tools). */
+  details?: unknown;
 };
 
 export type ImagePart = {
@@ -138,6 +140,7 @@ interface SdkToolResult {
   toolCallId: string;
   content?: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }>;
   isError?: boolean;
+  details?: unknown;
 }
 
 /** Raw SDK agent message. */
@@ -319,6 +322,7 @@ function normalizeAssistantContent(
           state: result.isError ? "error" : "success",
           output: outputText.length > 0 ? outputText : undefined,
           errorText: result.isError ? (outputText || "Tool returned error") : undefined,
+          details: result.details,
         });
       } else {
         parts.push({
@@ -570,12 +574,14 @@ export function attachToolResult(
   result: unknown,
   isError: boolean,
 ): UIMessage {
+  const resultObj = isObject(result) ? (result as Record<string, unknown>) : undefined;
   const outputText =
     typeof result === "string"
       ? result
-      : isObject(result) && "content" in result
-        ? extractContentText((result as Record<string, unknown>).content)
+      : resultObj && "content" in resultObj
+        ? extractContentText(resultObj.content)
         : JSON.stringify(result, null, 2);
+  const details = resultObj?.details;
 
   return {
     ...msg,
@@ -586,6 +592,7 @@ export function attachToolResult(
           state: isError ? ("error" as const) : ("success" as const),
           output: outputText.length > 0 ? outputText : p.output,
           errorText: isError ? (outputText || "Tool returned error") : undefined,
+          details,
         };
       }
       return p;

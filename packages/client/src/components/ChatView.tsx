@@ -6,6 +6,7 @@ import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { ChatEditDiff, ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
 
@@ -191,6 +192,43 @@ function getToolIcon(name: string): string {
   return "🔩";
 }
 
+/**
+ * Extract a human-friendly filename from a tool result/block for display
+ * in the tool entry header. Reads from `details` or `input` since the
+ * SDK stores it on different fields depending on the tool and version.
+ */
+function extractFilename(message: Record<string, unknown>): string | undefined {
+  const details = message.details as
+    | { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+    | undefined;
+  const input = message.input as
+    | { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+    | undefined;
+  for (const src of [details, input]) {
+    if (src === undefined) continue;
+    if (typeof src.path === "string") return src.path;
+    if (typeof src.filename === "string") return src.filename;
+    if (typeof src.file === "string") return src.file;
+    if (typeof src.file_path === "string") return src.file_path;
+  }
+  return undefined;
+}
+
+/**
+ * Cheap +/- counter for a unified diff string. Skips `---`/`+++` header lines
+ * so only actual additions/deletions are counted.
+ */
+function countDiffLines(diff: string): { adds: number; dels: number } {
+  let adds = 0;
+  let dels = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("+")) adds += 1;
+    else if (line.startsWith("-")) dels += 1;
+  }
+  return { adds, dels };
+}
+
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
   const showThinking = usePreferencesStore((s) => s.showThinking);
@@ -245,8 +283,22 @@ function ToolCallEntry({
   const preview = toolPreviewFromArgs(name, args);
   const icon = getToolIcon(name);
 
+  // For `edit`, prefer the unified diff string the SDK puts on
+  // result.details over the joined text body — same logic pi-forge uses.
+  // When details.diff is absent (e.g. some providers), fall back to
+  // outputText so the diff card still renders.
+  const editDiff =
+    name === "edit" && result !== undefined
+      ? (() => {
+          const d = (result.details as { diff?: unknown } | undefined)?.diff;
+          return typeof d === "string" ? d : outputText;
+        })()
+      : undefined;
+  const editFn = name === "edit" && result !== undefined ? extractFilename(result) : undefined;
+  const editStats = editDiff !== undefined ? countDiffLines(editDiff) : undefined;
+
   return (
-    <div className="tool-timeline-node">
+    <div className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}>
       <span
         className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
         aria-hidden="true"
@@ -287,14 +339,34 @@ function ToolCallEntry({
                 </pre>
               </div>
             )}
-            {outputText.length > 0 && (
+            {editDiff !== undefined && editStats !== undefined ? (
+              <div className="overflow-hidden px-3 pb-2">
+                <ChatEditDiff
+                  diff={editDiff}
+                  filename={editFn}
+                  adds={editStats.adds}
+                  dels={editStats.dels}
+                />
+              </div>
+            ) : outputText.length > 0 ? (
               <div>
-                <div className="tool-timeline-section-label">{isError ? "error" : "output"}</div>
+                <div className="tool-timeline-section-label">
+                  {isError ? "error" : "output"}
+                  {editStats !== undefined && !isError && (
+                    <span className="ml-2 font-mono text-[10px]">
+                      <span className="text-emerald-400 light:text-emerald-700">+{editStats.adds}</span>{" "}
+                      <span className="text-red-400 light:text-red-700">-{editStats.dels}</span>
+                      {editFn !== undefined && (
+                        <span className="ml-1 text-neutral-500">{editFn}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
                 <pre className="tool-timeline-code">
                   {outputText.length > 4000 ? outputText.slice(0, 4000) + "\n…(truncated)" : outputText}
                 </pre>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>
@@ -1153,6 +1225,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                   ? ({
                       content: [{ type: "text", text: part.output ?? "" }],
                       isError: part.state === "error",
+                      details: part.details,
                     } as unknown as Record<string, unknown>)
                   : undefined,
             } as ToolBatchEntry);
@@ -1402,6 +1475,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   ]);
 
   return (
+    <ChatDiffViewProvider>
     <div className="messages-container" style={stickyUserHeader ? { paddingTop: 50 } : undefined}>
       {error !== undefined && (
         <div onClick={clearError} className="error-banner">
@@ -1475,5 +1549,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         </div>
       )}
     </div>
+    </ChatDiffViewProvider>
   );
 }
