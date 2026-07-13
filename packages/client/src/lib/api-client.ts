@@ -1044,6 +1044,28 @@ export async function forkSession(
   );
 }
 
+// ---- Turn Diff ----
+
+export interface TurnDiffEntry {
+  file: string;
+  tool: "write" | "edit";
+  diff: string;
+  additions: number;
+  deletions: number;
+  isPureAddition: boolean;
+}
+
+export interface TurnDiffResponse {
+  entries: TurnDiffEntry[];
+}
+
+export async function getTurnDiff(sessionId: string): Promise<TurnDiffResponse> {
+  return request<TurnDiffResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/turn-diff`,
+  );
+}
+
 // ---- Ask User Question ----
 
 export interface AskQuestion {
