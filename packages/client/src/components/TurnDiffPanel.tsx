@@ -86,49 +86,51 @@ export function TurnDiffPanel() {
 
   if (activeSessionId === undefined) {
     return (
-      <div className="flex h-full items-center justify-center px-4 text-center text-xs italic text-neutral-500">
+      <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", padding: "0 16px", textAlign: "center", fontSize: "12px", fontStyle: "italic", color: "var(--text-dim)" }}>
         Pick a session to see its file changes.
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col text-xs text-neutral-300">
-      <div className="flex items-center justify-between border-b border-neutral-800 px-3 py-2">
-        <div className="flex items-center gap-2 font-medium text-neutral-200">
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", fontSize: "12px", color: "var(--text-secondary)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--border)", padding: "8px 12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 500, color: "var(--text-primary)", fontSize: "13px" }}>
           <FileDiff size={13} />
           Last turn
           {entries.length > 0 && (
-            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-400">
+            <span style={{ borderRadius: "var(--radius-sm)", background: "var(--bg-glass)", padding: "2px 6px", fontSize: "10px", color: "var(--text-dim)" }}>
               {entries.length}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
           <button
             onClick={() => setAndPersistViewType(viewType === "split" ? "unified" : "split")}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             title={viewType === "split" ? "Switch to unified view" : "Switch to side-by-side view"}
+            type="button"
           >
             {viewType === "split" ? <Rows2 size={13} /> : <Columns2 size={13} />}
           </button>
           <button
             onClick={() => void refresh()}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
+            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             title="Refresh diff"
+            type="button"
           >
-            <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={13} style={loading ? { animation: "spin 1s linear infinite" } : undefined} />
           </button>
         </div>
       </div>
       {error !== undefined && (
-        <div className="border-b border-red-700/40 bg-red-900/20 px-3 py-1.5 text-[11px] text-red-300">
+        <div style={{ borderBottom: "1px solid var(--error)", background: "rgba(248,113,113,0.08)", padding: "6px 12px", fontSize: "11px", color: "var(--error)" }}>
           {error}
         </div>
       )}
-      <div className="flex-1 overflow-y-auto">
+      <div style={{ flex: 1, overflowY: "auto" }}>
         {entries.length === 0 && (
-          <p className="px-3 py-3 italic text-neutral-500">
+          <p style={{ padding: "12px", fontStyle: "italic", color: "var(--text-dim)" }}>
             {loading
               ? "Loading…"
               : error !== undefined
@@ -140,25 +142,26 @@ export function TurnDiffPanel() {
           const open = expanded[entry.file] ?? false;
           const name = entry.file.split("/").pop() ?? entry.file;
           return (
-            <div key={entry.file} className="border-b border-neutral-800/60">
+            <div key={entry.file} style={{ borderBottom: "1px solid var(--border)" }}>
               <button
                 onClick={() => setExpanded((e) => ({ ...e, [entry.file]: !open }))}
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-neutral-900"
+                style={{ display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "8px 12px", textAlign: "left", cursor: "pointer", background: "none", border: "none", color: "var(--text-secondary)" }}
                 title={entry.file}
+                type="button"
               >
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <span className="truncate font-mono text-neutral-200">{name}</span>
+                <span style={{ display: "flex", minWidth: 0, alignItems: "baseline", gap: "8px" }}>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "monospace", color: "var(--text-primary)", fontSize: "12px" }}>{name}</span>
                   {entry.isPureAddition && (
-                    <span className="rounded bg-emerald-900/40 px-1 py-0.5 text-[9px] uppercase tracking-wider text-emerald-300 light:bg-emerald-100 light:text-emerald-800">
+                    <span style={{ borderRadius: "var(--radius-sm)", background: "rgba(52,211,153,0.12)", padding: "2px 6px", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--success)" }}>
                       new
                     </span>
                   )}
                 </span>
-                <span className="flex shrink-0 items-baseline gap-2 text-[11px]">
-                  <span className="text-emerald-400 light:text-emerald-700">
+                <span style={{ display: "flex", flexShrink: 0, alignItems: "baseline", gap: "8px", fontSize: "11px" }}>
+                  <span style={{ color: "var(--success)" }}>
                     +{entry.additions}
                   </span>
-                  <span className="text-red-400 light:text-red-700">−{entry.deletions}</span>
+                  <span style={{ color: "var(--error)" }}>−{entry.deletions}</span>
                 </span>
               </button>
               {open && <DiffBlock diff={entry.diff} viewType={viewType} />}

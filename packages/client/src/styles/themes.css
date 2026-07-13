@@ -36,6 +36,48 @@
   --warning: #fbbf24;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ═══ Diff overrides — react-diff-view CSS variables ═══ */
+:root[data-theme="dark"] {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--text-secondary);
+  --diff-gutter-insert-background-color: rgba(52, 211, 153, 0.08);
+  --diff-gutter-insert-text-color: var(--text-dim);
+  --diff-gutter-delete-background-color: rgba(248, 113, 113, 0.08);
+  --diff-gutter-delete-text-color: var(--text-dim);
+  --diff-code-insert-background-color: rgba(52, 211, 153, 0.10);
+  --diff-code-insert-text-color: var(--text-primary);
+  --diff-code-delete-background-color: rgba(248, 113, 113, 0.10);
+  --diff-code-delete-text-color: var(--text-primary);
+  --diff-code-insert-edit-background-color: rgba(52, 211, 153, 0.20);
+  --diff-code-insert-edit-text-color: var(--text-primary);
+  --diff-code-delete-edit-background-color: rgba(248, 113, 113, 0.20);
+  --diff-code-delete-edit-text-color: var(--text-primary);
+  --diff-omit-gutter-line-color: var(--error);
+}
+
+:root[data-theme="light"] {
+  --diff-background-color: transparent;
+  --diff-text-color: var(--text-secondary);
+  --diff-gutter-insert-background-color: rgba(52, 211, 153, 0.12);
+  --diff-gutter-insert-text-color: var(--text-dim);
+  --diff-gutter-delete-background-color: rgba(248, 113, 113, 0.12);
+  --diff-gutter-delete-text-color: var(--text-dim);
+  --diff-code-insert-background-color: rgba(52, 211, 153, 0.15);
+  --diff-code-insert-text-color: var(--text-primary);
+  --diff-code-delete-background-color: rgba(248, 113, 113, 0.15);
+  --diff-code-delete-text-color: var(--text-primary);
+  --diff-code-insert-edit-background-color: rgba(52, 211, 153, 0.28);
+  --diff-code-insert-edit-text-color: var(--text-primary);
+  --diff-code-delete-edit-background-color: rgba(248, 113, 113, 0.28);
+  --diff-code-delete-edit-text-color: var(--text-primary);
+  --diff-omit-gutter-line-color: var(--error);
+}
+
 /* ═══ DARK BASE — shared across all dark accents ═══ */
 :root[data-theme="dark"] {
   color-scheme: dark;

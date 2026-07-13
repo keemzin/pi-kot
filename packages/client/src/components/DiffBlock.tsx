@@ -168,9 +168,9 @@ export function DiffBlock({
   // column in unified mode. Split mode keeps both columns visible.
   const wrapperClass = `pi-diff-block ${
     viewType === "split" ? "pi-diff-split" : "pi-diff-unified"
-  } overflow-auto px-2 pb-2 text-[11px]`;
+  }`;
   return (
-    <div className={wrapperClass}>
+    <div className={wrapperClass} style={{ overflow: "auto", padding: "0 8px 8px", fontSize: "11px" }}>
       {files.map((file) => (
         <FileDiff
           key={`${file.oldPath ?? ""}:${file.newPath ?? ""}`}
@@ -250,15 +250,15 @@ function FileDiff({
               // them from showing through during scroll.
               out.push(
                 <Decoration key={`dec-${hunk.content}`}>
-                  <div className="relative flex items-center justify-between gap-2 border-y border-blue-700/30 bg-blue-950/30 py-px leading-none light:border-blue-300 light:bg-blue-50">
-                    <span className="sticky left-0 z-10 bg-blue-950 px-2 py-px text-[9px] uppercase tracking-wider text-blue-400 light:bg-blue-100 light:text-blue-700">
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", borderBottom: "1px solid var(--border)", borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "1px 0", lineHeight: 1.5 }}>
+                    <span style={{ position: "sticky", left: 0, zIndex: 10, background: "var(--bg-glass)", padding: "0 8px", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent-text)" }}>
                       Hunk {idx + 1}
                     </span>
                     <button
                       type="button"
                       onClick={() => onHunkAction(idx)}
                       disabled={hunkActionDisabled === true}
-                      className="sticky right-1 z-10 rounded border border-blue-500/60 bg-blue-900 px-1.5 py-px text-[10px] text-blue-100 hover:border-blue-400 hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50 light:border-blue-500 light:bg-blue-200 light:text-blue-900 light:hover:border-blue-600 light:hover:bg-blue-300"
+                      style={{ position: "sticky", right: 4, zIndex: 10, borderRadius: "var(--radius-sm)", border: "1px solid var(--accent-text)", background: "var(--accent-subtle)", padding: "2px 6px", fontSize: "10px", color: "var(--accent-text)", cursor: hunkActionDisabled ? "not-allowed" : "pointer", opacity: hunkActionDisabled ? 0.5 : 1 }}
                     >
                       {hunkActionLabel ?? "Apply hunk"}
                     </button>
@@ -274,8 +274,9 @@ function FileDiff({
       {isLarge && (
         <button
           onClick={() => setExpanded(true)}
-          className="my-1 w-full rounded border border-neutral-700 bg-neutral-900/60 px-3 py-1 text-[11px] text-neutral-300 hover:border-neutral-500 hover:bg-neutral-900"
+          style={{ margin: "4px 0", width: "100%", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px", fontSize: "11px", color: "var(--text-secondary)", cursor: "pointer" }}
           title={`Showing ~${LARGE_FILE_LINE_THRESHOLD} of ${totalChanges} lines — large diffs slow the renderer; click to render the rest.`}
+          type="button"
         >
           Show all ({totalChanges} lines, {file.hunks.length} hunks)
         </button>
@@ -468,31 +469,30 @@ function needsSyntheticHeader(diff: string): boolean {
 function FallbackDiff({ diff }: { diff: string }) {
   const lines = diff.split("\n");
   return (
-    <pre className="overflow-auto px-3 pb-2 font-mono text-[11px] leading-tight">
+    <pre style={{ overflow: "auto", padding: "0 12px 8px", fontFamily: "monospace", fontSize: "11px", lineHeight: 1.5 }}>
       {lines.map((line, i) => (
-        <div key={i} className={lineClass(line)}>
-          {line.length === 0 ? " " : line}
+        <div key={i} style={lineStyle(line)}>
+          {line.length === 0 ? "\u00a0" : line}
         </div>
       ))}
     </pre>
   );
 }
 
-function lineClass(line: string): string {
+function lineStyle(line: string): React.CSSProperties {
   // Order matters: check `+++` / `---` BEFORE `+` / `-`.
-  // Each branch ships a dark-mode default + a `light:` counterpart so
-  // raw-diff lines remain legible when the user is on the Light theme.
+  // Uses CSS variables from themes.css so colors adapt to dark/light.
   if (line.startsWith("+++") || line.startsWith("---")) {
-    return "text-neutral-500";
+    return { color: "var(--text-dim)" };
   }
   if (line.startsWith("@@")) {
-    return "bg-neutral-900 text-cyan-400 light:text-cyan-700";
+    return { background: "var(--bg-glass)", color: "var(--accent-text)" };
   }
   if (line.startsWith("+")) {
-    return "bg-emerald-950/60 text-emerald-200 light:bg-emerald-50 light:text-emerald-800";
+    return { background: "rgba(52, 211, 153, 0.12)", color: "var(--success)" };
   }
   if (line.startsWith("-")) {
-    return "bg-red-950/60 text-red-200 light:bg-red-50 light:text-red-800";
+    return { background: "rgba(248, 113, 113, 0.12)", color: "var(--error)" };
   }
-  return "text-neutral-400";
+  return { color: "var(--text-dim)" };
 }
