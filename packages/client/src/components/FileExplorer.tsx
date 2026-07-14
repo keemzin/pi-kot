@@ -4,6 +4,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
 import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
+import { TurnDiffPanel } from "./TurnDiffPanel";
 import { ConfirmDialog } from "./Modal";
 import { FileEditor } from "./FileEditor";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
@@ -80,7 +81,7 @@ async function collectDroppedUploadFiles(dataTransfer: DataTransfer): Promise<Fi
   return files;
 }
 
-export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt";
+export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt" | "diff";
 
 interface Props {
   projectId: string;
@@ -838,6 +839,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         >
           🎨 Artifacts
         </button>
+        <button
+          onClick={() => setTab("diff")}
+          style={{
+            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
+            background: tab === "diff" ? "var(--bg-solid)" : "transparent",
+            color: tab === "diff" ? "var(--accent-text)" : "var(--text-dim)",
+            border: "none", borderBottom: tab === "diff" ? "2px solid var(--accent-text)" : "2px solid transparent",
+            cursor: "pointer", transition: "all 0.12s ease",
+          }}
+          type="button"
+        >
+          📝 Diff
+        </button>
       </div>
 
       {/* ── Git tab ── */}
@@ -854,6 +868,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       {tab === "artifacts" && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
           <ArtifactsPanel />
+        </div>
+      )}
+
+      {/* ── Diff tab ── */}
+      {tab === "diff" && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+          <TurnDiffPanel />
         </div>
       )}
 

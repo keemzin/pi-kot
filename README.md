@@ -23,7 +23,7 @@ This project was built out of **love and curiosity**.
 
 | Feature | Description |
 |---|---|
-| **💬 Chat** | Full agent conversation with streaming, markdown rendering, code blocks with syntax highlighting, and diff views |
+| **💬 Chat** | Full agent conversation with streaming, markdown rendering, code blocks with syntax highlighting, and diff views — no intermediate adapter, SDK types consumed directly |
 | **🖥️ Terminal** | Multi-tab xterm.js terminal with persistent PTY sessions, **touch gestures** (long-press+drag arrows, double-tap Tab, 3-finger paste), and a mobile quick-keys bar |
 | **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
 | **🔧 MCP Support** | Add, configure, and toggle MCP servers with a full settings UI |
@@ -232,10 +232,11 @@ pi-kot/
 ├── packages/
 │   ├── client/          # React SPA (Vite, xterm.js, Zustand)
 │   │   └── src/
-│   │       ├── components/   # UI components (ChatView, TerminalPanel, SlidePanel, AddProviderDialog, ...)
-│   │       ├── stores/       # Zustand stores (layout, session, terminal, MCP, preferences)
+│   │       ├── components/   # UI components (ChatView, TerminalPanel, SlidePanel, ...)
+│   │       ├── stores/       # Zustand stores (session, layout, terminal, MCP, preferences)
 │   │       ├── hooks/        # Custom hooks (touch swipe, extensions, ...)
-│   │       └── lib/          # Utilities (API client, SSE, theme, ...)
+│   │       └── lib/          # Utilities (API client, SSE, theme, tool-registry, ...)
+│   │                          # Note: no normalize.ts — SDK types consumed directly
 │   └── server/          # Express server (REST, SSE, WebSocket, PTY)
 │       └── src/
 │           ├── routes/       # API routes (sessions, terminal, git, files, projects, extensions, tunnel, ...)

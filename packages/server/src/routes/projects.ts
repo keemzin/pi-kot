@@ -5,9 +5,11 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  reorderProjects,
   ProjectNotFoundError,
   InvalidNameError,
   DuplicatePathError,
+  InvalidProjectOrderError,
 } from "../workspace-store.js";
 import {
   validateCloneUrl,
@@ -182,6 +184,62 @@ export const projectRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return reply.send({ suggestions: suggestions.slice(0, 20) });
+    },
+  );
+
+  // PUT /api/v1/projects/order — reorder projects
+  fastify.put<{
+    Body: { ids: string[] };
+  }>(
+    "/projects/order",
+    {
+      schema: {
+        description: "Persist the display order of projects in the projects pane.",
+        tags: ["projects"],
+        body: {
+          type: "object",
+          required: ["ids"],
+          additionalProperties: false,
+          properties: {
+            ids: { type: "array", items: { type: "string" }, minItems: 0 },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["projects"],
+            properties: {
+              projects: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["id", "name", "path", "createdAt"],
+                  properties: {
+                    id: { type: "string" },
+                    name: { type: "string" },
+                    path: { type: "string" },
+                    createdAt: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+          400: {
+            type: "object",
+            properties: { error: { type: "string" }, message: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return { projects: await reorderProjects(req.body.ids) };
+      } catch (err) {
+        if (err instanceof InvalidProjectOrderError) {
+          return reply.code(400).send({ error: err.name, message: err.message });
+        }
+        throw err;
+      }
     },
   );
 

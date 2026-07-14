@@ -348,6 +348,12 @@ export async function deleteProjectAPI(
   );
 }
 
+export async function reorderProjectsAPI(
+  ids: string[],
+): Promise<{ projects: Project[] }> {
+  return request<{ projects: Project[] }>("PUT", "/api/v1/projects/order", { ids });
+}
+
 export async function getProjectSystemPrompt(
   projectId: string,
 ): Promise<{ addendum: string }> {
@@ -1035,6 +1041,28 @@ export async function forkSession(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/fork`,
     { entryId },
+  );
+}
+
+// ---- Turn Diff ----
+
+export interface TurnDiffEntry {
+  file: string;
+  tool: "write" | "edit";
+  diff: string;
+  additions: number;
+  deletions: number;
+  isPureAddition: boolean;
+}
+
+export interface TurnDiffResponse {
+  entries: TurnDiffEntry[];
+}
+
+export async function getTurnDiff(sessionId: string): Promise<TurnDiffResponse> {
+  return request<TurnDiffResponse>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/turn-diff`,
   );
 }
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Columns2, Rows2 } from "lucide-react";
 import { getStoredToken } from "../lib/api-client";
+import { DiffBlock } from "./DiffBlock";
 
 /** Wrapper around fetch that includes the auth token when available. */
 async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -107,6 +109,21 @@ export function GitPanel({ projectId }: Props) {
       if (revertTimerRef.current !== undefined) clearTimeout(revertTimerRef.current);
     };
   }, []);
+
+  // Diff view type (unified / split) — persisted to localStorage
+  type GitViewType = "unified" | "split";
+  const GIT_VIEW_KEY = "pi-kot.gitPanel.viewType";
+  const readGitViewType = (): GitViewType => {
+    try {
+      return localStorage.getItem(GIT_VIEW_KEY) === "split" ? "split" : "unified";
+    } catch { return "unified"; }
+  };
+  const [gitViewType, setGitViewType] = useState<GitViewType>(readGitViewType);
+  const toggleGitViewType = () => {
+    const next = gitViewType === "split" ? "unified" : "split";
+    setGitViewType(next);
+    try { localStorage.setItem(GIT_VIEW_KEY, next); } catch { /* ignore */ }
+  };
 
   const fetchStatus = useCallback(async () => {
     setStatusError(undefined);
@@ -516,17 +533,42 @@ export function GitPanel({ projectId }: Props) {
 
   return (
     <div style={{ fontSize: "13px", color: "var(--text-secondary)", display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Header: branch + refresh */}
+      {/* Header: branch + badge + view toggle + refresh */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "10px 14px", borderBottom: "1px solid var(--border)",
+        padding: "8px 12px", borderBottom: "1px solid var(--border)",
+        background: "var(--bg-glass)",
       }}>
-        <span style={{ fontWeight: 700, fontSize: "14px", color: "var(--text-primary)" }}>
-          {status?.branch ? (
-            <><span style={{ color: "var(--accent-text)" }}>⎇</span> {status.branch}</>
-          ) : "—"}
-        </span>
-        <button onClick={fetchStatus} title="Refresh" className="git-action-btn git-refresh-btn" type="button">↻</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 500, color: "var(--text-primary)", fontSize: "13px" }}>
+          <span style={{ fontWeight: 700 }}>
+            {status?.branch ? (
+              <><span style={{ color: "var(--accent-text)" }}>⎇</span> {status.branch}</>
+            ) : "—"}
+          </span>
+          {status && status.files.length > 0 && (
+            <span style={{ borderRadius: "var(--radius-sm)", background: "var(--bg-glass)", padding: "2px 6px", fontSize: "10px", color: "var(--text-dim)" }}>
+              {status.files.length}
+            </span>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <button
+            onClick={toggleGitViewType}
+            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            title={gitViewType === "split" ? "Switch to unified view" : "Switch to side-by-side view"}
+            type="button"
+          >
+            {gitViewType === "split" ? <Rows2 size={13} /> : <Columns2 size={13} />}
+          </button>
+          <button
+            onClick={fetchStatus}
+            title="Refresh"
+            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            type="button"
+          >
+            ↻
+          </button>
+        </div>
       </div>
 
       {/* Error/success banners */}
@@ -541,8 +583,8 @@ export function GitPanel({ projectId }: Props) {
         </div>
       )}
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      {/* Scrollable content — file groups only (Log/Worktrees/Branches in bottom panel) */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column" }}>
         {status === undefined && (
           <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "11px" }}>Loading git status…</div>
         )}
@@ -559,6 +601,7 @@ export function GitPanel({ projectId }: Props) {
             onClickFile={(f) => toggleDiff(f, true)}
             openDiffs={openDiffs}
             staged
+            viewType={gitViewType}
           />
         )}
 
@@ -576,6 +619,7 @@ export function GitPanel({ projectId }: Props) {
             pendingRevert={pendingRevert}
             openDiffs={openDiffs}
             staged={false}
+            viewType={gitViewType}
           />
         )}
 
@@ -591,6 +635,7 @@ export function GitPanel({ projectId }: Props) {
             onClickFile={(f) => toggleDiff(f, false)}
             openDiffs={openDiffs}
             staged={false}
+            viewType={gitViewType}
           />
         )}
 
@@ -600,42 +645,10 @@ export function GitPanel({ projectId }: Props) {
           </div>
         )}
 
-        {/* ── Commit section ── */}
-        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
-          <textarea
-            value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            placeholder="Commit message…"
-            rows={3}
-            style={{
-              width: "100%", resize: "none", fontSize: "13px",
-              background: "var(--bg-glass)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)", padding: "8px 10px",
-              color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
-            <button
-              onClick={commit}
-              disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
-              className={`git-action-btn git-commit-btn ${stagedFiles.length > 0 && commitMessage.trim() ? "ready" : "disabled"}`}
-              type="button"
-            >
-              Commit
-            </button>
-          </div>
-        </div>
-
-        {/* ── Push / Pull / Fetch ── */}
-        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
-            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
-            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
-          </div>
-        </div>
       </div>
+
+      {/* ── Bottom: Log / Worktrees / Branches ── */}
+      <div style={{ flexShrink: 0, overflowY: "auto", maxHeight: "40%", borderTop: "1px solid var(--border)", background: "var(--bg-subtle)" }}>
 
       {/* ── Log ── */}
       <div style={{ borderTop: "1px solid var(--border)" }}>
@@ -654,7 +667,7 @@ export function GitPanel({ projectId }: Props) {
             ) : log.length === 0 ? (
               <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>No commits yet.</div>
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: "180px", overflowY: "auto" }}>
                 {log.map((c) => {
                   const busy = worktreeBusy === c.hash;
                   const expanded = expandedCommits.has(c.hash);
@@ -755,8 +768,9 @@ export function GitPanel({ projectId }: Props) {
                                         borderTop: "1px solid var(--border)",
                                         background: "var(--bg-glass)",
                                         padding: "4px 8px",
+                                        overflow: "hidden",
                                       }}>
-                                        <DiffView diff={diffEntry.value} />
+                                        <DiffBlock diff={diffEntry.value} viewType={gitViewType} />
                                       </div>
                                     )}
                                     {diffEntry !== undefined && diffEntry.state === "loading" && (
@@ -924,6 +938,43 @@ export function GitPanel({ projectId }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Fixed footer: Commit + Push/Pull ── */}
+      <div style={{ flexShrink: 0, borderTop: "1px solid var(--border)", background: "var(--bg-solid)" }}>
+        <div style={{ padding: "10px 12px" }}>
+          <textarea
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            placeholder="Commit message…"
+            rows={2}
+            style={{
+              width: "100%", resize: "none", fontSize: "13px",
+              background: "var(--bg-glass)", border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)", padding: "8px 10px",
+              color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
+            }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
+            <button
+              onClick={commit}
+              disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
+              className={`git-action-btn git-commit-btn ${stagedFiles.length > 0 && commitMessage.trim() ? "ready" : "disabled"}`}
+              type="button"
+            >
+              Commit
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: "0 12px 10px" }}>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
+            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
+            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -942,6 +993,7 @@ interface FileGroupProps {
   staged: boolean;
   onRevert?: (f: GitFileStatus) => void;
   pendingRevert?: string;
+  viewType?: "unified" | "split";
 }
 
 function FileGroup(props: FileGroupProps) {
@@ -1014,7 +1066,7 @@ function FileGroup(props: FileGroupProps) {
               </div>
               {/* Inline diff */}
               {diffState !== undefined && (
-                <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px" }}>
+                <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px", overflow: "hidden" }}>
                   {diffState === "loading" ? (
                     <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>Loading diff…</div>
                   ) : diffState === "error" ? (
@@ -1022,7 +1074,7 @@ function FileGroup(props: FileGroupProps) {
                   ) : diffState.length === 0 ? (
                     <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>(no diff)</div>
                   ) : (
-                    <DiffView diff={diffState} />
+                    <DiffBlock diff={diffState} viewType={props.viewType} />
                   )}
                 </div>
               )}
@@ -1030,57 +1082,6 @@ function FileGroup(props: FileGroupProps) {
           );
         })}
       </ul>
-    </div>
-  );
-}
-
-/* ─── DiffView — colored unified-diff renderer ─── */
-
-interface DiffViewProps {
-  diff: string;
-}
-
-function DiffView({ diff }: DiffViewProps) {
-  const lines = diff.split("\n");
-
-  return (
-    <div style={{ fontSize: "10px", overflow: "auto", lineHeight: 1.5, fontFamily: "monospace", whiteSpace: "pre", maxHeight: "320px" }}>
-      {lines.map((line, i) => {
-        const prefix = line.charAt(0);
-        let bg: string | undefined;
-        let color: string | undefined;
-        let leftBorder: string | undefined;
-
-        if (prefix === "+") {
-          bg = "rgba(152,195,121,0.12)";
-          color = "#b8d4a0";
-          leftBorder = "2px solid rgba(152,195,121,0.5)";
-        } else if (prefix === "-") {
-          bg = "rgba(248,113,113,0.12)";
-          color = "#f0a0a0";
-          leftBorder = "2px solid rgba(248,113,113,0.5)";
-        } else if (line.startsWith("@@")) {
-          bg = "rgba(139,169,219,0.08)";
-          color = "var(--accent-text)";
-        }
-
-        return (
-          <div
-            key={i}
-            style={{
-              background: bg ?? "transparent",
-              color: color ?? "var(--text-secondary)",
-              borderLeft: leftBorder ?? "2px solid transparent",
-              padding: "0 8px",
-              minHeight: "14px",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
-            {line || "\u00A0"}
-          </div>
-        );
-      })}
     </div>
   );
 }

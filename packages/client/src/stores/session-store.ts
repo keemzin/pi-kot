@@ -1,15 +1,5 @@
 import { create } from "zustand";
 import {
-  normalizeMessages,
-  normalizePartialMessage,
-  normalizeUserMessage,
-  finalizeMessage,
-  attachToolResult,
-  updateToolCallState,
-  type UIMessage,
-  type ToolCallPart,
-} from "../lib/normalize";
-import {
   type SessionSummary,
   type Project,
   type ImageContent,
@@ -24,6 +14,7 @@ import {
   archiveSession as archiveSessionAPI,
   unarchiveSession as unarchiveSessionAPI,
   deleteProjectAPI,
+  reorderProjectsAPI,
   compactSession,
   getCompactions,
 } from "../lib/api-client";
@@ -39,14 +30,11 @@ export const EMPTY_QUEUED: { steering: string[]; followUp: string[] } = {
   followUp: [],
 };
 
-// ── localStorage persistence keys ──
-
 const ACTIVE_PROJECT_KEY = "pi-kot/active-project-id";
 const ACTIVE_SESSION_KEY = "pi-kot/active-session-id";
 
 function getInitialActiveProjectId(): string | undefined {
   try {
-    // URL hash takes priority (deep link / bookmark)
     const hash = window.location.hash;
     const m = hash.match(/^#\/project\/([^/]+)/);
     if (m) return m[1];
@@ -79,49 +67,25 @@ interface StreamState {
   isStreaming: boolean;
 }
 
-/** Normalized UI-ready messages (parts model). */
-interface NormalizedState {
-  partsMessages: UIMessage[];
-  streamingMessage: UIMessage | undefined;
-  isStreaming: boolean;
-}
-
 interface SessionState {
-  /** All known projects. */
   projects: Project[];
-  /** Currently active project ID. */
   activeProjectId: string | undefined;
-  /** All known sessions (flat, for sidebar). */
   sessions: SessionSummary[];
-  /** Sessions per project (loaded by loadProjectSessions). */
   projectSessions: Record<string, SessionSummary[]>;
-  /** Archived sessions per project. */
   archivedSessions: Record<string, SessionSummary[]>;
-  /** Currently active session ID. */
   activeSessionId: string | undefined;
-  /** Messages for the active session. */
+  /** Raw SDK messages for the active session. */
   messages: unknown[];
-  /** Per-session compaction archive from GET /sessions/:id/compactions. */
   compactionsBySession: Record<string, CompactionEvent[]>;
-  /** Per-session monotonic counter bumped on every compaction_end event. */
   compactionEndCountBySession: Record<string, number>;
-  /** Pending steer/followUp messages per session (from SSE queued event). */
   queuedBySession: Record<string, { steering: string[]; followUp: string[] } | undefined>;
-  /** Streaming state per session. */
   streamState: StreamState;
-  /** Normalized messages for parts-based rendering. */
-  partsMessages: UIMessage[];
-  /** In-progress streaming message with parts. */
-  streamingMessage: UIMessage | undefined;
-  /** True while agent is running (for abort button). */
+  /** Raw streaming SDK message (from message_update). Rendered directly by ChatView. */
+  streamingMessage: Record<string, unknown> | undefined;
   isStreaming: boolean;
-  /** Whether we're loading. */
   loading: boolean;
-  /** Error message, if any. */
   error: string | undefined;
-  /** SSE client handle (for cleanup). */
   sseClient: SSEClient | undefined;
-  /** SSE connection state for the active session. */
   connectionState: "disconnected" | "connecting" | "connected" | "error";
 }
 
@@ -145,6 +109,15 @@ interface SessionActions {
   reloadMessages: (sessionId: string) => Promise<void>;
   clearError: () => void;
   deleteProject: (id: string) => Promise<void>;
+  reorderProjects: (ids: string[]) => Promise<void>;
+  moveProject: (id: string, direction: "up" | "down") => Promise<void>;
+  getSessionTree: (sessionId: string) => Promise<unknown>;
+  navigateSession: (
+    sessionId: string,
+    entryId: string,
+    opts?: { summarize?: boolean; customInstructions?: string; label?: string },
+  ) => Promise<{ editorText?: string; cancelled: boolean; summaryEntry?: unknown }>;
+  forkSession: (sessionId: string, entryId: string) => Promise<{ sessionId: string }>;
 }
 
 type SessionStore = SessionState & SessionActions;
@@ -162,7 +135,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   compactionEndCountBySession: {},
   queuedBySession: {},
   streamState: { text: "", activeToolName: undefined, isStreaming: false },
-  partsMessages: [],
   streamingMessage: undefined,
   isStreaming: false,
   loading: false,
@@ -170,19 +142,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   sseClient: undefined,
   connectionState: "disconnected",
 
-  // Actions
+  // ── Actions ──
+
   loadProjects: async () => {
     try {
       const { projects } = await fetchProjects();
       const state = get();
       let nextProjectId = state.activeProjectId;
 
-      // Validate stored project still exists on the server
       if (nextProjectId !== undefined && !projects.some((p) => p.id === nextProjectId)) {
         nextProjectId = undefined;
       }
-
-      // Auto-select first project if none active and projects exist
       if (nextProjectId === undefined && projects.length > 0) {
         nextProjectId = projects[0].id;
       }
@@ -192,7 +162,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       if (nextProjectId !== undefined) {
         try {
           localStorage.setItem(ACTIVE_PROJECT_KEY, nextProjectId);
-        } catch { /* private mode */ }
+        } catch { /* private */ }
         await get().loadProjectSessions(nextProjectId);
       }
     } catch (err) {
@@ -204,16 +174,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       localStorage.setItem(ACTIVE_PROJECT_KEY, id);
       localStorage.removeItem(ACTIVE_SESSION_KEY);
-    } catch { /* private mode */ }
+    } catch { /* private */ }
     set({ activeProjectId: id, activeSessionId: undefined, messages: [] });
-    // Disconnect old SSE
     const old = get().sseClient;
     old?.close();
     set({ sseClient: undefined, connectionState: "disconnected" });
     await get().loadProjectSessions(id);
   },
 
-  loadProjectSessions: async (projectId: string) => {
+  loadProjectSessions: async (projectId) => {
     try {
       const { sessions } = await listSessions(projectId);
       set((s) => ({
@@ -256,7 +225,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }));
       try {
         localStorage.setItem(ACTIVE_SESSION_KEY, res.sessionId);
-      } catch { /* private mode */ }
+      } catch { /* private */ }
       get().connectSSE(res.sessionId);
       return res.sessionId;
     } catch (err) {
@@ -271,16 +240,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   setActiveSession: async (id: string) => {
     try {
       localStorage.setItem(ACTIVE_SESSION_KEY, id);
-    } catch { /* private mode */ }
-    // Disconnect old SSE
+    } catch { /* private */ }
     const old = get().sseClient;
     old?.close();
-
     set({
       activeSessionId: id,
       messages: [],
       streamState: { text: "", activeToolName: undefined, isStreaming: false },
-      partsMessages: [],
       streamingMessage: undefined,
       isStreaming: false,
       queuedBySession: {},
@@ -290,10 +256,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     // Load messages
     try {
       const { messages } = await getSessionMessages(id);
-      set({
-        messages,
-        partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
-      });
+      set({ messages, streamingMessage: undefined });
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to load messages" });
     }
@@ -307,66 +270,23 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     old?.close();
     set({ connectionState: "connecting" });
 
-    // RAF-coalesced text delta buffer (like forge)
-    let pendingDelta = "";
-    let rafId: number | undefined;
-    const flushDelta = () => {
-      rafId = undefined;
-      const text = pendingDelta;
-      if (text.length === 0) return;
-      pendingDelta = "";
-      set((s) => ({
-        streamState: {
-          ...s.streamState,
-          text: s.streamState.text + text,
-        },
-      }));
-    };
-
-    // RAF-coalesced partial normalization for parts model
-    let pendingPartial: Record<string, unknown> | undefined;
+    // RAF-coalesced partial message (raw SDK message, no normalization)
     let rafPartialId: number | undefined;
+    let pendingPartial: Record<string, unknown> | undefined;
+
     const flushPartial = () => {
       rafPartialId = undefined;
-      const partial = pendingPartial;
-      if (partial === undefined) return;
-      pendingPartial = undefined;
-      const uiMsg = normalizePartialMessage(partial, -1);
-      set((s) => {
-        // Preserve tool-call results from the previous streamingMessage.
-        // The SDK sends message_update events after tool_execution_end
-        // (e.g. when the assistant appends more text after tool calls),
-        // which would otherwise wipe tool results by creating a fresh
-        // partial with all tool-call parts reset to "input-available".
-        if (s.streamingMessage && s.streamingMessage.parts.length > 0) {
-          const prevParts = s.streamingMessage.parts;
-          uiMsg.parts = uiMsg.parts.map((part) => {
-            if (part.type === "tool-call") {
-              const prev = prevParts.find(
-                (p): p is ToolCallPart =>
-                  p.type === "tool-call" && p.toolCallId === part.toolCallId,
-              );
-              if (prev && prev.state !== "input-available") {
-                return { ...part, state: prev.state, output: prev.output, errorText: prev.errorText };
-              }
-            }
-            return part;
-          });
-        }
-        return {
-          streamingMessage: uiMsg,
-          isStreaming: true,
-          streamState: {
-            ...s.streamState,
-            isStreaming: true,
-          },
-        };
+      if (pendingPartial === undefined) return;
+      set({
+        streamingMessage: pendingPartial,
+        isStreaming: true,
       });
+      pendingPartial = undefined;
     };
 
-    // Debounced message refetch (like forge's scheduleMessagesRefetch)
     let refetchInflight = false;
     let refetchQueued = false;
+
     const refetchMessages = () => {
       if (refetchInflight) {
         refetchQueued = true;
@@ -375,13 +295,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       refetchInflight = true;
       getSessionMessages(sessionId)
         .then(({ messages }) => {
-          set({
-            messages,
-            // Rebuild partsMessages from fresh server data (same strategy as
-            // the old tool-call-pairing approach — tool results always fresh
-            // from the server, not tracked incrementally).
-            partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
-          });
+          set({ messages });
         })
         .catch(() => {})
         .finally(() => {
@@ -395,13 +309,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         });
     };
 
-    // Load the per-compaction archive on open so historical
-    // CompactionCards render immediately.
     void get().loadCompactions(sessionId);
 
     const client = streamSessionSSE(sessionId, {
       onEvent: (event) => {
-        // Any event means the connection is alive
         set({ connectionState: "connected" });
         switch (event.type) {
           case "snapshot": {
@@ -409,7 +320,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             const isStreaming = event.isStreaming === true;
             set({
               messages: msgs,
-              partsMessages: normalizeMessages(msgs as Record<string, unknown>[]),
               streamingMessage: undefined,
               isStreaming,
               streamState: {
@@ -433,8 +343,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             break;
           }
           case "message_update": {
-            // Normalize the partial for parts-based rendering
-            const msg = (event as Record<string, unknown>).message as Record<string, unknown> | undefined;
+            // Store raw SDK message — ChatView renders content[] directly
+            const msg = event.message as Record<string, unknown> | undefined;
             if (msg !== undefined && typeof msg === "object") {
               pendingPartial = msg;
               if (rafPartialId === undefined) {
@@ -447,25 +357,23 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             if (assistantEvent?.type === "text_delta") {
               const delta = assistantEvent.delta as string;
               if (delta) {
-                pendingDelta += delta;
-                if (rafId === undefined) {
-                  rafId = requestAnimationFrame(flushDelta);
-                }
+                set((s) => ({
+                  streamState: {
+                    ...s.streamState,
+                    text: s.streamState.text + delta,
+                  },
+                }));
               }
             }
             break;
           }
           case "tool_execution_start": {
             const toolName = event.toolName as string;
-            const toolCallId = event.toolCallId as string;
             set((s) => ({
               streamState: {
                 ...s.streamState,
                 activeToolName: toolName,
               },
-              streamingMessage: s.streamingMessage && toolCallId
-                ? updateToolCallState(s.streamingMessage, toolCallId, "running")
-                : s.streamingMessage,
             }));
             refetchMessages();
             break;
@@ -476,10 +384,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 ...s.streamState,
                 activeToolName: undefined,
               },
-              streamingMessage: s.streamingMessage && event.toolCallId
-                ? attachToolResult(s.streamingMessage, event.toolCallId as string, event.result, (event as Record<string, unknown>).isError === true)
-                : s.streamingMessage,
             }));
+            refetchMessages();
+            break;
+          }
+          case "tool_result": {
+            if (rafPartialId !== undefined) {
+              cancelAnimationFrame(rafPartialId);
+              rafPartialId = undefined;
+            }
+            flushPartial();
+            refetchMessages();
+            break;
+          }
+          case "message_end": {
+            if (rafPartialId !== undefined) {
+              cancelAnimationFrame(rafPartialId);
+              rafPartialId = undefined;
+            }
+            flushPartial();
+            set({ streamingMessage: undefined });
             refetchMessages();
             break;
           }
@@ -488,54 +412,29 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
               requestId: string;
               questions: import("../lib/api-client").AskQuestion[];
             };
-            useAskUserQuestionStore.getState().setPending({
-              requestId,
-              sessionId,
-              questions,
-            });
+            useAskUserQuestionStore.getState().setPending({ requestId, sessionId, questions });
             break;
           }
           case "ask_user_question_cancelled": {
-            const { requestId: cancelledId } = event as unknown as {
-              requestId: string;
-            };
+            const { requestId: cancelledId } = event as unknown as { requestId: string };
             useAskUserQuestionStore.getState().clearPending(sessionId, cancelledId);
             break;
           }
           case "compaction_start": {
-            // Show a brief banner so the user knows compaction is in progress.
-            // On manual compact there's already a "Compacting…" state in
-            // ChatInput, but auto-compact (context overflow) needs this.
             set((s) => ({
-              streamState: {
-                ...s.streamState,
-                activeToolName: "compacting…",
-              },
+              streamState: { ...s.streamState, activeToolName: "compacting…" },
             }));
             break;
           }
           case "compaction_end": {
-            // Clear the compacting indicator.
             set((s) => ({
-              streamState: {
-                ...s.streamState,
-                activeToolName: undefined,
-              },
-              // Bump the compaction-end counter so panels that need to
-              // react (e.g. ContextInspectorPanel re-fetching token
-              // usage) get a stable signal.
+              streamState: { ...s.streamState, activeToolName: undefined },
               compactionEndCountBySession: {
                 ...s.compactionEndCountBySession,
                 [sessionId]: (s.compactionEndCountBySession[sessionId] ?? 0) + 1,
               },
             }));
-            // Refetch compactions FIRST so the card data is available,
-            // then refetch messages. If messages update before compactions
-            // arrive, the ChatView renders post-compaction messages without
-            // the CompactionCard — a brief flash of ungrouped tool calls.
-            void get().loadCompactions(sessionId).then(() => {
-              refetchMessages();
-            });
+            void get().loadCompactions(sessionId).then(() => refetchMessages());
             break;
           }
           case "queued": {
@@ -558,32 +457,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             break;
           }
           case "agent_end": {
-            if (rafId !== undefined) {
-              cancelAnimationFrame(rafId);
-              rafId = undefined;
-            }
             if (rafPartialId !== undefined) {
               cancelAnimationFrame(rafPartialId);
               rafPartialId = undefined;
             }
-            flushDelta();
             flushPartial();
 
             const agentEndEv = event as Record<string, unknown>;
             const willRetry = agentEndEv.willRetry === true;
-            const finalMsgs = agentEndEv.messages as unknown[] | undefined;
 
             if (willRetry) {
-              set((s) => ({
-                streamState: {
-                  ...s.streamState,
-                  text: "",
-                },
-                streamingMessage: undefined,
-                // Keep isStreaming true during retry
-              }));
+              set({ streamingMessage: undefined });
             } else {
               let errorMessage = agentEndEv.errorMessage as string | undefined;
+              const finalMsgs = agentEndEv.messages as unknown[] | undefined;
               if (!errorMessage && finalMsgs && finalMsgs.length > 0) {
                 const last = finalMsgs[finalMsgs.length - 1] as Record<string, unknown> | undefined;
                 if (last?.role === "assistant" && last?.stopReason === "error") {
@@ -597,49 +484,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                   activeToolName: undefined,
                   isStreaming: false,
                 },
-                // Keep partsMessages built incrementally by message_update/message_end.
-                // Do NOT replace with finalMsgs — the SDK only includes the current
-                // run's messages in agent_end, not the full history.
                 streamingMessage: undefined,
                 isStreaming: false,
-              }));
-
-              if (errorMessage) {
-                set({ error: errorMessage });
-              }
-
-              set((s) => ({
+                error: errorMessage ?? undefined,
                 queuedBySession: { ...s.queuedBySession, [sessionId]: undefined },
               }));
             }
 
-            refetchMessages();
-            break;
-          }
-          case "message_end": {
-            if (rafId !== undefined) {
-              cancelAnimationFrame(rafId);
-              rafId = undefined;
-            }
-            if (rafPartialId !== undefined) {
-              cancelAnimationFrame(rafPartialId);
-              rafPartialId = undefined;
-            }
-            flushDelta();
-            flushPartial();
-            set((s) => {
-              const msgs = s.streamingMessage
-                ? [...s.partsMessages, finalizeMessage(s.streamingMessage)]
-                : s.partsMessages;
-              return {
-                partsMessages: msgs,
-                streamingMessage: undefined,
-                streamState: {
-                  ...s.streamState,
-                  text: "",
-                },
-              };
-            });
             refetchMessages();
             break;
           }
@@ -651,32 +502,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
             set({ error: `Model error — retrying (${attempt}/${maxAttempts}): ${errMsg}` });
             break;
           }
-
           case "auto_retry_end": {
-            const retryEndEv = event as Record<string, unknown>;
-            if (retryEndEv.success === true) {
-              // Retry succeeded — clear the error banner
-              set({ error: undefined });
-            } else {
-              // All retries exhausted — show the final error from the provider
-              const finalError = retryEndEv.finalError as string | undefined;
-              if (finalError) {
-                set({ error: finalError });
-              }
-            }
-            break;
-          }
-
-          case "tool_result": {
-            // Refetch to show the toolResult block inline in the
-            // rendered messages. Don't clear stream text — the agent
-            // may continue writing (same message) after analyzing the result.
-            if (rafId !== undefined) {
-              cancelAnimationFrame(rafId);
-              rafId = undefined;
-            }
-            flushDelta();
-            refetchMessages();
+            set({ error: undefined });
             break;
           }
           // ── Extension UI bridge events ──
@@ -686,31 +513,28 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           case "extension_ui_notify":
           case "extension_ui_done": {
             useExtensionUIStore.getState().pushEvent(
-              event as unknown as import("../stores/extension-ui-store").ExtensionUIEvent,
+              event as unknown as import("./extension-ui-store").ExtensionUIEvent,
             );
             break;
           }
-          // ── Streaming exec events (!cmd / !!cmd live terminal) ──
+          // ── Streaming exec events ──
           case "exec_start": {
             const { command, excludeFromContext } = event as unknown as {
               command: string;
               excludeFromContext: boolean;
             };
-            // Push an optimistic bashExecution message that streams live
             const optimisticMsg = {
               role: "bashExecution",
               command,
               output: "",
-              exitCode: undefined as number | undefined, // undefined = running
+              exitCode: undefined as number | undefined,
               cancelled: false,
               truncated: false,
               excludeFromContext,
               timestamp: Date.now(),
-              _pendingExec: true, // marker for the UI to show cancel button
+              _pendingExec: true,
             };
-            set((s) => ({
-              messages: [...s.messages, optimisticMsg],
-            }));
+            set((s) => ({ messages: [...s.messages, optimisticMsg] }));
             break;
           }
           case "exec_update": {
@@ -739,7 +563,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
                 const m = last as Record<string, unknown>;
                 if (execCancelled) {
                   m.cancelled = true;
-                  m.exitCode = exitCode; // null for killed process — fine, cancelled takes priority in UI
+                  m.exitCode = exitCode;
                 } else {
                   m.exitCode = exitCode;
                   m.cancelled = false;
@@ -757,7 +581,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           }
         }
       },
-      onReconnect: ({ attempt }) => {
+      onReconnect: ({ attempt }: { attempt: number }) => {
         set({ connectionState: "connecting" });
         if (attempt > 1) {
           set({ error: `Reconnecting... (attempt ${attempt})` });
@@ -771,15 +595,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     set({ sseClient: client });
   },
 
+  // ── Prompt / Abort ──
+
   sendPrompt: async (text: string, images?: ImageContent[]) => {
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
 
-    // Add user message immediately (optimistic)
     const optimisticContent: Record<string, unknown>[] = [{ type: "text", text }];
     if (images !== undefined && images.length > 0) {
       for (const img of images) {
-        // Use the base64 data as a data URL for the optimistic preview
         optimisticContent.push({
           type: "image",
           mimeType: img.mimeType,
@@ -789,18 +613,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     }
 
-    // Normalized optimistic entry
-    const optimisticUIMsg = normalizeUserMessage(
-      { role: "user", content: optimisticContent } as unknown as Record<string, unknown>,
-      -1,
-    );
-
     set((s) => ({
-      messages: [
-        ...s.messages,
-        { role: "user", content: optimisticContent },
-      ],
-      partsMessages: [...s.partsMessages, optimisticUIMsg],
+      messages: [...s.messages, { role: "user", content: optimisticContent }],
     }));
 
     try {
@@ -808,7 +622,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (err) {
       set((s) => ({
         error: err instanceof Error ? err.message : "Failed to send prompt",
-        // If an existing stream was active, reset it
         streamState: s.streamState.isStreaming
           ? { text: "", activeToolName: undefined, isStreaming: false }
           : s.streamState,
@@ -820,7 +633,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
 
-    // Build optimistic content
     const optimisticContent: Record<string, unknown>[] = [{ type: "text", text }];
     if (images !== undefined && images.length > 0) {
       for (const img of images) {
@@ -833,18 +645,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       }
     }
 
-    // Normalized optimistic entry
-    const optimisticUIMsg = normalizeUserMessage(
-      { role: "user", content: optimisticContent, metadata: { steer: true } } as unknown as Record<string, unknown>,
-      -1,
-    );
-
     set((s) => ({
       messages: [
         ...s.messages,
         { role: "user", content: optimisticContent, metadata: { steer: true } },
       ],
-      partsMessages: [...s.partsMessages, optimisticUIMsg],
     }));
 
     try {
@@ -852,7 +657,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     } catch (err) {
       set((s) => ({
         error: err instanceof Error ? err.message : "Failed to steer",
-        // If an existing stream was active, reset it
         streamState: s.streamState.isStreaming
           ? { text: "", activeToolName: undefined, isStreaming: false }
           : s.streamState,
@@ -864,15 +668,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const { activeSessionId } = get();
     if (activeSessionId === undefined) return;
 
-    // Optimistically reset streaming state so the UI responds immediately
-    // (abort button disappears, send button reappears). The SSE agent_end
-    // will confirm this, but we don't wait for it.
     set({
-      streamState: {
-        text: "",
-        activeToolName: undefined,
-        isStreaming: false,
-      },
+      streamState: { text: "", activeToolName: undefined, isStreaming: false },
       streamingMessage: undefined,
       isStreaming: false,
     });
@@ -880,14 +677,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       await abortSession(activeSessionId);
     } catch {
-      // best-effort — SSE events will eventually confirm the state
+      // best-effort
     }
   },
+
+  // ── Session management ──
 
   renameSession: async (sessionId: string, name: string) => {
     try {
       await renameSessionAPI(sessionId, name);
-      // Update local state
       set((s) => ({
         sessions: s.sessions.map((sess) =>
           sess.sessionId === sessionId ? { ...sess, name } : sess,
@@ -907,13 +705,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   archiveSession: async (sessionId: string) => {
-    // Find the projectId from local state
     const state = get();
     const session = state.sessions.find((s) => s.sessionId === sessionId);
     const projectId = session?.projectId ?? state.activeProjectId;
     try {
       await archiveSessionAPI(sessionId, projectId);
-      // Remove from local state
       const wasActive = get().activeSessionId === sessionId;
       set((s) => ({
         sessions: s.sessions.filter((sess) => sess.sessionId !== sessionId),
@@ -929,9 +725,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
           s.activeSessionId === sessionId ? undefined : s.activeSessionId,
       }));
       if (wasActive) {
-        try {
-          localStorage.removeItem(ACTIVE_SESSION_KEY);
-        } catch { /* private mode */ }
+        try { localStorage.removeItem(ACTIVE_SESSION_KEY); } catch { /* private */ }
       }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : "Failed to archive session" });
@@ -941,7 +735,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   unarchiveSession: async (sessionId: string, projectId: string) => {
     try {
       await unarchiveSessionAPI(sessionId, projectId);
-      // Reload both active and archived sessions
       await get().loadProjectSessions(projectId);
       await get().loadArchivedSessions(projectId);
     } catch (err) {
@@ -953,9 +746,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const { listArchivedSessions } = await import("../lib/api-client");
       const { sessions } = await listArchivedSessions(projectId);
-      set((s) => ({
-        archivedSessions: { ...s.archivedSessions, [projectId]: sessions },
-      }));
+      set((s) => ({ archivedSessions: { ...s.archivedSessions, [projectId]: sessions } }));
     } catch {
       // silently fail
     }
@@ -968,16 +759,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         compactionsBySession: { ...s.compactionsBySession, [sessionId]: compactions },
       }));
     } catch {
-      // Non-fatal — chat just renders without the cards.
+      // non-fatal
     }
   },
 
   compactAndReload: async (sessionId: string) => {
-    // Call the compact API. If it succeeds, also refetch messages and
-    // compactions so the ChatView updates even if SSE compaction_end
-    // events don't fire (race on manual compact).
-    // Load compactions FIRST, then messages — prevents a flash where
-    // post-compaction messages render without the CompactionCard.
     const result = await compactSession(sessionId);
     await get().loadCompactions(sessionId);
     await get().reloadMessages(sessionId);
@@ -988,12 +774,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const { getSessionMessages } = await import("../lib/api-client");
       const { messages } = await getSessionMessages(sessionId);
-      set({
-        messages,
-        partsMessages: normalizeMessages(messages as Record<string, unknown>[]),
-      });
+      set({ messages });
     } catch {
-      // silently fail — next SSE snapshot will fix it
+      // silently fail
     }
   },
 
@@ -1007,7 +790,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
         try {
           localStorage.removeItem(ACTIVE_PROJECT_KEY);
           localStorage.removeItem(ACTIVE_SESSION_KEY);
-        } catch { /* private mode */ }
+        } catch { /* private */ }
       }
       let nextActiveProjectId: string | undefined = state.activeProjectId;
       let nextSessions: SessionSummary[] = state.sessions;
@@ -1041,6 +824,32 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
   },
 
+  reorderProjects: async (ids: string[]) => {
+    const previous = get().projects;
+    const byId = new Map(previous.map((p) => [p.id, p] as const));
+    const next = ids.map((id) => byId.get(id)).filter((p): p is Project => p !== undefined);
+    if (next.length !== previous.length) return;
+    set({ projects: next, error: undefined });
+    try {
+      const { projects } = await reorderProjectsAPI(ids);
+      set({ projects });
+    } catch (err) {
+      set({ projects: previous, error: err instanceof Error ? err.message : "Failed to reorder projects" });
+      throw err;
+    }
+  },
+
+  moveProject: async (id: string, direction: "up" | "down") => {
+    const { projects, reorderProjects } = get();
+    const idx = projects.findIndex((p) => p.id === id);
+    if (idx === -1) return;
+    const newIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= projects.length) return;
+    const ids = projects.map((p) => p.id);
+    [ids[idx], ids[newIdx]] = [ids[newIdx], ids[idx]];
+    await reorderProjects(ids);
+  },
+
   // ── Session Tree / Navigate / Fork ──
 
   getSessionTree: async (sessionId: string) => {
@@ -1048,11 +857,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     return api(sessionId);
   },
 
-  navigateSession: async (
-    sessionId: string,
-    entryId: string,
-    opts?: { summarize?: boolean; customInstructions?: string; label?: string },
-  ) => {
+  navigateSession: async (sessionId, entryId, opts) => {
     const { navigateSession: api } = await import("../lib/api-client");
     return api(sessionId, entryId, opts);
   },

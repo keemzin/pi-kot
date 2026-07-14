@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { buildCompactionHistory } from "../compaction-cards.js";
+import { buildTurnDiff } from "../turn-diff-builder.js";
 import {
   createSession,
   disposeSession,
@@ -787,6 +788,65 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "session_not_found" });
       }
       return { compactions: buildCompactionHistory(live.session) };
+    },
+  );
+
+  // GET /sessions/:id/turn-diff — aggregate write/edit changes from latest turn
+  fastify.get<{ Params: { id: string } }>(
+    "/sessions/:id/turn-diff",
+    {
+      schema: {
+        description:
+          "Aggregate every write/edit tool result from the session's most " +
+          "recent turn into one reviewable changeset. Returns " +
+          "`{ entries: [{ file, tool, diff, additions, deletions, isPureAddition }] }`. " +
+          "Prefers the tool result's turn-scoped diff; falls back to " +
+          "`git diff HEAD -- <path>` and then a pure-addition diff when " +
+          "needed. 404 if the session isn't currently live.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["entries"],
+            properties: {
+              entries: {
+                type: "array",
+                items: {
+                  type: "object",
+                  required: ["file", "tool", "diff", "additions", "deletions", "isPureAddition"],
+                  properties: {
+                    file: { type: "string" },
+                    tool: { type: "string", enum: ["write", "edit"] },
+                    diff: { type: "string" },
+                    additions: { type: "integer", minimum: 0 },
+                    deletions: { type: "integer", minimum: 0 },
+                    isPureAddition: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) return reply.code(404).send({ error: "session_not_found" });
+      const entries = await buildTurnDiff(
+        live.session,
+        live.workspacePath,
+        live.lastAgentStartIndex,
+      );
+      return { entries };
     },
   );
 };
