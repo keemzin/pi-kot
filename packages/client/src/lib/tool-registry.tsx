@@ -1,5 +1,19 @@
 import React from "react";
-import type { ToolCallPart } from "./normalize";
+
+/**
+ * Shape passed to custom tool renderers.
+ * Derived from the SDK's ToolCall + ToolResultMessage pairing.
+ */
+export interface ToolCallPart {
+  type: "tool-call";
+  toolName: string;
+  toolCallId: string;
+  args: Record<string, unknown>;
+  state: "input-available" | "running" | "success" | "error";
+  output?: string;
+  errorText?: string;
+  details?: unknown;
+}
 
 export interface ToolRendererProps {
   part: ToolCallPart;

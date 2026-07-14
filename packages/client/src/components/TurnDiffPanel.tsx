@@ -28,13 +28,10 @@ export function TurnDiffPanel() {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const messages = useSessionStore((s) => s.messages);
   const isStreaming = useSessionStore((s) => s.isStreaming);
-  const partsMessages = useSessionStore((s) => s.partsMessages);
-
-  // Use partsMessages length as a proxy for agent_end — when a turn
-  // finishes, the SDK normalizes and flushes streamingMessage into
-  // partsMessages. This changes less frequently than raw messages but
-  // more reliably than a dedicated counter we'd need to add.
-  const messageCount = partsMessages.length;
+  // Use messages length as a proxy for turn completion.
+  // Each turn appends one user message + one or more assistant/toolResult
+  // messages, so the array grows monotonically across turns.
+  const messageCount = messages.length;
 
   const [entries, setEntries] = useState<TurnDiffEntry[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);

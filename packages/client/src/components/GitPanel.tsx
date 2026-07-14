@@ -583,8 +583,8 @@ export function GitPanel({ projectId }: Props) {
         </div>
       )}
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+      {/* Scrollable content — file groups + log/worktrees/branches */}
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column" }}>
         {status === undefined && (
           <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "11px" }}>Loading git status…</div>
         )}
@@ -645,44 +645,7 @@ export function GitPanel({ projectId }: Props) {
           </div>
         )}
 
-        {/* ── Commit section ── */}
-        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
-          <textarea
-            value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            placeholder="Commit message…"
-            rows={3}
-            style={{
-              width: "100%", resize: "none", fontSize: "13px",
-              background: "var(--bg-glass)", border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)", padding: "8px 10px",
-              color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
-            }}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
-            <button
-              onClick={commit}
-              disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
-              className={`git-action-btn git-commit-btn ${stagedFiles.length > 0 && commitMessage.trim() ? "ready" : "disabled"}`}
-              type="button"
-            >
-              Commit
-            </button>
-          </div>
-        </div>
-
-        {/* ── Push / Pull / Fetch ── */}
-        <div style={{ borderTop: "1px solid var(--border)", padding: "10px 12px" }}>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
-            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
-            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Log ── */}
+        {/* ── Log ── */}
       <div style={{ borderTop: "1px solid var(--border)" }}>
         <button
           onClick={() => setShowLog((v) => !v)}
@@ -699,7 +662,7 @@ export function GitPanel({ projectId }: Props) {
             ) : log.length === 0 ? (
               <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>No commits yet.</div>
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, maxHeight: "180px", overflowY: "auto" }}>
                 {log.map((c) => {
                   const busy = worktreeBusy === c.hash;
                   const expanded = expandedCommits.has(c.hash);
@@ -970,6 +933,43 @@ export function GitPanel({ projectId }: Props) {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ── Fixed footer: Commit + Push/Pull ── */}
+      <div style={{ flexShrink: 0, borderTop: "1px solid var(--border)", background: "var(--bg-solid)" }}>
+        <div style={{ padding: "10px 12px" }}>
+          <textarea
+            value={commitMessage}
+            onChange={(e) => setCommitMessage(e.target.value)}
+            placeholder="Commit message…"
+            rows={2}
+            style={{
+              width: "100%", resize: "none", fontSize: "13px",
+              background: "var(--bg-glass)", border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)", padding: "8px 10px",
+              color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
+            }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
+            <button
+              onClick={commit}
+              disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
+              className={`git-action-btn git-commit-btn ${stagedFiles.length > 0 && commitMessage.trim() ? "ready" : "disabled"}`}
+              type="button"
+            >
+              Commit
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: "0 12px 10px" }}>
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
+            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
+            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

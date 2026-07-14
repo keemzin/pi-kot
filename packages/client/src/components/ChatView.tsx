@@ -28,22 +28,29 @@ import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
-import {
-  type UIMessage,
-  type UIPart,
-  type TextPart,
-  type ThinkingPart,
-  type ToolCallPart,
-  type BashExecPart,
-  type ImagePart,
-} from "../lib/normalize";
+/** Shape of a tool-call part derived from paired SDK ToolCall + ToolResultMessage. */
+interface ToolCallPart {
+  type: "tool-call";
+  toolName: string;
+  toolCallId: string;
+  args: Record<string, unknown>;
+  state: "input-available" | "running" | "success" | "error";
+  output?: string;
+  errorText?: string;
+  details?: unknown;
+}
 
-/** Local mirror of old tool-call-pairing types (for ToolCallEntry/ToolCallBatchCard compat). */
+/** Shape passed to custom tool renderers (tool-registry.tsx). */
+export type { ToolCallPart as ToolCallPartExport } from "../lib/tool-registry";
+
+/** Local mirror of tool-call-pairing types (for ToolCallEntry/ToolCallBatchCard compat). */
 interface PairableMessage {
   role?: string;
   type?: string;
   content?: unknown;
   toolCallId?: unknown;
+  details?: unknown;
+  isError?: boolean;
   [key: string]: unknown;
 }
 interface ToolBatchEntry {
@@ -86,6 +93,15 @@ function extractText(content: unknown): string {
 }
 
 /** Extract image blocks from an SDK content array, returning { mimeType, data } for rendering. */
+/** Extract text from an SDK content array, concatenating text blocks. */
+function extractContentText(content: unknown): string {
+  if (!Array.isArray(content)) return typeof content === "string" ? content : "";
+  return content
+    .filter((c: Record<string, unknown>) => c.type === "text")
+    .map((c: Record<string, unknown>) => String(c.text ?? ""))
+    .join("\n\n");
+}
+
 function extractImages(content: unknown): { mimeType: string; data: string; __blobUrl?: boolean }[] {
   if (!Array.isArray(content)) return [];
   return content
@@ -921,19 +937,37 @@ function ModelBadge({ msg, fallbackModel, fallbackProvider }: {
   );
 }
 
+/** Render content blocks from a raw SDK streaming message (no tool-call parts — those go in ToolCallBatchCard). */
+function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
+  const content = msg.content;
+  if (!Array.isArray(content)) {
+    const text = typeof content === "string" ? content : "";
+    return text ? <ChatMarkdown text={text} /> : null;
+  }
+  return (
+    <>
+      {content.map((chunk: Record<string, unknown>, i: number) => {
+        if (chunk.type === "text" && typeof chunk.text === "string") {
+          return <ChatMarkdown key={i} text={chunk.text} />;
+        }
+        if (chunk.type === "thinking" && typeof chunk.thinking === "string") {
+          return <ThinkingBlock key={i} text={chunk.thinking} />;
+        }
+        return null;
+      })}
+    </>
+  );
+}
+
 /* ── Main ChatView ── */
 
 const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
-  const partsMessages = useSessionStore((s) => s.partsMessages);
+  const messages = useSessionStore((s) => s.messages);
   const streamingMessage = useSessionStore((s) => s.streamingMessage);
   const isStreaming = useSessionStore((s) => s.isStreaming);
   const rawCompactions = useSessionStore((s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS);
-  // Only show compaction cards when the current leaf is AT a compaction
-  // point (messages[0] is the SDK-synthesized compactionSummary). If you
-  // navigate to a pre-compaction leaf, messages[0] is a normal user
-  // message and compaction cards should be hidden.
   const rawMessages = useSessionStore((s) => s.messages);
   const compactions = (rawMessages as Record<string, unknown>[])[0]?.role === "compactionSummary"
     ? rawCompactions
@@ -947,26 +981,44 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
   const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 
-  // Push artifacts to the Artifacts Panel — scans both tool outputs AND
-  // assistant text (fenced code blocks like ```svg, ```html, ```json, ```md)
+  // Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
+  const buildToolResultMap = (msgs: unknown[]): Map<string, Record<string, unknown>> => {
+    const map = new Map<string, Record<string, unknown>>();
+    for (const m of msgs) {
+      const msg = m as Record<string, unknown>;
+      if (msg.role === "toolResult" && typeof msg.toolCallId === "string") {
+        map.set(msg.toolCallId, msg);
+      }
+    }
+    return map;
+  };
+
+  // Push artifacts to the Artifacts Panel
   const pushArtifact = useLayoutStore((s) => s.pushArtifact);
   const seenArtifactIds = useRef(new Set<string>());
   useEffect(() => {
-    const allMsgs = [...partsMessages, ...(streamingMessage ? [streamingMessage] : [])];
+    const allMsgs = [...messages, ...(streamingMessage ? [streamingMessage] : [])];
     for (const msg of allMsgs) {
-      for (const part of msg.parts) {
-        // ── Tool outputs ──
-        if (part.type === "tool-call") {
-          if (part.state === "running" || part.state === "input-available") continue;
-          if (seenArtifactIds.current.has(part.toolCallId)) continue;
-          const output = part.output ?? "";
-          const trimmed = output.trim();
+      const m = msg as Record<string, unknown>;
+      const contents = m.content;
+      if (!Array.isArray(contents)) continue;
 
-          // Detect artifact type from tool output content
+      for (const chunk of contents) {
+        const c = chunk as Record<string, unknown>;
+        // ── Tool outputs ──
+        if (c.type === "toolCall") {
+          const toolCallId = typeof c.id === "string" ? c.id : "";
+          if (seenArtifactIds.current.has(toolCallId)) continue;
+          seenArtifactIds.current.add(toolCallId);
+
+          // Find the paired result for output
+          const resultMap = buildToolResultMap(messages);
+          const result = resultMap.get(toolCallId);
+          const outputText = extractContentText(result?.content);
+          const trimmed = outputText.trim();
+
           let artType: string | undefined;
-          let artTitle: string = part.toolName === "javascript_repl"
-            ? ((part.args?.title as string) || "REPL Output")
-            : part.toolName;
+          let artTitle = typeof c.name === "string" ? c.name : "Tool Output";
 
           if (/^\s*<!doctype\s+html/i.test(trimmed) || /^\s*<html/i.test(trimmed)) {
             artType = "html";
@@ -979,47 +1031,38 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
           }
 
           if (artType) {
-            seenArtifactIds.current.add(part.toolCallId);
-            pushArtifact({ title: artTitle, type: artType as any, content: output, sessionId });
+            pushArtifact({ title: artTitle, type: artType as any, content: outputText, sessionId });
           }
         }
         // ── Assistant text — extract fenced code blocks ──
-        if (part.type === "text") {
+        if (c.type === "text" && typeof c.text === "string") {
           const fenceRe = /```(svg|html|json|markdown|md|text|plain|txt|image)\s*\n([\s\S]*?)```/gi;
           let match: RegExpExecArray | null;
-          while ((match = fenceRe.exec(part.text)) !== null) {
+          while ((match = fenceRe.exec(c.text)) !== null) {
             const rawLang = match[1].toLowerCase();
             const content = match[2].trim();
-            const artifactId = `${msg.id}-text-${match.index}`;
+            // Use message id + text position as stable artifact key
+            const artifactId = `${(m.id as string) ?? ""}-text-${match.index}`;
             if (seenArtifactIds.current.has(artifactId)) continue;
             seenArtifactIds.current.add(artifactId);
 
-            // Normalize language to artifact type
             let type: string;
             let title: string;
             switch (rawLang) {
-              case "svg":
-                type = "svg"; title = "SVG"; break;
-              case "html":
-                type = "html"; title = "HTML"; break;
-              case "json":
-                type = "json"; title = "JSON"; break;
-              case "markdown": case "md":
-                type = "markdown"; title = "Markdown"; break;
-              case "text": case "plain": case "txt":
-                type = "text"; title = "Text"; break;
-              case "image":
-                type = "image"; title = "Image"; break;
-              default:
-                type = "text"; title = "Text";
+              case "svg": type = "svg"; title = "SVG"; break;
+              case "html": type = "html"; title = "HTML"; break;
+              case "json": type = "json"; title = "JSON"; break;
+              case "markdown": case "md": type = "markdown"; title = "Markdown"; break;
+              case "text": case "plain": case "txt": type = "text"; title = "Text"; break;
+              case "image": type = "image"; title = "Image"; break;
+              default: type = "text"; title = "Text";
             }
-
             pushArtifact({ title, type: type as any, content, sessionId });
           }
         }
       }
     }
-  }, [partsMessages, streamingMessage, pushArtifact, sessionId]);
+  }, [messages, streamingMessage, pushArtifact, sessionId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const isFollowingBottomRef = useRef(true);
@@ -1040,7 +1083,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
   // before the user sees anything.
   useLayoutEffect(() => {
     const el = scrollRef.current;
-    const hasContent = partsMessages.length > 0 || streamingMessage !== undefined;
+    const hasContent = rawMessages.length > 0 || streamingMessage !== undefined;
     if (el === null || !hasContent) return;
     if (isFollowingBottomRef.current) {
       el.scrollTop = el.scrollHeight;
@@ -1048,18 +1091,32 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
     } else {
       el.scrollTop = lastScrollTopRef.current;
     }
-  }, [partsMessages, streamingMessage]);
+  }, [rawMessages, streamingMessage]);
 
-  // Derive active tool name from the streaming message's running tool calls
+  // Derive active tool name from the streaming message's tool call content blocks
+  // paired with pendingToolCalls from state.
   const activeToolName = useMemo(() => {
     if (!streamingMessage) return undefined;
-    const running = streamingMessage.parts.find(
-      (p): p is ToolCallPart => p.type === "tool-call" && p.state === "running",
-    );
-    return running?.toolName;
+    const content = (streamingMessage as Record<string, unknown>).content;
+    if (!Array.isArray(content)) return undefined;
+    // Any toolCall in the streaming message that has no result yet = running
+    const toolCall = content.find((c: Record<string, unknown>) => c.type === "toolCall");
+    return toolCall ? String(toolCall.name ?? "tool") : undefined;
   }, [streamingMessage]);
 
   // Render loop: iterate messages by flat index so
+  // Build tool-result map at render time for pairing tool calls with results
+  const toolResults = useMemo(() => {
+    const map = new Map<string, Record<string, unknown>>();
+    for (const m of messages) {
+      const msg = m as Record<string, unknown>;
+      if (msg.role === "toolResult" && typeof msg.toolCallId === "string") {
+        map.set(msg.toolCallId, msg);
+      }
+    }
+    return map;
+  }, [messages]);
+
   const renderedRows = useMemo(() => {
     const out: React.ReactNode[] = [];
 
@@ -1075,7 +1132,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       <ArchivedMessages messages={ev.archivedMessages} />
     );
 
-    // Push all compaction cards for a given raw message index.
     const pushCardsAt = (rawIdx: number): void => {
       const events = compactionsAt.get(rawIdx);
       if (events === undefined) return;
@@ -1084,32 +1140,23 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       }
     };
 
-    // Kept-window: messages with rawIndex in [1, latestCard.insertBeforeIndex)
-    // are hidden from inline rendering (shown inside CompactionCard expand).
     const latestCard =
       compactions.length > 0 ? compactions[compactions.length - 1] : undefined;
     const keptWindowEnd = latestCard?.insertBeforeIndex ?? 0;
 
-    // Extract images from a UIMessage's parts
-    const userImagesFromMsg = (msg: UIMessage): { mimeType: string; data: string; __blobUrl?: boolean }[] =>
-      msg.parts
-        .filter((p): p is ImagePart => p.type === "image")
-        .map((p) => ({ mimeType: p.mimeType, data: p.data, __blobUrl: p.__blobUrl }));
+    // Extract images from raw SDK message content
+    const userImagesFromMsg = (msg: Record<string, unknown>): { mimeType: string; data: string; __blobUrl?: boolean }[] =>
+      extractImages(msg.content);
 
-    // Combine text from text parts
-    const combineText = (parts: UIPart[]): string =>
-      parts
-        .filter((p): p is TextPart => p.type === "text")
-        .map((p) => p.text)
-        .join("\n\n");
+    // Combine text from raw SDK message content
+    const combineTextFromMsg = (msg: Record<string, unknown>): string =>
+      extractContentText(msg.content);
 
-    // Render a list of assistant messages by their parts.
-    // Matches the old code's accumulation pattern from 1a37982:
-    //   - Thinking blocks are pushed to prose, then TRAILING thinking
-    //     before a tool call is extracted and bundled INTO the tool batch
-    //   - Tools accumulate across messages via toolEntries
-    //   - Prose segments flush the tool batch first (tools before text)
-    const renderAssistantParts = (msgs: UIMessage[]): React.ReactNode[] => {
+    // Render a list of assistant messages by their SDK content blocks.
+    // - text blocks   → ChatMarkdown (accumulated in prose, then flushed)
+    // - thinking      → ThinkingBlock (trailing thinking bundled INTO tool batch)
+    // - toolCall      → ToolCallBatchCard (paired with toolResults map)
+    const renderAssistantParts = (msgs: Record<string, unknown>[]): React.ReactNode[] => {
       const elements: React.ReactNode[] = [];
       const toolEntries: ToolBatchEntry[] = [];
       let contentSerial = 0;
@@ -1127,10 +1174,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         toolEntries.length = 0;
       };
 
-      // Render a group of text/thinking parts inside a single bubble.
-      // Flushes accumulated tools BEFORE rendering prose (matching old
-      // splitAssistantToolSegments: tools segments come before prose).
-      const flushProse = (msgId: string, parts: (TextPart | ThinkingPart)[]) => {
+      const flushProse = (msgId: string, parts: { type: string; text?: string }[]) => {
         if (parts.length === 0) return;
         flushToolBatch(`pretool-${msgId}-${contentSerial}`);
         const serial = contentSerial++;
@@ -1140,9 +1184,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
               <div className="assistant-blocks">
                 {parts.map((p, i) =>
                   p.type === "text" ? (
-                    <ChatMarkdown key={i} text={p.text} />
+                    <ChatMarkdown key={i} text={p.text ?? ""} />
                   ) : (
-                    <ThinkingBlock key={i} text={p.text} />
+                    <ThinkingBlock key={i} text={p.text ?? ""} />
                   ),
                 )}
               </div>
@@ -1151,9 +1195,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         );
       };
 
-      // Extract trailing thinking blocks from prose (matching old
-      // takeTrailingToolRunContext). These get bundled INTO the tool batch.
-      const extractTrailingThinking = (prose: (TextPart | ThinkingPart)[]): ToolBatchEntry[] => {
+      // Extract trailing thinking blocks from prose. Bundled INTO tool batch.
+      const extractTrailingThinking = (prose: { type: string; text?: string }[]): ToolBatchEntry[] => {
         const result: ToolBatchEntry[] = [];
         while (prose.length > 0) {
           const last = prose[prose.length - 1]!;
@@ -1165,143 +1208,155 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       };
 
       for (const m of msgs) {
-        const prose: (TextPart | ThinkingPart)[] = [];
-
-        for (const part of m.parts) {
-          if (part.type === "bash-exec") {
-            flushProse(m.id, prose);
-            prose.length = 0;
-            flushToolBatch(`prebash-${m.id}`);
-
-            const msgForBubble: BashExecMessage & { _pendingExec?: boolean } = {
-              role: "bashExecution",
-              command: part.command,
-              output: part.output,
-              exitCode: part.exitCode,
-              cancelled: part.cancelled,
-              truncated: part.truncated,
-              timestamp: Date.now(),
-              _pendingExec: part.state === "running",
-            };
-            elements.push(
-              <BashExecBubble key={`bash-${m.id}`} msg={msgForBubble} sessionId={sessionId} />,
+        // Handle non-assistant message types at the message level
+        const role = m.role as string | undefined;
+        if (role === "bashExecution") {
+          elements.push(
+            <BashExecBubble
+              key={`bash-${String(m.id ?? "")}-${Date.now()}`}
+              msg={m as unknown as BashExecMessage}
+              sessionId={sessionId}
+            />,
+          );
+          continue;
+        }
+        if (role === "branchSummary") {
+          const summary = m.summary as string ?? "";
+          const fromId = m.fromId as string | undefined;
+          elements.push(
+            <div key={`branch-${String(m.id ?? "")}`} className="message-row assistant">
+              <div className="message-bubble assistant">
+                <div className="branch-summary-block">
+                  <div className="branch-summary-label">Branch Summary</div>
+                  <ChatMarkdown text={summary} />
+                  {fromId && (
+                    <div className="branch-summary-from" title={fromId}>
+                      from {fromId.slice(0, 8)}...
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>,
+          );
+          continue;
+        }
+        if (role === "custom") {
+          const customType = m.customType as string ?? "custom";
+          const customContent = m.content;
+          const details = m.details;
+          let renderedContent: React.ReactNode;
+          if (typeof customContent === "string") {
+            renderedContent = <ChatMarkdown text={customContent} />;
+          } else if (Array.isArray(customContent)) {
+            renderedContent = (
+              <div>
+                {customContent.map((block: Record<string, unknown>, i: number) =>
+                  block.type === "text" ? (
+                    <ChatMarkdown key={i} text={String(block.text ?? "")} />
+                  ) : block.type === "image" ? (
+                    <img
+                      key={i}
+                      src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
+                      alt="Custom message image"
+                      style={{ maxWidth: "100%", height: "auto" }}
+                    />
+                  ) : null
+                )}
+              </div>
             );
-          } else if (part.type === "tool-call") {
-            // Extract trailing thinking from prose (bundles INTO batch)
+          } else {
+            renderedContent = null;
+          }
+          elements.push(
+            <div key={`custom-msg-${String(m.id ?? "")}`} className="message-row assistant">
+              <div className="message-bubble assistant">
+                <div className="custom-message-block">
+                  {customType !== "custom" && (
+                    <div className="custom-message-type">{customType}</div>
+                  )}
+                  {renderedContent}
+                  {details != null && (
+                    <details className="custom-message-details">
+                      <summary>Details</summary>
+                      <pre>{JSON.stringify(details, null, 2)}</pre>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </div>,
+          );
+          continue;
+        }
+
+        // Assistant messages — render content[] blocks
+        const content = m.content;
+        if (!Array.isArray(content)) {
+          const text = typeof content === "string" ? content : "";
+          if (text) flushProse(m.id as string ?? "", [{ type: "text", text }]);
+          continue;
+        }
+
+        const prose: { type: string; text?: string }[] = [];
+
+        for (const chunk of content) {
+          const c = chunk as Record<string, unknown>;
+          const blockType = c.type as string | undefined;
+
+          if (blockType === "toolCall") {
             const trailing = extractTrailingThinking(prose);
-            // Flush remaining text-only prose (flushes tools first)
-            flushProse(m.id, prose);
+            flushProse(m.id as string ?? "", prose);
             prose.length = 0;
 
-            const CustomRenderer = toolRegistry.get(part.toolName);
+            const toolName = String(c.name ?? "tool");
+            const toolCallId = String(c.id ?? "");
+            const args = (c.arguments ?? {}) as Record<string, unknown>;
+            const result = toolCallId ? toolResults.get(toolCallId) : undefined;
+
+            // Build compat ToolCallPart for custom renderers
+            const toolCallPart: ToolCallPart = {
+              type: "tool-call",
+              toolName,
+              toolCallId,
+              args,
+              state: result ? (result.isError === true ? "error" : "success") : "running",
+              output: result ? extractContentText(result.content) : undefined,
+              errorText: result && result.isError === true ? (extractContentText(result.content) || "Tool returned error") : undefined,
+              details: result?.details,
+            };
+
+            const CustomRenderer = toolRegistry.get(toolName);
 
             if (CustomRenderer) {
-              flushToolBatch(`precustom-${m.id}-${part.toolCallId}`);
+              flushToolBatch(`precustom-${m.id as string ?? ""}-${toolCallId}`);
               elements.push(
-                <div key={`custom-${m.id}-${part.toolCallId}`} className="message-row assistant">
+                <div key={`custom-${m.id as string ?? ""}-${toolCallId}`} className="message-row assistant">
                   <div className="message-bubble assistant">
-                    <CustomRenderer part={part} messageId={m.id} />
+                    <CustomRenderer part={toolCallPart} messageId={m.id as string ?? ""} />
                   </div>
                 </div>,
               );
               continue;
             }
 
-            // Add trailing thinking + tool to accumulated entries
             toolEntries.push(...trailing);
             toolEntries.push({
               kind: "tool",
               block: {
-                name: part.toolName,
-                arguments: part.args,
-                id: part.toolCallId,
+                name: toolName,
+                arguments: args,
+                id: toolCallId,
               } as Record<string, unknown>,
-              result:
-                part.state !== "input-available" && part.state !== "running"
-                  ? ({
-                      content: [{ type: "text", text: part.output ?? "" }],
-                      isError: part.state === "error",
-                      details: part.details,
-                    } as unknown as Record<string, unknown>)
-                  : undefined,
+              result: result ?? undefined,
             } as ToolBatchEntry);
-          } else if (part.type === "branch-summary") {
-            // Branch summary — flush any pending prose, then render summary
-            flushProse(m.id, prose);
-            prose.length = 0;
-            flushToolBatch(`prebranch-${m.id}`);
-
-            elements.push(
-              <div key={`branch-${m.id}`} className="message-row assistant">
-                <div className="message-bubble assistant">
-                  <div className="branch-summary-block">
-                    <div className="branch-summary-label">Branch Summary</div>
-                    <ChatMarkdown text={part.summary} />
-                    {part.fromId && (
-                      <div className="branch-summary-from" title={part.fromId}>
-                        from {part.fromId.slice(0, 8)}...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>,
-            );
-          } else if (part.type === "custom") {
-            // Custom message — flush any pending prose, then render custom content
-            flushProse(m.id, prose);
-            prose.length = 0;
-            flushToolBatch(`precustom-${m.id}`);
-
-            let content: React.ReactNode;
-            if (typeof part.content === "string") {
-              content = <ChatMarkdown text={part.content} />;
-            } else if (Array.isArray(part.content)) {
-              content = (
-                <div>
-                  {part.content.map((block, i) =>
-                    block.type === "text" ? (
-                      <ChatMarkdown key={i} text={block.text} />
-                    ) : block.type === "image" ? (
-                      <img
-                        key={i}
-                        src={`data:${block.mimeType};base64,${block.data}`}
-                        alt="Custom message image"
-                        style={{ maxWidth: "100%", height: "auto" }}
-                      />
-                    ) : null
-                  )}
-                </div>
-              );
-            } else {
-              content = null;
-            }
-
-            elements.push(
-              <div key={`custom-msg-${m.id}`} className="message-row assistant">
-                <div className="message-bubble assistant">
-                  <div className="custom-message-block">
-                    {part.customType !== "custom" && (
-                      <div className="custom-message-type">{part.customType}</div>
-                    )}
-                    {content}
-                    {part.details != null && (
-                      <details className="custom-message-details">
-                        <summary>Details</summary>
-                        <pre>{JSON.stringify(part.details, null, 2)}</pre>
-                      </details>
-                    )}
-                  </div>
-                </div>
-              </div>,
-            );
-          } else {
-            // text or thinking — accumulate in prose array
-            prose.push(part as TextPart | ThinkingPart);
+          } else if (blockType === "text" && typeof c.text === "string" && c.text.trim() !== "") {
+            prose.push({ type: "text", text: c.text as string });
+          } else if (blockType === "thinking" && typeof c.thinking === "string" && c.thinking.trim() !== "") {
+            prose.push({ type: "thinking", text: c.thinking as string });
           }
         }
 
         // Flush remaining prose at message boundary (flushes tools first)
-        flushProse(m.id, prose);
+        flushProse(String(m.id ?? ""), prose);
         // Tools are NOT flushed here — they accumulate across messages
       }
 
@@ -1311,14 +1366,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
     };
 
     // ── Turn-grouped rendering ──
-    let currentUser: UIMessage | undefined;
-    let currentAssistants: UIMessage[] = [];
+    let turnIdx = 0;
+    let currentUser: Record<string, unknown> | undefined;
+    let currentAssistants: Record<string, unknown>[] = [];
 
     const flushTurn = (): void => {
       if (currentUser === undefined) return;
-      const text = combineText(currentUser.parts);
+      const turnKey = currentUser.id ?? `turn-${turnIdx}`;
+      turnIdx++;
+      const text = extractContentText(currentUser.content);
       const combinedAssistantText = currentAssistants
-        .map((m) => combineText(m.parts))
+        .map((m) => extractContentText(m.content))
         .filter((t) => t.length > 0)
         .join("\n\n");
 
@@ -1328,7 +1386,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
       if (stickyUserHeader && text.length > 0) {
         out.push(
-          <div key={`turn-${currentUser.id}`} style={{ position: "relative" }}>
+          <div key={`turn-${turnKey}`} style={{ position: "relative" }}>
             <div
               style={{
                 position: "sticky",
@@ -1338,7 +1396,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                 overflowAnchor: "none",
               }}
             >
-              <UserMessageBubble text={text} isSteer={isSteer} images={userImagesFromMsg(currentUser)} />
+              <UserMessageBubble text={text} isSteer={isSteer} images={extractImages(currentUser.content)} />
               {text.length > 0 && (
                 <div className="assistant-msg-footer user">
                   <CopyMsgButton getText={() => text} />
@@ -1381,20 +1439,19 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         // Non-sticky mode
         out.push(
           <div
-            key={`user-${currentUser.id}`}
+            key={`user-${turnKey}`}
             className="message-row user"
-            data-message-raw-index={currentUser.rawIndex}
           >
             <div className="message-bubble user">
               {isSteer && <span className="steer-tag">steer</span>}
-              <UserImages images={userImagesFromMsg(currentUser)} />
+              <UserImages images={extractImages(currentUser.content)} />
               {text}
             </div>
           </div>,
         );
         if (text.length > 0) {
           out.push(
-            <div key={`user-${currentUser.id}-copy`} className="assistant-msg-footer user">
+            <div key={`user-${turnKey}-copy`} className="assistant-msg-footer user">
               <CopyMsgButton getText={() => text} />
               {rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
             </div>,
@@ -1403,7 +1460,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         if (currentAssistants.length > 0) out.push(...renderAssistantParts(currentAssistants));
         if (combinedAssistantText.length > 0) {
           out.push(
-            <div key={`turn-${currentUser.id}-copy`} className="assistant-msg-footer">
+            <div key={`turn-${turnKey}-copy`} className="assistant-msg-footer">
               <CopyMsgButton getText={() => combinedAssistantText} />
               <SaveAsPngButton getText={() => combinedAssistantText} />
               {showTokenUsage && (
@@ -1423,56 +1480,50 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
       currentAssistants = [];
     };
 
-    // ── Iterate normalized parts messages ──
-    // 🔔 Insert compaction cards at rawIndex=0 (compactionSummary was
-    // filtered out by normalizeMessages, so no msg has rawIndex=0).
+    // ── Iterate raw SDK messages ──
     pushCardsAt(0);
-    for (const msg of partsMessages) {
-      // Insert compaction cards based on the raw message index
-      pushCardsAt(msg.rawIndex);
+    for (const msg of rawMessages as Record<string, unknown>[]) {
+      const role = msg.role as string | undefined;
 
-      // Kept-window: messages with rawIndex in [1, keptWindowEnd) are archived
-      if (latestCard !== undefined && msg.rawIndex >= 1 && msg.rawIndex < keptWindowEnd) {
+      if (role === "compactionSummary") {
         continue;
       }
 
-      if (msg.role === "user") {
+      if (role === "user" || role === "user-with-attachments") {
         flushTurn();
         currentUser = msg;
+      } else if (role === "toolResult") {
+        // Skip standalone tool results — paired inline at render time
+        continue;
       } else {
-        // Assistant message (may contain bash-exec, text, thinking, tool-call parts)
+        // Assistant / bashExecution / branchSummary / custom
         if (currentUser !== undefined) {
           currentAssistants.push(msg);
         } else {
-          // Orphan assistant (kept-window edge case)
           out.push(...renderAssistantParts([msg]));
         }
       }
     }
 
     // Inject streaming message into currentAssistants when it has
-    // tool-call parts, so they render inside the ToolCallBatchCard via
-    // renderAssistantParts — not as a separate card below the main list.
-    // Text/thinking parts still render via the streaming bubble to avoid
-    // duplicating live prose content.
+    // tool-call content blocks, so they render inside ToolCallBatchCard.
     if (streamingMessage !== undefined && currentUser !== undefined && isStreaming) {
-      if (streamingMessage.parts.some(p => p.type === "tool-call")) {
-        currentAssistants.push(streamingMessage);
+      const content = (streamingMessage as Record<string, unknown>).content;
+      if (Array.isArray(content) && content.some((c: Record<string, unknown>) => c.type === "toolCall")) {
+        currentAssistants.push(streamingMessage as unknown as Record<string, unknown>);
       }
     }
 
     flushTurn();
 
     // Trailing compaction cards
-    const lastRawIdx =
-      partsMessages.length > 0
-        ? partsMessages[partsMessages.length - 1].rawIndex + 1
-        : rawMessages.length;
+    const lastRawIdx = rawMessages.length;
     pushCardsAt(lastRawIdx);
 
     return out;
   }, [
-    partsMessages,
+    messages,
+    toolResults,
     streamingMessage,
     stickyUserHeader,
     compactions,
@@ -1490,7 +1541,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
         </div>
       )}
 
-      {partsMessages.length === 0 && !isStreaming ? (
+      {rawMessages.length === 0 && !isStreaming ? (
         <div className="welcome">
           <div className="welcome-icon">💬</div>
           <div className="welcome-text">Send a message to start chatting</div>
@@ -1510,19 +1561,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
                       {activeToolName}
                     </div>
                   )}
-                  {streamingMessage.parts.map((part, i) => {
-                    if (part.type === "text") {
-                      return <ChatMarkdown key={i} text={(part as TextPart).text} />;
-                    }
-                    if (part.type === "thinking") {
-                      return <ThinkingBlock key={i} text={(part as ThinkingPart).text} />;
-                    }
-                    // Tool-call parts render inside the ToolCallBatchCard in
-                    // the main message list (injected via currentAssistants),
-                    // not in the streaming bubble. This keeps them inside the
-                    // batch group alongside all other tools.
-                    return null;
-                  })}
+                  {renderStreamingContent(streamingMessage as Record<string, unknown>)}
                 </div>
               </div>
             )}

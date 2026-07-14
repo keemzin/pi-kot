@@ -65,98 +65,84 @@ When in doubt: run code in ctx_execute, print only the answer.
 - **If the SDK emits an event** (`text_delta`, `message_end`, `tool_result`) — consume it directly instead of re-fetching or reconstructing.
 - Default: SDK. Fallback: your own code. This keeps pi-kot lean and automatically gains features when the SDK updates.
 
-## ⚠️ Parts-Based Message Architecture (normalize.ts)
+## ✅ SDK-Direct Message Architecture (no normalize.ts)
 
-**This is the single most important adapter in the codebase.** Understand it before touching any chat rendering.
+normalize.ts has been **removed**. The SDK types are the single source of truth.
 
 ### Architecture
 ```
-SDK AssistantMessage  ──>  normalize.ts  ──>  UIMessage.parts[]  ──>  ChatView rendering
-(Transport format)           (ADAPTER)          (UI format)            (renderAssistantParts)
+SDK AssistantMessage.content[] ──> ChatView switches on chunk.type directly
+      (TextContent | ThinkingContent | ToolCall)[]
+```
+
+No adapter, no `UIMessage.parts[]`, no intermediate format. The three content block types from `@earendil-works/pi-ai` are consumed directly:
+
+```typescript
+content = (TextContent | ThinkingContent | ToolCall)[]
+
+TextContent    = { type: "text";     text: string }
+ThinkingContent = { type: "thinking"; thinking: string }
+ToolCall       = { type: "toolCall";  id: string; name: string; arguments: {} }
 ```
 
 ### Key files
 | File | Role |
 |------|------|
-| `packages/client/src/lib/normalize.ts` | **THE single adapter** — maps SDK types to UI parts. This is the ONLY file that reads SDK content blocks. |
-| `packages/client/src/stores/session-store.ts` | Holds `partsMessages: UIMessage[]` and `streamingMessage: UIMessage \| undefined`. SSE handlers write to these. |
-| `packages/client/src/components/ChatView.tsx` | Reads `msg.parts[]` and renders each part by type in `renderAssistantParts()`. |
+| `packages/client/src/stores/session-store.ts` | Holds raw `messages: unknown[]` and `streamingMessage: Record<string, unknown> \| undefined`. SSE events stored as-is — no normalization. |
+| `packages/client/src/components/ChatView.tsx` | Reads SDK types directly, switches on `msg.role` + `chunk.type`. |
 
-### UIMessage.parts[] shape
+### ChatView rendering flow
+```
+for msg in messages[]:
+  msg.role === "user"              → extractText(content) + extractImages(content)
+  msg.role === "assistant"         → for chunk in content[]:
+                                      chunk.type === "text"     → ChatMarkdown
+                                      chunk.type === "thinking" → ThinkingBlock
+                                      chunk.type === "toolCall" → ToolCallEntry (+ paired result)
+  msg.role === "bashExecution"     → BashExecBubble
+  msg.role === "branchSummary"     → Branch Summary block
+  msg.role === "custom"            → custom message renderer
+  msg.role === "toolResult"        → skipped (paired inline into tool calls at render time)
+```
+
+### Tool result pairing (render-time, not store-time)
 ```typescript
-parts = [
-  { type: 'text', text: '...', state: 'streaming' | 'done' },
-  { type: 'thinking', text: '...' },
-  { type: 'tool-call', toolName, toolCallId, args, state, output, errorText },
-  { type: 'image', mimeType, data },
-  { type: 'bash-exec', command, output, exitCode, ... },
-]
+// ChatView.tsx — built fresh each render from messages[]
+const toolResults = useMemo(() => {
+  const map = new Map<string, Record<string, unknown>>();
+  for (const m of messages) {
+    if (msg.role === "toolResult" && typeof msg.toolCallId === "string") {
+      map.set(msg.toolCallId, msg);
+    }
+  }
+  return map;
+}, [messages]);
 ```
 
-### Tool grouping logic (critical for understanding)
-Tools accumulate ACROSS assistant messages in one turn via `toolEntries[]` inside `renderAssistantParts`. They flush into a single `ToolCallBatchCard` when prose (text) appears or at the end of the turn.
+### Streaming (no normalizePartialMessage)
+Streaming messages are stored as raw SDK `AssistantMessage` objects. `ChatView.renderStreamingContent()` reads `content[]` directly — same switch on `chunk.type`.
 
-Thinking blocks immediately before a tool call are extracted from prose (`extractTrailingThinking`) and bundled INSIDE the tool batch as `ToolBatchEntry` entries — they render inside the batch card's expandable details, NOT as separate bubbles.
+### Tool grouping
+Tools accumulate across assistant messages in one turn via `toolEntries[]` inside `renderAssistantParts`. They flush into a single `ToolCallBatchCard` when prose appears or at end of turn. Trailing thinking blocks before a tool call are extracted and bundled into the tool batch — same logic as before, now operating on SDK `content[]` directly.
 
-### ⚠️ What to watch out for when the SDK updates
+### Debugging SDK field not appearing in UI
 
-The pi SDK (`@earendil-works/pi-ai`, `@earendil-works/pi-agent-core`) can change its content block types or event protocol. Here's what to check:
-
-**1. SDK adds a new content block type** (e.g., `ReasoningContent` alongside `ThinkingContent`)
-   - ONLY `normalize.ts` needs a new mapping (`normalizeAssistantContent` and `normalizePartialContent`)
-   - `ChatView.tsx` needs a new `else if (part.type === "reasoning")` branch in `renderAssistantParts`
-   - TypeScript's discriminated union tells you if you missed anything
-
-**2. SDK changes field names** (e.g., `ToolCall.arguments` → `ToolCall.args`)
-   - ONLY `normalize.ts` — update the field access in `normalizeAssistantContent`/`normalizePartialContent`
-   - No changes needed in ChatView, session-store, or any other file
-
-**3. SDK changes event protocol** (e.g., removes `message_update` events)
-   - `session-store.ts` SSE handlers need updating
-   - `normalize.ts` may need new entry points if the replacement data shape is different
-   - ChatView is usually unaffected (it only reads the already-normalized `partsMessages`)
-
-**4. SDK changes `AssistantMessage.content` type**
-   - ONLY `normalize.ts` — this is the only consumer of the raw content array
-   - All other code reads `UIMessage.parts[]` which stays stable
-
-**5. Tool result pairing breaks** (tool results not showing)
-   - Check `normalizeMessages()` in `normalize.ts` — the first pass collects tool results by `toolCallId`
-   - Check `refetchMessages()` in `session-store.ts` — it calls `normalizeMessages()` to rebuild `partsMessages`
-
-### The golden rule
-> **If a bug relates to how a message looks in the chat UI, first check what `partsMessages` contains. Then trace back through `normalize.ts` to see how the SDK data was mapped.**
-
-Never bypass `normalize.ts` by reading SDK types directly in ChatView. If you need a new field from AssistantMessage in the UI, add it to `UIMessage` and map it in `normalize.ts`.
-
-### 🔍 Debugging checklist: SDK field not appearing in UI
-
-When a field from the SDK (e.g. `result.details.diff`, `message.model`, `usage`) doesn't show up in the chat UI, trace through ALL layers:
-
+Since there's no normalize.ts, debugging is straight to the source:
 ```
-SDK event/object
-  ↓ (1) normalize.ts:   Does SdkToolResult / SdkAgentMessage have the field?
-  ↓ (2) normalize.ts:   Does normalizeAssistantContent / attachToolResult pass it to the part?
-  ↓ (3) normalize.ts:   Does the UIPart type (ToolCallPart / TextPart etc.) include it?
-  ↓ (4) session-store:  Does the SSE handler forward the raw event data?
-  ↓ (5) ChatView.tsx:   Does renderAssistantParts reconstruct the result with the field?
-  ↓ (6) ToolCallEntry:  Does the component read the field from the right source?
+SDK event
+  ↓
+Does session-store store the field?  (check SSE handler in connectSSE)
+  ↓
+Does ChatView read it?  (find the msg.role switch case)
 ```
 
-**Common failure modes:**
-- **Type missing** — `SdkToolResult` or `UIPart` lacks the field → add `details?: unknown`
-- **Dropped in mapping** — `normalizeAssistantContent` pairs tool results but only extracts `content`, not `details` → add `details: result.details`
-- **Dropped in attach** — `attachToolResult` only extracts `outputText` from `result.content` → also extract and forward `details`
-- **Dropped in render** — `renderAssistantParts` reconstructs the result object as `{ content, isError }` but omits `details` → add `details: part.details`
-- **Wrong source** — `ToolCallEntry` reads `result.details.diff` but the data is on `block.arguments` or `result.content` → check the actual SDK field location
-
-> **If a tool field is missing in the UI, the bug is almost certainly in normalize.ts — don't waste time in ChatView first.**
-
-### Reverting (if ever needed)
-```bash
-# Restore the old entire client from the reference commit:
-git checkout 1a37982 -- packages/client/src/
-```
+### When the SDK updates
+| SDK change | What to touch |
+|---|---|
+| New content block type (`ReasoningContent`) | Add `else if (blockType === "reasoning")` in `renderAssistantParts` + `renderStreamingContent` in `ChatView.tsx` |
+| New custom message role | Add `else if (msg.role === "newRole")` in the turn-grouping loop in `ChatView.tsx` |
+| Field rename on `AssistantMessage` | Update the field access where ChatView reads it |
+| Event protocol changes | Update `connectSSE()` in `session-store.ts` — no other file needed |
 
 ## 🎨 Artifacts Panel — Multi-Format Support
 
