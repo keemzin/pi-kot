@@ -19,6 +19,7 @@ export type UiSettings = {
   showTokenUsage: boolean;
   compressImages: boolean;
   showThinking: boolean;
+  viewerWidth: number;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -30,6 +31,7 @@ const DEFAULTS: UiSettings = {
   showTokenUsage: false,
   compressImages: true,
   showThinking: false,
+  viewerWidth: 480,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -51,6 +53,7 @@ function normalize(value: unknown): UiSettings {
   if (typeof v.showTokenUsage === "boolean") settings.showTokenUsage = v.showTokenUsage;
   if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
   if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
+  if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
 
   return settings;
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileEditor } from "./FileEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
-import { filesRead, filesWrite } from "../lib/api-client";
+import { filesRead, filesWrite, getUiSettings, updateUiSettings } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { ConfirmDialog } from "./Modal";
 
@@ -26,6 +26,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
     { kind: "close-tab"; path: string; name: string } | { kind: "close-all" } | undefined
   >(undefined);
   const resizeRef = useRef<{ startX: number; startW: number } | undefined>(undefined);
+  const [isResizing, setIsResizing] = useState(false);
 
   const activeFile = viewerTabs.find((t) => t.path === viewerActivePath);
   const isDirty = content !== savedContent;
@@ -87,9 +88,25 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
     setContent(value);
   }, []);
 
+  // ── Load persisted width from server on mount ──
+  useEffect(() => {
+    let cancelled = false;
+    getUiSettings()
+      .then((s) => {
+        if (cancelled) return;
+        const w = (s as Record<string, unknown>).viewerWidth;
+        if (typeof w === "number" && w > 0) {
+          setViewerWidth(w);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [setViewerWidth]);
+
   // ── Resize ──
   const onResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
+    setIsResizing(true);
     resizeRef.current = { startX: e.clientX, startW: viewerWidth };
     const onMove = (ev: MouseEvent) => {
       if (!resizeRef.current) return;
@@ -97,9 +114,13 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
       setViewerWidth(resizeRef.current.startW - dx);
     };
     const onUp = () => {
+      setIsResizing(false);
       resizeRef.current = undefined;
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
+      // Read actual final width from store (closure may have stale value)
+      const finalW = useLayoutStore.getState().viewerWidth;
+      updateUiSettings({ viewerWidth: finalW }).catch(() => {});
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
@@ -129,9 +150,10 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         minWidth: hasViewer ? VIEWER_MIN_WIDTH : 0,
         overflow: "hidden",
         flexShrink: 0,
+        position: "relative",
         borderLeft: hasViewer ? "1px solid var(--border)" : "none",
         background: "var(--bg-solid)",
-        transition: "width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        transition: isResizing ? "none" : "width 0.2s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         willChange: "width",
         paddingTop: "50px",
       }}
