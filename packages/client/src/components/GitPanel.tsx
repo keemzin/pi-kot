@@ -583,7 +583,7 @@ export function GitPanel({ projectId }: Props) {
         </div>
       )}
 
-      {/* Scrollable content — file groups + log/worktrees/branches */}
+      {/* Scrollable content — file groups only (Log/Worktrees/Branches in bottom panel) */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", display: "flex", flexDirection: "column" }}>
         {status === undefined && (
           <div style={{ padding: "16px", textAlign: "center", color: "var(--text-dim)", fontSize: "11px" }}>Loading git status…</div>
@@ -645,7 +645,12 @@ export function GitPanel({ projectId }: Props) {
           </div>
         )}
 
-        {/* ── Log ── */}
+      </div>
+
+      {/* ── Bottom: Log / Worktrees / Branches ── */}
+      <div style={{ flexShrink: 0, overflowY: "auto", maxHeight: "40%", borderTop: "1px solid var(--border)", background: "var(--bg-subtle)" }}>
+
+      {/* ── Log ── */}
       <div style={{ borderTop: "1px solid var(--border)" }}>
         <button
           onClick={() => setShowLog((v) => !v)}
