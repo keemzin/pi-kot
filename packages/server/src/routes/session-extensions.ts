@@ -81,7 +81,14 @@ export const sessionExtensionRoutes: FastifyPluginAsync = async (fastify) => {
       const sessionId = req.params.id;
       const live = getSession(sessionId);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return reply.send({
+          activeExtensions: [],
+          commands: [],
+          registeredTools: [],
+          eventHandlers: [],
+        });
       }
 
       const runner = live.session.extensionRunner;

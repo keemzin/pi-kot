@@ -711,7 +711,20 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return {
+          contextUsage: null,
+          stats: {
+            userMessages: 0,
+            assistantMessages: 0,
+            toolCalls: 0,
+            toolResults: 0,
+            totalMessages: 0,
+            tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            cost: 0,
+          },
+        };
       }
       const usage = live.session.getContextUsage();
       const stats = live.session.getSessionStats();
@@ -785,7 +798,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return { compactions: [] };
       }
       return { compactions: buildCompactionHistory(live.session) };
     },

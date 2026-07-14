@@ -285,7 +285,9 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return { provider: "", modelId: "" };
       }
       const model = live.session.model;
       if (model === undefined) {
