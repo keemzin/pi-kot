@@ -20,6 +20,7 @@ export type UiSettings = {
   compressImages: boolean;
   showThinking: boolean;
   viewerWidth: number;
+  artifactViewerWidth: number;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -32,6 +33,7 @@ const DEFAULTS: UiSettings = {
   compressImages: true,
   showThinking: false,
   viewerWidth: 480,
+  artifactViewerWidth: 480,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -54,6 +56,7 @@ function normalize(value: unknown): UiSettings {
   if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
   if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
   if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
+  if (typeof v.artifactViewerWidth === "number") settings.artifactViewerWidth = v.artifactViewerWidth;
 
   return settings;
 }
