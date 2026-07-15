@@ -824,9 +824,10 @@ export async function resumeSessionById(
  * the path-to-leaf from root to the given entry, registers the new
  * session, and returns it.
  *
- * NOTE: `createBranchedSession` mutates the source session's in-memory
- * file reference to point at the new fork (SDK behavior). We handle this
- * by capturing the source file before and re-opening the source after.
+ * We use a throwaway SessionManager for `createBranchedSession` to avoid
+ * mutating the source session's SessionManager (the SDK changes the
+ * internal file reference on the SM it's called on). This keeps the
+ * source session's AgentSession messages and tree state intact.
  */
 export async function forkSession(
   sessionId: string,
@@ -839,22 +840,25 @@ export async function forkSession(
     return forkSession(resumed.sessionId, entryId);
   }
 
-  // Capture the source file path BEFORE createBranchedSession mutates it
+  // Capture the source file path
   const sourceSessionFile = sourceLive.sessionManager.getSessionFile();
   if (sourceSessionFile === undefined) {
     throw new Error("fork_failed: source session has no file (in-memory only)");
   }
   const sourceDir = join(config.sessionDir, sourceLive.projectId);
 
-  // Create the branched session file
-  const newPath = sourceLive.sessionManager.createBranchedSession(entryId);
+  // Use a TEMPORARY SessionManager to create the branch instead of mutating
+  // the source session's SessionManager. The SDK's createBranchedSession()
+  // changes the SessionManager's internal file reference to the new fork,
+  // which corrupts sourceLive.session.messages (the AgentSession holds its
+  // own internal reference to the original SM). By using a throwaway SM,
+  // the source's AgentSession is never affected.
+  const branchSM = SessionManager.open(sourceSessionFile, sourceDir, sourceLive.workspacePath);
+  const newPath = branchSM.createBranchedSession(entryId);
   if (newPath === undefined) {
     throw new Error("fork_failed: createBranchedSession returned undefined");
   }
-
-  // Re-open the SOURCE session from the original file to undo SDK mutation
-  const restoredSourceSM = SessionManager.open(sourceSessionFile, sourceDir, sourceLive.workspacePath);
-  sourceLive.sessionManager = restoredSourceSM;
+  // branchSM is discarded — source session's SessionManager is untouched
 
   // Open the new fork as a SessionManager
   const dir = join(config.sessionDir, sourceLive.projectId);

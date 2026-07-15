@@ -868,21 +868,17 @@ function TokenUsageBadge({ msg }: {
   const usage = msg?.usage as { input?: number; output?: number; cacheRead?: number } | undefined;
   const input = usage?.input;
   const output = usage?.output;
-  const cacheRead = usage?.cacheRead;
-
-  if (input == null && output == null && !(cacheRead && cacheRead > 0)) return null;
+  if (input == null && output == null) return null;
 
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
       {input != null && (
-        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↑ {input.toLocaleString()} in</span>
+        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↑{input.toLocaleString()}</span>
       )}
       {output != null && (
-        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↓ {output.toLocaleString()} out</span>
+        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>↓{output.toLocaleString()}</span>
       )}
-      {cacheRead && cacheRead > 0 && (
-        <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>⚡ {cacheRead.toLocaleString()} cached</span>
-      )}
+
     </span>
   );
 }
@@ -950,7 +946,7 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
         if (chunk.type === "text" && typeof chunk.text === "string") {
           return <ChatMarkdown key={i} text={chunk.text} />;
         }
-        if (chunk.type === "thinking" && typeof chunk.thinking === "string") {
+        if ((chunk.type === "thinking" || chunk.type === "reasoning") && typeof chunk.thinking === "string") {
           return <ThinkingBlock key={i} text={chunk.thinking} />;
         }
         return null;
@@ -1350,7 +1346,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
             } as ToolBatchEntry);
           } else if (blockType === "text" && typeof c.text === "string" && c.text.trim() !== "") {
             prose.push({ type: "text", text: c.text as string });
-          } else if (blockType === "thinking" && typeof c.thinking === "string" && c.thinking.trim() !== "") {
+          } else if ((blockType === "thinking" || blockType === "reasoning") && typeof c.thinking === "string" && c.thinking.trim() !== "") {
             prose.push({ type: "thinking", text: c.thinking as string });
           }
         }
