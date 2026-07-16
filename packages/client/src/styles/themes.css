@@ -3733,10 +3733,16 @@ strong {
   flex-shrink: 0;
 }
 
+/* Stop state — accent background for the abort button */
+.ti-send-btn.ti-send-btn-stop {
+  background: var(--accent, #e06c75);
+}
+.ti-send-btn.ti-send-btn-stop:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
 @media (max-width: 600px) {
-  .ti-send-btn,
-  .ti-abort-btn,
-  .ti-steer-send {
+  .ti-send-btn {
     width: 44px !important;
     height: 44px !important;
     min-width: 44px !important;
@@ -3766,29 +3772,6 @@ strong {
   align-items: center;
   justify-content: center;
   color: var(--bg-solid);
-}
-
-.ti-abort-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: var(--text-primary);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  color: var(--bg-solid);
-  transition: all var(--duration) var(--ease);
-}
-
-.ti-abort-btn:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.ti-abort-btn:active:not(:disabled) {
-  transform: scale(0.9);
 }
 
 /* ── Slash command suggestions ──────────────────────── */

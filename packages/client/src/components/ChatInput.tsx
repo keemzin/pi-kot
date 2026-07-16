@@ -750,32 +750,28 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 <span className="ti-thinking-label">{thinkingLevel || "off"}</span>
               </button>
             )}
-            {isStreaming ? (
-              <>
-                <button type="button" onClick={abort} className="ti-abort-btn" title="Abort" tabIndex={-1}>
+            {/* One button, two states: send (idle) / stop (streaming) */}
+            <button
+              type={isStreaming ? "button" : "submit"}
+              onClick={isStreaming ? abort : undefined}
+              className={`ti-send-btn${isStreaming ? " ti-send-btn-stop" : ""}${isStreaming && activeToolName ? " pulsing" : ""}`}
+              title={isStreaming ? "Stop" : "Send"}
+              tabIndex={-1}
+              disabled={compacting}
+            >
+              <span className="ti-send-icon">
+                {isStreaming ? (
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                     <rect x="4" y="4" width="16" height="16" rx="2" />
                   </svg>
-                </button>
-                <button type="submit" className="ti-send-btn ti-steer-send" title="Send (steer)" tabIndex={-1} disabled={compacting}>
-                  <span className="ti-send-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="19" x2="12" y2="5" />
-                      <polyline points="5 12 12 5 19 12" />
-                    </svg>
-                  </span>
-                </button>
-              </>
-            ) : (
-              <button type="submit" className={`ti-send-btn${isStreaming && activeToolName ? " pulsing" : ""}`} title="Send" tabIndex={-1} disabled={compacting}>
-                <span className="ti-send-icon">
+                ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="19" x2="12" y2="5" />
                     <polyline points="5 12 12 5 19 12" />
                   </svg>
-                </span>
-              </button>
-            )}
+                )}
+              </span>
+            </button>
           </div>
         </div>
       </div>
