@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { createReadStream } from "node:fs";
 import { join, extname, resolve } from "node:path";
 import { config } from "../config.js";
@@ -44,13 +44,99 @@ function safeName(raw: string): string | undefined {
   return name;
 }
 
+interface ArtifactFileInfo {
+  name: string;
+  type: string;
+  size: number;
+  modified: string;
+  source: string;
+}
+
+function getArtifactDirs(): string[] {
+  const dirs: string[] = [];
+  const seen = new Set<string>();
+
+  const addDir = (dir: string) => {
+    if (!seen.has(dir) && existsSync(dir)) {
+      seen.add(dir);
+      dirs.push(dir);
+    }
+  };
+
+  for (const cwd of knownCwds) {
+    addDir(join(cwd, ".pi", "artifacts"));
+  }
+
+  addDir(join(config.workspacePath, ".pi", "artifacts"));
+
+  try {
+    const entries = readdirSync(config.workspacePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        addDir(join(config.workspacePath, entry.name, ".pi", "artifacts"));
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  return dirs;
+}
+
 /**
  * Serve agent-created artifacts from .pi/artifacts/.
  * These are files the agent writes for user-visible output
  * (screenshots, diagrams, HTML reports, etc.).
  */
 export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Params: { filename: string } }>(
+  // List all artifacts. Optional ?cwd=<path> filters to that directory only.
+  fastify.get<{ Querystring: { cwd?: string } }>(
+    "/artifacts",
+    { config: { public: true } },
+    async (req, reply) => {
+      const files: ArtifactFileInfo[] = [];
+
+      // If cwd is provided, only search that directory
+      const dirs: string[] = [];
+      if (req.query.cwd) {
+        const specificDir = join(req.query.cwd, ".pi", "artifacts");
+        if (existsSync(specificDir)) {
+          dirs.push(specificDir);
+        } else {
+          return reply.send({ files: [] });
+        }
+      } else {
+        dirs.push(...getArtifactDirs());
+      }
+
+      for (const dir of dirs) {
+        try {
+          const entries = readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (entry.isFile()) {
+              const filePath = join(dir, entry.name);
+              const stat = statSync(filePath);
+              files.push({
+                name: entry.name,
+                type: extname(entry.name).toLowerCase().slice(1) || "unknown",
+                size: stat.size,
+                modified: stat.mtime.toISOString(),
+                source: dir,
+              });
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Sort by modified time (newest first)
+      files.sort((a, b) => new Date(b.modified).getTime() - new Date(a.modified).getTime());
+
+      return reply.send({ files });
+    },
+  );
+  fastify.get<{ Params: { filename: string }; Querystring: { cwd?: string } }>(
     "/artifacts/:filename",
     {
       config: { public: true },
@@ -66,6 +152,7 @@ export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
       // 1. All known CWDs (registered via registerArtifactCwd)
       // 2. Workspace root
       // 3. All project subdirectories (scan for .pi/artifacts/)
+      // 4. Specific cwd passed as query param (for external projects)
       const artifactDirs: string[] = [];
       const seen = new Set<string>();
 
@@ -75,6 +162,11 @@ export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
           artifactDirs.push(dir);
         }
       };
+
+      // Specific CWD (external projects)
+      if (req.query.cwd) {
+        addDir(join(req.query.cwd, ".pi", "artifacts"));
+      }
 
       // Known CWDs
       for (const cwd of knownCwds) {

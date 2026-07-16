@@ -1698,3 +1698,18 @@ export async function startTunnel(body?: Record<string, unknown>): Promise<Tunne
 export async function stopTunnel(): Promise<TunnelStopResponse> {
   return request<TunnelStopResponse>("POST", "/api/v1/tunnel/stop");
 }
+
+// ---- Artifacts (saved files from .pi/artifacts/) ----
+
+export interface ArtifactFileInfo {
+  name: string;
+  type: string;
+  size: number;
+  modified: string;
+  source: string;
+}
+
+export async function listArtifacts(cwd?: string): Promise<{ files: ArtifactFileInfo[] }> {
+  const qs = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+  return request<{ files: ArtifactFileInfo[] }>("GET", `/api/v1/artifacts${qs}`);
+}
