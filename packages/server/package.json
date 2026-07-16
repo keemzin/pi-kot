@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsgo",
+    "build": "tsgo && cp -r src/contexts dist/ 2>/dev/null || true",
     "check": "tsgo --noEmit"
   },
   "dependencies": {
