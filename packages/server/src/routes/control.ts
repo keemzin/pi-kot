@@ -100,18 +100,19 @@ function mapSdkError(reply: import("fastify").FastifyReply, err: unknown): impor
 }
 
 export const controlRoutes: FastifyPluginAsync = async (fastify) => {
-  // POST /sessions/:id/model — set per-session model override
+  // ── POST /sessions/:id/model — set per-session model (+ optional thinking level) ──
   fastify.post<{
     Params: { id: string };
-    Body: { provider: string; modelId: string };
+    Body: { provider: string; modelId: string; thinkingLevel?: string };
   }>(
     "/sessions/:id/model",
     {
       schema: {
         description:
-          "Set the model for a session. Provider + modelId are validated " +
-          "against the SDK's ModelRegistry. Returns an error if the provider " +
-          "or model is unknown, or if no API key is configured for the provider.",
+          "Set the model for a session, and optionally the thinking level. " +
+          "Provider + modelId are validated against the SDK's ModelRegistry. " +
+          "Returns an error if the provider or model is unknown, or if no " +
+          "API key is configured for the provider.",
         tags: ["sessions"],
         params: {
           type: "object",
@@ -124,15 +125,21 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
           properties: {
             provider: { type: "string" },
             modelId: { type: "string" },
+            thinkingLevel: { type: "string" },
           },
         },
         response: {
           200: {
             type: "object",
-            required: ["provider", "modelId"],
+            required: ["provider", "modelId", "thinkingLevel"],
             properties: {
               provider: { type: "string" },
               modelId: { type: "string" },
+              thinkingLevel: { type: "string" },
+              availableThinkingLevels: {
+                type: "array",
+                items: { type: "string" },
+              },
             },
           },
           400: errorSchema,
@@ -149,7 +156,7 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "session_not_found" });
       }
 
-      const { provider, modelId } = req.body;
+      const { provider, modelId, thinkingLevel } = req.body;
 
       // Build fresh ModelRegistry (reads latest auth.json + models.json)
       const store = authStorage();
@@ -248,18 +255,32 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(result.status).send(result.body);
       }
 
-      return { provider, modelId };
+      // Apply thinking level after model change (level must be clamped to new model)
+      if (thinkingLevel !== undefined) {
+        const available = live.session.getAvailableThinkingLevels();
+        if (available.includes(thinkingLevel as any)) {
+          live.session.setThinkingLevel(thinkingLevel as any);
+        }
+        // silently ignore invalid levels — the client can re-fetch
+      }
+
+      return {
+        provider,
+        modelId,
+        thinkingLevel: live.session.thinkingLevel,
+        availableThinkingLevels: live.session.getAvailableThinkingLevels(),
+      };
     },
   );
 
-  // GET /sessions/:id/model — get current model info
+  // ── GET /sessions/:id/model — get current model + thinking info ──
   fastify.get<{
     Params: { id: string };
   }>(
     "/sessions/:id/model",
     {
       schema: {
-        description: "Get the currently configured model for a session.",
+        description: "Get the currently configured model and thinking level for a session.",
         tags: ["sessions"],
         params: {
           type: "object",
@@ -269,10 +290,15 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         response: {
           200: {
             type: "object",
-            required: ["provider", "modelId"],
+            required: ["provider", "modelId", "thinkingLevel"],
             properties: {
               provider: { type: "string" },
               modelId: { type: "string" },
+              thinkingLevel: { type: "string" },
+              availableThinkingLevels: {
+                type: "array",
+                items: { type: "string" },
+              },
             },
           },
           404: {
@@ -287,13 +313,88 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
       if (live === undefined) {
         // Session not in memory (e.g. from before a server restart) —
         // return empty defaults so the client doesn't log 404 errors.
-        return { provider: "", modelId: "" };
+        return { provider: "", modelId: "", thinkingLevel: "off", availableThinkingLevels: [] };
       }
       const model = live.session.model;
       if (model === undefined) {
-        return reply.code(200).send({ provider: "", modelId: "" });
+        return reply.code(200).send({ provider: "", modelId: "", thinkingLevel: "off", availableThinkingLevels: [] });
       }
-      return { provider: model.provider, modelId: model.id };
+      return {
+        provider: model.provider,
+        modelId: model.id,
+        thinkingLevel: live.session.thinkingLevel,
+        availableThinkingLevels: live.session.getAvailableThinkingLevels(),
+      };
+    },
+  );
+
+  // ── POST /sessions/:id/thinking — set thinking level (no model change) ──
+  fastify.post<{
+    Params: { id: string };
+    Body: { thinkingLevel: string };
+  }>(
+    "/sessions/:id/thinking",
+    {
+      schema: {
+        description:
+          "Set the thinking/reasoning level for a session without changing " +
+          "the model. Validates the level against the session's available " +
+          "thinking levels.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          required: ["thinkingLevel"],
+          properties: {
+            thinkingLevel: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["thinkingLevel"],
+            properties: {
+              thinkingLevel: { type: "string" },
+              availableThinkingLevels: {
+                type: "array",
+                items: { type: "string" },
+              },
+            },
+          },
+          400: errorSchema,
+          404: {
+            type: "object",
+            properties: { error: { type: "string" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+
+      const { thinkingLevel } = req.body;
+      const available = live.session.getAvailableThinkingLevels();
+
+      if (!available.includes(thinkingLevel as any)) {
+        return reply.code(400).send({
+          error: "invalid_thinking_level",
+          message: `"${thinkingLevel}" is not available. Available levels: ${available.join(", ")}`,
+        });
+      }
+
+      live.session.setThinkingLevel(thinkingLevel as any);
+
+      return {
+        thinkingLevel: live.session.thinkingLevel,
+        availableThinkingLevels: live.session.getAvailableThinkingLevels(),
+      };
     },
   );
 

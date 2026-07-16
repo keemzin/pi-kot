@@ -3680,6 +3680,33 @@ strong {
   border-color: var(--border-hover);
 }
 
+.ti-thinking-btn {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  transition: all var(--duration) var(--ease);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ti-thinking-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+  border-color: var(--border-hover);
+}
+
+.ti-thinking-label {
+  text-transform: capitalize;
+}
+
 .ti-toolbar-right .model-dropdown-menu {
   top: auto;
   bottom: calc(100% + 6px);
