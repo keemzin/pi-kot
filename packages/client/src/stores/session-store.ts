@@ -67,6 +67,17 @@ interface StreamState {
 	isStreaming: boolean;
 }
 
+export interface ActiveCompaction {
+	reason: "manual" | "threshold" | "overflow";
+	startedAt: number;
+	/** Set when compaction_end fires — transitions notice to done state */
+	completedAt?: number;
+	aborted?: boolean;
+	errorMessage?: string;
+	tokensBefore?: number;
+	estimatedTokensAfter?: number;
+}
+
 interface SessionState {
 	projects: Project[];
 	activeProjectId: string | undefined;
@@ -78,6 +89,7 @@ interface SessionState {
 	messages: unknown[];
 	compactionsBySession: Record<string, CompactionEvent[]>;
 	compactionEndCountBySession: Record<string, number>;
+	activeCompaction: ActiveCompaction | null;
 	queuedBySession: Record<
 		string,
 		{ steering: string[]; followUp: string[] } | undefined
@@ -147,6 +159,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 	compactionEndCountBySession: {},
 	queuedBySession: {},
 	streamState: { text: "", activeToolName: undefined, isStreaming: false },
+	activeCompaction: null,
 	streamingMessage: undefined,
 	isStreaming: false,
 	loading: false,
@@ -280,6 +293,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 			activeSessionId: id,
 			messages: [],
 			streamState: { text: "", activeToolName: undefined, isStreaming: false },
+			activeCompaction: null,
 			streamingMessage: undefined,
 			isStreaming: false,
 			queuedBySession: {},
@@ -464,23 +478,87 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						break;
 					}
 					case "compaction_start": {
+						const compactionEvent = event as {
+							reason?: "manual" | "threshold" | "overflow";
+						};
 						set((s) => ({
-							streamState: { ...s.streamState, activeToolName: "compacting…" },
+							activeCompaction: {
+								reason: compactionEvent.reason ?? "overflow",
+								startedAt: Date.now(),
+							},
 						}));
 						break;
 					}
 					case "compaction_end": {
+						const endEv = event as {
+							reason?: "manual" | "threshold" | "overflow";
+							aborted?: boolean;
+							errorMessage?: string;
+							result?: {
+								summary: string;
+								tokensBefore: number;
+								estimatedTokensAfter?: number;
+							};
+						};
+						// Synthesize a CompactionEvent from the SSE data so
+						// the card renders immediately — no dependency on
+						// the async GET /compactions API call which may race
+						// with compactAndReload's parallel loadCompactions().
+						const synResult = endEv.result;
+						const syntheticEvent = synResult
+							? {
+									id: `syn-compact-${Date.now()}`,
+									timestamp: new Date().toISOString(),
+									summary: synResult.summary ?? "",
+									tokensBefore: synResult.tokensBefore ?? 0,
+									estimatedTokensAfter:
+										synResult.estimatedTokensAfter,
+									insertBeforeIndex: 0,
+									archivedMessages: [],
+								}
+							: null;
 						set((s) => ({
-							streamState: { ...s.streamState, activeToolName: undefined },
+							activeCompaction: s.activeCompaction
+								? {
+										...s.activeCompaction,
+										completedAt: Date.now(),
+										aborted: endEv.aborted ?? false,
+										errorMessage: endEv.errorMessage,
+										tokensBefore: endEv.result?.tokensBefore,
+										estimatedTokensAfter:
+											endEv.result?.estimatedTokensAfter,
+									}
+								: null,
 							compactionEndCountBySession: {
 								...s.compactionEndCountBySession,
 								[sessionId]:
 									(s.compactionEndCountBySession[sessionId] ?? 0) + 1,
 							},
+							compactionsBySession: syntheticEvent
+								? {
+										...s.compactionsBySession,
+										[sessionId]: [
+											syntheticEvent,
+											...(s.compactionsBySession[sessionId] ??
+												EMPTY_COMPACTIONS),
+										],
+									}
+								: s.compactionsBySession,
 						}));
+						// Load compactions + messages from the API (will
+						// overwrite the synthetic event with proper data
+						// including archivedMessages when the API has it).
 						void get()
 							.loadCompactions(sessionId)
 							.then(() => refetchMessages());
+						// Auto-dismiss completion notice after 5s (card should be visible by then)
+						const dismissTimer = setTimeout(() => {
+							const current = get();
+							if (current.activeSessionId !== sessionId) return;
+							if (current.activeCompaction?.completedAt) {
+								set({ activeCompaction: null });
+							}
+						}, 5000);
 						break;
 					}
 					case "queued": {
@@ -746,6 +824,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
 		set({
 			streamState: { text: "", activeToolName: undefined, isStreaming: false },
+			activeCompaction: null,
 			streamingMessage: undefined,
 			isStreaming: false,
 		});
@@ -843,12 +922,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 	loadCompactions: async (sessionId: string) => {
 		try {
 			const { compactions } = await getCompactions(sessionId);
-			set((s) => ({
-				compactionsBySession: {
-					...s.compactionsBySession,
-					[sessionId]: compactions,
-				},
-			}));
+			// Only overwrite if the API returned data. If the API
+			// returns empty (race between compaction_end SSE and
+			// compactAndReload), keep any synthetic event that was
+			// injected by the compaction_end handler.
+			if (compactions.length > 0) {
+				set((s) => ({
+					compactionsBySession: {
+						...s.compactionsBySession,
+						[sessionId]: compactions,
+					},
+				}));
+			}
 		} catch {
 			// non-fatal
 		}

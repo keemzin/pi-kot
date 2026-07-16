@@ -14,6 +14,8 @@ import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { CompactionNotice } from "./CompactionNotice";
+import type { ActiveCompaction } from "../stores/session-store";
 import { ChatEditDiff, ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
@@ -1132,11 +1134,13 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const rawCompactions = useSessionStore(
 		(s) => s.compactionsBySession[sessionId] ?? EMPTY_COMPACTIONS,
 	);
+	const activeCompaction = useSessionStore((s) => s.activeCompaction);
 	const rawMessages = useSessionStore((s) => s.messages);
-	const compactions =
-		(rawMessages as Record<string, unknown>[])[0]?.role === "compactionSummary"
-			? rawCompactions
-			: EMPTY_COMPACTIONS;
+	// Compaction cards render if we have data — no need to check
+	// `messages[0]?.role === "compactionSummary"` as a guard. That
+	// check fails in a timing race when manual compaction (via
+	// compactAndReload) loads compactions before messages are refetched.
+	const compactions = rawCompactions;
 	const queued = useSessionStore((s) => s.queuedBySession[sessionId]);
 	const error = useSessionStore((s) => s.error);
 	const clearError = useSessionStore((s) => s.clearError);
@@ -1754,10 +1758,24 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 		// ── Iterate raw SDK messages ──
 		pushCardsAt(0);
+		let msgIdx = 0;
 		for (const msg of rawMessages as Record<string, unknown>[]) {
 			const role = msg.role as string | undefined;
+			const idx = msgIdx++;
 
 			if (role === "compactionSummary") {
+				continue;
+			}
+
+			// Suppress kept-window messages — they live in the latest
+			// compaction card's archivedMessages drawer. Without this,
+			// the archived conversation renders both inside the card
+			// AND as inline bubbles below the card, making compaction
+			// appear to have accomplished nothing.
+			// Index 0 is compactionSummary (already skipped above).
+			// Indices [1, keptWindowEnd) are the kept window.
+			if (idx >= 1 && idx < keptWindowEnd) {
+				flushTurn();
 				continue;
 			}
 
@@ -1873,6 +1891,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 										)}
 									</div>
 								</div>
+							)}
+
+							{activeCompaction !== null && (
+								<CompactionNotice compaction={activeCompaction} />
 							)}
 
 							{queued !== undefined &&
