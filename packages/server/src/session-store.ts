@@ -7,12 +7,14 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { compactionContinuationExtension } from "./compaction-continuation.js";
 import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
+import { readFileSync, existsSync } from "node:fs";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { createPlanModeQuestionTool } from "./ask-user-question/plan-mode-question-tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
 import { getProjectSystemPromptAddendum } from "./system-prompt-overrides.js";
+import { registerArtifactCwd } from "./routes/artifacts.js";
 
 /**
  * Build a DefaultResourceLoader with pi-kot's always-on extensions and
@@ -23,6 +25,13 @@ import { getProjectSystemPromptAddendum } from "./system-prompt-overrides.js";
  * in an operational state (the SDK skips resourceLoader.reload()
  * when a pre-built resourceLoader is provided).
  */
+// Web UI context file — tells the agent it's running in a browser
+const webUiContextFile = join(
+  new URL("./", import.meta.url).pathname,
+  "contexts",
+  "web-ui.md",
+);
+
 export async function buildResourceLoader(
   cwd: string,
   projectId?: string,
@@ -32,6 +41,13 @@ export async function buildResourceLoader(
     const addendum = await getProjectSystemPromptAddendum(projectId);
     if (addendum.length > 0) {
       appendSystemPrompt.push(addendum);
+    }
+  }
+  // Inject web UI context so the agent knows it's running in a browser
+  if (existsSync(webUiContextFile)) {
+    const webUiContext = readFileSync(webUiContextFile, "utf-8");
+    if (webUiContext.length > 0) {
+      appendSystemPrompt.push(webUiContext);
     }
   }
   const loader = new DefaultResourceLoader({
@@ -244,6 +260,9 @@ export async function createSession(
     createPlanModeQuestionTool(sessionId),
     ...orchestrationTools,
   ];
+
+  // Register this CWD so artifact route can find files here
+  registerArtifactCwd(workspacePath);
 
   const resourceLoader = await buildResourceLoader(workspacePath, projectId);
   const { session } = await createAgentSession({
@@ -824,9 +843,10 @@ export async function resumeSessionById(
  * the path-to-leaf from root to the given entry, registers the new
  * session, and returns it.
  *
- * NOTE: `createBranchedSession` mutates the source session's in-memory
- * file reference to point at the new fork (SDK behavior). We handle this
- * by capturing the source file before and re-opening the source after.
+ * We use a throwaway SessionManager for `createBranchedSession` to avoid
+ * mutating the source session's SessionManager (the SDK changes the
+ * internal file reference on the SM it's called on). This keeps the
+ * source session's AgentSession messages and tree state intact.
  */
 export async function forkSession(
   sessionId: string,
@@ -839,22 +859,25 @@ export async function forkSession(
     return forkSession(resumed.sessionId, entryId);
   }
 
-  // Capture the source file path BEFORE createBranchedSession mutates it
+  // Capture the source file path
   const sourceSessionFile = sourceLive.sessionManager.getSessionFile();
   if (sourceSessionFile === undefined) {
     throw new Error("fork_failed: source session has no file (in-memory only)");
   }
   const sourceDir = join(config.sessionDir, sourceLive.projectId);
 
-  // Create the branched session file
-  const newPath = sourceLive.sessionManager.createBranchedSession(entryId);
+  // Use a TEMPORARY SessionManager to create the branch instead of mutating
+  // the source session's SessionManager. The SDK's createBranchedSession()
+  // changes the SessionManager's internal file reference to the new fork,
+  // which corrupts sourceLive.session.messages (the AgentSession holds its
+  // own internal reference to the original SM). By using a throwaway SM,
+  // the source's AgentSession is never affected.
+  const branchSM = SessionManager.open(sourceSessionFile, sourceDir, sourceLive.workspacePath);
+  const newPath = branchSM.createBranchedSession(entryId);
   if (newPath === undefined) {
     throw new Error("fork_failed: createBranchedSession returned undefined");
   }
-
-  // Re-open the SOURCE session from the original file to undo SDK mutation
-  const restoredSourceSM = SessionManager.open(sourceSessionFile, sourceDir, sourceLive.workspacePath);
-  sourceLive.sessionManager = restoredSourceSM;
+  // branchSM is discarded — source session's SessionManager is untouched
 
   // Open the new fork as a SessionManager
   const dir = join(config.sessionDir, sourceLive.projectId);

@@ -4,6 +4,7 @@ import { usePreferencesStore } from "../stores/preferences-store";
 import type { ImageContent } from "../lib/api-client";
 import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
+import { getSessionModel, setSessionThinking } from "../lib/api-client";
 
 interface Props {
   sessionId: string;
@@ -36,6 +37,8 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [slashSuggestions, setSlashSuggestions] = useState<SlashCommand[]>([]);
   const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>([]);
   const [compacting, setCompacting] = useState(false);
+  const [thinkingLevel, setThinkingLevel] = useState<string | undefined>(undefined);
+  const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
 
   // ── @-autocomplete state ──
@@ -352,6 +355,35 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     setAcToken(undefined);
     setAcSuggestions([]);
   };
+
+  // ── Fetch thinking level when session changes ──
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    getSessionModel(sessionId)
+      .then((res) => {
+        if (cancelled) return;
+        setThinkingLevel(res.thinkingLevel);
+        setAvailableLevels(res.availableThinkingLevels);
+      })
+      .catch(() => {/* session not ready */});
+    return () => { cancelled = true; };
+  }, [sessionId]);
+
+  // ── Cycle thinking level ──
+  const cycleThinking = useCallback(async () => {
+    if (!sessionId || availableLevels.length === 0) return;
+    const cur = thinkingLevel || "off";
+    const idx = availableLevels.indexOf(cur);
+    const next = availableLevels[(idx + 1) % availableLevels.length];
+    try {
+      const res = await setSessionThinking(sessionId, next);
+      setThinkingLevel(res.thinkingLevel);
+      setAvailableLevels(res.availableThinkingLevels);
+    } catch {
+      // silently fail
+    }
+  }, [sessionId, thinkingLevel, availableLevels]);
 
   // ── Submit handler ──
 
@@ -702,6 +734,21 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 onError={onModelError ?? (() => {})}
                 compact
               />
+            )}
+            {sessionId !== undefined && availableLevels.length > 0 && (
+              <button
+                type="button"
+                className="ti-thinking-btn"
+                onClick={cycleThinking}
+                tabIndex={-1}
+                title={`Thinking: ${thinkingLevel || "off"} — click to cycle`}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <path d="M12 2a10 10 0 1 0 10 10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+                <span className="ti-thinking-label">{thinkingLevel || "off"}</span>
+              </button>
             )}
             {isStreaming ? (
               <>

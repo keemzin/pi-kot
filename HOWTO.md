@@ -17,7 +17,8 @@ A practical guide to using pi-kot day-to-day.
 9. [Git Panel](#9-git-panel)
 10. [Settings](#10-settings)
 11. [Tunnel](#11-tunnel)
-12. [Troubleshooting](#12-troubleshooting)
+12. [Artifacts](#12-artifacts)
+13. [Troubleshooting](#13-troubleshooting)
 
 ---
 
@@ -334,7 +335,58 @@ pi-kot can expose your local instance to the internet from the **Settings** → 
 
 ---
 
-## 12. Troubleshooting
+## 12. Artifacts
+
+pi-kot can render agent-created content inline in chat — HTML pages, SVG images, Mermaid diagrams, and more.
+
+### How it works
+
+1. The agent writes files to `.pi/artifacts/` in your project directory
+2. Files are served via `/api/v1/artifacts/<filename>`
+3. The chat renderer detects HTML/SVG/JSON/Markdown content and shows a live preview
+
+### Creating artifacts
+
+Simply ask the agent to create something visual:
+
+- "Create a dashboard with charts"
+- "Draw a system architecture diagram"
+- "Make a login form with animations"
+
+The agent will:
+1. Write the HTML/CSS/JS to `.pi/web/artifacts/`
+2. Output a link like: `[Live Preview](/api/v1/artifacts/dashboard.html)`
+3. The preview renders inline in your chat
+
+### Supported formats
+
+| Format | How it appears |
+|---|---|
+| **HTML** | Sandboxed iframe with live preview |
+| **SVG** | Rendered image |
+| **Mermaid** | Diagram rendered from ` ```mermaid` code blocks |
+| **Markdown** | Rendered markdown |
+| **JSON** | Syntax-highlighted code block |
+
+### Using existing files
+
+You can also ask the agent to make existing files viewable:
+
+> "Copy my index.html to artifacts so I can preview it"
+
+The agent copies the file to `.pi/artifacts/` and outputs a preview link.
+
+### Agent behavior
+
+pi-kot automatically tells the agent it's running in a browser. This means:
+- The agent uses Mermaid for diagrams (not ASCII art)
+- Files are written to the correct artifacts directory
+- Links use the correct `/api/v1/artifacts/` path
+- The agent knows HTML previews are sandboxed
+
+---
+
+## 13. Troubleshooting
 
 ### "Connection lost" in terminal
 

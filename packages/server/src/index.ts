@@ -31,6 +31,7 @@ import { skillRoutes } from "./routes/skills.js";
 import { terminalRoutes } from "./routes/terminal.js";
 import { execRoutes } from "./routes/exec.js";
 import { tunnelRoutes } from "./routes/tunnel.js";
+import { artifactRoutes } from "./routes/artifacts.js";
 import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
@@ -155,6 +156,7 @@ export async function buildServer() {
       await api.register(terminalRoutes);
       await api.register(execRoutes);
       await api.register(tunnelRoutes);
+      await api.register(artifactRoutes);
     },
     { prefix: "/api/v1" },
   );

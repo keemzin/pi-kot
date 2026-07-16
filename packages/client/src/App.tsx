@@ -11,6 +11,7 @@ import { SessionTreePanel } from "./components/SessionTreePanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { FileViewerPanel } from "./components/FileViewerPanel";
+import { ArtifactViewer } from "./components/ArtifactViewer";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { ArtifactsPanel } from "./components/ArtifactsPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
@@ -1044,6 +1045,11 @@ export function App() {
           {/* File viewer — slides in when a file is opened */}
           {activeProjectId !== undefined && (
             <FileViewerPanel projectId={activeProjectId} />
+          )}
+
+          {/* Artifact viewer — slides in when an artifact is clicked */}
+          {activeProjectId !== undefined && (
+            <ArtifactViewer />
           )}
 
           {/* File tree / git panel — slides in */}

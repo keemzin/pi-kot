@@ -28,6 +28,12 @@ export interface ArtifactItem {
   createdAt: number;
 }
 
+export interface ArtifactViewerTab {
+  id: string;
+  title: string;
+  type: ArtifactItem["type"];
+}
+
 interface LayoutState {
   /* ── Sidebar ── */
   sidebarCollapsed: boolean;
@@ -53,6 +59,11 @@ interface LayoutState {
   artifactActiveId: string | undefined;
   artifactWidth: number;
   showArtifacts: boolean;
+
+  /* ── Artifact viewer (slides between chat and explorer) ── */
+  artifactViewerTabs: ArtifactViewerTab[];
+  artifactViewerActiveId: string | undefined;
+  artifactViewerWidth: number;
 
   /* ── Derived ── */
   isMobile: boolean;
@@ -88,6 +99,13 @@ interface LayoutState {
   clearArtifacts: (sessionId: string) => void;
   setShowArtifacts: (show: boolean) => void;
 
+  /* ── Artifact viewer actions ── */
+  openArtifactViewer: (id: string, title: string, type: ArtifactItem["type"]) => void;
+  closeArtifactViewerTab: (id: string) => void;
+  closeAllArtifactViewerTabs: () => void;
+  setArtifactViewerActiveId: (id: string | undefined) => void;
+  setArtifactViewerWidth: (width: number) => void;
+
   /** Close every panel and sidebar (useful for deep-link "reset") */
   closeAllPanels: () => void;
 
@@ -97,6 +115,33 @@ interface LayoutState {
 const VIEWER_DEFAULT_WIDTH = 480;
 const VIEWER_MIN_WIDTH = 280;
 const VIEWER_MAX_WIDTH = 900;
+
+const VIEWER_WIDTH_STORAGE_KEY = "pi-kot/viewer-width";
+
+/** Read viewer width from localStorage (synchronous, instant on refresh). */
+function readStoredViewerWidth(): number {
+  try {
+    const raw = localStorage.getItem(VIEWER_WIDTH_STORAGE_KEY);
+    if (raw !== null) {
+      const n = Number(raw);
+      if (!isNaN(n) && n >= VIEWER_MIN_WIDTH && n <= VIEWER_MAX_WIDTH) return n;
+    }
+  } catch { /* private mode */ }
+  return VIEWER_DEFAULT_WIDTH;
+}
+
+const ARTIFACT_VIEWER_WIDTH_STORAGE_KEY = "pi-kot/artifact-viewer-width";
+
+function readStoredArtifactViewerWidth(): number {
+  try {
+    const raw = localStorage.getItem(ARTIFACT_VIEWER_WIDTH_STORAGE_KEY);
+    if (raw !== null) {
+      const n = Number(raw);
+      if (!isNaN(n) && n >= VIEWER_MIN_WIDTH && n <= VIEWER_MAX_WIDTH) return n;
+    }
+  } catch { /* private mode */ }
+  return VIEWER_DEFAULT_WIDTH;
+}
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
   sidebarCollapsed: false,
@@ -116,12 +161,18 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       ? Math.max(280, Math.min(420, window.innerWidth - 40))
       : 420,
   showArtifacts: false,
-  // On mobile the 480px default overflows the screen — clamp to
-  // viewport minus a 40px gutter for the chat column.
+  artifactViewerTabs: [],
+  artifactViewerActiveId: undefined,
+  artifactViewerWidth:
+    typeof window !== "undefined" && window.innerWidth <= 600
+      ? Math.max(VIEWER_MIN_WIDTH, Math.min(readStoredArtifactViewerWidth(), window.innerWidth - 40))
+      : readStoredArtifactViewerWidth(),
+  // Try localStorage first (instant on refresh), then fall back to default
+  // Mobile gets clamped to viewport minus 40px gutter for the chat column.
   viewerWidth:
     typeof window !== "undefined" && window.innerWidth <= 600
-      ? Math.max(VIEWER_MIN_WIDTH, Math.min(VIEWER_DEFAULT_WIDTH, window.innerWidth - 40))
-      : VIEWER_DEFAULT_WIDTH,
+      ? Math.max(VIEWER_MIN_WIDTH, Math.min(readStoredViewerWidth(), window.innerWidth - 40))
+      : readStoredViewerWidth(),
   isMobile: typeof window !== "undefined" ? window.innerWidth <= 600 : false,
 
   /* ── Sidebar actions ── */
@@ -204,6 +255,10 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
   setViewerWidth: (width) => {
     const clamped = Math.min(VIEWER_MAX_WIDTH, Math.max(VIEWER_MIN_WIDTH, Math.round(width)));
+    // Sync to localStorage for instant reads on next page load
+    try {
+      localStorage.setItem(VIEWER_WIDTH_STORAGE_KEY, String(clamped));
+    } catch { /* private mode */ }
     set({ viewerWidth: clamped });
   },
 
@@ -238,6 +293,51 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     })),
 
   setShowArtifacts: (show) => set({ showArtifacts: show }),
+
+  /* ── Artifact viewer ── */
+
+  openArtifactViewer: (id, title, type) => {
+    const { artifactViewerTabs } = get();
+    const exists = artifactViewerTabs.find((t) => t.id === id);
+    if (exists) {
+      set({ artifactViewerActiveId: id });
+    } else {
+      set({
+        artifactViewerTabs: [...artifactViewerTabs, { id, title, type }],
+        artifactViewerActiveId: id,
+      });
+    }
+  },
+
+  closeAllArtifactViewerTabs: () => set({ artifactViewerTabs: [], artifactViewerActiveId: undefined }),
+
+  closeArtifactViewerTab: (id) => {
+    const { artifactViewerTabs, artifactViewerActiveId } = get();
+    const remaining = artifactViewerTabs.filter((t) => t.id !== id);
+    let nextActive = artifactViewerActiveId;
+    if (artifactViewerActiveId === id) {
+      const idx = artifactViewerTabs.findIndex((t) => t.id === id);
+      if (remaining.length > 0) {
+        nextActive = remaining[Math.min(idx, remaining.length - 1)].id;
+      } else {
+        nextActive = undefined;
+      }
+    }
+    set({
+      artifactViewerTabs: remaining,
+      artifactViewerActiveId: nextActive,
+    });
+  },
+
+  setArtifactViewerActiveId: (id) => set({ artifactViewerActiveId: id }),
+
+  setArtifactViewerWidth: (width) => {
+    const clamped = Math.min(VIEWER_MAX_WIDTH, Math.max(VIEWER_MIN_WIDTH, Math.round(width)));
+    try {
+      localStorage.setItem(ARTIFACT_VIEWER_WIDTH_STORAGE_KEY, String(clamped));
+    } catch { /* private mode */ }
+    set({ artifactViewerWidth: clamped });
+  },
 
   /* ── Bulk ── */
 

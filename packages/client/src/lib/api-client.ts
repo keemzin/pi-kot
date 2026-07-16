@@ -846,22 +846,27 @@ export async function setEnabledModels(
 export interface SetModelResponse {
   provider: string;
   modelId: string;
+  thinkingLevel: string;
+  availableThinkingLevels: string[];
 }
 
 export interface GetModelResponse {
   provider: string;
   modelId: string;
+  thinkingLevel: string;
+  availableThinkingLevels: string[];
 }
 
 export async function setSessionModel(
   sessionId: string,
   provider: string,
   modelId: string,
+  thinkingLevel?: string,
 ): Promise<SetModelResponse> {
   return request<SetModelResponse>(
     "POST",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/model`,
-    { provider, modelId },
+    { provider, modelId, ...(thinkingLevel !== undefined ? { thinkingLevel } : {}) },
   );
 }
 
@@ -871,6 +876,22 @@ export async function getSessionModel(
   return request<GetModelResponse>(
     "GET",
     `/api/v1/sessions/${encodeURIComponent(sessionId)}/model`,
+  );
+}
+
+export interface SetThinkingResponse {
+  thinkingLevel: string;
+  availableThinkingLevels: string[];
+}
+
+export async function setSessionThinking(
+  sessionId: string,
+  thinkingLevel: string,
+): Promise<SetThinkingResponse> {
+  return request<SetThinkingResponse>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/thinking`,
+    { thinkingLevel },
   );
 }
 
@@ -1697,4 +1718,19 @@ export async function startTunnel(body?: Record<string, unknown>): Promise<Tunne
 
 export async function stopTunnel(): Promise<TunnelStopResponse> {
   return request<TunnelStopResponse>("POST", "/api/v1/tunnel/stop");
+}
+
+// ---- Artifacts (saved files from .pi/artifacts/) ----
+
+export interface ArtifactFileInfo {
+  name: string;
+  type: string;
+  size: number;
+  modified: string;
+  source: string;
+}
+
+export async function listArtifacts(cwd?: string): Promise<{ files: ArtifactFileInfo[] }> {
+  const qs = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
+  return request<{ files: ArtifactFileInfo[] }>("GET", `/api/v1/artifacts${qs}`);
 }

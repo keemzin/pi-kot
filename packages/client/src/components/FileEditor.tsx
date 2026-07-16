@@ -2,7 +2,7 @@
  * FileEditor — shared file editing component used by FileViewerPanel and FileExplorer.
  * Handles editor toolbar, CodeMirror/RenderedView toggle, footer, and dirty state.
  */
-import { useState } from "react";
+import { memo, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
 
@@ -20,7 +20,7 @@ interface Props {
   showToolbar?: boolean;
 }
 
-export function FileEditor({
+export const FileEditor = memo(function FileEditor({
   path,
   fileName,
   content,
@@ -222,4 +222,4 @@ export function FileEditor({
       </div>
     </div>
   );
-}
+});

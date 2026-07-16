@@ -9,6 +9,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:publish": "node scripts/build-publish-dir.mjs",
+    "postinstall": "node patch-branch-summary.mjs",
+    "patch": "node patch-branch-summary.mjs",
     "dev": "cross-env PIKOT_MODE=dev PORT=3332 concurrently --kill-others \"cross-env PIKOT_MODE=dev PORT=3332 npm run dev -w packages/server\" \"wait-on tcp:3332 && cross-env PIKOT_MODE=dev VITE_API_PORT=3332 npm run dev -w packages/client\"",
     "start": "node bin/pi-kot.mjs",
     "dev:server": "cross-env PIKOT_MODE=dev PORT=3332 npm run dev -w packages/server",

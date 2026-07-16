@@ -35,6 +35,7 @@ This project was built out of **love and curiosity**.
 | **🎨 Unified Theme System** | Consistent light/dark theme tokens across panels, modals, inputs, and terminal chrome |
 | **🔌 Tunnel** | Built-in tunnel helper UI for exposing local pi-kot traffic via supported providers, with install checks, diagnostics, and one-click start/stop |
 | **📦 Extensions** | Discover and install pi extensions from the UI — some features only appear after installing the right extension |
+| **🎨 Artifacts** | Agent-created HTML, SVG, Mermaid diagrams, and other files render inline in chat via sandboxed previews |
 
 ---
 
@@ -202,6 +203,56 @@ The Git panel shows the current repository's status — modified files, staged c
 - **Branch**: Switch branches
 - **Commit history**: Browse commits and expand each one to see changed files
 - **Inline commit diffs**: Click a file inside a commit to view its unified diff directly in the panel
+
+---
+
+## Artifacts
+
+pi-kot can render agent-created content inline in chat — HTML pages, SVG images, Mermaid diagrams, and more.
+
+### How it works
+
+1. The agent writes files to `.pi/artifacts/` in your project directory
+2. Files are served via `/api/v1/artifacts/<filename>`
+3. The chat renderer detects HTML/SVG/JSON/Markdown content and shows a live preview
+
+### Supported formats
+
+| Format | Detection | Preview |
+|---|---|---|
+| **HTML** | `<!DOCTYPE html>`, `<html>`, or ` ```html` | Sandboxed iframe |
+| **SVG** | `<svg>` or ` ```svg` | Sandboxed iframe |
+| **Mermaid** | ` ```mermaid` | Rendered diagram |
+| **Markdown** | ` ```markdown` | Rendered markdown |
+| **JSON** | ` ```json` or valid JSON tool output | Syntax highlighted |
+| **Image** | `data:image/...` or ` ```image` | `<img>` tag |
+
+### Agent context injection
+
+pi-kot automatically injects a **web UI context** into every session, telling the agent:
+
+- It's running in a browser (not a terminal)
+- To write user-visible files to `.pi/artifacts/` in the current directory
+- To use `/api/v1/artifacts/<filename>` links for previews
+- To use Mermaid instead of ASCII art for diagrams
+
+This means the agent will automatically produce web-compatible output when creating diagrams, reports, or interactive content.
+
+### Example
+
+Ask the agent:
+> "Create a futuristic button with hover effects"
+
+The agent will:
+1. Write the HTML to `.pi/web/artifacts/button.html`
+2. Output: `[Live Preview](/api/v1/artifacts/button.html)`
+3. You see the rendered button inline in chat
+
+### API route
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/artifacts/:filename` | Serve an artifact file (no auth required) |
 
 ---
 

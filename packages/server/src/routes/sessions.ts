@@ -572,11 +572,20 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       if (req.body.summarize !== undefined) opts.summarize = req.body.summarize;
       if (req.body.customInstructions !== undefined) opts.customInstructions = req.body.customInstructions;
       if (req.body.label !== undefined) opts.label = req.body.label;
+
+      req.log.info({ body: req.body, opts, leafId: live.sessionManager.getLeafId() }, 'NAVIGATE: entry');
+
       try {
         const result = await live.session.navigateTree(req.body.entryId, opts);
         const out: Record<string, unknown> = { cancelled: result.cancelled };
         if (result.aborted !== undefined) out.aborted = result.aborted;
         if (result.editorText !== undefined) out.editorText = result.editorText;
+
+        const msgsAfter = live.session.messages;
+        req.log.info(
+          { cancelled: result.cancelled, aborted: result.aborted, summaryEntry: result.summaryEntry, msgCount: msgsAfter.length, lastRole: msgsAfter.length > 0 ? msgsAfter[msgsAfter.length - 1]?.role : 'none' },
+          'NAVIGATE: after',
+        );
 
         // Emit snapshot to all connected SSE clients so the chat UI
         // reflects the new session leaf without a client-triggered refetch.
@@ -711,7 +720,20 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return {
+          contextUsage: null,
+          stats: {
+            userMessages: 0,
+            assistantMessages: 0,
+            toolCalls: 0,
+            toolResults: 0,
+            totalMessages: 0,
+            tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            cost: 0,
+          },
+        };
       }
       const usage = live.session.getContextUsage();
       const stats = live.session.getSessionStats();
@@ -785,7 +807,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) {
-        return reply.code(404).send({ error: "session_not_found" });
+        // Session not in memory (e.g. from before a server restart) —
+        // return empty defaults so the client doesn't log 404 errors.
+        return { compactions: [] };
       }
       return { compactions: buildCompactionHistory(live.session) };
     },
