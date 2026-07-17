@@ -783,7 +783,7 @@ strong {
   }
 }
 
-/* ═══ Sidebar — overlay ═══ */
+/* ═══ Sidebar — push-content (desktop) / overlay (mobile) ═══ */
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -793,30 +793,47 @@ strong {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 100;
-  position: fixed;
-  top: 50px;
-  left: 0;
-  bottom: 0;
-  transform: translateX(0);
-  will-change: transform;
   overflow: hidden;
 }
 
-.sidebar.collapsed {
-  transform: translateX(calc(var(--sidebar-width) * -1));
+/* ── Desktop: flex child, pushes main area ── */
+@media (min-width: 601px) {
+  .sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    transition: width var(--duration) var(--ease), min-width var(--duration) var(--ease), border-color var(--duration) var(--ease);
+    will-change: width;
+  }
+
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    border-right-color: transparent;
+  }
 }
 
-/* ── Mobile sidebar polish ── */
+/* ── Mobile: fixed overlay, slides in ── */
 @media (max-width: 600px) {
   .sidebar {
-    /* Start off-screen on mobile — user opens with burger */
+    position: fixed;
+    top: 50px;
+    left: 0;
+    bottom: 0;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+    /* Default off-screen — burger toggles .collapsed to reveal */
     transform: translateX(calc(var(--sidebar-width) * -1));
   }
 
   .sidebar:not(.collapsed) {
     transform: translateX(0);
+  }
+
+  .sidebar.collapsed {
+    transform: translateX(calc(var(--sidebar-width) * -1));
   }
 
   /* Moderate touch targets for mobile */
@@ -864,6 +881,15 @@ strong {
   font-size: 14px;
   color: var(--accent-text);
   letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+@media (min-width: 601px) {
+  .sidebar-header {
+    height: 50px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 /* Add project button in sidebar header */
