@@ -3864,28 +3864,7 @@ strong {
 
 /* ── Steer / Queued messages ──────────────────────────── */
 
-.ti-steer-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  max-width: 800px;
-  margin: 0 auto 6px;
-  padding: 5px 10px;
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-  font-size: 11px;
-  line-height: 1.4;
-  animation: fadeIn 0.2s var(--ease);
-}
 
-.ti-steer-send {
-  background: var(--accent) !important;
-}
-.ti-steer-send:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
 
 .steer-tag {
   display: inline-block;

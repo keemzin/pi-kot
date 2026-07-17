@@ -518,16 +518,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
   return (
     <form onSubmit={handleSubmit} onDragOver={handleDragOver} onDrop={handleDrop} className="ti-area">
-      {isStreaming && (
-        <div className="ti-steer-badge">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
-          <span>Your message will redirect the agent after its current tool calls</span>
-        </div>
-      )}
+
       <div className="ti-container">
         {/* Inline status message */}
         {compactMessage !== null && (

@@ -1275,6 +1275,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const isFollowingBottomRef = useRef(true);
 	const lastScrollTopRef = useRef(0);
 	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(undefined);
+
 	const NEAR_BOTTOM_PX = 24;
 
 	// onScroll: releases auto-follow when user scrolls up past the
@@ -1837,15 +1838,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			currentUser !== undefined &&
 			isStreaming
 		) {
-			const content = (streamingMessage as Record<string, unknown>).content;
-			if (
-				Array.isArray(content) &&
-				content.some((c: Record<string, unknown>) => c.type === "toolCall")
-			) {
-				currentAssistants.push(
-					streamingMessage as unknown as Record<string, unknown>,
-				);
-			}
+			currentAssistants.push(
+				streamingMessage as unknown as Record<string, unknown>,
+			);
 		}
 
 		flushTurn();
@@ -1896,17 +1891,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							{renderedRows}
 
 							{isStreaming && streamingMessage !== undefined && (() => {
-							// When the streaming message has tool calls, its text is
-							// already rendered inside renderedRows via renderAssistantParts
-							// (absorbed into currentAssistants). Skip this standalone
-							// streaming row to avoid duplicating the text content.
-							const content = (streamingMessage as Record<string, unknown>).content;
-							const hasToolCallBlock =
-								Array.isArray(content) &&
-								content.some(
-									(c: Record<string, unknown>) => c.type === "toolCall",
-								);
-							if (hasToolCallBlock) return null;
+							// Streaming content is always rendered inside renderedRows via
+							// currentAssistants injection. No standalone row needed.
+							return null;
 							return (
 								<div className="message-row assistant streaming-row">
 									<div className="message-bubble assistant streaming-bubble">
