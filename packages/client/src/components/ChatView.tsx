@@ -1727,7 +1727,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							/>
 						</div>
 						{renderAssistantParts(currentAssistants)}
-						{combinedAssistantText.length > 0 && streamingMessage === undefined && !isStreaming && (
+						{combinedAssistantText.length > 0 && (
 							<div className="assistant-msg-footer">
 								<CopyMsgButton getText={() => combinedAssistantText} />
 								<SaveAsPngButton getText={() => combinedAssistantText} />
@@ -1769,7 +1769,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				}
 				if (currentAssistants.length > 0)
 					out.push(...renderAssistantParts(currentAssistants));
-				if (combinedAssistantText.length > 0 && streamingMessage === undefined && !isStreaming) {
+				if (combinedAssistantText.length > 0) {
 					out.push(
 						<div key={`turn-${turnKey}-copy`} className="assistant-msg-footer">
 							<CopyMsgButton getText={() => combinedAssistantText} />
