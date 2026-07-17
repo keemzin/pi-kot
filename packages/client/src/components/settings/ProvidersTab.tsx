@@ -13,6 +13,7 @@ import {
 import { AddProviderDialog } from "../AddProviderDialog";
 import { ConfirmDialog } from "../Modal";
 import { errorMsg } from "./shared";
+import { ModelEditor, type ModelEntry } from "./ModelEditor";
 
 interface Props {
   onError: (msg: string | undefined) => void;
@@ -23,6 +24,8 @@ export function ProvidersTab({ onError }: Props) {
   const [auth, setAuth] = useState<AuthSummaryResponse | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [customProviders, setCustomProviders] = useState<Set<string>>(new Set());
+  const [modelsData, setModelsData] = useState<{ providers: Record<string, any> } | undefined>(undefined);
+  const [editingModel, setEditingModel] = useState<{ provider: string; index: number } | undefined>(undefined);
   const [removingProvider, setRemovingProvider] = useState<string | undefined>(undefined);
   const [editingProvider, setEditingProvider] = useState<string | undefined>(undefined);
   const [keyDraft, setKeyDraft] = useState("");
@@ -43,6 +46,7 @@ export function ProvidersTab({ onError }: Props) {
       setAuth(a);
       const custom = new Set(Object.keys(m.providers));
       setCustomProviders(custom);
+      setModelsData(m);
     } catch (err) {
       onError(`Failed to load providers: ${errorMsg(err)}`);
     }
@@ -203,10 +207,63 @@ export function ProvidersTab({ onError }: Props) {
                 {p.models.length} model{p.models.length === 1 ? "" : "s"}
               </summary>
               <ul className="settings-model-list">
-                {p.models.map((m) => (
-                  <li key={m.id} className="settings-model-item">
-                    <span className={m.hasAuth ? "" : "text-dim"}>{m.name}</span>
-                    <span className="text-dim">ctx {Math.round(m.contextWindow / 1000)}k</span>
+                {p.models.map((m, mi) => (
+                  <li key={m.id} className="settings-model-item" style={{ cursor: customProviders.has(p.provider) ? "pointer" : undefined }}>
+                    {editingModel?.provider === p.provider && editingModel?.index === mi && modelsData ? (
+                      <div style={{ width: "100%" }}>
+                        <ModelEditor
+                          model={modelsData.providers[p.provider]?.models?.[mi] as ModelEntry ?? { id: m.id, name: m.name }}
+                          onChange={(updated) => {
+                            setModelsData((prev) => {
+                              if (!prev) return prev;
+                              const prov = { ...(prev.providers[p.provider] ?? {}) };
+                              const mods = [...(prov.models ?? [])];
+                              mods[mi] = updated;
+                              prov.models = mods;
+                              return { ...prev, providers: { ...prev.providers, [p.provider]: prov } };
+                            });
+                          }}
+                          onDelete={() => {
+                            setEditingModel(undefined);
+                            setModelsData((prev) => {
+                              if (!prev) return prev;
+                              const prov = { ...(prev.providers[p.provider] ?? {}) };
+                              const mods = [...(prov.models ?? [])];
+                              mods.splice(mi, 1);
+                              prov.models = mods.length ? mods : undefined;
+                              return { ...prev, providers: { ...prev.providers, [p.provider]: prov } };
+                            });
+                          }}
+                        />
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                          <button onClick={() => setEditingModel(undefined)} className="settings-btn">Cancel</button>
+                          <button onClick={async () => {
+                            if (!modelsData) return;
+                            setBusy(true);
+                            try {
+                              await putModelsJson(modelsData);
+                              setEditingModel(undefined);
+                              setJsonSavedAt(Date.now());
+                              await refresh();
+                            } catch (err) {
+                              onError(`Save failed: ${errorMsg(err)}`);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }} className="settings-btn settings-btn-primary" disabled={busy}>
+                            {busy ? "Saving…" : "Save"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div onClick={() => {
+                        if (!customProviders.has(p.provider)) return;
+                        setEditingModel({ provider: p.provider, index: mi });
+                      }} style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
+                        <span className={m.hasAuth ? "" : "text-dim"}>{m.name}</span>
+                        <span className="text-dim">ctx {Math.round(m.contextWindow / 1000)}k</span>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

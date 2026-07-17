@@ -1,10 +1,8 @@
 import {
 	useEffect,
-	useLayoutEffect,
 	useRef,
 	useState,
 	useMemo,
-	useCallback,
 	memo,
 } from "react";
 import { Copy, Check, CornerUpLeft, ImageDown } from "lucide-react";
@@ -1276,31 +1274,71 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingBottomRef = useRef(true);
 	const lastScrollTopRef = useRef(0);
+	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(undefined);
+
 	const NEAR_BOTTOM_PX = 24;
-	// Track user's scroll intent: isFollowingBottomRef stays true while
-	// the user is near the bottom, false when they scroll up.
+
+	// onScroll: releases auto-follow when user scrolls up past the
+	// bottom zone, and re-engages when they scroll back down into it.
+	// The ResizeObserver corrects scrollTop before the scroll event
+	// fires, so content growth never falsely reads as "scrolled up".
 	const onScroll = (): void => {
 		const el = scrollRef.current;
 		if (el === null) return;
 		const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
 		const scrolledUp = el.scrollTop < lastScrollTopRef.current - 1;
-		isFollowingBottomRef.current = !scrolledUp && distance <= NEAR_BOTTOM_PX;
+		const nearBottom = distance <= NEAR_BOTTOM_PX;
+		if (scrolledUp && !nearBottom) {
+			isFollowingBottomRef.current = false;
+		} else if (!scrolledUp && nearBottom) {
+			isFollowingBottomRef.current = true;
+		}
 		lastScrollTopRef.current = el.scrollTop;
 	};
 
-	// Layout effect: runs before paint, so scroll-to-bottom happens
-	// before the user sees anything.
-	useLayoutEffect(() => {
+	// ResizeObserver: fires after layout and before paint on EVERY content
+	// size change — streaming text growth, tool results expanding, code
+	// highlighting landing, etc. This makes auto-follow truly sticky.
+	// Unlike useLayoutEffect (which only fires when the deps change), this
+	// catches layout changes from any source, even inside memo'd children.
+	useEffect(() => {
 		const el = scrollRef.current;
-		const hasContent = rawMessages.length > 0 || streamingMessage !== undefined;
-		if (el === null || !hasContent) return;
-		if (isFollowingBottomRef.current) {
-			el.scrollTop = el.scrollHeight;
-			lastScrollTopRef.current = el.scrollTop;
-		} else {
-			el.scrollTop = lastScrollTopRef.current;
-		}
+		if (!el || typeof ResizeObserver === 'undefined') return;
+
+		const streamingJustEnded =
+			prevStreamingRef.current !== undefined && streamingMessage === undefined;
+		prevStreamingRef.current = streamingMessage;
+
+		// When streaming just ended, skip the first ResizeObserver callback
+		// (the finalized messages replace streaming content at same height).
+		let settled = false;
+		let active = true;
+		const ro = new ResizeObserver(() => {
+			if (!active) return; // stale callback after cleanup
+			if (streamingJustEnded && !settled) {
+				settled = true;
+				return;
+			}
+			if (isFollowingBottomRef.current) {
+				el.scrollTop = el.scrollHeight;
+				lastScrollTopRef.current = el.scrollTop;
+			}
+		});
+		ro.observe(el);
+		const inner = el.firstElementChild;
+		if (inner instanceof Element) ro.observe(inner);
+
+		return () => {
+			active = false;
+			ro.disconnect();
+		};
 	}, [rawMessages, streamingMessage]);
+
+	// On session change (project switch, initial load), pin to bottom.
+	useEffect(() => {
+		if (rawMessages.length === 0 && streamingMessage === undefined) return;
+		isFollowingBottomRef.current = true;
+	}, [sessionId]);
 
 	// Derive active tool name from the streaming message's tool call content blocks
 	// paired with pendingToolCalls from state.
@@ -1800,15 +1838,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			currentUser !== undefined &&
 			isStreaming
 		) {
-			const content = (streamingMessage as Record<string, unknown>).content;
-			if (
-				Array.isArray(content) &&
-				content.some((c: Record<string, unknown>) => c.type === "toolCall")
-			) {
-				currentAssistants.push(
-					streamingMessage as unknown as Record<string, unknown>,
-				);
-			}
+			currentAssistants.push(
+				streamingMessage as unknown as Record<string, unknown>,
+			);
 		}
 
 		flushTurn();
@@ -1822,6 +1854,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		messages,
 		toolResults,
 		streamingMessage,
+		isStreaming,
 		stickyUserHeader,
 		compactions,
 		sessionId,
@@ -1857,7 +1890,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						<div className="chat-message-list">
 							{renderedRows}
 
-							{isStreaming && streamingMessage !== undefined && (
+							{isStreaming && streamingMessage !== undefined && (() => {
+							// Streaming content is always rendered inside renderedRows via
+							// currentAssistants injection. No standalone row needed.
+							return null;
+							return (
 								<div className="message-row assistant streaming-row">
 									<div className="message-bubble assistant streaming-bubble">
 										{activeToolName && (
@@ -1871,7 +1908,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 										)}
 									</div>
 								</div>
-							)}
+							);
+						})()}
 
 							{isStreaming && streamingMessage === undefined && (
 								<div className="message-row assistant streaming-row">

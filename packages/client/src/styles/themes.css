@@ -18,6 +18,9 @@
   --radius-lg: 24px;
   --radius-pill: 100px;
 
+  /* Fonts */
+  --font-mono: 'Noto Sans Mono', 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+
   /* Sizing */
   --sidebar-width: 260px;
 
@@ -709,7 +712,7 @@
 
 /* ═══ Base Body ═══ */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   background: var(--bg-solid);
   color: var(--text-primary);
@@ -783,7 +786,7 @@ strong {
   }
 }
 
-/* ═══ Sidebar — overlay ═══ */
+/* ═══ Sidebar — push-content (desktop) / overlay (mobile) ═══ */
 .sidebar {
   width: var(--sidebar-width);
   min-width: var(--sidebar-width);
@@ -793,30 +796,47 @@ strong {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 100;
-  position: fixed;
-  top: 50px;
-  left: 0;
-  bottom: 0;
-  transform: translateX(0);
-  will-change: transform;
   overflow: hidden;
 }
 
-.sidebar.collapsed {
-  transform: translateX(calc(var(--sidebar-width) * -1));
+/* ── Desktop: flex child, pushes main area ── */
+@media (min-width: 601px) {
+  .sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    transition: width var(--duration) var(--ease), min-width var(--duration) var(--ease), border-color var(--duration) var(--ease);
+    will-change: width;
+  }
+
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    border-right-color: transparent;
+  }
 }
 
-/* ── Mobile sidebar polish ── */
+/* ── Mobile: fixed overlay, slides in ── */
 @media (max-width: 600px) {
   .sidebar {
-    /* Start off-screen on mobile — user opens with burger */
+    position: fixed;
+    top: 50px;
+    left: 0;
+    bottom: 0;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+    /* Default off-screen — burger toggles .collapsed to reveal */
     transform: translateX(calc(var(--sidebar-width) * -1));
   }
 
   .sidebar:not(.collapsed) {
     transform: translateX(0);
+  }
+
+  .sidebar.collapsed {
+    transform: translateX(calc(var(--sidebar-width) * -1));
   }
 
   /* Moderate touch targets for mobile */
@@ -864,6 +884,15 @@ strong {
   font-size: 14px;
   color: var(--accent-text);
   letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+@media (min-width: 601px) {
+  .sidebar-header {
+    height: 50px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 /* Add project button in sidebar header */
@@ -1429,7 +1458,7 @@ strong {
   background: var(--bg-glass);
   color: var(--text-primary);
   font-size: 12px;
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-family: var(--font-mono);
   outline: none;
   transition: border-color var(--duration) var(--ease);
 }
@@ -1465,7 +1494,7 @@ strong {
   background: var(--bg-glass);
   color: var(--text-primary);
   font-size: 12px;
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-family: var(--font-mono);
   outline: none;
   transition: border-color var(--duration) var(--ease);
 }
@@ -1534,7 +1563,7 @@ strong {
   text-align: right;
   font-size: 10px;
   color: var(--text-dim);
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2166,7 +2195,7 @@ strong {
   padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
+  font-family: var(--font-mono);
   color: var(--text-secondary);
   transition: background 0.1s, color 0.1s;
 }
@@ -2257,7 +2286,7 @@ strong {
   background: rgba(0,0,0,0.2);
   font-size: 10px;
   line-height: 1.5;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
 }
 
 .clone-progress-line {
@@ -2669,13 +2698,13 @@ strong {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .mcp-tool-fqn {
   font-size: 10px;
   color: var(--text-dim);
-  font-family: monospace;
+  font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2924,7 +2953,7 @@ strong {
   border-radius: var(--radius-md);
   padding: 4px 10px;
   font-size: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   color: var(--text-primary);
   cursor: pointer;
   transition: all var(--duration) var(--ease);
@@ -2993,7 +3022,7 @@ strong {
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   outline: none;
   margin-bottom: 4px;
   box-sizing: border-box;
@@ -3015,7 +3044,7 @@ strong {
   padding: 6px 12px;
   border-radius: var(--radius-md);
   font-size: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   color: var(--text-primary);
   cursor: pointer;
   border: none;
@@ -3078,7 +3107,7 @@ strong {
   border-top: 1px solid var(--border);
   font-size: 10px;
   color: var(--text-dim);
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
 }
 
 .model-dropdown-warn {
@@ -3124,6 +3153,12 @@ strong {
   align-items: flex-start;
   gap: 8px;
   width: 100%;
+}
+
+/* Animate only truly new messages — not on every re-render.
+   The --entering class is added once in ChatView when a message
+   is first seen and removed after animation completes. */
+.message-row--entering {
   animation: msgIn 0.25s var(--ease);
 }
 
@@ -3164,6 +3199,8 @@ strong {
 }
 
 .message-bubble.assistant {
+  flex: 1;
+  min-width: 0;
   padding: 4px 0;
   background: none;
   border: none;
@@ -3261,7 +3298,7 @@ strong {
   background: var(--tool-bg);
   border: 1px solid var(--tool-border);
   font-size: 13px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   line-height: 1.4;
   overflow: hidden;
   animation: toolFadeIn 0.25s ease-out;
@@ -3396,7 +3433,7 @@ strong {
   border: 1px solid var(--border);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
   color: var(--accent-text);
 }
@@ -3408,7 +3445,7 @@ strong {
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid var(--border);
   overflow-x: auto;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -3484,7 +3521,7 @@ strong {
 .compaction-notice-timer {
   font-size: 10px;
   color: var(--text-dim);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   margin-top: 1px;
 }
@@ -3522,7 +3559,7 @@ strong {
   margin-top: 4px;
   font-size: 11px;
   color: var(--text-secondary);
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
 
@@ -3733,10 +3770,16 @@ strong {
   flex-shrink: 0;
 }
 
+/* Stop state — accent background for the abort button */
+.ti-send-btn.ti-send-btn-stop {
+  background: var(--accent, #e06c75);
+}
+.ti-send-btn.ti-send-btn-stop:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+
 @media (max-width: 600px) {
-  .ti-send-btn,
-  .ti-abort-btn,
-  .ti-steer-send {
+  .ti-send-btn {
     width: 44px !important;
     height: 44px !important;
     min-width: 44px !important;
@@ -3766,29 +3809,6 @@ strong {
   align-items: center;
   justify-content: center;
   color: var(--bg-solid);
-}
-
-.ti-abort-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: var(--text-primary);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  color: var(--bg-solid);
-  transition: all var(--duration) var(--ease);
-}
-
-.ti-abort-btn:hover:not(:disabled) {
-  opacity: 0.85;
-}
-
-.ti-abort-btn:active:not(:disabled) {
-  transform: scale(0.9);
 }
 
 /* ── Slash command suggestions ──────────────────────── */
@@ -3844,28 +3864,7 @@ strong {
 
 /* ── Steer / Queued messages ──────────────────────────── */
 
-.ti-steer-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  max-width: 800px;
-  margin: 0 auto 6px;
-  padding: 5px 10px;
-  border-radius: var(--radius-md);
-  background: var(--accent-subtle);
-  color: var(--accent-text);
-  font-size: 11px;
-  line-height: 1.4;
-  animation: fadeIn 0.2s var(--ease);
-}
 
-.ti-steer-send {
-  background: var(--accent) !important;
-}
-.ti-steer-send:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
 
 .steer-tag {
   display: inline-block;
@@ -4039,7 +4038,7 @@ strong {
   background: var(--tool-bg);
   color: var(--tool-accent-text);
   font-size: 12px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-weight: 600;
   animation: toolFadeIn 0.2s ease-out;
 }
@@ -4270,7 +4269,7 @@ strong {
 }
 
 .settings-textarea {
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1.5;
   resize: vertical;
@@ -4447,7 +4446,7 @@ strong {
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
 }
 
 .settings-raw-json {
@@ -4525,7 +4524,7 @@ strong {
 
 .text-dim { color: var(--text-dim); }
 
-.font-mono { font-family: 'SF Mono', 'Menlo', 'Monaco', monospace; }
+.font-mono { font-family: var(--font-mono); }
 
 .text-xs { font-size: 11px; }
 
@@ -4555,7 +4554,7 @@ strong {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0px;
 }
 .assistant-blocks {
   display: flex;
@@ -4589,7 +4588,7 @@ strong {
   background: var(--bg-glass);
   border-radius: var(--radius-sm);
   padding: 1px 6px;
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
@@ -4599,7 +4598,7 @@ strong {
   border: 1px solid var(--border);
   padding: 1px 5px;
   border-radius: var(--radius-sm);
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
   color: var(--accent-text);
 }
@@ -4621,7 +4620,7 @@ strong {
 .code-block-lang {
   font-size: 11px;
   color: var(--text-dim);
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   text-transform: lowercase;
 }
 .code-copy-btn {
@@ -4647,7 +4646,7 @@ strong {
   margin: 0;
   padding: 12px 48px 12px 12px;
   overflow-x: auto;
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.55;
   background: var(--bg-elevated);
@@ -4762,7 +4761,7 @@ strong {
 
 /* Batch label: "↳ 3 tools" */
 .tool-timeline-batch-label {
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
   color: var(--text-dim);
@@ -4770,7 +4769,7 @@ strong {
 
 /* Inline preview of what tools ran: "bash · read · write" */
 .tool-timeline-batch-preview {
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-dim);
   flex: 1;
@@ -4836,7 +4835,7 @@ strong {
 .tool-timeline-content {
   flex: 1;
   min-width: 0;
-  font-family: 'SF Mono','Menlo','Monaco',monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -5618,7 +5617,7 @@ strong {
 }
 
 .toast-card-content {
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-secondary);
