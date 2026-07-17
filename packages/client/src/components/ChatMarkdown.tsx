@@ -3,6 +3,8 @@ import { Check, Copy } from "lucide-react";
 import { Highlight, themes as prismThemes } from "prism-react-renderer";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -157,6 +159,24 @@ const components: Components = {
   pre: ({ children }) => <>{children}</>,
 };
 
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    div: [...(defaultSchema.attributes?.div ?? []), ["style", /.*/] as [string, ...unknown[]]],
+    span: [...(defaultSchema.attributes?.span ?? []), ["style", /.*/] as [string, ...unknown[]]],
+    strong: [...(defaultSchema.attributes?.strong ?? []), ["style", /.*/] as [string, ...unknown[]]],
+    p: [...(defaultSchema.attributes?.p ?? []), ["style", /.*/] as [string, ...unknown[]]],
+  },
+  strip: [...(defaultSchema.strip || []), "iframe", "script", "object", "form", "style"],
+} as any;
+
+const htmlRehypePlugins: any[] = [
+  rehypeRaw,
+  [rehypeSanitize, sanitizeSchema],
+  [rehypeKatex, { throwOnError: false, strict: false }],
+];
+
 /**
  * Styled card for <proposed_plan> blocks rendered by the pi-plan-mode extension.
  * Displays the inner plan content as markdown inside a bordered panel.
@@ -226,7 +246,7 @@ export function ChatMarkdown({ text, chatStyleBreaks }: Props) {
   if (segments.length === 1 && typeof segments[0] === "string") {
     return (
       <div className="md-root text-sm break-words" style={{ overflowWrap: "anywhere" }}>
-        <ReactMarkdown remarkPlugins={plugins} rehypePlugins={[rehypeKatex]} components={components}>
+        <ReactMarkdown remarkPlugins={plugins} rehypePlugins={htmlRehypePlugins} components={components}>
           {text}
         </ReactMarkdown>
       </div>
@@ -241,7 +261,7 @@ export function ChatMarkdown({ text, chatStyleBreaks }: Props) {
           <ReactMarkdown
             key={i}
             remarkPlugins={plugins}
-            rehypePlugins={[rehypeKatex]}
+            rehypePlugins={htmlRehypePlugins}
             components={components}
           >
             {seg}
