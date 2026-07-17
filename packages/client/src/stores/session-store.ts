@@ -452,8 +452,15 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 							rafPartialId = undefined;
 						}
 						flushPartial();
-						set({ streamingMessage: undefined });
-						refetchMessages();
+						// Append finalized streaming message to messages locally
+						// instead of refetching from server — avoids full array
+						// replacement which causes a full re-render ("refresh" feeling).
+						// The SSE events already delivered the complete state.
+						const finalMsg = get().streamingMessage;
+						set((s) => ({
+							streamingMessage: undefined,
+							messages: finalMsg ? [...s.messages, finalMsg] : s.messages,
+						}));
 						break;
 					}
 					case "ask_user_question": {
