@@ -426,7 +426,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 								activeToolName: toolName,
 							},
 						}));
-						refetchMessages();
 						break;
 					}
 					case "tool_execution_end": {
@@ -436,7 +435,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 								activeToolName: undefined,
 							},
 						}));
-						refetchMessages();
 						break;
 					}
 					case "tool_result": {

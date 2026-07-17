@@ -3124,6 +3124,12 @@ strong {
   align-items: flex-start;
   gap: 8px;
   width: 100%;
+}
+
+/* Animate only truly new messages — not on every re-render.
+   The --entering class is added once in ChatView when a message
+   is first seen and removed after animation completes. */
+.message-row--entering {
   animation: msgIn 0.25s var(--ease);
 }
 
@@ -4538,7 +4544,7 @@ strong {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 0px;
 }
 .assistant-blocks {
   display: flex;
