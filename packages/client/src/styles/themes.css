@@ -44,6 +44,16 @@
   to { transform: rotate(360deg); }
 }
 
+/* ═══ Markdown images — constrain to container width ═══ */
+.md-root img,
+.markdown-preview img,
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* ═══ Diff overrides — react-diff-view (scoped to .pi-diff-block) ═══ */
 .pi-diff-block {
   max-width: 100%;
