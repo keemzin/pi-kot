@@ -78,6 +78,32 @@
   --tool-border: rgba(255, 255, 255, 0.06);
 }
 
+/* ═══ Dusk — neutral mid-tone, between dark and light ═══ */
+:root[data-theme="dusk"] {
+  color-scheme: dark;
+  --bg-solid: #212121;
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --bg-glass-hover: rgba(255, 255, 255, 0.06);
+  --bg-glass-active: rgba(255, 255, 255, 0.09);
+  --bg-glass-strong: rgba(255, 255, 255, 0.05);
+  --header-bg: rgba(55, 55, 60, 0.75);
+  --sidebar-bg: rgba(40, 40, 38, 0.95);
+  --bg-frosted: rgba(33, 33, 33, 0.85);
+  --text-primary: rgba(255, 255, 255, 0.88);
+  --text-secondary: rgba(255, 255, 255, 0.60);
+  --text-dim: rgba(255, 255, 255, 0.40);
+  --text-ghost: rgba(255, 255, 255, 0.10);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.10);
+  --border-bright: rgba(255, 255, 255, 0.14);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.14);
+  --tool-bg: rgba(255, 255, 255, 0.03);
+  --tool-border: rgba(255, 255, 255, 0.06);
+}
+
 /* ═══ Dark warm — Flexoki ═══ */
 :root[data-theme="dark-warm"] {
   color-scheme: dark;

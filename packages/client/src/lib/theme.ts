@@ -18,6 +18,7 @@ export interface AccentInfo {
 
 export const themes: ThemeInfo[] = [
   { id: "dark",      name: "Dark",      icon: "🌙" },
+  { id: "dusk",      name: "Dusk",      icon: "🌆" },
   { id: "dark-warm", name: "Dark Warm", icon: "🟤" },
   { id: "light",     name: "Light",     icon: "☀️" },
   { id: "light-warm",name: "Light Warm",icon: "📜" },
@@ -25,7 +26,7 @@ export const themes: ThemeInfo[] = [
 
 // ── Old theme name → new theme name migration ──
 export const THEME_MIGRATIONS: Record<string, ThemeMode> = {
-  "night": "dark",
+  "night": "dusk",
   "midnight": "dark",
   "dawn": "dark-warm",
   "flexoki-dark": "dark-warm",
@@ -51,7 +52,7 @@ export const accents: AccentInfo[] = [
   { id: "flexoki", name: "Flexoki", color: "#da702c" },
 ];
 
-export type ThemeMode = "dark" | "dark-warm" | "light" | "light-warm";
+export type ThemeMode = "dark" | "dusk" | "dark-warm" | "light" | "light-warm";
 
 const STORAGE_KEY = "pi-kot-theme";
 const STORAGE_ACCENT = "pi-kot-accent";
