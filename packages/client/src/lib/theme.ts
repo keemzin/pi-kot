@@ -1,45 +1,96 @@
+/**
+ * Theme system — 2 layers:
+ *   Theme: surface identity (dark, dark-warm, light, light-warm)
+ *   Accent: a single primary color (everything else derives from it)
+ */
+
 export interface ThemeInfo {
   id: string;
   name: string;
-  base: "dark" | "light";
-  colors: string[];
+  icon: string;
+}
+
+export interface AccentInfo {
+  id: string;
+  name: string;
+  color: string;
 }
 
 export const themes: ThemeInfo[] = [
-  { id: "night", name: "Dusk", base: "dark", colors: ["#212121", "#a0a0a0", "#777777", "#666666"] },
-  { id: "midnight", name: "Midnight", base: "dark", colors: ["#000000", "#5a7a9a", "#4a5565", "#4a5a72"] },
-  { id: "dawn", name: "Dawn", base: "dark", colors: ["#1a1d26", "#7a8ab0", "#6a5a80", "#5a7a9a"] },
-  { id: "monokai", name: "Monokai", base: "dark", colors: ["#272822", "#ae81ff", "#f92672", "#a6e22e"] },
-  { id: "dracula", name: "Dracula", base: "dark", colors: ["#282a36", "#bd93f9", "#ff79c6", "#50fa7b"] },
-  { id: "nord", name: "Nord", base: "dark", colors: ["#2e3440", "#88c0d0", "#81a1c1", "#5e81ac"] },
-  { id: "bourbon", name: "Bourbon", base: "dark", colors: ["#1a1410", "#d4a054", "#c07030", "#8b6914"] },
-  { id: "flexoki-dark", name: "Flexoki Dark", base: "dark", colors: ["#171515", "#da702c", "#4385be", "#a0af54"] },
-  { id: "clean", name: "Clean", base: "light", colors: ["#ffffff", "#0580c4", "#007aff", "#5ac8fa"] },
-  { id: "terracotta", name: "Terracotta", base: "light", colors: ["#f4f1ec", "#b06a48", "#5c2860", "#3a6a9b"] },
-  { id: "sage", name: "Sage", base: "light", colors: ["#f0f2ec", "#6a7d5a", "#4a3860", "#3a6a7a"] },
-  { id: "flexoki-light", name: "Flexoki Light", base: "light", colors: ["#fffdf4", "#bc5215", "#205ea6", "#66800b"] },
+  { id: "dark",      name: "Dark",      icon: "🌙" },
+  { id: "dark-warm", name: "Dark Warm", icon: "🟤" },
+  { id: "light",     name: "Light",     icon: "☀️" },
+  { id: "light-warm",name: "Light Warm",icon: "📜" },
 ];
 
-export function getSavedTheme(): string {
-  try {
-    const saved = localStorage.getItem("pi-kot-theme");
-    if (saved && themes.some((t) => t.id === saved)) return saved;
-  } catch {
-    // private mode
-  }
-  // Auto-detect from OS
-  if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "terracotta";
-  return "night";
+// ── Old theme name → new theme name migration ──
+export const THEME_MIGRATIONS: Record<string, ThemeMode> = {
+  "night": "dark",
+  "midnight": "dark",
+  "dawn": "dark-warm",
+  "flexoki-dark": "dark-warm",
+  "monokai": "dark",
+  "dracula": "dark",
+  "nord": "dark",
+  "bourbon": "dark-warm",
+  "clean": "light",
+  "terracotta": "light-warm",
+  "sage": "light-warm",
+  "flexoki-light": "light-warm",
+};
+
+export const accents: AccentInfo[] = [
+  { id: "slate",   name: "Slate",   color: "#64748b" },
+  { id: "blue",    name: "Blue",    color: "#2563eb" },
+  { id: "violet",  name: "Violet",  color: "#7c3aed" },
+  { id: "emerald", name: "Emerald", color: "#059669" },
+  { id: "amber",   name: "Amber",   color: "#d97706" },
+  { id: "rose",    name: "Rose",    color: "#e11d48" },
+  { id: "teal",    name: "Teal",    color: "#0d9488" },
+  { id: "orange",  name: "Orange",  color: "#ea580c" },
+  { id: "flexoki", name: "Flexoki", color: "#da702c" },
+];
+
+export type ThemeMode = "dark" | "dark-warm" | "light" | "light-warm";
+
+const STORAGE_KEY = "pi-kot-theme";
+const STORAGE_ACCENT = "pi-kot-accent";
+
+function defaults(): { theme: ThemeMode; accent: string } {
+  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+  return { theme: prefersDark ? "dark" : "light", accent: "blue" };
 }
 
-export function applyTheme(themeId: string): void {
-  const theme = themes.find((t) => t.id === themeId);
-  if (!theme) return;
-  document.documentElement.setAttribute("data-theme", theme.base);
-  document.documentElement.setAttribute("data-accent", themeId);
+export function getSavedTheme(): ThemeMode {
   try {
-    localStorage.setItem("pi-kot-theme", themeId);
-  } catch {
-    // private mode
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (themes.some((t) => t.id === v)) return v as ThemeMode;
+    // Check for old theme names
+    if (v && v in THEME_MIGRATIONS) {
+      const migrated = THEME_MIGRATIONS[v];
+      // Immediately save the migrated value so next load is clean
+      try { localStorage.setItem(STORAGE_KEY, migrated); } catch {}
+      return migrated;
+    }
+  } catch {}
+  return defaults().theme;
+}
+
+export function getSavedAccent(): string {
+  try {
+    const v = localStorage.getItem(STORAGE_ACCENT);
+    if (v && accents.some((a) => a.id === v)) return v;
+  } catch {}
+  return defaults().accent;
+}
+
+export function applyTheme(theme: ThemeMode, accent?: string): void {
+  document.documentElement.setAttribute("data-theme", theme);
+  if (accent) {
+    document.documentElement.setAttribute("data-accent", accent);
   }
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+    if (accent) localStorage.setItem(STORAGE_ACCENT, accent);
+  } catch {}
 }
