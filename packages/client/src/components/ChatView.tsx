@@ -485,7 +485,8 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 	const completedCount = toolEntries.filter(
 		(e) => e.result !== undefined && !e.result?.isError,
 	).length;
-	const errored = toolEntries.some((e) => e.result?.isError === true);
+	const erroredCount = toolEntries.filter((e) => e.result?.isError === true).length;
+	const errored = erroredCount > 0;
 	const runningCount = toolEntries.filter((e) => e.result === undefined).length;
 	const allDone = runningCount === 0 && toolCount > 0;
 
@@ -515,11 +516,17 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 				{toolCount > 1 && (
 					<span className="tool-timeline-batch-count">
 						{allDone ? (
-							<span className="done">✓ {completedCount}</span>
+							<>
+								{completedCount > 0 && <span className="done">✓ {completedCount}</span>}
+								{erroredCount > 0 && <span className="tool-timeline-badge error">✖ {erroredCount}</span>}
+							</>
 						) : (
 							<>
 								{completedCount > 0 && (
 									<span className="done">✓ {completedCount}</span>
+								)}
+								{erroredCount > 0 && (
+									<span className="tool-timeline-badge error" style={{ marginLeft: "4px" }}>✖ {erroredCount}</span>
 								)}
 								{runningCount > 0 && (
 									<span className="pending"> ⟳ {runningCount}</span>
@@ -529,7 +536,7 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 					</span>
 				)}
 				<span className="tool-timeline-batch-preview">{previewText}</span>
-				{errored && (
+				{errored && toolCount === 1 && (
 					<span className="tool-timeline-badge error" aria-label="error">
 						error
 					</span>
