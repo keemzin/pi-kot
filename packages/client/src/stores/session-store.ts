@@ -429,11 +429,33 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						break;
 					}
 					case "tool_execution_end": {
+						const { toolCallId, toolName, result, isError } =
+							event as unknown as {
+								toolCallId?: string;
+								toolName?: string;
+								result?: { content?: unknown; details?: unknown };
+								isError?: boolean;
+							};
 						set((s) => ({
 							streamState: {
 								...s.streamState,
 								activeToolName: undefined,
 							},
+							// Append a synthetic toolResult message so ChatView pairs it
+							// with the tool call and shows "completed" immediately.
+							// Without this, every tool in the batch stays "running"
+							// until agent_end triggers refetchMessages().
+							messages: [
+								...s.messages,
+								{
+									role: "toolResult",
+									toolCallId: toolCallId ?? "",
+									toolName: toolName ?? "tool",
+									content: result?.content ?? [],
+									details: result?.details,
+									isError: isError === true,
+								} as never,
+							],
 						}));
 						break;
 					}
