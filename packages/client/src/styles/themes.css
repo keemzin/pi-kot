@@ -4488,6 +4488,18 @@ strong {
   animation-name: toolCompleteError;
 }
 
+/* Running tool rendered standalone outside the batch card */
+.tool-running-standalone {
+  background: var(--bg-glass);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  animation: toolNodeIn 0.2s ease-out;
+}
+.tool-running-standalone .tool-timeline-node.running {
+  animation: none;
+}
+
 /* Currently executing tool node — subtle left accent */
 .tool-timeline-node.running {
   background: linear-gradient(90deg, rgba(59,130,246,0.06) 0%, transparent 60%);

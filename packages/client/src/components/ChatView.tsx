@@ -333,11 +333,13 @@ function ThinkingBlock({ text }: { text: string }) {
 function ToolCallEntry({
 	block,
 	result,
+	initialExpanded = false,
 }: {
 	block: Record<string, unknown>;
 	result: PairableMessage | undefined;
+	initialExpanded?: boolean;
 }) {
-	const [detailsOpen, setDetailsOpen] = useState(false);
+	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
 	const [justCompleted, setJustCompleted] = useState(false);
 	const wasRunning = useRef(result === undefined);
 	useEffect(() => {
@@ -1460,15 +1462,44 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 			const flushToolBatch = (key: string) => {
 				if (toolEntries.length === 0) return;
-				const snapshot = toolEntries.slice();
-				elements.push(
-					<div key={key} className="message-row assistant">
-						<div className="message-bubble assistant">
-							<ToolCallBatchCard entries={snapshot as any} />
-						</div>
-					</div>,
+
+				// Separate the currently-running tool from completed ones
+				const completed = toolEntries.filter(
+					(e) => e.kind !== "tool" || e.result !== undefined,
+				);
+				const running = toolEntries.find(
+					(e) => e.kind === "tool" && e.result === undefined,
 				);
 				toolEntries.length = 0;
+
+				// Render completed tools in the collapsed batch
+				if (completed.length > 0) {
+					elements.push(
+						<div key={`batch-${key}`} className="message-row assistant">
+							<div className="message-bubble assistant">
+								<ToolCallBatchCard entries={completed as any} />
+							</div>
+						</div>,
+					);
+				}
+
+				// Render the running tool as a standalone expanded entry below the batch
+				if (running) {
+					const tId = String(running.block.id ?? running.block.name ?? "tool");
+					elements.push(
+						<div key={`running-${tId}`} className="message-row assistant">
+							<div className="message-bubble assistant">
+								<div className="tool-running-standalone">
+									<ToolCallEntry
+										block={running.block}
+										result={undefined}
+										initialExpanded={true}
+									/>
+								</div>
+							</div>
+						</div>,
+					);
+				}
 			};
 
 			const flushProse = (
