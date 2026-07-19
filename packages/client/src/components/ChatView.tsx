@@ -338,6 +338,16 @@ function ToolCallEntry({
 	result: PairableMessage | undefined;
 }) {
 	const [detailsOpen, setDetailsOpen] = useState(false);
+	const [justCompleted, setJustCompleted] = useState(false);
+	const wasRunning = useRef(result === undefined);
+	useEffect(() => {
+		if (wasRunning.current && result !== undefined) {
+			setJustCompleted(true);
+			const t = setTimeout(() => setJustCompleted(false), 600);
+			return () => clearTimeout(t);
+		}
+		wasRunning.current = result === undefined;
+	}, [result]);
 	const name = String(block.name ?? "tool");
 	const args = block.arguments ?? block.input ?? {};
 	const argsText =
@@ -384,7 +394,7 @@ function ToolCallEntry({
 			className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
 		>
 			<span
-				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
+				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}${justCompleted ? " just-completed" : ""}`}
 				aria-hidden="true"
 			>
 				{icon}
@@ -472,7 +482,12 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 	const [open, setOpen] = useState(false);
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
+	const completedCount = toolEntries.filter(
+		(e) => e.result !== undefined && !e.result?.isError,
+	).length;
 	const errored = toolEntries.some((e) => e.result?.isError === true);
+	const runningCount = toolEntries.filter((e) => e.result === undefined).length;
+	const allDone = runningCount === 0 && toolCount > 0;
 
 	// Unique tool names for the inline preview
 	const names = [
@@ -497,6 +512,22 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 				<span className="tool-timeline-batch-label">
 					↳ {toolCount} {toolCount === 1 ? "tool" : "tools"}
 				</span>
+				{toolCount > 1 && (
+					<span className="tool-timeline-batch-count">
+						{allDone ? (
+							<span className="done">✓ {completedCount}</span>
+						) : (
+							<>
+								{completedCount > 0 && (
+									<span className="done">✓ {completedCount}</span>
+								)}
+								{runningCount > 0 && (
+									<span className="pending"> ⟳ {runningCount}</span>
+								)}
+							</>
+						)}
+					</span>
+				)}
 				<span className="tool-timeline-batch-preview">{previewText}</span>
 				{errored && (
 					<span className="tool-timeline-badge error" aria-label="error">
