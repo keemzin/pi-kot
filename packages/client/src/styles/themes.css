@@ -4620,8 +4620,9 @@ strong {
   background: var(--bg-glass);
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  max-height: 160px;
-  overflow: auto;
+  max-height: 80px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
 /* Thinking block — slim variant inside timeline */

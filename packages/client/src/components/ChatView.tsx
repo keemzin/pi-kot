@@ -342,6 +342,7 @@ function ToolCallEntry({
 	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
 	const [justCompleted, setJustCompleted] = useState(false);
 	const wasRunning = useRef(result === undefined);
+	const argsPreRef = useRef<HTMLPreElement>(null);
 	useEffect(() => {
 		if (wasRunning.current && result !== undefined) {
 			setJustCompleted(true);
@@ -357,6 +358,14 @@ function ToolCallEntry({
 
 	const isError = result?.isError === true;
 	const isRunning = result === undefined;
+
+	// Auto-scroll the args pane to bottom while the tool is streaming
+	useEffect(() => {
+		if (isRunning && detailsOpen && argsPreRef.current) {
+			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
+		}
+	});
+
 	const resultContent = Array.isArray(result?.content) ? result?.content : [];
 	const outputText = resultContent
 		.filter((c): c is { type: "text"; text: string } => {
@@ -439,7 +448,7 @@ function ToolCallEntry({
 						{argsText.length > 2 && (
 							<div>
 								<div className="tool-timeline-section-label">input</div>
-								<pre className="tool-timeline-code">{argsText}</pre>
+								<pre className="tool-timeline-code" ref={argsPreRef}>{argsText}</pre>
 							</div>
 						)}
 						{editDiff !== undefined && editStats !== undefined ? (
