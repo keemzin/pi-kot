@@ -2024,25 +2024,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							);
 						})()}
 
-							{isStreaming && streamingMessage === undefined && (
-								<div className="message-row assistant streaming-row">
-									<div className="message-bubble assistant thinking-bubble">
-										{activeToolName ? (
-											<span className="thinking-running">
-												<span className="tool-badge-dot" />
-												running{" "}
-												<code className="thinking-code">{activeToolName}</code>
-											</span>
-										) : (
-											<span className="pi-thinking-dots" aria-hidden="true">
-												<span>.</span>
-												<span>.</span>
-												<span>.</span>
-											</span>
-										)}
-									</div>
-								</div>
-							)}
+
 
 							{activeCompaction !== null && (
 								<CompactionNotice compaction={activeCompaction} />
