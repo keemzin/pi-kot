@@ -249,10 +249,12 @@
   --diff-code-delete-edit-background-color: #991b1b;
   --diff-code-delete-edit-text-color: #fee2e2;
   --diff-omit-gutter-line-color: #404040;
+  /* gutter solid bg token — overridden per theme below */
+  --diff-gutter-bg: #0a0a0a;
 }
 .pi-diff-block .diff {
   background: transparent;
-  color: #e5e5e5;
+  color: var(--diff-text-color);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   table-layout: auto;
   width: max-content;
@@ -289,7 +291,7 @@
   position: sticky;
   left: 0;
   z-index: 1;
-  background: #0a0a0a;
+  background: var(--diff-gutter-bg);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -315,6 +317,11 @@
   --diff-code-delete-edit-background-color: #fca5a5;
   --diff-code-delete-edit-text-color: #450a0a;
   --diff-omit-gutter-line-color: #cbd5e1;
+  --diff-gutter-bg: #ffffff;
+}
+[data-theme="light-warm"] .pi-diff-block {
+  --diff-gutter-bg: #fffdf4;
+  --diff-text-color: #0a0a0a;
 }
 [data-theme="light"] .pi-diff-block .diff {
   color: #0a0a0a;
@@ -326,6 +333,28 @@
 [data-theme="light"] .pi-diff-block .diff-decoration {
   background: #f3f4f6;
   color: #525252;
+}
+
+/* ── ChatEditDiff wrapper — theme-aware ── */
+.chat-edit-diff-wrap {
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-solid);
+}
+.chat-edit-diff-summary {
+  color: var(--text-secondary);
+}
+.chat-edit-diff-filename {
+  color: var(--text-secondary);
+}
+.chat-edit-diff-toggle-btn {
+  color: var(--text-dim);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+.chat-edit-diff-toggle-btn:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
 }
 
 /* ═══ DARK BASE — shared across all dark accents ═══ */

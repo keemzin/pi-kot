@@ -53,10 +53,10 @@ export function ChatEditDiff({
   const { viewType, setViewType } = useContext(ChatDiffViewContext);
 
   return (
-    <details className="group overflow-hidden rounded border border-neutral-800 bg-neutral-950 text-xs">
-      <summary className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-neutral-300">
+    <details className="chat-edit-diff-wrap group overflow-hidden text-xs">
+      <summary className="chat-edit-diff-summary flex cursor-pointer items-center justify-between gap-2 px-3 py-2">
         <span className="flex min-w-0 items-baseline gap-2">
-          <span className="truncate font-mono text-neutral-300">{filename ?? "diff"}</span>
+          <span className="chat-edit-diff-filename truncate font-mono">{filename ?? "diff"}</span>
           <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-emerald-950/50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400 light:bg-emerald-100 light:text-emerald-700">
             +{adds}
           </span>
@@ -74,7 +74,7 @@ export function ChatEditDiff({
               e.stopPropagation();
               setViewType(viewType === "split" ? "unified" : "split");
             }}
-            className="rounded p-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
+            className="chat-edit-diff-toggle-btn rounded p-0.5"
             title={
               viewType === "split"
                 ? "Switch chat diffs to unified view"
