@@ -10,11 +10,11 @@ import { AppearanceTab } from "./settings/AppearanceTab";
 import { ProvidersTab } from "./settings/ProvidersTab";
 import { AgentTab } from "./settings/AgentTab";
 import { GeneralTab } from "./settings/GeneralTab";
-import { ExtensionsTab } from "./ExtensionsTab";
+import { PackagesTab } from "./PackagesTab";
 import { SkillsTab } from "./SkillsTab";
 import { TunnelTab } from "./TunnelTab";
 
-type Tab = "appearance" | "providers" | "agent" | "general" | "extensions" | "skills" | "tunnel";
+type Tab = "appearance" | "providers" | "agent" | "general" | "packages" | "skills" | "tunnel";
 
 interface Props {
   onClose: () => void;
@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose, initialTab }: Props) {
-  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "extensions", "skills", "tunnel"];
+  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "packages", "skills", "tunnel"];
 
   const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
   const [error, setError] = useState<string | undefined>(undefined);
@@ -74,8 +74,8 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
                     ? "Providers"
                     : t === "agent"
                       ? "Agent"
-                      : t === "extensions"
-                        ? "Extensions ⚗️"
+                      : t === "packages"
+                        ? "Packages 📦"
                         : t === "skills"
                           ? "Skills"
                           : t === "tunnel"
@@ -111,7 +111,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       {tab === "appearance" && <AppearanceTab />}
       {tab === "providers" && <ProvidersTab onError={setError} />}
       {tab === "agent" && <AgentTab onError={setError} />}
-      {tab === "extensions" && <ExtensionsTab onError={setError} />}
+      {tab === "packages" && <PackagesTab onError={setError} />}
       {tab === "skills" && <SkillsTab onError={setError} />}
       {tab === "tunnel" && <TunnelTab />}
       {tab === "general" && <GeneralTab />}

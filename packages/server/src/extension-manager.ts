@@ -15,6 +15,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import type { PackageSource } from "@earendil-works/pi-coding-agent";
 import { execSync } from "node:child_process";
 import { config } from "./config.js";
 
@@ -289,7 +290,7 @@ async function extractDescriptionFromExtension(filePath: string): Promise<string
 }
 
 /** Read settings.json for configured packages */
-async function readConfiguredPackages(): Promise<string[]> {
+async function readConfiguredPackages(): Promise<PackageSource[]> {
   try {
     const raw = await readFile(settingsPath(), "utf-8");
     const settings = JSON.parse(raw);
@@ -303,7 +304,11 @@ async function readConfiguredPackages(): Promise<string[]> {
 
 export async function discoverExtensions(): Promise<ExtensionsResponse> {
   const installed = await readInstalledPackages();
-  const configured = new Set(await readConfiguredPackages());
+  const rawConfigured = await readConfiguredPackages();
+  // Normalize PackageSource[] to string[] — entries can be strings or objects
+  const configured = new Set(
+    rawConfigured.map((p) => (typeof p === "string" ? p : p.source)),
+  );
 
   // Scan filesystem
   const [extFiles, agents] = await Promise.all([

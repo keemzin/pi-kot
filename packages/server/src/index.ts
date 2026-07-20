@@ -23,6 +23,7 @@ import { subscribe as subscribeAskUserQuestion } from "./ask-user-question/regis
 import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
 import { extensionRoutes } from "./routes/extensions.js";
+import { extensionPackagesRoutes } from "./routes/extension-packages.js";
 import { extensionCommandRoutes } from "./routes/extension-commands.js";
 import { sessionExtensionRoutes } from "./routes/session-extensions.js";
 import { gitRoutes } from "./routes/git.js";
@@ -147,6 +148,7 @@ export async function buildServer() {
       await api.register(versionRoutes);
       await api.register(projectRoutes);
       await api.register(extensionRoutes);
+      await api.register(extensionPackagesRoutes);
       await api.register(extensionCommandRoutes);
       await api.register(sessionExtensionRoutes);
       await api.register(orchestrationRoutes);

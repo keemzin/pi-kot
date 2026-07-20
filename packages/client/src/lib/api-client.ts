@@ -1397,6 +1397,79 @@ export async function reloadAgent(): Promise<ReloadResponse> {
   return request<ReloadResponse>("POST", "/api/v1/control/reload");
 }
 
+// ---- SDK Packages (DefaultPackageManager-powered) ----
+
+export interface SdkResourceInfo {
+  kind: "extension" | "skill" | "prompt" | "theme";
+  name: string;
+  path: string;
+  relativePath: string;
+}
+
+export interface SdkPackageCounts {
+  extensions: number;
+  skills: number;
+  prompts: number;
+  themes: number;
+}
+
+export interface SdkPackageInfo {
+  source: string;
+  scope: "user" | "project";
+  filtered: boolean;
+  disabled: boolean;
+  installedPath?: string;
+  packageName?: string;
+  version?: string;
+  counts: SdkPackageCounts;
+  resources: SdkResourceInfo[];
+  status: "loaded" | "disabled" | "installed" | "missing";
+}
+
+export interface SdkPackagesResponse {
+  packages: SdkPackageInfo[];
+  totals: SdkPackageCounts;
+}
+
+/**
+ * List all configured extension packages with resource details.
+ * Uses SDK's DefaultPackageManager under the hood.
+ */
+export async function fetchSdkPackages(): Promise<SdkPackagesResponse> {
+  return request<SdkPackagesResponse>("GET", "/api/v1/extensions/sdk-packages");
+}
+
+/**
+ * Install an extension package via the SDK package manager.
+ */
+export async function installSdkPackage(
+  source: string,
+  local?: boolean,
+): Promise<SdkPackagesResponse> {
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/install", { source, local });
+}
+
+/**
+ * Remove an extension package via the SDK package manager.
+ */
+export async function removeSdkPackage(
+  source: string,
+  local?: boolean,
+): Promise<SdkPackagesResponse> {
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/remove", { source, local });
+}
+
+/**
+ * Enable or disable an extension package.
+ */
+export async function toggleSdkPackage(
+  source: string,
+  scope: "user" | "project",
+  disabled: boolean,
+): Promise<SdkPackagesResponse> {
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/toggle", { source, scope, disabled });
+}
+
 // ---- Session Extensions (runtime state) ----
 
 export interface SessionExtensionInfo {
