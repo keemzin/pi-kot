@@ -15,12 +15,17 @@ import { config } from "./config.js";
 export type UiSettings = {
   version: 1;
   theme?: string;
+  accent?: string;
   stickyUserHeader: boolean;
   showTokenUsage: boolean;
   compressImages: boolean;
   showThinking: boolean;
   viewerWidth: number;
   artifactViewerWidth: number;
+  // User bubble customization (null = use accent default)
+  userBubbleColor?: string | null;
+  userBubbleTextColor?: string | null;
+  userBubbleBorderColor?: string | null;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -28,12 +33,16 @@ export type UiSettings = {
 const DEFAULTS: UiSettings = {
   version: 1,
   theme: undefined,
+  accent: undefined,
   stickyUserHeader: true,
   showTokenUsage: false,
   compressImages: true,
   showThinking: false,
   viewerWidth: 480,
   artifactViewerWidth: 480,
+  userBubbleColor: null,
+  userBubbleTextColor: null,
+  userBubbleBorderColor: null,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -51,12 +60,17 @@ function normalize(value: unknown): UiSettings {
   const v = value as Record<string, unknown>;
 
   if (typeof v.theme === "string") settings.theme = v.theme;
+  if (typeof v.accent === "string") settings.accent = v.accent;
   if (typeof v.stickyUserHeader === "boolean") settings.stickyUserHeader = v.stickyUserHeader;
   if (typeof v.showTokenUsage === "boolean") settings.showTokenUsage = v.showTokenUsage;
   if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
   if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
   if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
   if (typeof v.artifactViewerWidth === "number") settings.artifactViewerWidth = v.artifactViewerWidth;
+  // User bubble: null = use accent default, string = custom hex
+  if (v.userBubbleColor === null || typeof v.userBubbleColor === "string") settings.userBubbleColor = v.userBubbleColor;
+  if (v.userBubbleTextColor === null || typeof v.userBubbleTextColor === "string") settings.userBubbleTextColor = v.userBubbleTextColor;
+  if (v.userBubbleBorderColor === null || typeof v.userBubbleBorderColor === "string") settings.userBubbleBorderColor = v.userBubbleBorderColor;
 
   return settings;
 }
@@ -99,12 +113,14 @@ async function write(settings: UiSettings): Promise<UiSettings> {
 
 async function patch(patch: Partial<UiSettings>): Promise<UiSettings> {
   const current = await read();
+  console.log("[ui-settings] patch received:", JSON.stringify(patch));
   const merged: UiSettings = {
     ...current,
     ...Object.fromEntries(
       Object.entries(patch).filter(([_, v]) => v !== undefined),
     ),
   };
+  console.log("[ui-settings] merged:", JSON.stringify(merged));
   return write(merged);
 }
 

@@ -4,6 +4,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite, getUiSettings, updateUiSettings } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { ConfirmDialog } from "./Modal";
+import { isImagePath } from "../lib/file-types";
 
 export function FileViewerPanel({ projectId }: { projectId: string }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
@@ -18,6 +19,8 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
   const [savedContent, setSavedContent] = useState("");
   const [fileName, setFileName] = useState("");
   const [language, setLanguage] = useState<string | undefined>();
+  const [fileSize, setFileSize] = useState<number | undefined>();
+  const [fileBinary, setFileBinary] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -45,7 +48,10 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
     filesRead(projectId, activeFile.path)
       .then((data) => {
         if (cancelled) return;
-        const c = data.binary ? "(binary file)" : data.content ?? "";
+        // For image files, keep the raw base64 content from the server.
+        // For other binary files, show a placeholder.
+        const isImage = isImagePath(activeFile.path);
+        const c = data.binary && !isImage ? "(binary file)" : data.content ?? "";
         // CM6 always terminates documents with \n — normalize so
         // the onChange callback doesn't fire after the sync sync
         // effect, which would make content !== savedContent and
@@ -55,6 +61,8 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         setSavedContent(normalized);
         setLanguage(data.language);
         setFileName(activeFile.name);
+        setFileSize(data.size);
+        setFileBinary(data.binary);
         setSavedAt(undefined);
       })
       .catch((err) => {
@@ -335,6 +343,8 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
                   onSave={handleSave}
                   savedAt={savedAt}
                   error={error}
+                  size={fileSize}
+                  binary={fileBinary}
                 />
               </>
             ) : null}

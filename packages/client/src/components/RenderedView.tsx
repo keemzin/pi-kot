@@ -170,6 +170,20 @@ export function RenderedView({ content, fileName }: Props) {
                 </a>
               );
             },
+            img({ src, alt }) {
+              return (
+                <img
+                  src={src}
+                  alt={alt ?? ""}
+                  style={{
+                    maxWidth: "100%",
+                    height: "auto",
+                    borderRadius: 4,
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+                  }}
+                />
+              );
+            },
             table({ children }) {
               return (
                 <div className="table-wrapper">

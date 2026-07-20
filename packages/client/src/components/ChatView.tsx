@@ -329,15 +329,70 @@ function ThinkingBlock({ text }: { text: string }) {
 	);
 }
 
+/**
+ * Wrapper that keeps the standalone running card mounted during its exit
+ * animation. When `running` goes undefined, it plays the collapse-up animation
+ * for EXIT_MS before unmounting.
+ */
+const EXIT_MS = 320;
+function RunningToolCard({ running }: { running: { block: Record<string, unknown> } | undefined }) {
+	const [displayed, setDisplayed] = useState(running);
+	const [exiting, setExiting] = useState(false);
+	const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		if (running) {
+			if (exitTimer.current) clearTimeout(exitTimer.current);
+			setDisplayed(running);
+			setExiting(false);
+		} else if (displayed) {
+			setExiting(true);
+			exitTimer.current = setTimeout(() => {
+				setDisplayed(undefined);
+				setExiting(false);
+			}, EXIT_MS);
+		}
+		return () => {
+			if (exitTimer.current) clearTimeout(exitTimer.current);
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [running]);
+
+	if (!displayed) return null;
+
+	return (
+		<div className={`tool-running-standalone${exiting ? " exiting" : ""}`}>
+			<ToolCallEntry
+				block={displayed.block}
+				result={undefined}
+				initialExpanded={true}
+			/>
+		</div>
+	);
+}
+
 /** Render a single tool call + its result as a timeline node. */
 function ToolCallEntry({
 	block,
 	result,
+	initialExpanded = false,
 }: {
 	block: Record<string, unknown>;
 	result: PairableMessage | undefined;
+	initialExpanded?: boolean;
 }) {
-	const [detailsOpen, setDetailsOpen] = useState(false);
+	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
+	const [justCompleted, setJustCompleted] = useState(false);
+	const wasRunning = useRef(result === undefined);
+	const argsPreRef = useRef<HTMLPreElement>(null);
+	useEffect(() => {
+		if (wasRunning.current && result !== undefined) {
+			setJustCompleted(true);
+			const t = setTimeout(() => setJustCompleted(false), 600);
+			return () => clearTimeout(t);
+		}
+		wasRunning.current = result === undefined;
+	}, [result]);
 	const name = String(block.name ?? "tool");
 	const args = block.arguments ?? block.input ?? {};
 	const argsText =
@@ -345,6 +400,14 @@ function ToolCallEntry({
 
 	const isError = result?.isError === true;
 	const isRunning = result === undefined;
+
+	// Auto-scroll the args pane to bottom while the tool is streaming
+	useEffect(() => {
+		if (isRunning && detailsOpen && argsPreRef.current) {
+			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
+		}
+	});
+
 	const resultContent = Array.isArray(result?.content) ? result?.content : [];
 	const outputText = resultContent
 		.filter((c): c is { type: "text"; text: string } => {
@@ -384,7 +447,7 @@ function ToolCallEntry({
 			className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
 		>
 			<span
-				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
+				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}${justCompleted ? " just-completed" : ""}`}
 				aria-hidden="true"
 			>
 				{icon}
@@ -427,7 +490,7 @@ function ToolCallEntry({
 						{argsText.length > 2 && (
 							<div>
 								<div className="tool-timeline-section-label">input</div>
-								<pre className="tool-timeline-code">{argsText}</pre>
+								<pre className="tool-timeline-code" ref={argsPreRef}>{argsText}</pre>
 							</div>
 						)}
 						{editDiff !== undefined && editStats !== undefined ? (
@@ -472,7 +535,13 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 	const [open, setOpen] = useState(false);
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
-	const errored = toolEntries.some((e) => e.result?.isError === true);
+	const completedCount = toolEntries.filter(
+		(e) => e.result !== undefined && !e.result?.isError,
+	).length;
+	const erroredCount = toolEntries.filter((e) => e.result?.isError === true).length;
+	const errored = erroredCount > 0;
+	const runningCount = toolEntries.filter((e) => e.result === undefined).length;
+	const allDone = runningCount === 0 && toolCount > 0;
 
 	// Unique tool names for the inline preview
 	const names = [
@@ -497,8 +566,30 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 				<span className="tool-timeline-batch-label">
 					↳ {toolCount} {toolCount === 1 ? "tool" : "tools"}
 				</span>
+				{toolCount > 1 && (
+					<span className="tool-timeline-batch-count">
+						{allDone ? (
+							<>
+								{completedCount > 0 && <span className="done">✓ {completedCount}</span>}
+								{erroredCount > 0 && <span className="tool-timeline-badge error">✖ {erroredCount}</span>}
+							</>
+						) : (
+							<>
+								{completedCount > 0 && (
+									<span className="done">✓ {completedCount}</span>
+								)}
+								{erroredCount > 0 && (
+									<span className="tool-timeline-badge error" style={{ marginLeft: "4px" }}>✖ {erroredCount}</span>
+								)}
+								{runningCount > 0 && (
+									<span className="pending"> ⟳ {runningCount}</span>
+								)}
+							</>
+						)}
+					</span>
+				)}
 				<span className="tool-timeline-batch-preview">{previewText}</span>
-				{errored && (
+				{errored && toolCount === 1 && (
 					<span className="tool-timeline-badge error" aria-label="error">
 						error
 					</span>
@@ -1422,15 +1513,37 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 			const flushToolBatch = (key: string) => {
 				if (toolEntries.length === 0) return;
-				const snapshot = toolEntries.slice();
+
+				// Separate the currently-running tool from completed ones
+				const completed = toolEntries.filter(
+					(e) => e.kind !== "tool" || e.result !== undefined,
+				);
+				const running = toolEntries.find(
+					(e) => e.kind === "tool" && e.result === undefined,
+				);
+				toolEntries.length = 0;
+
+				// Render completed tools in the collapsed batch
+				if (completed.length > 0) {
+					elements.push(
+						<div key={`batch-${key}`} className="message-row assistant">
+							<div className="message-bubble assistant">
+								<ToolCallBatchCard entries={completed as any} />
+							</div>
+						</div>,
+					);
+				}
+
+				// Render the running tool as a standalone expanded entry below the batch
+				// Use a stable key so RunningToolCard persists across tool transitions
+				// and can play its exit animation before unmounting.
 				elements.push(
-					<div key={key} className="message-row assistant">
+					<div key="running-standalone-slot" className="message-row assistant">
 						<div className="message-bubble assistant">
-							<ToolCallBatchCard entries={snapshot as any} />
+							<RunningToolCard running={running} />
 						</div>
 					</div>,
 				);
-				toolEntries.length = 0;
 			};
 
 			const flushProse = (
@@ -1911,25 +2024,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							);
 						})()}
 
-							{isStreaming && streamingMessage === undefined && (
-								<div className="message-row assistant streaming-row">
-									<div className="message-bubble assistant thinking-bubble">
-										{activeToolName ? (
-											<span className="thinking-running">
-												<span className="tool-badge-dot" />
-												running{" "}
-												<code className="thinking-code">{activeToolName}</code>
-											</span>
-										) : (
-											<span className="pi-thinking-dots" aria-hidden="true">
-												<span>.</span>
-												<span>.</span>
-												<span>.</span>
-											</span>
-										)}
-									</div>
-								</div>
-							)}
+
 
 							{activeCompaction !== null && (
 								<CompactionNotice compaction={activeCompaction} />

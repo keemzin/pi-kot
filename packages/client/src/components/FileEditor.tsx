@@ -5,6 +5,8 @@
 import { memo, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
+import { ImageViewer } from "./ImageViewer";
+import { isImagePath, isHtmlPath, isMarkdownPath, formatFileSize } from "../lib/file-types";
 
 interface Props {
   path: string;
@@ -18,6 +20,10 @@ interface Props {
   savedAt?: Date;
   error?: string;
   showToolbar?: boolean;
+  /** File size in bytes from the server response. */
+  size?: number;
+  /** Whether the file is binary (images, etc). */
+  binary?: boolean;
 }
 
 export const FileEditor = memo(function FileEditor({
@@ -32,9 +38,15 @@ export const FileEditor = memo(function FileEditor({
   savedAt,
   error,
   showToolbar = true,
+  size,
+  binary,
 }: Props) {
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
+
+  const isImage = isImagePath(path);
+  const isHtml = isHtmlPath(path);
+  const isMarkdown = isMarkdownPath(path);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
@@ -65,53 +77,55 @@ export const FileEditor = memo(function FileEditor({
             {path}
           </span>
 
-          {/* Raw / Rendered toggle */}
-          <div
-            style={{
-              display: "flex",
-              gap: "1px",
-              background: "var(--bg-glass)",
-              borderRadius: "var(--radius-sm)",
-              padding: "1px",
-              flexShrink: 0,
-            }}
-          >
-            <button
-              onClick={() => setEditorMode("raw")}
+          {/* Raw / Rendered toggle — hidden for images (no raw mode) */}
+          {!isImage && (
+            <div
               style={{
-                background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                fontSize: "10px",
-                fontWeight: 600,
-                padding: "2px 8px",
+                display: "flex",
+                gap: "1px",
+                background: "var(--bg-glass)",
                 borderRadius: "var(--radius-sm)",
+                padding: "1px",
+                flexShrink: 0,
               }}
-              type="button"
             >
-              Raw
-            </button>
-            <button
-              onClick={() => setEditorMode("rendered")}
-              style={{
-                background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                fontSize: "10px",
-                fontWeight: 600,
-                padding: "2px 8px",
-                borderRadius: "var(--radius-sm)",
-              }}
-              type="button"
-            >
-              Rendered
-            </button>
-          </div>
+              <button
+                onClick={() => setEditorMode("raw")}
+                style={{
+                  background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-sm)",
+                }}
+                type="button"
+              >
+                Raw
+              </button>
+              <button
+                onClick={() => setEditorMode("rendered")}
+                style={{
+                  background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-sm)",
+                }}
+                type="button"
+              >
+                Rendered
+              </button>
+            </div>
+          )}
 
-          {/* Wrap toggle — only in raw mode */}
-          {editorMode === "raw" && (
+          {/* Wrap toggle — only in raw mode for non-image files */}
+          {!isImage && editorMode === "raw" && (
             <button
               onClick={() => setWordWrap((w) => !w)}
               title="Toggle word wrap"
@@ -134,8 +148,19 @@ export const FileEditor = memo(function FileEditor({
         </div>
       )}
 
-      {/* Editor body */}
-      {editorMode === "raw" ? (
+      {/* Editor body — conditional rendering based on file type */}
+      {isImage ? (
+        <ImageViewer content={content} filePath={path} binary={binary ?? false} />
+      ) : isHtml && editorMode === "rendered" ? (
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <iframe
+            srcDoc={content}
+            sandbox="allow-scripts"
+            style={{ width: "100%", height: "100%", border: "none", background: "var(--bg)" }}
+            title={`Preview ${fileName}`}
+          />
+        </div>
+      ) : editorMode === "raw" ? (
         <CodeMirrorEditor
           key={`editor-${path}`}
           value={content}
@@ -163,7 +188,7 @@ export const FileEditor = memo(function FileEditor({
           flexShrink: 0,
         }}
       >
-        {/* Left: language label */}
+        {/* Left: language label + file size */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           {language && (
             <span
@@ -174,6 +199,11 @@ export const FileEditor = memo(function FileEditor({
               }}
             >
               {language}
+            </span>
+          )}
+          {typeof size === "number" && size > 0 && (
+            <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>
+              {formatFileSize(size)}
             </span>
           )}
         </div>
