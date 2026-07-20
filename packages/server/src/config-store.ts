@@ -8,9 +8,8 @@ import { join, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import {
-  AuthStorage,
+  ModelRuntime,
   SettingsManager,
-  ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
 import { config } from "./config.js";
 
@@ -217,29 +216,31 @@ export interface AuthSummary {
   providers: Record<string, AuthPresence>;
 }
 
-export function readAuthSummary(): AuthSummary {
-  const store = AuthStorage.create(AUTH_PATH);
+export async function readAuthSummary(): Promise<AuthSummary> {
+  const modelRuntime = await ModelRuntime.create({ authPath: AUTH_PATH });
   const providers: Record<string, AuthPresence> = {};
-  for (const name of store.list()) {
-    providers[name] = {
-      configured: store.has(name),
-      source: "stored",
+  for (const provider of modelRuntime.getProviders()) {
+    const status = modelRuntime.getProviderAuthStatus(provider.id);
+    providers[provider.id] = {
+      configured: status.configured,
+      source: status.source,
     };
   }
   return { providers };
 }
 
-export function writeApiKey(provider: string, apiKey: string): void {
-  const store = AuthStorage.create(AUTH_PATH);
-  store.set(provider, { type: "api_key", key: apiKey });
+export async function writeApiKey(provider: string, apiKey: string): Promise<void> {
+  const modelRuntime = await ModelRuntime.create({ authPath: AUTH_PATH });
+  await modelRuntime.setRuntimeApiKey(provider, apiKey);
 }
 
-export function removeApiKey(provider: string): void {
-  const store = AuthStorage.create(AUTH_PATH);
-  if (!store.has(provider)) {
+export async function removeApiKey(provider: string): Promise<void> {
+  const modelRuntime = await ModelRuntime.create({ authPath: AUTH_PATH });
+  const status = modelRuntime.getProviderAuthStatus(provider);
+  if (!status.configured) {
     throw new AuthProviderNotFoundError(provider);
   }
-  store.remove(provider);
+  await modelRuntime.removeRuntimeApiKey(provider);
 }
 
 // ── Settings (settings.json) ──────────────────────────────────────────────
@@ -379,7 +380,7 @@ export function writeEnabledModels(patterns: string[] | null | undefined): void 
 
 // ── Live providers listing (from SDK ModelRegistry) ──────────────────────
 
-function buildModelDetail(m: import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>, registry: ModelRegistry) {
+function buildModelDetail(m: import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>, modelRuntime: ModelRuntime) {
   const supportedThinkingLevels: string[] = (() => {
     try {
       return getSupportedThinkingLevels(m as Parameters<typeof getSupportedThinkingLevels>[0]);
@@ -395,7 +396,7 @@ function buildModelDetail(m: import("@earendil-works/pi-ai").Model<import("@eare
     maxTokens: m.maxTokens,
     reasoning: m.reasoning,
     input: m.input,
-    hasAuth: registry.hasConfiguredAuth(m),
+    hasAuth: modelRuntime.hasConfiguredAuth(m.provider),
     supportedThinkingLevels,
   };
 }
@@ -405,7 +406,7 @@ export interface ProvidersListingOptions {
   scoped?: boolean;
 }
 
-export function liveProvidersListing(opts?: ProvidersListingOptions): {
+export async function liveProvidersListing(opts?: ProvidersListingOptions): Promise<{
   providers: Array<{
     provider: string;
     models: Array<{
@@ -419,10 +420,9 @@ export function liveProvidersListing(opts?: ProvidersListingOptions): {
       supportedThinkingLevels: string[];
     }>;
   }>;
-} {
-  const store = AuthStorage.create(AUTH_PATH);
-  const registry = ModelRegistry.create(store, MODELS_PATH);
-  let all = registry.getAll();
+}> {
+  const modelRuntime = await ModelRuntime.create({ authPath: AUTH_PATH, modelsPath: MODELS_PATH });
+  let all = modelRuntime.getModels();
   console.log("[config] total models:", all.length);
 
   // Filter to enabled models when scoped mode is on
@@ -456,7 +456,7 @@ export function liveProvidersListing(opts?: ProvidersListingOptions): {
       grouped.set(m.provider, entry);
     }
 
-    entry.models.push(buildModelDetail(m, registry));
+    entry.models.push(buildModelDetail(m, modelRuntime));
   }
 
   return { providers: Array.from(grouped.values()) };

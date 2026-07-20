@@ -1,24 +1,13 @@
 import { join } from "node:path";
 import { type FastifyPluginAsync } from "fastify";
 import {
-  AuthStorage,
-  ModelRegistry,
+  ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { getSession, listSessions, rebuildSessionTools } from "../session-store.js";
 import { config } from "../config.js";
 import { readSettings, writeSettings } from "../config-store.js";
 
-/**
- * Auth storage backed by ~/.pi/agent/auth.json.
- * ⚠️ AuthStorage.create() expects a FILE path, not a directory.
- *    Passing a directory causes the ReadFileSync to fail silently,
- *    leaving authStorage.data empty and hasAuth() always returning false.
- *    This was the root cause of the "No API key configured" error.
- *    Pattern from config-store: AUTH_FILE path.
- */
-function authStorage() {
-  return AuthStorage.create(join(config.piConfigDir, "auth.json"));
-}
+
 
 /**
  * Error schema helper for route responses.
@@ -158,13 +147,14 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
 
       const { provider, modelId, thinkingLevel } = req.body;
 
-      // Build fresh ModelRegistry (reads latest auth.json + models.json)
-      const store = authStorage();
-      const modelsFile = `${config.piConfigDir}/models.json`;
-      const registry = ModelRegistry.create(store, modelsFile);
+      // Build fresh ModelRuntime (reads latest auth.json + models.json)
+      const modelRuntime = await ModelRuntime.create({
+        authPath: join(config.piConfigDir, "auth.json"),
+        modelsPath: join(config.piConfigDir, "models.json"),
+      });
 
       // Check provider exists
-      const providerKnown = registry.getAll().some((m) => m.provider === provider);
+      const providerKnown = modelRuntime.getProvider(provider) !== undefined;
       if (!providerKnown) {
         return reply.code(400).send({
           error: "unknown_provider",
@@ -173,7 +163,7 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       // Check model exists under that provider
-      const model = registry.find(provider, modelId);
+      const model = modelRuntime.getModel(provider, modelId);
       if (model === undefined) {
         return reply.code(400).send({
           error: "unknown_model",
@@ -181,9 +171,8 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Check auth is configured for this model
-      const hasAuth = registry.hasConfiguredAuth(model);
-      if (!hasAuth) {
+      // Check auth is configured for this provider
+      if (!modelRuntime.hasConfiguredAuth(provider)) {
         return reply.code(400).send({
           error: "auth_not_configured",
           message: `No API key configured for provider "${provider}". Add one via PUT /api/v1/config/auth/${provider}.`,
@@ -215,10 +204,9 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         try {
-          // Refresh the session's internal ModelRegistry so it picks up
+          // Refresh the session's internal model runtime so it picks up
           // any API keys added after session creation.
-          live.session.modelRegistry.authStorage.reload();
-          live.session.modelRegistry.refresh();
+          await live.session.modelRuntime.reloadConfig();
 
           // Pass the full model object from the registry, not a {provider, id} stub.
           // ⚠️ The SDK's setModel() stores the model object in agent.state.model, and

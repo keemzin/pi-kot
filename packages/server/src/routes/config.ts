@@ -90,7 +90,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         const opts: ProvidersListingOptions = {};
         if (req.query.scoped === "true") opts.scoped = true;
-        return liveProvidersListing(opts);
+        return await liveProvidersListing(opts);
       } catch (err) {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
@@ -110,7 +110,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (_req, reply) => {
       try {
-        return readAuthSummary();
+        return await readAuthSummary();
       } catch (err) {
         fastify.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
@@ -151,7 +151,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        writeApiKey(req.params.provider, req.body.apiKey);
+        await writeApiKey(req.params.provider, req.body.apiKey);
         return { provider: req.params.provider, configured: true };
       } catch (err) {
         fastify.log.error(err);
@@ -177,7 +177,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        removeApiKey(req.params.provider);
+        await removeApiKey(req.params.provider);
         return reply.code(204).send();
       } catch (err) {
         if (err instanceof AuthProviderNotFoundError) {
