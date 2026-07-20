@@ -329,6 +329,48 @@ function ThinkingBlock({ text }: { text: string }) {
 	);
 }
 
+/**
+ * Wrapper that keeps the standalone running card mounted during its exit
+ * animation. When `running` goes undefined, it plays the collapse-up animation
+ * for EXIT_MS before unmounting.
+ */
+const EXIT_MS = 320;
+function RunningToolCard({ running }: { running: { block: Record<string, unknown> } | undefined }) {
+	const [displayed, setDisplayed] = useState(running);
+	const [exiting, setExiting] = useState(false);
+	const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		if (running) {
+			if (exitTimer.current) clearTimeout(exitTimer.current);
+			setDisplayed(running);
+			setExiting(false);
+		} else if (displayed) {
+			setExiting(true);
+			exitTimer.current = setTimeout(() => {
+				setDisplayed(undefined);
+				setExiting(false);
+			}, EXIT_MS);
+		}
+		return () => {
+			if (exitTimer.current) clearTimeout(exitTimer.current);
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [running]);
+
+	if (!displayed) return null;
+
+	return (
+		<div className={`tool-running-standalone${exiting ? " exiting" : ""}`}>
+			<ToolCallEntry
+				block={displayed.block}
+				result={undefined}
+				initialExpanded={true}
+			/>
+		</div>
+	);
+}
+
 /** Render a single tool call + its result as a timeline node. */
 function ToolCallEntry({
 	block,
@@ -1493,22 +1535,15 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				}
 
 				// Render the running tool as a standalone expanded entry below the batch
-				if (running) {
-					const tId = String(running.block.id ?? running.block.name ?? "tool");
-					elements.push(
-						<div key={`running-${tId}`} className="message-row assistant">
-							<div className="message-bubble assistant">
-								<div className="tool-running-standalone">
-									<ToolCallEntry
-										block={running.block}
-										result={undefined}
-										initialExpanded={true}
-									/>
-								</div>
-							</div>
-						</div>,
-					);
-				}
+				// Use a stable key so RunningToolCard persists across tool transitions
+				// and can play its exit animation before unmounting.
+				elements.push(
+					<div key="running-standalone-slot" className="message-row assistant">
+						<div className="message-bubble assistant">
+							<RunningToolCard running={running} />
+						</div>
+					</div>,
+				);
 			};
 
 			const flushProse = (

@@ -4495,9 +4495,20 @@ strong {
   border-radius: var(--radius);
   padding: 4px 10px;
   animation: toolNodeIn 0.2s ease-out;
+  overflow: hidden;
+  transform-origin: top center;
 }
 .tool-running-standalone .tool-timeline-node.running {
   animation: none;
+}
+.tool-running-standalone.exiting {
+  animation: toolStandaloneOut 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  pointer-events: none;
+}
+@keyframes toolStandaloneOut {
+  0%   { opacity: 1;   transform: translateY(0)    scaleY(1);    max-height: 200px; }
+  40%  { opacity: 0.6; transform: translateY(-6px) scaleY(0.9);  max-height: 80px;  }
+  100% { opacity: 0;   transform: translateY(-12px) scaleY(0);   max-height: 0;     padding-top: 0; padding-bottom: 0; }
 }
 
 /* Currently executing tool node — subtle left accent */
