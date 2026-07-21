@@ -113,6 +113,7 @@ interface SessionActions {
 	connectSSE: (sessionId: string) => void;
 	sendPrompt: (text: string, images?: ImageContent[]) => Promise<void>;
 	sendSteer: (text: string, images?: ImageContent[]) => Promise<void>;
+	sendFollowUp: (text: string, images?: ImageContent[]) => Promise<void>;
 	abort: () => Promise<void>;
 	refreshSessions: () => Promise<void>;
 	renameSession: (sessionId: string, name: string) => Promise<void>;
@@ -838,6 +839,41 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 		} catch (err) {
 			set((s) => ({
 				error: err instanceof Error ? err.message : "Failed to steer",
+				streamState: s.streamState.isStreaming
+					? { text: "", activeToolName: undefined, isStreaming: false }
+					: s.streamState,
+			}));
+		}
+	},
+
+	sendFollowUp: async (text: string, images?: ImageContent[]) => {
+		const { activeSessionId } = get();
+		if (activeSessionId === undefined) return;
+
+		const optimisticContent: Record<string, unknown>[] = [{ type: "text", text }];
+		if (images !== undefined && images.length > 0) {
+			for (const img of images) {
+				optimisticContent.push({
+					type: "image",
+					mimeType: img.mimeType,
+					data: `data:${img.mimeType};base64,${img.data}`,
+					__blobUrl: true,
+				});
+			}
+		}
+
+		set((s) => ({
+			messages: [
+				...s.messages,
+				{ role: "user", content: optimisticContent, metadata: { followUp: true } },
+			],
+		}));
+
+		try {
+			await steerSession(activeSessionId, text, "followUp", images);
+		} catch (err) {
+			set((s) => ({
+				error: err instanceof Error ? err.message : "Failed to follow up",
 				streamState: s.streamState.isStreaming
 					? { text: "", activeToolName: undefined, isStreaming: false }
 					: s.streamState,
