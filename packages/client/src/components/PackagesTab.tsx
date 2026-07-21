@@ -252,14 +252,12 @@ const SELECT_STYLE: React.CSSProperties = {
 
 function RecommendedExtCard({
   ext,
-  alreadyInstalled,
   installedScope,
   installing,
   projectPath,
   onInstall,
 }: {
   ext: RecommendedExtension;
-  alreadyInstalled: boolean;
   installedScope?: "user" | "project";
   installing: boolean;
   projectPath?: string;
@@ -268,6 +266,9 @@ function RecommendedExtCard({
   const hasProject = projectPath !== undefined && projectPath.length > 0;
   const [scope, setScope] = useState<"user" | "project">(hasProject ? "project" : "user");
   const canBeProject = hasProject;
+  // Only grey out if installed in the SAME scope as current selection.
+  // Project-scoped installs are per-project, so user can install to other projects.
+  const alreadyInstalled = installedScope === scope;
 
   return (
     <div
@@ -376,7 +377,7 @@ function RecommendedExtCard({
         }}
         disabled={installing || alreadyInstalled}
       >
-        {installing ? "…" : alreadyInstalled ? (installedScope === "project" ? "Installed (project)" : "Installed") : "Install"}
+        {installing ? "…" : alreadyInstalled ? (scope === "project" ? `Installed (project)` : "Installed") : "Install"}
       </button>
     </div>
   );
@@ -1021,14 +1022,12 @@ export function PackagesTab({ onError, projectPath }: Props) {
                     p.source === ext.package ||
                     p.source.includes(ext.name),
                 );
-                const alreadyInstalled = matchedPkg !== undefined;
                 const installedScope = matchedPkg?.scope;
 
                 return (
                   <RecommendedExtCard
                     key={ext.id}
                     ext={ext}
-                    alreadyInstalled={alreadyInstalled}
                     installedScope={installedScope}
                     installing={installing === ext.package}
                     projectPath={projectPath}
@@ -1042,37 +1041,6 @@ export function PackagesTab({ onError, projectPath }: Props) {
           ))}
         </div>
       )}
-
-      {/* ── Detected extensions not in SDK packages ── */}
-      {extData?.detected
-        .filter(
-          (d) =>
-            !sdkData?.packages.some(
-              (p) => p.packageName === d.name || p.source.includes(d.name),
-            ),
-        )
-        .map((ext) => (
-          <div key={ext.name} style={s.card}>
-            <div style={s.cardHeader}>
-              <span
-                style={{
-                  ...s.statusDot,
-                  background: "var(--yellow, #fbbf24)",
-                }}
-              />
-              <span style={s.cardTitle}>{ext.name}</span>
-              <span
-                style={{
-                  ...s.badge,
-                  background: "var(--bg-surface)",
-                  color: "var(--text-dim)",
-                }}
-              >
-                detected
-              </span>
-            </div>
-          </div>
-        ))}
 
       {/* ── Update check ── */}
       <div style={s.section}>
