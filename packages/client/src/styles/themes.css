@@ -3439,6 +3439,9 @@ strong {
   cursor: pointer;
   transition: all var(--duration) var(--ease);
   flex-shrink: 0;
+  position: relative; /* needed for the hold-ring SVG */
+  user-select: none;  /* prevent text selection on long-press */
+  -webkit-user-select: none;
 }
 
 /* Stop state — accent background for the abort button */
@@ -3468,6 +3471,15 @@ strong {
 
 .ti-send-btn.pulsing {
   animation: sendPulse 1.4s ease-in-out infinite;
+}
+
+/* followUp-ready: ring filled, icon swapped to clock */
+.ti-send-btn.ti-send-btn-followup-ready {
+  background: var(--accent-subtle, rgba(167, 139, 250, 0.15));
+  border: 1.5px solid var(--accent-text, #a78bfa);
+}
+.ti-send-btn.ti-send-btn-followup-ready .ti-send-icon {
+  color: var(--accent-text, #a78bfa);
 }
 
 @keyframes sendPulse {

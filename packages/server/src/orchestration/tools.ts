@@ -9,6 +9,7 @@
  * these tools. Same-project enforcement: spawn_worker creates in
  * the supervisor's project.
  */
+import { join } from "node:path";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import {
   createSession,
@@ -270,12 +271,13 @@ function createSpawnWorker(supervisorId: string): ToolDefinition {
         const orchProvider = settings.orchProvider as string | undefined;
         const orchModel = settings.orchModel as string | undefined;
         if (orchProvider !== undefined && orchModel !== undefined && orchProvider.length > 0 && orchModel.length > 0) {
-          const { AuthStorage, ModelRegistry } = await import("@earendil-works/pi-coding-agent");
+          const { ModelRuntime } = await import("@earendil-works/pi-coding-agent");
           const { config } = await import("../config.js");
-          const store = AuthStorage.create(config.piConfigDir);
-          const registry = ModelRegistry.create(store);
-          registry.refresh();
-          const fullModel = registry.find(orchProvider, orchModel);
+          const modelRuntime = await ModelRuntime.create({
+            authPath: join(config.piConfigDir, "auth.json"),
+            modelsPath: join(config.piConfigDir, "models.json"),
+          });
+          const fullModel = modelRuntime.getModel(orchProvider, orchModel);
           if (fullModel !== undefined) {
             worker.session.setModel(fullModel);
           }

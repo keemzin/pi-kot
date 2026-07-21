@@ -4,17 +4,18 @@
  * Shell component that renders tab navigation and delegates content
  * to individual tab components in ./settings/.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SlidePanel } from "./SlidePanel";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { ProvidersTab } from "./settings/ProvidersTab";
 import { AgentTab } from "./settings/AgentTab";
 import { GeneralTab } from "./settings/GeneralTab";
-import { ExtensionsTab } from "./ExtensionsTab";
+import { PackagesTab } from "./PackagesTab";
 import { SkillsTab } from "./SkillsTab";
 import { TunnelTab } from "./TunnelTab";
+import { useSessionStore } from "../stores/session-store";
 
-type Tab = "appearance" | "providers" | "agent" | "general" | "extensions" | "skills" | "tunnel";
+type Tab = "appearance" | "providers" | "agent" | "general" | "packages" | "skills" | "tunnel";
 
 interface Props {
   onClose: () => void;
@@ -22,11 +23,19 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose, initialTab }: Props) {
-  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "extensions", "skills", "tunnel"];
+  const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "packages", "skills", "tunnel"];
 
   const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
   const [error, setError] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+  // Derive active project path for package scope
+  const activeProjectId = useSessionStore((s) => s.activeProjectId);
+  const projects = useSessionStore((s) => s.projects);
+  const projectPath = useMemo(() => {
+    if (activeProjectId === undefined) return undefined;
+    return projects.find((p) => p.id === activeProjectId)?.path;
+  }, [activeProjectId, projects]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 600);
@@ -74,8 +83,8 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
                     ? "Providers"
                     : t === "agent"
                       ? "Agent"
-                      : t === "extensions"
-                        ? "Extensions ⚗️"
+                      : t === "packages"
+                        ? "Packages 📦"
                         : t === "skills"
                           ? "Skills"
                           : t === "tunnel"
@@ -111,7 +120,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       {tab === "appearance" && <AppearanceTab />}
       {tab === "providers" && <ProvidersTab onError={setError} />}
       {tab === "agent" && <AgentTab onError={setError} />}
-      {tab === "extensions" && <ExtensionsTab onError={setError} />}
+      {tab === "packages" && <PackagesTab onError={setError} projectPath={projectPath} />}
       {tab === "skills" && <SkillsTab onError={setError} />}
       {tab === "tunnel" && <TunnelTab />}
       {tab === "general" && <GeneralTab />}

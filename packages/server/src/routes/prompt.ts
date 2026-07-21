@@ -77,7 +77,7 @@ async function preflight(
     return undefined;
   }
   // Check auth is configured for the current model
-  if (!live.session.modelRegistry.hasConfiguredAuth(model)) {
+  if (!live.session.modelRuntime.hasConfiguredAuth(model.provider)) {
     await reply.code(400).send({
       error: "auth_not_configured",
       message: `No API key configured for provider "${model.provider}". Add one via PUT /api/v1/config/auth/${model.provider}.`,
@@ -236,6 +236,19 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "session_not_found" });
       }
       try {
+        // Disable auto-retry before abort so the SDK doesn't treat the
+        // abort-caused provider error as a transient failure and retry
+        // the same conversation turn (including re-executing tool calls
+        // like web_search, fetch_content, etc.).
+        //
+        // Chain: user aborts → agent.abort() fires → LLM call rejects
+        // with stopReason="error"/errorMessage=~"fetch failed" → SDK's
+        // _isRetryableError() matches retryable patterns → _prepareRetry
+        // removes the error message and retries the same messages with
+        // backoff. By disabling retry here, _prepareRetry sees
+        // settings.enabled=false and returns immediately.
+        live.session.setAutoRetryEnabled(false);
+
         // Fire the abort signal immediately, then wait for the agent to
         // become idle with a timeout. The SDK's session.abort() calls
         // agent.abort() (fires the AbortController) and then awaits
@@ -251,6 +264,14 @@ export const promptRoutes: FastifyPluginAsync = async (fastify) => {
           req.log.warn({ sessionId: req.params.id }, "abort timed out after " + ABORT_TIMEOUT_MS + "ms");
         }
         // best-effort — abort signal was already fired
+      } finally {
+        // Re-enable retry so subsequent provider errors (network flake,
+        // rate limit) still get automatic recovery.
+        try {
+          live.session.setAutoRetryEnabled(true);
+        } catch {
+          // best-effort — session may have been disposed during abort
+        }
       }
       return { aborted: true };
     },

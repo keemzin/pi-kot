@@ -32,6 +32,6 @@
   },
   "dependencies": {
     "@ayulab/pi-rewind": "^0.3.1",
-    "@earendil-works/pi-coding-agent": "^0.80.2"
+    "@earendil-works/pi-coding-agent": "^0.80.10"
   }
 }

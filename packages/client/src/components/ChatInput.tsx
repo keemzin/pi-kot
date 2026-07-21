@@ -32,6 +32,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
+  const sendFollowUp = useSessionStore((s) => s.sendFollowUp);
   const abort = useSessionStore((s) => s.abort);
   const reloadMessages = useSessionStore((s) => s.reloadMessages);
   const [slashSuggestions, setSlashSuggestions] = useState<SlashCommand[]>([]);
@@ -40,6 +41,14 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [thinkingLevel, setThinkingLevel] = useState<string | undefined>(undefined);
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
+
+  // ── Hold-to-followUp state (streaming only) ──
+  const HOLD_DURATION = 600; // ms to hold before followUp triggers
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdRafRef = useRef<number | null>(null);
+  const holdStartRef = useRef<number>(0);
+  const [holdProgress, setHoldProgress] = useState(0); // 0–1
+  const [holdReady, setHoldReady] = useState(false);   // ring fully filled
 
   // ── @-autocomplete state ──
   const project = useSessionStore((s) => {
@@ -465,6 +474,101 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     }
   };
 
+  // ── Hold-to-followUp handlers (only active while streaming) ──
+  const cancelHold = useCallback(() => {
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdRafRef.current !== null) {
+      cancelAnimationFrame(holdRafRef.current);
+      holdRafRef.current = null;
+    }
+    setHoldProgress(0);
+    setHoldReady(false);
+  }, []);
+
+  const startHold = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isStreaming) return;
+    // prevent the normal click/abort from firing immediately
+    e.preventDefault();
+    holdStartRef.current = performance.now();
+    setHoldProgress(0);
+    setHoldReady(false);
+
+    // animate the progress ring
+    const tick = () => {
+      const elapsed = performance.now() - holdStartRef.current;
+      const p = Math.min(elapsed / HOLD_DURATION, 1);
+      setHoldProgress(p);
+      if (p < 1) {
+        holdRafRef.current = requestAnimationFrame(tick);
+      } else {
+        setHoldReady(true);
+      }
+    };
+    holdRafRef.current = requestAnimationFrame(tick);
+
+    holdTimerRef.current = setTimeout(() => {
+      setHoldReady(true);
+    }, HOLD_DURATION);
+  }, [isStreaming]);
+
+  const commitHold = useCallback(async (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isStreaming) return;
+    e.preventDefault();
+    const elapsed = performance.now() - holdStartRef.current;
+    cancelHold();
+
+    const el = textareaRef.current;
+    const text = el?.value.trim() ?? "";
+    if (!text) {
+      // short tap → abort (stop)
+      abort();
+      return;
+    }
+
+    if (elapsed >= HOLD_DURATION) {
+      // held long enough → followUp
+      let imageContents: ImageContent[] | undefined;
+      if (images.length > 0) {
+        imageContents = await Promise.all(
+          images.map(async ({ file }) => {
+            const compressed = await compressImage(file);
+            return {
+              type: "image" as const,
+              data: await fileToBase64(compressed),
+              mimeType: compressed === file ? file.type : "image/jpeg",
+            };
+          }),
+        );
+      }
+      el!.value = "";
+      el!.style.height = "auto";
+      setImages([]);
+      await sendFollowUp(text, imageContents);
+    } else {
+      // short tap with text → steer
+      let imageContents: ImageContent[] | undefined;
+      if (images.length > 0) {
+        imageContents = await Promise.all(
+          images.map(async ({ file }) => {
+            const compressed = await compressImage(file);
+            return {
+              type: "image" as const,
+              data: await fileToBase64(compressed),
+              mimeType: compressed === file ? file.type : "image/jpeg",
+            };
+          }),
+        );
+      }
+      el!.value = "";
+      el!.style.height = "auto";
+      setImages([]);
+      await sendSteer(text, imageContents);
+    }
+  }, [isStreaming, images, sendFollowUp, sendSteer, abort, cancelHold]);
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -741,20 +845,59 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 <span className="ti-thinking-label">{thinkingLevel || "off"}</span>
               </button>
             )}
-            {/* One button, two states: send (idle) / stop (streaming) */}
+            {/* One button: send (idle) / stop+steer+hold-followUp (streaming) */}
             <button
               type={isStreaming ? "button" : "submit"}
-              onClick={isStreaming ? abort : undefined}
-              className={`ti-send-btn${isStreaming ? " ti-send-btn-stop" : ""}${isStreaming && activeToolName ? " pulsing" : ""}`}
-              title={isStreaming ? "Stop" : "Send"}
+              onClick={isStreaming ? undefined : undefined}
+              onMouseDown={isStreaming ? startHold : undefined}
+              onMouseUp={isStreaming ? commitHold : undefined}
+              onMouseLeave={isStreaming ? cancelHold : undefined}
+              onTouchStart={isStreaming ? startHold : undefined}
+              onTouchEnd={isStreaming ? commitHold : undefined}
+              onTouchCancel={isStreaming ? cancelHold : undefined}
+              className={`ti-send-btn${isStreaming ? " ti-send-btn-stop" : ""}${isStreaming && activeToolName && holdProgress === 0 ? " pulsing" : ""}${holdReady ? " ti-send-btn-followup-ready" : ""}`}
+              title={isStreaming ? (holdProgress > 0 ? "Release to follow-up" : "Tap to steer · Hold to follow-up") : "Send"}
               tabIndex={-1}
               disabled={compacting}
             >
+              {/* Hold progress ring — only visible while streaming and holding */}
+              {isStreaming && holdProgress > 0 && (
+                <svg
+                  className="ti-hold-ring"
+                  viewBox="0 0 36 36"
+                  style={{
+                    position: "absolute",
+                    top: 0, left: 0,
+                    width: "100%", height: "100%",
+                    transform: "rotate(-90deg)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  <circle
+                    cx="18" cy="18" r="15"
+                    fill="none"
+                    stroke={holdReady ? "var(--accent-text, #a78bfa)" : "var(--text-primary)"}
+                    strokeWidth="2.5"
+                    strokeDasharray={`${holdProgress * 94.25} 94.25`}
+                    strokeLinecap="round"
+                    style={{ transition: "stroke 0.15s" }}
+                  />
+                </svg>
+              )}
               <span className="ti-send-icon">
                 {isStreaming ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <rect x="4" y="4" width="16" height="16" rx="2" />
-                  </svg>
+                  holdReady ? (
+                    // followUp icon — clock/queue
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15 15" />
+                    </svg>
+                  ) : (
+                    // stop square
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                  )
                 ) : (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="19" x2="12" y2="5" />

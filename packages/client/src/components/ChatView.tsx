@@ -618,10 +618,12 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 function UserMessageBubble({
 	text,
 	isSteer,
+	isFollowUp,
 	images,
 }: {
 	text: string;
 	isSteer?: boolean;
+	isFollowUp?: boolean;
 	images?: { mimeType: string; data: string; __blobUrl?: boolean }[];
 }) {
 	const [expanded, setExpanded] = useState(false);
@@ -646,6 +648,7 @@ function UserMessageBubble({
 		<div className="message-row user">
 			<div className="message-bubble user">
 				{isSteer && <span className="steer-tag">steer</span>}
+				{isFollowUp && <span className="steer-tag">follow-up</span>}
 				{images !== undefined && images.length > 0 && (
 					<UserImages images={images} />
 				)}
@@ -1800,6 +1803,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			const isSteer =
 				(currentUser.metadata as { steer?: boolean } | undefined)?.steer ===
 				true;
+			const isFollowUp =
+				(currentUser.metadata as { followUp?: boolean } | undefined)?.followUp ===
+				true;
 			const lastAssistant = currentAssistants[currentAssistants.length - 1];
 
 			if (stickyUserHeader && text.length > 0) {
@@ -1817,6 +1823,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							<UserMessageBubble
 								text={text}
 								isSteer={isSteer}
+								isFollowUp={isFollowUp}
 								images={extractImages(currentUser.content)}
 							/>
 							{text.length > 0 && (
@@ -1865,6 +1872,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					<div key={`user-${turnKey}`} className="message-row user">
 						<div className="message-bubble user">
 							{isSteer && <span className="steer-tag">steer</span>}
+							{isFollowUp && <span className="steer-tag">follow-up</span>}
 							<UserImages images={extractImages(currentUser.content)} />
 							{text}
 						</div>
