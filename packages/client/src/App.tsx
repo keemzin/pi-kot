@@ -20,6 +20,7 @@ import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LoadingSkeleton } from "./components/LoadingSkeleton";
+import { SystemPromptTab } from "./components/SystemPromptTab";
 import { useTouchSwipe } from "./hooks/useTouchSwipe";
 import { useLayoutStore } from "./stores/layout-store";
 
@@ -99,6 +100,7 @@ export function App() {
   const [projectToDelete, setProjectToDelete] = useState<string | undefined>();
   const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
+  const [showPrompt, setShowPrompt] = useState(false);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const resetDragState = useCallback(() => {
@@ -516,10 +518,14 @@ export function App() {
           </span>
           <button
             onClick={() => setShowAddProjectDialog(true)}
-            title="Add a new project"
+            title="Add project"
             className="sidebar-add-project"
+            aria-label="Add project"
           >
-            Add Project
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
           </button>
         </div>
 
@@ -628,6 +634,11 @@ export function App() {
 
                   {/* Project name — lowercase, truncate */}
                   <span className="project-name">{project.name.toLowerCase()}</span>
+
+                  {/* Session count badge — visible when collapsed */}
+                  {!isExpanded && pSessions.length > 0 && (
+                    <span className="project-session-count">{pSessions.length}</span>
+                  )}
 
                   {/* Hover-reveal project menu (left group) */}
                   <div className="project-actions-left">
@@ -788,37 +799,43 @@ export function App() {
           </>
         )}
 
-        {/* Sidebar Footer (Mobile Actions) */}
+        {/* Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div className="sidebar-nav-items">
             <button
               type="button"
               onClick={() => { setShowMCP(true); setSidebarCollapsed(true); }}
-              className="add-project-toggle"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              className="sidebar-nav-btn"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sidebar-nav-icon">
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
               </svg>
-              MCP Settings
+              <span>MCP</span>
             </button>
             <button
               type="button"
               onClick={() => { setShowSettings(true); setSidebarCollapsed(true); }}
-              className="add-project-toggle"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              className="sidebar-nav-btn"
             >
-              ⚙ Settings
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sidebar-nav-icon">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span>Settings</span>
             </button>
             <button
               type="button"
               onClick={() => { handleClearToken(); setSidebarCollapsed(true); }}
-              className="add-project-toggle"
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}
+              className="sidebar-nav-btn sidebar-nav-btn-muted"
             >
-              Sign out
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="sidebar-nav-icon">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Sign out</span>
             </button>
           </div>
         </div>
@@ -847,7 +864,11 @@ export function App() {
                     marginLeft: "8px",
                   }}
                 >
-                  Session {activeSessionId.slice(0, 8)}
+                  {activeProjectId !== undefined && projects.find(p => p.id === activeProjectId)?.name
+                    ? <><span style={{ color: "var(--text-dim)" }}>{projects.find(p => p.id === activeProjectId)!.name.toLowerCase()}</span><span style={{ color: "var(--text-ghost)", margin: "0 4px" }}>/</span></>
+                    : null
+                  }
+                  {sessions.find(s => s.sessionId === activeSessionId)?.name ?? `session ${activeSessionId.slice(0, 8)}`}
                 </span>
                 <button
                   type="button"
@@ -866,6 +887,25 @@ export function App() {
                 >
                   🌿
                 </button>
+                {activeProjectId !== undefined && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPrompt((v) => !v)}
+                    title="System prompt for this project"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: showPrompt ? "var(--accent-text)" : "var(--text-dim)",
+                      fontSize: "13px",
+                      cursor: "pointer",
+                      padding: "3px 6px",
+                      borderRadius: "var(--radius-sm)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✦
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1147,6 +1187,40 @@ export function App() {
 
       {inspectData !== undefined && (
         <ContextInspectModal data={inspectData} onClose={() => setInspectData(undefined)} sessionId={activeSessionId} />
+      )}
+
+      {/* System Prompt popup — anchored to header ✦ button */}
+      {showPrompt && activeProjectId !== undefined && (
+        <div
+          className="prompt-popup-overlay"
+          onClick={() => setShowPrompt(false)}
+        >
+          <div
+            className="prompt-popup"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="prompt-popup-header">
+              <span className="prompt-popup-title">System Prompt</span>
+              <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>·</span>
+              <span className="prompt-popup-project">
+                {projects.find(p => p.id === activeProjectId)?.name.toLowerCase() ?? activeProjectId}
+              </span>
+              <button
+                className="prompt-popup-close"
+                onClick={() => setShowPrompt(false)}
+                type="button"
+                title="Close"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div className="prompt-popup-body">
+              <SystemPromptTab projectId={activeProjectId} />
+            </div>
+          </div>
+        </div>
       )}
 
       <ErrorBoundary label="TerminalPanel" compact>

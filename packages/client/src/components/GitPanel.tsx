@@ -942,21 +942,34 @@ export function GitPanel({ projectId }: Props) {
 
       {/* ── Fixed footer: Commit + Push/Pull ── */}
       <div style={{ flexShrink: 0, borderTop: "1px solid var(--border)", background: "var(--bg-solid)" }}>
-        <div style={{ padding: "10px 12px" }}>
+        <div style={{ padding: "10px 12px 8px" }}>
           <textarea
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             placeholder="Commit message…"
-            rows={2}
+            rows={3}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commit();
+            }}
             style={{
-              width: "100%", resize: "none", fontSize: "13px",
+              width: "100%", resize: "none", fontSize: "12px",
               background: "var(--bg-glass)", border: "1px solid var(--border)",
               borderRadius: "var(--radius-sm)", padding: "8px 10px",
               color: "var(--text-primary)", outline: "none", fontFamily: "inherit",
+              lineHeight: 1.5,
+              transition: "border-color 0.12s ease",
             }}
+            onFocus={(e) => { e.target.style.borderColor = "var(--border-bright)"; }}
+            onBlur={(e) => { e.target.style.borderColor = "var(--border)"; }}
           />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-            <span style={{ fontSize: "12px", color: "var(--text-dim)" }}>{stagedFiles.length} staged</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "6px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-dim)" }}>
+              {stagedFiles.length > 0
+                ? <span style={{ color: "var(--accent-text)" }}>{stagedFiles.length} staged</span>
+                : <span>0 staged</span>
+              }
+              <span style={{ opacity: 0.5, marginLeft: "4px", fontSize: "10px" }}>⌘↵ to commit</span>
+            </span>
             <button
               onClick={commit}
               disabled={busy || stagedFiles.length === 0 || !commitMessage.trim()}
@@ -967,11 +980,28 @@ export function GitPanel({ projectId }: Props) {
             </button>
           </div>
         </div>
+        {/* Fetch / Pull / Push — button group */}
         <div style={{ padding: "0 12px 10px" }}>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button onClick={doFetch} disabled={busy} className="git-action-btn git-remote-btn" type="button">Fetch</button>
-            <button onClick={doPull} disabled={busy} className="git-action-btn git-remote-btn" type="button">Pull</button>
-            <button onClick={doPush} disabled={busy} className="git-action-btn git-remote-btn" type="button">Push</button>
+          <div className="git-remote-group">
+            <button onClick={doFetch} disabled={busy} className="git-remote-group-btn" type="button" title="Fetch from remote">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              Fetch
+            </button>
+            <button onClick={doPull} disabled={busy} className="git-remote-group-btn" type="button" title="Pull from remote">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+              </svg>
+              Pull
+            </button>
+            <button onClick={doPush} disabled={busy} className="git-remote-group-btn" type="button" title="Push to remote">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px" }}>
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+              Push
+            </button>
           </div>
         </div>
       </div>
