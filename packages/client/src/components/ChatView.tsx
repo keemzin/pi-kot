@@ -555,7 +555,16 @@ function ToolCallEntry({
 
 /** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
-	const { open, toggle } = useContext(ToolBatchOpenContext);
+	const { open: sharedOpen, toggle: sharedToggle } = useContext(ToolBatchOpenContext);
+	// Each card owns its own open state, seeded from the shared preference once on mount.
+	// This prevents all cards from snapping open/closed when one card's preference changes
+	// (e.g. when a live card finishes and re-joins the group as a batch card).
+	const [open, setOpen] = useState(() => sharedOpen);
+	const toggle = () => {
+		const next = !open;
+		setOpen(next);
+		sharedToggle(); // keep shared preference in sync for future cards
+	};
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
 	const completedCount = toolEntries.filter(
@@ -1554,10 +1563,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 				toolEntries.length = 0;
 
-				// Render completed tools in the collapsed batch
+				// Render completed tools in the collapsed batch.
+				// Key is derived from the *first* tool call ID in the batch so the
+				// ToolCallBatchCard component instance stays alive (no unmount/remount)
+				// as more tools complete and join the group. Using a positional key like
+				// `batch-${key}` caused React to remount the card every time the batch
+				// grew or the contentSerial changed, producing a visible flash.
 				if (completed.length > 0) {
+					const firstToolId = completed.find((e) => e.kind === "tool")?.block?.id as string | undefined;
+					const stableKey = firstToolId ? `batch-id-${firstToolId}` : `batch-${key}`;
 					elements.push(
-						<div key={`batch-${key}`} className="message-row assistant">
+						<div key={stableKey} className="message-row assistant">
 							<div className="message-bubble assistant">
 								<ToolCallBatchCard entries={completed as any} />
 							</div>
