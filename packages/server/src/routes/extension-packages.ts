@@ -279,6 +279,7 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
           properties: {
             source: { type: "string", description: "Package source (npm:, git:, or local path)" },
             local: { type: "boolean", description: "Install as project-local (default false = global)" },
+            cwd: { type: "string", description: "Working directory for project-local installs (defaults to ~)" },
           },
         },
         response: { 200: packageInfoSchema, ...autoError },
@@ -286,13 +287,13 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        const { source, local } = req.body as { source: string; local?: boolean };
+        const { source, local, cwd: bodyCwd } = req.body as { source: string; local?: boolean; cwd?: string };
         // Normalize: bare npm package names need npm: prefix
         // (e.g. "@org/name" → "npm:@org/name", "pi-free" → "npm:pi-free")
         const normalized = source.startsWith("npm:") || source.startsWith("git:") || source.startsWith("/") || source.startsWith(".") || source.includes("://")
           ? source
           : `npm:${source}`;
-        const cwd = homedir();
+        const cwd = bodyCwd || homedir();
         const settingsManager = SettingsManager.create(cwd, config.piConfigDir);
         const packageManager = new DefaultPackageManager({
           cwd,
@@ -300,6 +301,7 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
           settingsManager,
         });
         await packageManager.installAndPersist(normalized, { local });
+        await settingsManager.flush();
         await sessionReload(req.log);
         const result = await readPackages(cwd);
         return reply.send(result);
@@ -324,6 +326,7 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
           properties: {
             source: { type: "string", description: "Package source to remove" },
             local: { type: "boolean", description: "Remove from project scope (default false = global)" },
+            cwd: { type: "string", description: "Working directory for project-local removals (defaults to ~)" },
           },
         },
         response: { 200: packageInfoSchema, ...autoError },
@@ -331,8 +334,8 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        const { source, local } = req.body as { source: string; local?: boolean };
-        const cwd = homedir();
+        const { source, local, cwd: bodyCwd } = req.body as { source: string; local?: boolean; cwd?: string };
+        const cwd = bodyCwd || homedir();
         const agentDir = config.piConfigDir;
         const settingsManager = SettingsManager.create(cwd, agentDir);
         const packageManager = new DefaultPackageManager({
@@ -356,8 +359,8 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
           });
           if (scope === "project") settingsManager.setProjectPackages(filtered);
           else settingsManager.setPackages(filtered);
-          await settingsManager.flush();
         }
+        await settingsManager.flush();
         await sessionReload(req.log);
         const result = await readPackages(cwd);
         return reply.send(result);
@@ -383,6 +386,7 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
             source: { type: "string", description: "Package source to toggle" },
             disabled: { type: "boolean", description: "true = disable, false = enable" },
             scope: { type: "string", enum: ["user", "project"], description: "Package scope" },
+            cwd: { type: "string", description: "Working directory for project-local toggles (defaults to ~)" },
           },
         },
         response: { 200: packageInfoSchema, ...autoError },
@@ -390,12 +394,13 @@ export const extensionPackagesRoutes: FastifyPluginAsync = async (fastify) => {
     },
     async (req, reply) => {
       try {
-        const { source, disabled, scope } = req.body as {
+        const { source, disabled, scope, cwd: bodyCwd } = req.body as {
           source: string;
           disabled: boolean;
           scope: "user" | "project";
+          cwd?: string;
         };
-        const cwd = homedir();
+        const cwd = bodyCwd || homedir();
         const settingsManager = SettingsManager.create(cwd, config.piConfigDir);
         setPackageDisabled(settingsManager, source, scope, disabled);
         await settingsManager.flush();

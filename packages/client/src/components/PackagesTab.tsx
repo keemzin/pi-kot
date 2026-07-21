@@ -248,13 +248,326 @@ const SELECT_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
+// ── Recommended Extension Card (with scope toggle) ────────────────
+
+function RecommendedExtCard({
+  ext,
+  alreadyInstalled,
+  installedScope,
+  installing,
+  projectPath,
+  onInstall,
+}: {
+  ext: RecommendedExtension;
+  alreadyInstalled: boolean;
+  installedScope?: "user" | "project";
+  installing: boolean;
+  projectPath?: string;
+  onInstall: (scope: "user" | "project") => void;
+}) {
+  const hasProject = projectPath !== undefined && projectPath.length > 0;
+  const [scope, setScope] = useState<"user" | "project">(hasProject ? "project" : "user");
+  const canBeProject = hasProject;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 10px",
+        borderRadius: 8,
+        background: "var(--bg-glass)",
+        border: "1px solid var(--border-color)",
+        marginBottom: 6,
+        opacity: alreadyInstalled ? 0.6 : 1,
+      }}
+    >
+      <span style={{ fontSize: 16 }}>{ext.icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          {ext.name}
+          {ext.verified && (
+            <span
+              style={{
+                fontSize: 9,
+                padding: "1px 5px",
+                borderRadius: 3,
+                background: "rgba(52, 211, 153, 0.12)",
+                color: "#34d399",
+                fontWeight: 500,
+              }}
+            >
+              ✓ Verified
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            fontSize: 10,
+            color: "var(--text-dim)",
+            marginTop: 2,
+            lineHeight: 1.4,
+          }}
+        >
+          {ext.description}
+        </div>
+      </div>
+
+      {/* Scope toggle — only when a project is selected */}
+      {canBeProject && !alreadyInstalled && (
+        <div
+          style={{
+            display: "inline-flex",
+            border: "1px solid var(--border-color)",
+            borderRadius: 5,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          {(["user", "project"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setScope(s)}
+              style={{
+                padding: "2px 8px",
+                fontSize: 9,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.03em",
+                border: "none",
+                borderRight: s === "user" ? "1px solid var(--border-color)" : "none",
+                background: scope === s ? "var(--bg-surface)" : "transparent",
+                color: scope === s ? "var(--text-primary)" : "var(--text-dim)",
+                cursor: "pointer",
+              }}
+            >
+              {s === "user" ? "global" : "project"}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        style={{
+          fontSize: 10,
+          padding: "4px 12px",
+          borderRadius: 5,
+          border: "none",
+          background: alreadyInstalled
+            ? "var(--bg-surface)"
+            : "var(--accent-bg, #3b82f6)",
+          color: alreadyInstalled ? "var(--text-dim)" : "white",
+          cursor: alreadyInstalled ? "default" : "pointer",
+          fontWeight: 500,
+          flexShrink: 0,
+        }}
+        onClick={() => {
+          if (!alreadyInstalled) onInstall(scope);
+        }}
+        disabled={installing || alreadyInstalled}
+      >
+        {installing ? "…" : alreadyInstalled ? (installedScope === "project" ? "Installed (project)" : "Installed") : "Install"}
+      </button>
+    </div>
+  );
+}
+
+// ── Package Card ──────────────────────────────────────────────────
+
+function PackageCard({
+  pkg,
+  expanded,
+  pkgUpdate,
+  busy,
+  installing,
+  uninstalling,
+  updating,
+  onToggleExpand,
+  onToggle,
+  onUninstall,
+  onUpdate,
+}: {
+  pkg: SdkPackageInfo;
+  expanded: boolean;
+  pkgUpdate?: ExtensionUpdateInfo;
+  busy: boolean;
+  installing: string | null;
+  uninstalling: string | null;
+  updating: string | null;
+  onToggleExpand: () => void;
+  onToggle: () => void;
+  onUninstall: () => void;
+  onUpdate: (pkgSource: string) => void;
+}) {
+  const key = `${pkg.scope}\0${pkg.source}`;
+  const hasResources = pkg.resources.length > 0;
+
+  return (
+    <div
+      style={{
+        ...s.card,
+        ...(pkg.disabled ? s.disabled : {}),
+      }}
+    >
+      {/* Header — click to expand */}
+      <div>
+        {/* Row 1: identity */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 12px 4px",
+            cursor: "pointer",
+            userSelect: "none" as const,
+          }}
+          onClick={onToggleExpand}
+        >
+          <span
+            style={{
+              ...s.expandIcon,
+              transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          >
+            ▶
+          </span>
+
+          <span
+            style={{
+              ...s.statusDot,
+              background: STATUS_COLORS[pkg.status] ?? "var(--text-dim)",
+            }}
+          />
+
+          <span style={s.cardTitle}>
+            {pkg.packageName || pkg.source}
+          </span>
+
+          {pkg.version && (
+            <span
+              style={{
+                ...s.badge,
+                background: "var(--bg-surface)",
+                color: "var(--text-dim)",
+              }}
+            >
+              v{pkg.version}
+            </span>
+          )}
+        </div>
+
+        {/* Row 2: actions */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 12px 10px 38px",
+            flexWrap: "wrap" as const,
+          }}
+        >
+          {pkgUpdate?.updateAvailable && (
+            <button
+              style={s.actionBtn}
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdate(pkgUpdate.package);
+              }}
+              disabled={updating === pkgUpdate.package}
+              title={`Update: ${pkgUpdate.installed} → ${pkgUpdate.latest}`}
+            >
+              {updating === pkgUpdate.package ? "…" : "Update"}
+            </button>
+          )}
+
+          <button
+            style={s.toggle}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            disabled={busy}
+          >
+            {pkg.disabled ? "Enable" : "Disable"}
+          </button>
+
+          <button
+            style={s.dangerBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUninstall();
+            }}
+            disabled={uninstalling === pkg.source}
+          >
+            {uninstalling === pkg.source ? "…" : "Uninstall"}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded resources */}
+      {expanded && (
+        <div style={s.resourceSection}>
+          {!hasResources && (
+            <div style={{ fontSize: 11, color: "var(--text-dim)", padding: "4px 8px" }}>
+              {pkg.status === "missing"
+                ? "Package not installed."
+                : "No resources loaded from this package."}
+            </div>
+          )}
+
+          {(["extension", "skill", "prompt", "theme"] as const).map((kind) => {
+            const items = pkg.resources.filter((r) => r.kind === kind);
+            if (items.length === 0) return null;
+            return (
+              <div key={kind} style={{ marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: "var(--text-dim)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    marginBottom: 2,
+                    padding: "0 8px",
+                  }}
+                >
+                  {RESOURCE_ICONS[kind]} {kind}s ({items.length})
+                </div>
+                {items.map((r, i) => (
+                  <div key={r.path + i} style={s.resourceItem}>
+                    <span style={{ color: "var(--text-dim)", fontSize: 10 }}>
+                      {r.relativePath}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ──────────────────────────────────────────────────
 
 interface Props {
   onError: (msg: string | undefined) => void;
+  /** Active project's filesystem path (for project-local installs). */
+  projectPath?: string;
 }
 
-export function PackagesTab({ onError }: Props) {
+export function PackagesTab({ onError, projectPath }: Props) {
   // ── SDK packages ──
   const [sdkData, setSdkData] = useState<SdkPackagesResponse | undefined>();
   const [extData, setExtData] = useState<ExtensionsResponse | null>(null);
@@ -266,7 +579,7 @@ export function PackagesTab({ onError }: Props) {
   const [uninstalling, setUninstalling] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
   const [installSource, setInstallSource] = useState("");
-  const [installScope, setInstallScope] = useState<"user" | "project">("user");
+  const [installScope, setInstallScope] = useState<"user" | "project">(projectPath ? "project" : "user");
   const [manualInput, setManualInput] = useState("");
 
   // ── Updates ──
@@ -286,12 +599,12 @@ export function PackagesTab({ onError }: Props) {
 
   const loadSdk = useCallback(async () => {
     try {
-      const result = await fetchSdkPackages();
+      const result = await fetchSdkPackages(projectPath);
       setSdkData(result);
     } catch (err) {
       onError(`Failed to load packages: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [onError]);
+  }, [onError, projectPath]);
 
   const loadExt = useCallback(async () => {
     try {
@@ -355,12 +668,14 @@ export function PackagesTab({ onError }: Props) {
 
   // ── Actions ──
 
-  const handleInstall = async (source: string) => {
+  const handleInstall = async (source: string, scope?: "user" | "project") => {
     if (!source) return;
+    const effectiveScope = scope ?? installScope;
     setInstalling(source);
     onError(undefined);
     try {
-      await installSdkPackage(source, installScope === "project");
+      const isLocal = effectiveScope === "project" && projectPath !== undefined;
+      await installSdkPackage(source, isLocal, isLocal ? projectPath : undefined);
       setInstallSource("");
       await loadSdk();
     } catch (err) {
@@ -383,7 +698,8 @@ export function PackagesTab({ onError }: Props) {
     setUninstalling(pkg.source);
     onError(undefined);
     try {
-      await removeSdkPackage(pkg.source, pkg.scope === "project");
+      const isLocal = pkg.scope === "project" && projectPath !== undefined;
+      await removeSdkPackage(pkg.source, isLocal, isLocal ? projectPath : undefined);
       await loadSdk();
     } catch (err) {
       onError(`Uninstall failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -396,7 +712,8 @@ export function PackagesTab({ onError }: Props) {
     setBusy(true);
     onError(undefined);
     try {
-      await toggleSdkPackage(pkg.source, pkg.scope, !pkg.disabled);
+      const isLocal = pkg.scope === "project" && projectPath !== undefined;
+      await toggleSdkPackage(pkg.source, pkg.scope, !pkg.disabled, isLocal ? projectPath : undefined);
       await loadSdk();
     } catch (err) {
       onError(`Toggle failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -601,176 +918,81 @@ export function PackagesTab({ onError }: Props) {
         </details>
       </div>
 
-      {/* ── Package cards ── */}
+      {/* ── Package cards (grouped by scope) ── */}
       {sdkData && sdkData.packages.length === 0 && !extData?.detected.length && (
         <div style={s.empty}>
           No extension packages configured yet.
         </div>
       )}
 
-      {sdkData?.packages.map((pkg) => {
-        const key = `${pkg.scope}\0${pkg.source}`;
-        const isExpanded = expanded.has(key);
-        const hasResources = pkg.resources.length > 0;
-        const pkgUpdate = updateMap.get(pkg.packageName ?? pkg.source);
+      {sdkData && (() => {
+        const globalPkgs = sdkData.packages.filter((p) => p.scope === "user");
+        const projectPkgs = sdkData.packages.filter((p) => p.scope === "project");
 
         return (
-          <div
-            key={key}
-            style={{
-              ...s.card,
-              ...(pkg.disabled ? s.disabled : {}),
-            }}
-          >
-            {/* Header — click to expand */}
-            <div>
-              {/* Row 1: identity */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "10px 12px 4px",
-                  cursor: "pointer",
-                  userSelect: "none" as const,
-                }}
-                onClick={() => toggleExpand(key)}
-              >
-                <span
-                  style={{
-                    ...s.expandIcon,
-                    transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                  }}
-                >
-                  ▶
-                </span>
-
-                <span
-                  style={{
-                    ...s.statusDot,
-                    background: STATUS_COLORS[pkg.status] ?? "var(--text-dim)",
-                  }}
-                />
-
-                <span style={s.cardTitle}>
-                  {pkg.packageName || pkg.source}
-                </span>
-
-                <span
-                  style={{
-                    ...s.badge,
-                    background: "var(--bg-surface)",
-                    color: "var(--text-dim)",
-                  }}
-                >
-                  {SCOPE_LABELS[pkg.scope] ?? pkg.scope}
-                </span>
-
-                {pkg.version && (
-                  <span
-                    style={{
-                      ...s.badge,
-                      background: "var(--bg-surface)",
-                      color: "var(--text-dim)",
-                    }}
-                  >
-                    v{pkg.version}
-                  </span>
-                )}
-              </div>
-
-              {/* Row 2: actions */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 12px 10px 38px",
-                  flexWrap: "wrap" as const,
-                }}
-              >
-                {pkgUpdate?.updateAvailable && (
-                  <button
-                    style={s.actionBtn}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleUpdate(pkgUpdate.package);
-                    }}
-                    disabled={updating === pkgUpdate.package}
-                    title={`Update: ${pkgUpdate.installed} → ${pkgUpdate.latest}`}
-                  >
-                    {updating === pkgUpdate.package ? "…" : "Update"}
-                  </button>
-                )}
-
-                <button
-                  style={s.toggle}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleToggle(pkg);
-                  }}
-                  disabled={busy}
-                >
-                  {pkg.disabled ? "Enable" : "Disable"}
-                </button>
-
-                <button
-                  style={s.dangerBtn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void handleUninstall(pkg);
-                  }}
-                  disabled={uninstalling === pkg.source}
-                >
-                  {uninstalling === pkg.source ? "…" : "Uninstall"}
-                </button>
-              </div>
-            </div>
-
-            {/* Expanded resources */}
-            {isExpanded && (
-              <div style={s.resourceSection}>
-                {!hasResources && (
-                  <div style={{ fontSize: 11, color: "var(--text-dim)", padding: "4px 8px" }}>
-                    {pkg.status === "missing"
-                      ? "Package not installed."
-                      : "No resources loaded from this package."}
+          <>
+            {/* Global scope section */}
+            {globalPkgs.length > 0 && (
+              <div style={s.section}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                    🌐 Global scope
                   </div>
-                )}
-
-                {(["extension", "skill", "prompt", "theme"] as const).map((kind) => {
-                  const items = pkg.resources.filter((r) => r.kind === kind);
-                  if (items.length === 0) return null;
-                  return (
-                    <div key={kind} style={{ marginBottom: 6 }}>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: "var(--text-dim)",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: 2,
-                          padding: "0 8px",
-                        }}
-                      >
-                        {RESOURCE_ICONS[kind]} {kind}s ({items.length})
-                      </div>
-                      {items.map((r, i) => (
-                        <div key={r.path + i} style={s.resourceItem}>
-                          <span style={{ color: "var(--text-dim)", fontSize: 10 }}>
-                            {r.relativePath}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
+                    ~/.pi/agent/
+                  </div>
+                </div>
+                {globalPkgs.map((pkg) => (
+                  <PackageCard
+                    key={`${pkg.scope}\0${pkg.source}`}
+                    pkg={pkg}
+                    expanded={expanded.has(`${pkg.scope}\0${pkg.source}`)}
+                    pkgUpdate={updateMap.get(pkg.packageName ?? pkg.source)}
+                    busy={busy}
+                    installing={installing}
+                    uninstalling={uninstalling}
+                    updating={updating}
+                    onToggleExpand={() => toggleExpand(`${pkg.scope}\0${pkg.source}`)}
+                    onToggle={() => void handleToggle(pkg)}
+                    onUninstall={() => void handleUninstall(pkg)}
+                    onUpdate={(src) => void handleUpdate(src)}
+                  />
+                ))}
               </div>
             )}
-          </div>
+
+            {/* Project scope section */}
+            {projectPkgs.length > 0 && (
+              <div style={s.section}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
+                    📁 Project scope
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {projectPath?.replace(/^\/[^/]+\/[^/]+/, "~") ?? "unknown"}
+                  </div>
+                </div>
+                {projectPkgs.map((pkg) => (
+                  <PackageCard
+                    key={`${pkg.scope}\0${pkg.source}`}
+                    pkg={pkg}
+                    expanded={expanded.has(`${pkg.scope}\0${pkg.source}`)}
+                    pkgUpdate={updateMap.get(pkg.packageName ?? pkg.source)}
+                    busy={busy}
+                    installing={installing}
+                    uninstalling={uninstalling}
+                    updating={updating}
+                    onToggleExpand={() => toggleExpand(`${pkg.scope}\0${pkg.source}`)}
+                    onToggle={() => void handleToggle(pkg)}
+                    onUninstall={() => void handleUninstall(pkg)}
+                    onUpdate={(src) => void handleUpdate(src)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         );
-      })}
+      })()}
 
       {/* ── Recommended ── */}
       {extData && extData.recommended.length > 0 && (
@@ -793,94 +1015,27 @@ export function PackagesTab({ onError }: Props) {
                 {CATEGORY_LABELS[cat] ?? cat}
               </div>
               {items.map((ext) => {
-                const alreadyInstalled =
-                  sdkData?.packages.some(
-                    (p) =>
-                      p.packageName === ext.name ||
-                      p.source === ext.package ||
-                      p.source.includes(ext.name),
-                  ) ?? false;
+                const matchedPkg = sdkData?.packages.find(
+                  (p) =>
+                    p.packageName === ext.name ||
+                    p.source === ext.package ||
+                    p.source.includes(ext.name),
+                );
+                const alreadyInstalled = matchedPkg !== undefined;
+                const installedScope = matchedPkg?.scope;
 
                 return (
-                  <div
+                  <RecommendedExtCard
                     key={ext.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 10px",
-                      borderRadius: 8,
-                      background: "var(--bg-glass)",
-                      border: "1px solid var(--border-color)",
-                      marginBottom: 6,
-                      opacity: alreadyInstalled ? 0.6 : 1,
+                    ext={ext}
+                    alreadyInstalled={alreadyInstalled}
+                    installedScope={installedScope}
+                    installing={installing === ext.package}
+                    projectPath={projectPath}
+                    onInstall={(scope) => {
+                      void handleInstall(ext.package, scope);
                     }}
-                  >
-                    <span style={{ fontSize: 16 }}>{ext.icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: "var(--text-primary)",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {ext.name}
-                        {ext.verified && (
-                          <span
-                            style={{
-                              fontSize: 9,
-                              padding: "1px 5px",
-                              borderRadius: 3,
-                              background: "rgba(52, 211, 153, 0.12)",
-                              color: "#34d399",
-                              fontWeight: 500,
-                            }}
-                          >
-                            ✓ Verified
-                          </span>
-                        )}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: "var(--text-dim)",
-                          marginTop: 2,
-                          lineHeight: 1.4,
-                        }}
-                      >
-                        {ext.description}
-                      </div>
-                    </div>
-                    <button
-                      style={{
-                        fontSize: 10,
-                        padding: "4px 12px",
-                        borderRadius: 5,
-                        border: "none",
-                        background: alreadyInstalled
-                          ? "var(--bg-surface)"
-                          : "var(--accent-bg, #3b82f6)",
-                        color: alreadyInstalled ? "var(--text-dim)" : "white",
-                        cursor: alreadyInstalled ? "default" : "pointer",
-                        fontWeight: 500,
-                        flexShrink: 0,
-                      }}
-                      onClick={() => {
-                        if (!alreadyInstalled) void handleInstall(ext.package);
-                      }}
-                      disabled={installing === ext.package || alreadyInstalled}
-                    >
-                      {installing === ext.package
-                        ? "…"
-                        : alreadyInstalled
-                          ? "Installed"
-                          : "Install"}
-                    </button>
-                  </div>
+                  />
                 );
               })}
             </div>

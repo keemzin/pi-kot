@@ -1435,8 +1435,9 @@ export interface SdkPackagesResponse {
  * List all configured extension packages with resource details.
  * Uses SDK's DefaultPackageManager under the hood.
  */
-export async function fetchSdkPackages(): Promise<SdkPackagesResponse> {
-  return request<SdkPackagesResponse>("GET", "/api/v1/extensions/sdk-packages");
+export async function fetchSdkPackages(cwd?: string): Promise<SdkPackagesResponse> {
+  const qs = cwd !== undefined ? `?cwd=${encodeURIComponent(cwd)}` : "";
+  return request<SdkPackagesResponse>("GET", `/api/v1/extensions/sdk-packages${qs}`);
 }
 
 /**
@@ -1445,8 +1446,9 @@ export async function fetchSdkPackages(): Promise<SdkPackagesResponse> {
 export async function installSdkPackage(
   source: string,
   local?: boolean,
+  cwd?: string,
 ): Promise<SdkPackagesResponse> {
-  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/install", { source, local });
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/install", { source, local, cwd });
 }
 
 /**
@@ -1455,8 +1457,9 @@ export async function installSdkPackage(
 export async function removeSdkPackage(
   source: string,
   local?: boolean,
+  cwd?: string,
 ): Promise<SdkPackagesResponse> {
-  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/remove", { source, local });
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/remove", { source, local, cwd });
 }
 
 /**
@@ -1466,8 +1469,9 @@ export async function toggleSdkPackage(
   source: string,
   scope: "user" | "project",
   disabled: boolean,
+  cwd?: string,
 ): Promise<SdkPackagesResponse> {
-  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/toggle", { source, scope, disabled });
+  return request<SdkPackagesResponse>("POST", "/api/v1/extensions/sdk-packages/toggle", { source, scope, disabled, cwd });
 }
 
 // ---- Session Extensions (runtime state) ----

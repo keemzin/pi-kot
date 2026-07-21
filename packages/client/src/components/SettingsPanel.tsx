@@ -4,7 +4,7 @@
  * Shell component that renders tab navigation and delegates content
  * to individual tab components in ./settings/.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SlidePanel } from "./SlidePanel";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { ProvidersTab } from "./settings/ProvidersTab";
@@ -13,6 +13,7 @@ import { GeneralTab } from "./settings/GeneralTab";
 import { PackagesTab } from "./PackagesTab";
 import { SkillsTab } from "./SkillsTab";
 import { TunnelTab } from "./TunnelTab";
+import { useSessionStore } from "../stores/session-store";
 
 type Tab = "appearance" | "providers" | "agent" | "general" | "packages" | "skills" | "tunnel";
 
@@ -27,6 +28,14 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
   const [error, setError] = useState<string | undefined>(undefined);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 600);
+
+  // Derive active project path for package scope
+  const activeProjectId = useSessionStore((s) => s.activeProjectId);
+  const projects = useSessionStore((s) => s.projects);
+  const projectPath = useMemo(() => {
+    if (activeProjectId === undefined) return undefined;
+    return projects.find((p) => p.id === activeProjectId)?.path;
+  }, [activeProjectId, projects]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= 600);
@@ -111,7 +120,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       {tab === "appearance" && <AppearanceTab />}
       {tab === "providers" && <ProvidersTab onError={setError} />}
       {tab === "agent" && <AgentTab onError={setError} />}
-      {tab === "packages" && <PackagesTab onError={setError} />}
+      {tab === "packages" && <PackagesTab onError={setError} projectPath={projectPath} />}
       {tab === "skills" && <SkillsTab onError={setError} />}
       {tab === "tunnel" && <TunnelTab />}
       {tab === "general" && <GeneralTab />}
