@@ -36,6 +36,29 @@ import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
+
+// ── Tool batch expand/collapse preference (shared across all batch cards) ──
+import { createContext, useContext } from "react";
+const BATCH_OPEN_KEY = "pi.toolBatch.open";
+const ToolBatchOpenContext = createContext<{
+	open: boolean;
+	toggle: () => void;
+}>({ open: false, toggle: () => undefined });
+function ToolBatchOpenProvider({ children }: { children: React.ReactNode }) {
+	const [open, setOpen] = useState<boolean>(() => {
+		try { return localStorage.getItem(BATCH_OPEN_KEY) === "true"; } catch { return false; }
+	});
+	const toggle = () => setOpen((o) => {
+		const next = !o;
+		try { localStorage.setItem(BATCH_OPEN_KEY, String(next)); } catch { /* ignore */ }
+		return next;
+	});
+	return (
+		<ToolBatchOpenContext.Provider value={{ open, toggle }}>
+			{children}
+		</ToolBatchOpenContext.Provider>
+	);
+}
 /** Shape of a tool-call part derived from paired SDK ToolCall + ToolResultMessage. */
 interface ToolCallPart {
 	type: "tool-call";
@@ -365,7 +388,7 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 			<ToolCallEntry
 				block={displayed.block}
 				result={undefined}
-				initialExpanded={true}
+				initialExpanded={false}
 			/>
 		</div>
 	);
@@ -532,7 +555,7 @@ function ToolCallEntry({
 
 /** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
-	const [open, setOpen] = useState(false);
+	const { open, toggle } = useContext(ToolBatchOpenContext);
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
 	const completedCount = toolEntries.filter(
@@ -551,12 +574,17 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 		names.slice(0, 4).join(" · ") + (names.length > 4 ? " · …" : "");
 
 	return (
-		<details open={open} className="tool-timeline" style={{ marginLeft: 0 }}>
+		<details
+			open={open}
+			className="tool-timeline"
+			style={{ marginLeft: 0 }}
+			onToggle={(e) => e.preventDefault()}
+		>
 			<summary
 				className="tool-timeline-header"
 				onClick={(e) => {
 					e.preventDefault();
-					setOpen((o) => !o);
+					toggle();
 				}}
 				aria-label={`${toolCount} tool ${toolCount === 1 ? "call" : "calls"}: ${previewText}`}
 			>
@@ -1984,6 +2012,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	]);
 
 	return (
+		<ToolBatchOpenProvider>
 		<ChatDiffViewProvider>
 			<div
 				className="messages-container"
@@ -2067,5 +2096,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				)}
 			</div>
 		</ChatDiffViewProvider>
+		</ToolBatchOpenProvider>
 	);
 }
