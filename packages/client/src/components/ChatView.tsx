@@ -36,6 +36,29 @@ import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
+
+// ── Tool batch expand/collapse preference (shared across all batch cards) ──
+import { createContext, useContext } from "react";
+const BATCH_OPEN_KEY = "pi.toolBatch.open";
+const ToolBatchOpenContext = createContext<{
+	open: boolean;
+	toggle: () => void;
+}>({ open: false, toggle: () => undefined });
+function ToolBatchOpenProvider({ children }: { children: React.ReactNode }) {
+	const [open, setOpen] = useState<boolean>(() => {
+		try { return localStorage.getItem(BATCH_OPEN_KEY) === "true"; } catch { return false; }
+	});
+	const toggle = () => setOpen((o) => {
+		const next = !o;
+		try { localStorage.setItem(BATCH_OPEN_KEY, String(next)); } catch { /* ignore */ }
+		return next;
+	});
+	return (
+		<ToolBatchOpenContext.Provider value={{ open, toggle }}>
+			{children}
+		</ToolBatchOpenContext.Provider>
+	);
+}
 /** Shape of a tool-call part derived from paired SDK ToolCall + ToolResultMessage. */
 interface ToolCallPart {
 	type: "tool-call";
@@ -365,7 +388,7 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 			<ToolCallEntry
 				block={displayed.block}
 				result={undefined}
-				initialExpanded={true}
+				initialExpanded={false}
 			/>
 		</div>
 	);
@@ -532,7 +555,16 @@ function ToolCallEntry({
 
 /** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
-	const [open, setOpen] = useState(false);
+	const { open: sharedOpen, toggle: sharedToggle } = useContext(ToolBatchOpenContext);
+	// Each card owns its own open state, seeded from the shared preference once on mount.
+	// This prevents all cards from snapping open/closed when one card's preference changes
+	// (e.g. when a live card finishes and re-joins the group as a batch card).
+	const [open, setOpen] = useState(() => sharedOpen);
+	const toggle = () => {
+		const next = !open;
+		setOpen(next);
+		sharedToggle(); // keep shared preference in sync for future cards
+	};
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
 	const completedCount = toolEntries.filter(
@@ -551,12 +583,17 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 		names.slice(0, 4).join(" · ") + (names.length > 4 ? " · …" : "");
 
 	return (
-		<details open={open} className="tool-timeline" style={{ marginLeft: 0 }}>
+		<details
+			open={open}
+			className="tool-timeline"
+			style={{ marginLeft: 0 }}
+			onToggle={(e) => e.preventDefault()}
+		>
 			<summary
 				className="tool-timeline-header"
 				onClick={(e) => {
 					e.preventDefault();
-					setOpen((o) => !o);
+					toggle();
 				}}
 				aria-label={`${toolCount} tool ${toolCount === 1 ? "call" : "calls"}: ${previewText}`}
 			>
@@ -1526,10 +1563,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 				toolEntries.length = 0;
 
-				// Render completed tools in the collapsed batch
+				// Render completed tools in the collapsed batch.
+				// Key is derived from the *first* tool call ID in the batch so the
+				// ToolCallBatchCard component instance stays alive (no unmount/remount)
+				// as more tools complete and join the group. Using a positional key like
+				// `batch-${key}` caused React to remount the card every time the batch
+				// grew or the contentSerial changed, producing a visible flash.
 				if (completed.length > 0) {
+					const firstToolId = completed.find((e) => e.kind === "tool")?.block?.id as string | undefined;
+					const stableKey = firstToolId ? `batch-id-${firstToolId}` : `batch-${key}`;
 					elements.push(
-						<div key={`batch-${key}`} className="message-row assistant">
+						<div key={stableKey} className="message-row assistant">
 							<div className="message-bubble assistant">
 								<ToolCallBatchCard entries={completed as any} />
 							</div>
@@ -1984,6 +2028,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	]);
 
 	return (
+		<ToolBatchOpenProvider>
 		<ChatDiffViewProvider>
 			<div
 				className="messages-container"
@@ -2067,5 +2112,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				)}
 			</div>
 		</ChatDiffViewProvider>
+		</ToolBatchOpenProvider>
 	);
 }

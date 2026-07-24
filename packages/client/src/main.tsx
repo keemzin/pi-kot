@@ -59,7 +59,12 @@ getUiSettingsPreload().then((settings) => {
 // Inline fetch — avoids circular imports
 async function getUiSettingsPreload() {
   try {
-    const res = await fetch("/api/v1/config/ui-settings");
+    const headers: Record<string, string> = {};
+    try {
+      const token = localStorage.getItem("pi-kot/auth-token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    } catch {}
+    const res = await fetch("/api/v1/config/ui-settings", { headers });
     if (!res.ok) return null;
     return await res.json();
   } catch {

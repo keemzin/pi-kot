@@ -786,71 +786,38 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       <div className="fe-tab-bar" style={{
         display: "flex", borderBottom: "1px solid var(--border)",
         background: "var(--bg-glass)", flexShrink: 0,
+        alignItems: "center", padding: "0 6px", gap: "2px",
       }}>
+        {(
+          [
+            { key: "files",         label: "Files",    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); setView("tree"); } },
+            { key: "git",           label: "Git",      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
+            { key: "diff",          label: "Diff",     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>, onClick: () => setTab("diff") },
+            { key: "artifacts",     label: "Artifacts",icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
+          ] as { key: string; label: string; icon: React.ReactNode; onClick: () => void }[]
+        ).map(({ key, label, icon, onClick }) => (
+          <button
+            key={key}
+            onClick={onClick}
+            title={label}
+            type="button"
+            className={`fe-tab-btn${tab === key ? " active" : ""}`}
+          >
+            {icon}
+            <span className="fe-tab-label">{label}</span>
+          </button>
+        ))}
+        {/* Close panel */}
         <button
-          onClick={() => { setTab("files"); setView("tree"); }}
-          style={{
-            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
-            background: tab === "files" ? "var(--bg-solid)" : "transparent",
-            color: tab === "files" ? "var(--accent-text)" : "var(--text-dim)",
-            border: "none", borderBottom: tab === "files" ? "2px solid var(--accent-text)" : "2px solid transparent",
-            cursor: "pointer", transition: "all 0.12s ease",
-          }}
+          onClick={onClose}
+          title="Close panel"
           type="button"
+          className="fe-tab-close"
+          style={{ marginLeft: "auto" }}
         >
-          📁 Files
-        </button>
-        <button
-          onClick={() => setTab("git")}
-          style={{
-            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
-            background: tab === "git" ? "var(--bg-solid)" : "transparent",
-            color: tab === "git" ? "var(--accent-text)" : "var(--text-dim)",
-            border: "none", borderBottom: tab === "git" ? "2px solid var(--accent-text)" : "2px solid transparent",
-            cursor: "pointer", transition: "all 0.12s ease",
-          }}
-          type="button"
-        >
-          ⎇ Git
-        </button>
-        <button
-          onClick={() => setTab("system-prompt")}
-          style={{
-            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
-            background: tab === "system-prompt" ? "var(--bg-solid)" : "transparent",
-            color: tab === "system-prompt" ? "var(--accent-text)" : "var(--text-dim)",
-            border: "none", borderBottom: tab === "system-prompt" ? "2px solid var(--accent-text)" : "2px solid transparent",
-            cursor: "pointer", transition: "all 0.12s ease",
-          }}
-          type="button"
-        >
-          ✦ Prompt
-        </button>
-        <button
-          onClick={() => setTab("artifacts")}
-          style={{
-            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
-            background: tab === "artifacts" ? "var(--bg-solid)" : "transparent",
-            color: tab === "artifacts" ? "var(--accent-text)" : "var(--text-dim)",
-            border: "none", borderBottom: tab === "artifacts" ? "2px solid var(--accent-text)" : "2px solid transparent",
-            cursor: "pointer", transition: "all 0.12s ease",
-          }}
-          type="button"
-        >
-          🎨 Artifacts
-        </button>
-        <button
-          onClick={() => setTab("diff")}
-          style={{
-            flex: 1, padding: "11px 12px", fontSize: "13px", fontWeight: 600,
-            background: tab === "diff" ? "var(--bg-solid)" : "transparent",
-            color: tab === "diff" ? "var(--accent-text)" : "var(--text-dim)",
-            border: "none", borderBottom: tab === "diff" ? "2px solid var(--accent-text)" : "2px solid transparent",
-            cursor: "pointer", transition: "all 0.12s ease",
-          }}
-          type="button"
-        >
-          📝 Diff
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
         </button>
       </div>
 
@@ -901,21 +868,60 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           {/* Header */}
           <div style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "10px 12px", borderBottom: "1px solid var(--border)",
+            padding: "8px 10px", borderBottom: "1px solid var(--border)",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
                 Files
               </span>
-              {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading...</span>}
+              {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading…</span>}
             </div>
-            <div style={{ display: "flex", gap: "2px" }}>
-              <button onClick={() => uploadRef.current?.click()} title="Upload files" disabled={uploading} style={{ background: "none", border: "none", color: uploading ? "var(--text-dim)" : "var(--text-secondary)", cursor: uploading ? "default" : "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">{uploading ? "⏳" : "↑"}</button>
-              <button onClick={() => uploadFolderRef.current?.click()} title="Upload folder" disabled={uploading} style={{ background: "none", border: "none", color: uploading ? "var(--text-dim)" : "var(--text-secondary)", cursor: uploading ? "default" : "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">{uploading ? "⏳" : "📁↑"}</button>
-              <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📄</button>
-              <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "13px", borderRadius: "var(--radius-sm)" }} type="button">+📁</button>
-              <button onClick={loadTree} title="Refresh" style={{ background: "none", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px 5px", fontSize: "14px", borderRadius: "var(--radius-sm)" }} type="button">↻</button>
-              <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: "var(--text-secondary)", cursor: "pointer", padding: "2px 5px", fontSize: "15px", borderRadius: "var(--radius-sm)" }} type="button">✕</button>
+            <div style={{ display: "flex", gap: "1px", alignItems: "center" }}>
+              {/* Upload files */}
+              <button onClick={() => uploadRef.current?.click()} title="Upload files" disabled={uploading} className="fe-toolbar-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </button>
+              {/* Upload folder */}
+              <button onClick={() => uploadFolderRef.current?.click()} title="Upload folder" disabled={uploading} className="fe-toolbar-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  <polyline points="12 11 12 17"/>
+                  <polyline points="9 14 12 11 15 14"/>
+                </svg>
+              </button>
+              {/* Divider */}
+              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
+              {/* New file */}
+              <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" className="fe-toolbar-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </button>
+              {/* New folder */}
+              <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" className="fe-toolbar-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                  <line x1="12" y1="11" x2="12" y2="17"/>
+                  <line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </button>
+              {/* Divider */}
+              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
+              {/* Refresh */}
+              <button onClick={loadTree} title="Refresh" className="fe-toolbar-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -944,7 +950,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           {showCreate && (
             <div style={{ padding: "4px 10px 6px", borderBottom: "1px solid var(--border)", display: "flex", gap: "4px", alignItems: "center", fontSize: "11px" }}>
               <span style={{ color: "var(--text-dim)", flexShrink: 0 }}>
-                {showCreate === "file" ? "📄" : "📁"}:
+                {showCreate === "file" ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                )}
               </span>
               <input
                 ref={createRef}
@@ -1049,7 +1059,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                   padding: "3px 12px", fontSize: "10px", color: "var(--text-dim)",
                   borderBottom: "1px solid var(--border)", display: "flex", gap: "8px", alignItems: "center",
                 }}>
-                  <span>📄 {contentSearchResults.matches.length} match{contentSearchResults.matches.length !== 1 ? "es" : ""} in {groupByPath(contentSearchResults.matches).length} file{groupByPath(contentSearchResults.matches).length !== 1 ? "s" : ""}</span>
+                  <span>{contentSearchResults.matches.length} match{contentSearchResults.matches.length !== 1 ? "es" : ""} in {groupByPath(contentSearchResults.matches).length} file{groupByPath(contentSearchResults.matches).length !== 1 ? "s" : ""}</span>
                   {contentSearchResults.truncated && <span style={{ color: "var(--accent-bg)" }}>truncated</span>}
                   {contentSearchResults.engine === "node" && (
                     <span style={{
@@ -1286,7 +1296,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               whiteSpace: "nowrap",
               maxWidth: "220px",
             }}>
-              {contextMenu.node.type === "directory" ? "📁" : "📄"} {contextMenu.node.name}
+              {contextMenu.node.type === "directory" ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+              )} {contextMenu.node.name}
             </div>
 
             {/* Copy Relative Path */}
@@ -1343,7 +1357,9 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 }}
                 style={contextMenuItemStyle}
               >
-                <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📄</span>
+                <span style={{ width: "16px", textAlign: "center", flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                </span>
                 <span>New File</span>
               </div>
             )}
@@ -1361,7 +1377,9 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 }}
                 style={contextMenuItemStyle}
               >
-                <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📁</span>
+                <span style={{ width: "16px", textAlign: "center", flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                </span>
                 <span>New Folder</span>
               </div>
             )}

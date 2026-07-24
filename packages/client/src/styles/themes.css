@@ -534,12 +534,6 @@ strong {
     font-size: 14px;
   }
 
-  /* Add project button */
-  .add-project-toggle {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
-
   .new-session-mini {
     padding: 6px 10px;
     font-size: 12px;
@@ -566,25 +560,26 @@ strong {
   }
 }
 
-/* Add project button in sidebar header */
+/* Add project button in sidebar header — icon-only, minimal */
 .sidebar-add-project {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  line-height: 1;
-  padding: 4px 8px;
+  color: var(--text-dim);
   border-radius: var(--radius-sm);
-  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease), border-color var(--duration) var(--ease);
+  flex-shrink: 0;
 }
 
 .sidebar-add-project:hover {
   color: var(--text-primary);
   background: var(--bg-glass-hover);
+  border-color: var(--border-hover);
 }
 
 /* ═══ Project Tree ═══ */
@@ -627,6 +622,8 @@ strong {
 .project-row.active {
   background: var(--accent-subtle);
   color: var(--accent-text);
+  box-shadow: inset 3px 0 0 var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 .project-row.drag-over {
@@ -639,9 +636,15 @@ strong {
   display: none !important;
 }
 
-/* Drag handle - hidden on mobile */
+/* Drag handle - hidden until row is hovered, hidden on mobile */
 .project-drag-handle {
   display: flex;
+  opacity: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.project-row:hover .project-drag-handle {
+  opacity: 1;
 }
 
 @media (max-width: 600px) {
@@ -688,6 +691,23 @@ strong {
   font-weight: 500;
 }
 
+/* Session count badge — shown on collapsed project rows */
+.project-session-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-glass-strong);
+  border-radius: 10px;
+  padding: 1px 6px;
+  line-height: 1.4;
+  flex-shrink: 0;
+  transition: opacity var(--duration) var(--ease);
+}
+
+.project-row:hover .project-session-count {
+  opacity: 0; /* hide when action buttons appear on hover */
+}
+
 /* Session sub-list within a project */
 .project-sublist {
   flex: unset;
@@ -717,6 +737,7 @@ strong {
   background: var(--accent-subtle);
   color: var(--accent-text);
   font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .session-name {
@@ -944,14 +965,15 @@ strong {
   align-items: center;
 }
 
-/* New session (+) always faintly visible — no need to hover to discover */
+/* New session (+) hidden until hover — fully hidden so it doesn't compete with project names */
 .project-actions-right .project-action-btn {
-  opacity: 0.35;
-  pointer-events: auto;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .project-row:hover .project-actions-right .project-action-btn {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .project-action-btn {
@@ -1034,31 +1056,134 @@ strong {
   display: none;
 }
 
-/* ═══ Sidebar Footer — Add Project ═══ */
+/* ═══ Sidebar Footer — Nav Items ═══ */
 .sidebar-footer {
-  padding: 4px 6px;
+  padding: 4px 6px 6px;
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
-.add-project-toggle {
+.sidebar-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--border);
+  border: none;
   background: transparent;
-  color: var(--text-tertiary);
-  font-size: 11px;
+  color: var(--text-secondary);
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  transition: all var(--duration) var(--ease);
-  text-align: center;
+  text-align: left;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
 
-.add-project-toggle:hover {
+.sidebar-nav-btn:hover {
   background: var(--bg-glass-hover);
-  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.sidebar-nav-btn-muted {
+  color: var(--text-dim);
+}
+
+.sidebar-nav-btn-muted:hover {
+  color: var(--text-secondary);
+}
+
+.sidebar-nav-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ═══ System Prompt Popup ═══ */
+.prompt-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.15s ease;
+}
+
+.prompt-popup {
+  width: 600px;
+  max-width: 94vw;
+  height: 560px;
+  max-height: 85vh;
+  background: var(--bg-frosted);
+  backdrop-filter: blur(var(--blur-heavy));
+  -webkit-backdrop-filter: blur(var(--blur-heavy));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.prompt-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.prompt-popup-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.prompt-popup-project {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--accent-text);
+}
+
+.prompt-popup-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.prompt-popup-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+.prompt-popup-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Add Project Dialog ── */
@@ -4892,6 +5017,132 @@ strong {
   }
 }
 
+/* ── File explorer tab buttons ── */
+.fe-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  transition: color var(--duration) var(--ease), border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  white-space: nowrap;
+}
+
+.fe-tab-btn:hover {
+  color: var(--text-secondary);
+  background: var(--bg-glass-hover);
+}
+
+.fe-tab-btn.active {
+  color: var(--accent-text);
+  border-bottom-color: var(--accent);
+  background: transparent;
+}
+
+/* Label hidden by default — show if panel is wide enough */
+.fe-tab-label {
+  display: none;
+}
+
+@media (min-width: 400px) {
+  .fe-tab-label {
+    display: inline;
+  }
+}
+
+.fe-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+  flex-shrink: 0;
+}
+
+.fe-tab-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+/* ── File explorer toolbar icon buttons ── */
+.fe-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+  flex-shrink: 0;
+}
+
+.fe-toolbar-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-glass-hover);
+}
+
+.fe-toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ── Git remote button group (Fetch / Pull / Push) ── */
+.git-remote-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.git-remote-group-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 6px;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+}
+
+.git-remote-group-btn:last-child {
+  border-right: none;
+}
+
+.git-remote-group-btn:hover:not(:disabled) {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+}
+
+.git-remote-group-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* Git panel action buttons — base style */
 .git-action-btn {
   background: none;
@@ -4954,30 +5205,6 @@ strong {
 
 .git-group-action-btn:hover {
   background: var(--accent-subtle);
-}
-
-/* Fetch / Pull / Push primary row */
-.git-remote-btn {
-  flex: 1;
-  padding: 9px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: center;
-  color: var(--text-primary);
-  border: 1px solid var(--border-bright);
-  background: var(--bg-glass);
-  border-radius: var(--radius-sm);
-}
-
-.git-remote-btn:hover:not(:disabled) {
-  background: var(--bg-glass-hover);
-  border-color: var(--accent);
-  color: var(--accent-text);
-}
-
-.git-remote-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* Collapsible section header (Log / Worktrees / Branches) */
@@ -5099,7 +5326,7 @@ strong {
     min-width: 36px;
   }
 
-  .git-remote-btn {
+  .git-remote-group-btn {
     padding: 12px 6px;
     font-size: 14px;
   }
