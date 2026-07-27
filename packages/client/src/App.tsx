@@ -137,6 +137,15 @@ export function App() {
     setIsMobile,
   } = useLayoutStore();
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
+  const [mobileViewerOpen, setMobileViewerOpen] = useState(false);
+
+  // On mobile, opening a file (viewerTabs adds a tab) shows the overlay.
+  // Pressing ← hides the overlay but keeps tabs — re-opening shows both.
+  useEffect(() => {
+    if (isMobile && viewerTabs.length > 0) {
+      setMobileViewerOpen(true);
+    }
+  }, [isMobile, viewerTabs.length]);
 
   // Keep isMobile in sync with viewport
   useEffect(() => {
@@ -1122,7 +1131,7 @@ export function App() {
       )}
 
       {/* Mobile file viewer: full-screen overlay */}
-      {activeProjectId !== undefined && isMobile && viewerTabs.length > 0 && (
+      {activeProjectId !== undefined && isMobile && mobileViewerOpen && viewerTabs.length > 0 && (
         <div
           style={{
             position: "fixed",
@@ -1134,7 +1143,7 @@ export function App() {
         >
           <FileViewerPanel
             projectId={activeProjectId}
-            onClose={() => useLayoutStore.getState().closeAllViewerTabs()}
+            onClose={() => setMobileViewerOpen(false)}
             fullWidth
           />
         </div>
