@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
 import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
 import { TurnDiffPanel } from "./TurnDiffPanel";
-import { ConfirmDialog } from "./Modal";
-import { FileEditor } from "./FileEditor";
-import { FileViewer } from "./FileViewer";
-import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
-import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
+import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
 
@@ -90,8 +85,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   initialTab?: ExplorerTab;
-  /** When true, uses flex-flow width transition and delegates
-   *  file editing to a separate FileViewerPanel. */
+  /** When true, uses flex-flow width transition instead of translateX overlay. */
   flexLayout?: boolean;
 }
 
@@ -109,24 +103,10 @@ interface SearchResult {
   truncated: boolean;
 }
 
-interface OpenFileState {
-  path: string;
-  content: string;
-  saved: string;
-  dirty: boolean;
-  language: string;
-  saving: boolean;
-  loadingError?: string;
-}
-
-type PaneView = "tree" | "editor";
-
 const DEFAULT_EXPLORER_WIDTH = 360;
 const MIN_EXPLORER_WIDTH = 220;
 const MAX_EXPLORER_WIDTH = 800;
 
-/** When true, the editor view is delegated to FileViewerPanel
- *  and clicking a file opens it in the separate viewer. */
 const USE_FLEX_LAYOUT = true;
 
 const CONTENT_SEARCH_DEBOUNCE_MS = 300;
@@ -154,10 +134,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const [createParent, setCreateParent] = useState("");
   const [createName, setCreateName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>();
-  const [openFiles, setOpenFiles] = useState<OpenFileState[]>([]);
-  const [activePath, setActivePath] = useState<string | undefined>();
   const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
-  const [view, setView] = useState<PaneView>("tree");
 
   const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 
@@ -165,10 +142,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   useEffect(() => {
     if (initialTab !== undefined && initialTab !== tab) {
       setTab(initialTab);
-      if (initialTab === "files") setView("tree");
     }
   }, [initialTab]);
-  const [pendingCloseTab, setPendingCloseTab] = useState<string | undefined>(undefined);
   // ── Context menu for right-click / long-press ──
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -388,113 +363,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   }, [renaming]);
 
   const openFile = useCallback(async (path: string) => {
-    if (flexLayout) {
-      // In flex mode, delegate file viewing to the separate FileViewerPanel
-      const name = path.split("/").pop() || path;
-      openFileViewer(path, name);
-      return;
-    }
+    const name = path.split("/").pop() || path;
+    openFileViewer(path, name);
+  }, [openFileViewer]);
 
-    const existing = openFiles.find((f) => f.path === path);
-    if (existing) {
-      setActivePath(path);
-      setView("editor");
-      return;
-    }
 
-    setError(undefined);
-    const placeholder: OpenFileState = {
-      path, content: "", saved: "", dirty: false, language: "", saving: false,
-    };
-    setOpenFiles((prev) => [...prev, placeholder]);
-    setActivePath(path);
-    setView("editor");
-
-    try {
-      // Binary files (images, audio, PDF) are streamed directly by /files/read
-      // now — skip filesRead() for them to avoid JSON parse errors.
-      const isBinary = isImagePath(path) || isAudioPath(path) || isDocumentPath(path);
-      if (isBinary) {
-        setOpenFiles((prev) =>
-          prev.map((f) =>
-            f.path === path ? { ...f, content: "", saved: "", language: "", dirty: false } : f,
-          ),
-        );
-      } else {
-        const data = await filesRead(projectId, path);
-        const raw = data.content ?? "";
-        // CM6 always terminates documents with \n — normalize so the
-        // onChange callback doesn't fire on first render and mark a
-        // freshly opened file as dirty (same fix as FileViewerPanel).
-        const content = raw === "" || raw.endsWith("\n") ? raw : raw + "\n";
-        setOpenFiles((prev) =>
-          prev.map((f) =>
-            f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
-          ),
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "read failed");
-      setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-      setActivePath((prev) => (prev === path ? undefined : prev));
-      setView("tree");
-    }
-  }, [openFiles, activePath, projectId]);
-
-  const handleTabClose = useCallback((path: string) => {
-    // Check if file is dirty before closing
-    const file = openFiles.find((f) => f.path === path);
-    if (file?.dirty) {
-      setPendingCloseTab(path);
-      return;
-    }
-
-    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-    setActivePath((prev) => {
-      if (prev !== path) return prev;
-      const remaining = openFiles.filter((f) => f.path !== path);
-      return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
-    });
-  }, [openFiles]);
-
-  const confirmTabClose = useCallback((path: string) => {
-    setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-    setActivePath((prev) => {
-      if (prev !== path) return prev;
-      const remaining = openFiles.filter((f) => f.path !== path);
-      return remaining.length > 0 ? remaining[remaining.length - 1].path : undefined;
-    });
-    setPendingCloseTab(undefined);
-  }, [openFiles]);
-
-  const handleSave = async () => {
-    if (!activePath) return;
-    const file = openFiles.find((f) => f.path === activePath);
-    if (!file || file.saving) return;
-
-    setOpenFiles((prev) => prev.map((f) => (f.path === activePath ? { ...f, saving: true } : f)));
-    setError(undefined);
-    try {
-      await filesWrite(projectId, activePath, file.content);
-      setOpenFiles((prev) =>
-        prev.map((f) =>
-          f.path === activePath ? { ...f, dirty: false, saved: file.content, saving: false } : f,
-        ),
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
-      setOpenFiles((prev) => prev.map((f) => (f.path === activePath ? { ...f, saving: false } : f)));
-    }
-  };
-
-  const handleContentChange = useCallback((value: string) => {
-    if (!activePath) return;
-    setOpenFiles((prev) =>
-      prev.map((f) =>
-        f.path === activePath ? { ...f, content: value, dirty: value !== f.saved } : f,
-      ),
-    );
-  }, [activePath]);
 
   const toggleFolder = (path: string) => {
     setExpanded((prev) => {
@@ -513,17 +386,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     try {
       await filesRename(projectId, oldPath, name);
       setRenaming(undefined);
-      setOpenFiles((prev) =>
-        prev.map((f) => {
-          const parent = oldPath.includes("/") ? oldPath.substring(0, oldPath.lastIndexOf("/")) : "";
-          const newPath = parent ? `${parent}/${name}` : name;
-          return f.path === oldPath ? { ...f, path: newPath } : f;
-        }),
-      );
-      if (activePath === oldPath) {
-        const parent = oldPath.includes("/") ? oldPath.substring(0, oldPath.lastIndexOf("/")) : "";
-        setActivePath(parent ? `${parent}/${name}` : name);
-      }
       await loadTree();
     } catch (err) {
       setError(err instanceof Error ? err.message : "rename failed");
@@ -555,12 +417,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     try {
       await filesDelete(projectId, path, { recursive: true });
       setConfirmDelete(undefined);
-      setOpenFiles((prev) => prev.filter((f) => f.path !== path));
-      setActivePath((prev) => {
-        if (prev !== path) return prev;
-        const remaining = openFiles.filter((f) => f.path !== path);
-        return remaining.length > 0 ? remaining[0].path : undefined;
-      });
       await loadTree();
     } catch (err) {
       setError(err instanceof Error ? err.message : "delete failed");
@@ -737,8 +593,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     );
   };
 
-  const activeFile = openFiles.find((f) => f.path === activePath);
-
   // Flex layout: use width transition instead of translateX
   const outStyle: React.CSSProperties = flexLayout ? {
     display: "flex",
@@ -803,7 +657,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       }}>
         {(
           [
-            { key: "files",         label: "Files",    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); setView("tree"); } },
+            { key: "files",         label: "Files",    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); } },
             { key: "git",           label: "Git",      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
             { key: "diff",          label: "Diff",     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>, onClick: () => setTab("diff") },
             { key: "artifacts",     label: "Artifacts",icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
@@ -859,7 +713,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       )}
 
       {/* ── Files tab ── */}
-      {tab === "files" && view === "tree" && (
+      {tab === "files" && (
         <>
           {/* Hidden file inputs for upload */}
           <input
@@ -1155,123 +1009,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         </>
       )}
 
-      {/* ── VIEW: Editor ── */}
-      {tab === "files" && view === "editor" && (
-        <>
-          {/* Editor header with back button + tabs */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "4px",
-            padding: "6px 10px", borderBottom: "1px solid var(--border)",
-            background: "var(--bg-glass)",
-          }}>
-            <button
-              onClick={() => setView("tree")}
-              title="Back to file tree"
-              style={{
-                background: "none", border: "none", color: "var(--text-secondary)",
-                cursor: "pointer", padding: "4px 8px", fontSize: "14px",
-                borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
-              }}
-              type="button"
-            >
-              ←
-            </button>
 
-            {/* Tab strip */}
-            <div style={{ display: "flex", flex: 1, overflowX: "auto", gap: "2px" }}>
-              {openFiles.map((f) => {
-                const isActive = f.path === activePath;
-                return (
-                  <div
-                    key={f.path}
-                    style={{
-                      display: "flex", alignItems: "center", gap: "3px",
-                      padding: "3px 8px", fontSize: "11px", whiteSpace: "nowrap",
-                      borderRadius: "var(--radius-sm)",
-                      background: isActive ? "var(--accent-subtle)" : "transparent",
-                      color: isActive ? "var(--accent-text)" : "var(--text-dim)",
-                      cursor: "default", minWidth: 0,
-                    }}
-                  >
-                    <button
-                      onClick={() => setActivePath(f.path)}
-                      style={{
-                        background: "none", border: "none", color: "inherit",
-                        cursor: "pointer", padding: 0, fontSize: "11px",
-                        overflow: "hidden", textOverflow: "ellipsis",
-                      }}
-                      type="button"
-                    >
-                      {f.dirty && (
-                        <span style={{ color: "var(--accent-bg)", marginRight: "2px" }}>●</span>
-                      )}
-                      {f.path.split("/").pop()}
-                    </button>
-                    <button
-                      onClick={() => handleTabClose(f.path)}
-                      title="Close tab"
-                      style={{
-                        background: "none", border: "none", color: "var(--text-dim)",
-                        cursor: "pointer", padding: "1px", fontSize: "10px",
-                        opacity: 0.5, lineHeight: 1, flexShrink: 0,
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Close button */}
-            <button
-              onClick={onClose}
-              title="Close"
-              style={{
-                background: "none", border: "none", color: "var(--text-secondary)",
-                cursor: "pointer", padding: "2px 5px", fontSize: "15px",
-                borderRadius: "var(--radius-sm)", flexShrink: 0, lineHeight: 1,
-              }}
-              type="button"
-            >
-              ✕
-            </button>
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div style={{ padding: "4px 14px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
-              {error}
-            </div>
-          )}
-
-          {/* Active editor — binary files use FileViewer, text files use FileEditor */}
-          {activeFile ? (
-            isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path) ? (
-              <FileViewer projectId={projectId} filePath={activeFile.path} />
-            ) : (
-            <FileEditor
-              path={activeFile.path}
-              fileName={activeFile.path.split("/").pop() ?? activeFile.path}
-              content={activeFile.content}
-              language={activeFile.language}
-              saving={activeFile.saving}
-              dirty={activeFile.dirty}
-              onChange={handleContentChange}
-              onSave={handleSave}
-              error={error}
-            />
-          )
-          ) : (
-            <div style={{
-              flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "12px", color: "var(--text-dim)",
-            }}>
-              No file selected
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── Context menu ── */}
       {contextMenu && (
@@ -1437,18 +1175,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         </>
       )}
 
-      {/* ── Unsaved changes confirmation dialog ── */}
-      <ConfirmDialog
-        open={pendingCloseTab !== undefined}
-        onClose={() => setPendingCloseTab(undefined)}
-        onConfirm={() => {
-          if (pendingCloseTab) confirmTabClose(pendingCloseTab);
-        }}
-        title="Unsaved changes"
-        message={`Close "${pendingCloseTab?.split("/").pop() ?? ""}"? Unsaved changes will be lost.`}
-        primaryLabel="Discard & close"
-        tone="danger"
-      />
+
     </div>
   );
 }

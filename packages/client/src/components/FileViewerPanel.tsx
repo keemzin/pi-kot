@@ -7,7 +7,7 @@ import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { ConfirmDialog } from "./Modal";
 import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 
-export function FileViewerPanel({ projectId }: { projectId: string }) {
+export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: string; onClose?: () => void; fullWidth?: boolean }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
   const viewerActivePath = useLayoutStore((s) => s.viewerActivePath);
   const viewerWidth = useLayoutStore((s) => s.viewerWidth);
@@ -163,10 +163,10 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        width: hasViewer ? viewerWidth : 0,
-        minWidth: hasViewer ? VIEWER_MIN_WIDTH : 0,
+        width: hasViewer ? (fullWidth ? "100%" : viewerWidth) : 0,
+        minWidth: hasViewer ? (fullWidth ? 0 : VIEWER_MIN_WIDTH) : 0,
         overflow: "hidden",
-        flexShrink: 0,
+        flexShrink: fullWidth ? undefined : 0,
         position: "relative",
         borderLeft: hasViewer ? "1px solid var(--border)" : "none",
         background: "var(--bg-solid)",
@@ -208,6 +208,26 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
               minHeight: "38px",
             }}
           >
+            {onClose && (
+              <button
+                onClick={onClose}
+                title="Close viewer"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                  fontSize: "14px",
+                  borderRadius: "var(--radius-xs)",
+                  flexShrink: 0,
+                  lineHeight: 1,
+                }}
+                type="button"
+              >
+                ←
+              </button>
+            )}
             {viewerTabs.length > 1 && (
               <button
                 onClick={() => {

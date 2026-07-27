@@ -136,6 +136,7 @@ export function App() {
     setShowAddProjectDialog, setExplorerTab, toggleExplorerTab,
     setIsMobile,
   } = useLayoutStore();
+  const viewerTabs = useLayoutStore((s) => s.viewerTabs);
 
   // Keep isMobile in sync with viewport
   useEffect(() => {
@@ -1082,8 +1083,8 @@ export function App() {
             )}
           </div>
 
-          {/* File viewer — slides in when a file is opened */}
-          {activeProjectId !== undefined && (
+          {/* File viewer — slides in when a file is opened (desktop only) */}
+          {activeProjectId !== undefined && !isMobile && (
             <FileViewerPanel projectId={activeProjectId} />
           )}
 
@@ -1118,6 +1119,25 @@ export function App() {
             flexLayout={false}
           />
         </ErrorBoundary>
+      )}
+
+      {/* Mobile file viewer: full-screen overlay */}
+      {activeProjectId !== undefined && isMobile && viewerTabs.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 130,
+            background: "var(--bg-solid)",
+            overflow: "hidden",
+          }}
+        >
+          <FileViewerPanel
+            projectId={activeProjectId}
+            onClose={() => useLayoutStore.getState().closeAllViewerTabs()}
+            fullWidth
+          />
+        </div>
       )}
 
       {/* Session Tree Panel overlay */}
