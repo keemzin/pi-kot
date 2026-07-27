@@ -7,7 +7,9 @@ import { ArtifactsPanel } from "./ArtifactsPanel";
 import { TurnDiffPanel } from "./TurnDiffPanel";
 import { ConfirmDialog } from "./Modal";
 import { FileEditor } from "./FileEditor";
+import { FileViewer } from "./FileViewer";
 import { filesTree, filesRead, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
+import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
 
@@ -409,17 +411,28 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     setView("editor");
 
     try {
-      const data = await filesRead(projectId, path);
-      const raw = data.binary ? "(binary file)" : data.content ?? "";
-      // CM6 always terminates documents with \n — normalize so the
-      // onChange callback doesn't fire on first render and mark a
-      // freshly opened file as dirty (same fix as FileViewerPanel).
-      const content = raw === "" || raw.endsWith("\n") ? raw : raw + "\n";
-      setOpenFiles((prev) =>
-        prev.map((f) =>
-          f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
-        ),
-      );
+      // Binary files (images, audio, PDF) are streamed directly by /files/read
+      // now — skip filesRead() for them to avoid JSON parse errors.
+      const isBinary = isImagePath(path) || isAudioPath(path) || isDocumentPath(path);
+      if (isBinary) {
+        setOpenFiles((prev) =>
+          prev.map((f) =>
+            f.path === path ? { ...f, content: "", saved: "", language: "", dirty: false } : f,
+          ),
+        );
+      } else {
+        const data = await filesRead(projectId, path);
+        const raw = data.content ?? "";
+        // CM6 always terminates documents with \n — normalize so the
+        // onChange callback doesn't fire on first render and mark a
+        // freshly opened file as dirty (same fix as FileViewerPanel).
+        const content = raw === "" || raw.endsWith("\n") ? raw : raw + "\n";
+        setOpenFiles((prev) =>
+          prev.map((f) =>
+            f.path === path ? { ...f, content, saved: content, language: data.language, dirty: false } : f,
+          ),
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "read failed");
       setOpenFiles((prev) => prev.filter((f) => f.path !== path));
@@ -1232,8 +1245,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             </div>
           )}
 
-          {/* Active editor */}
+          {/* Active editor — binary files use FileViewer, text files use FileEditor */}
           {activeFile ? (
+            isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path) ? (
+              <FileViewer projectId={projectId} filePath={activeFile.path} />
+            ) : (
             <FileEditor
               path={activeFile.path}
               fileName={activeFile.path.split("/").pop() ?? activeFile.path}
@@ -1245,6 +1261,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               onSave={handleSave}
               error={error}
             />
+          )
           ) : (
             <div style={{
               flex: 1, display: "flex", alignItems: "center", justifyContent: "center",

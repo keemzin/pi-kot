@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileEditor } from "./FileEditor";
+import { FileViewer } from "./FileViewer";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite, getUiSettings, updateUiSettings } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { ConfirmDialog } from "./Modal";
-import { isImagePath } from "../lib/file-types";
+import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 
 export function FileViewerPanel({ projectId }: { projectId: string }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
@@ -20,7 +21,6 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
   const [fileName, setFileName] = useState("");
   const [language, setLanguage] = useState<string | undefined>();
   const [fileSize, setFileSize] = useState<number | undefined>();
-  const [fileBinary, setFileBinary] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -33,6 +33,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
 
   const activeFile = viewerTabs.find((t) => t.path === viewerActivePath);
   const isDirty = content !== savedContent;
+  const isBinaryFile = activeFile !== undefined && (isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path));
 
   // Load file content when active file changes
   useEffect(() => {
@@ -42,16 +43,25 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
       setError(undefined);
       return;
     }
+    // Binary files (images, audio, PDF) are streamed directly by FileViewer
+    // — no need to fetch JSON content for them.
+    if (isBinaryFile) {
+      setContent("");
+      setSavedContent("");
+      setLanguage(undefined);
+      setFileName(activeFile.name);
+      setFileSize(undefined);
+      setSavedAt(undefined);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(undefined);
     filesRead(projectId, activeFile.path)
       .then((data) => {
         if (cancelled) return;
-        // For image files, keep the raw base64 content from the server.
-        // For other binary files, show a placeholder.
-        const isImage = isImagePath(activeFile.path);
-        const c = data.binary && !isImage ? "(binary file)" : data.content ?? "";
+        const c = data.content ?? "";
         // CM6 always terminates documents with \n — normalize so
         // the onChange callback doesn't fire after the sync sync
         // effect, which would make content !== savedContent and
@@ -62,7 +72,6 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         setLanguage(data.language);
         setFileName(activeFile.name);
         setFileSize(data.size);
-        setFileBinary(data.binary);
         setSavedAt(undefined);
       })
       .catch((err) => {
@@ -75,7 +84,7 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [activeFile?.path, projectId]);
+  }, [activeFile?.path, projectId, isBinaryFile]);
 
   const handleSave = useCallback(async () => {
     if (!activeFile || !isDirty || saving) return;
@@ -331,21 +340,27 @@ export function FileViewerPanel({ projectId }: { projectId: string }) {
               </div>
             ) : activeFile ? (
               <>
-                {/* Editor body */}
-                <FileEditor
-                  path={activeFile.path}
-                  fileName={activeFile.name}
-                  content={content}
-                  language={language}
-                  saving={saving}
-                  dirty={isDirty}
-                  onChange={handleContentChange}
-                  onSave={handleSave}
-                  savedAt={savedAt}
-                  error={error}
-                  size={fileSize}
-                  binary={fileBinary}
-                />
+                {/* Binary files: use unified FileViewer (images, audio, PDF) */}
+                {isBinaryFile ? (
+                  <FileViewer
+                    projectId={projectId}
+                    filePath={activeFile.path}
+                  />
+                ) : (
+                  <FileEditor
+                    path={activeFile.path}
+                    fileName={activeFile.name}
+                    content={content}
+                    language={language}
+                    saving={saving}
+                    dirty={isDirty}
+                    onChange={handleContentChange}
+                    onSave={handleSave}
+                    savedAt={savedAt}
+                    error={error}
+                    size={fileSize}
+                  />
+                )}
               </>
             ) : null}
           </div>

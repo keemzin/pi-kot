@@ -1,12 +1,12 @@
 /**
- * FileEditor — shared file editing component used by FileViewerPanel and FileExplorer.
- * Handles editor toolbar, CodeMirror/RenderedView toggle, footer, and dirty state.
+ * FileEditor — text-only file editing component with CodeMirror.
+ * Handles editor toolbar, Raw/Rendered toggle, footer, and dirty state.
+ * Binary files (images, audio, PDF) are handled by FileViewer instead.
  */
 import { memo, useState } from "react";
 import { CodeMirrorEditor } from "./CodeMirrorEditor";
 import { RenderedView } from "./RenderedView";
-import { ImageViewer } from "./ImageViewer";
-import { isImagePath, isHtmlPath, isMarkdownPath, formatFileSize } from "../lib/file-types";
+import { isHtmlPath, isMarkdownPath, formatFileSize } from "../lib/file-types";
 
 interface Props {
   path: string;
@@ -22,8 +22,6 @@ interface Props {
   showToolbar?: boolean;
   /** File size in bytes from the server response. */
   size?: number;
-  /** Whether the file is binary (images, etc). */
-  binary?: boolean;
 }
 
 export const FileEditor = memo(function FileEditor({
@@ -39,12 +37,10 @@ export const FileEditor = memo(function FileEditor({
   error,
   showToolbar = true,
   size,
-  binary,
 }: Props) {
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
 
-  const isImage = isImagePath(path);
   const isHtml = isHtmlPath(path);
   const isMarkdown = isMarkdownPath(path);
 
@@ -77,55 +73,53 @@ export const FileEditor = memo(function FileEditor({
             {path}
           </span>
 
-          {/* Raw / Rendered toggle — hidden for images (no raw mode) */}
-          {!isImage && (
-            <div
+          {/* Raw / Rendered toggle */}
+          <div
+            style={{
+              display: "flex",
+              gap: "1px",
+              background: "var(--bg-glass)",
+              borderRadius: "var(--radius-sm)",
+              padding: "1px",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              onClick={() => setEditorMode("raw")}
               style={{
-                display: "flex",
-                gap: "1px",
-                background: "var(--bg-glass)",
+                background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
+                fontSize: "10px",
+                fontWeight: 600,
+                padding: "2px 8px",
                 borderRadius: "var(--radius-sm)",
-                padding: "1px",
-                flexShrink: 0,
               }}
+              type="button"
             >
-              <button
-                onClick={() => setEditorMode("raw")}
-                style={{
-                  background: editorMode === "raw" ? "var(--bg-solid)" : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: editorMode === "raw" ? "var(--text-primary)" : "var(--text-dim)",
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  padding: "2px 8px",
-                  borderRadius: "var(--radius-sm)",
-                }}
-                type="button"
-              >
-                Raw
-              </button>
-              <button
-                onClick={() => setEditorMode("rendered")}
-                style={{
-                  background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
-                  fontSize: "10px",
-                  fontWeight: 600,
-                  padding: "2px 8px",
-                  borderRadius: "var(--radius-sm)",
-                }}
-                type="button"
-              >
-                Rendered
-              </button>
-            </div>
-          )}
+              Raw
+            </button>
+            <button
+              onClick={() => setEditorMode("rendered")}
+              style={{
+                background: editorMode === "rendered" ? "var(--bg-solid)" : "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: editorMode === "rendered" ? "var(--text-primary)" : "var(--text-dim)",
+                fontSize: "10px",
+                fontWeight: 600,
+                padding: "2px 8px",
+                borderRadius: "var(--radius-sm)",
+              }}
+              type="button"
+            >
+              Rendered
+            </button>
+          </div>
 
-          {/* Wrap toggle — only in raw mode for non-image files */}
-          {!isImage && editorMode === "raw" && (
+          {/* Wrap toggle — only in raw mode */}
+          {editorMode === "raw" && (
             <button
               onClick={() => setWordWrap((w) => !w)}
               title="Toggle word wrap"
@@ -148,10 +142,8 @@ export const FileEditor = memo(function FileEditor({
         </div>
       )}
 
-      {/* Editor body — conditional rendering based on file type */}
-      {isImage ? (
-        <ImageViewer content={content} filePath={path} binary={binary ?? false} />
-      ) : isHtml && editorMode === "rendered" ? (
+      {/* Editor body — text editing only (binary files handled by FileViewer) */}
+      {isHtml && editorMode === "rendered" ? (
         <div style={{ flex: 1, minHeight: 0 }}>
           <iframe
             srcDoc={content}

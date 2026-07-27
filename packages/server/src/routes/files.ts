@@ -1,4 +1,6 @@
 import { basename, dirname, join } from "node:path";
+import { stat, createReadStream, watch as fsWatch } from "node:fs";
+import type { FSWatcher } from "node:fs";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import {
   ChecksumMismatchError,
@@ -24,6 +26,127 @@ import { config } from "../config.js";
 import { getProject } from "../workspace-store.js";
 import { searchFiles, SearchEngineUnavailableError } from "../file-searcher.js";
 import { errorSchema } from "./_schemas.js";
+
+// ── MIME types for streaming binary files directly from /files/read ──
+
+const IMAGE_EXT_TO_MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  avif: "image/avif",
+};
+
+const AUDIO_EXT_TO_MIME: Record<string, string> = {
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
+  weba: "audio/webm",
+  webm: "audio/webm",
+};
+
+const DOCUMENT_EXT_TO_MIME: Record<string, string> = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
+
+function getExt(filename: string): string {
+  return basename(filename).toLowerCase().split(".").pop() ?? "";
+}
+
+function getStreamMimeType(filename: string): string | null {
+  const ext = getExt(filename);
+  return IMAGE_EXT_TO_MIME[ext] ?? AUDIO_EXT_TO_MIME[ext] ?? DOCUMENT_EXT_TO_MIME[ext] ?? null;
+}
+
+/**
+ * Stream a file from disk as an HTTP response with correct Content-Type.
+ * Supports Range requests for media files.
+ */
+function streamFileResponse(
+  reply: FastifyReply,
+  filePath: string,
+  contentType: string,
+  fileSize: number,
+  rangeHeader: string | null,
+): void {
+  reply.header("Content-Type", contentType);
+  reply.header("Content-Disposition", "inline");
+  reply.header("Cache-Control", "no-cache");
+  reply.header("Accept-Ranges", "bytes");
+
+  if (!rangeHeader) {
+    reply.header("Content-Length", String(fileSize));
+    reply.send(createReadStream(filePath));
+    // hijack() prevents Fastify's wrapThenable from calling reply.send(undefined)
+    // after the async handler returns — otherwise the response body ends up empty.
+    // Must be called AFTER reply.send() because hijack sets reply.sent=true
+    // which would cause send() to short-circuit.
+    reply.hijack();
+    return;
+  }
+
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+  if (!match) {
+    reply.code(416).header("Content-Range", `bytes */${fileSize}`).send();
+    return;
+  }
+
+  let start = match[1] ? Number(match[1]) : 0;
+  let end = match[2] ? Number(match[2]) : fileSize - 1;
+  if (!match[1] && match[2]) {
+    const suffixLength = Number(match[2]);
+    start = Math.max(fileSize - suffixLength, 0);
+    end = fileSize - 1;
+  }
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start || start >= fileSize) {
+    reply.code(416).header("Content-Range", `bytes */${fileSize}`).send();
+    return;
+  }
+
+  const chunkSize = end - start + 1;
+  reply.code(206);
+  reply.header("Content-Range", `bytes ${start}-${end}/${fileSize}`);
+  reply.header("Content-Length", String(chunkSize));
+  reply.send(createReadStream(filePath, { start, end }));
+  reply.hijack();
+}
+
+/**
+ * Create an fs.watch wrapper that debounces rapid-fire events
+ * and handles errors gracefully (e.g. file moved/deleted).
+ */
+function createFSWatch(dir: string, onChange: () => void): FSWatcher {
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const debounced = () => {
+    if (debounceTimer !== null) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      onChange();
+    }, 100);
+  };
+  try {
+    const watcher = fsWatch(dir, { persistent: false }, () => debounced());
+    watcher.on("error", () => {
+      // Silently ignore — file may have been moved/deleted
+    });
+    return watcher;
+  } catch {
+    // fs.watch can throw on some platforms if path doesn't exist
+    return { close() {} } as FSWatcher;
+  }
+}
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024; // 100 MB per file
 const MAX_UPLOAD_FILES = 50;
@@ -293,10 +416,10 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     {
       schema: {
         description:
-          "Read a UTF-8 file from the project. 5 MB cap (returns 413). " +
-          "Binary files return `{ binary: true, content: '' }` rather than a " +
-          "garbled UTF-8 decode — clients should not pass binary content " +
-          "to the editor.",
+          "Read a file from the project. Binary files (images, audio, PDF, DOCX) " +
+          "are streamed directly with the correct Content-Type so the browser can " +
+          "render them inline. Text files return JSON { content, language, size }. " +
+          "5 MB cap for text files (returns 413). Supports Range requests for media.",
         tags: ["files"],
         querystring: {
           type: "object",
@@ -319,12 +442,118 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const project = await resolveProject(req.query.projectId, reply);
       if (project === undefined) return reply;
+      const filePath = join(project.path, req.query.path);
       try {
-        const result = await readFile(join(project.path, req.query.path), project.path);
+        // Check if this is a binary file that should be streamed directly
+        const streamMime = getStreamMimeType(filePath);
+        if (streamMime !== null) {
+          // Stream binary file directly with correct Content-Type
+          const st = await new Promise<import("node:fs").Stats>((resolve, reject) => {
+            stat(filePath, (err, stats) => (err ? reject(err) : resolve(stats)));
+          });
+          if (!st.isFile()) {
+            return reply.code(400).send({ error: "not_a_file", message: "target is not a regular file" });
+          }
+          const rangeHeader = req.headers.range ?? null;
+          streamFileResponse(reply, filePath, streamMime, st.size, rangeHeader);
+          return;
+        }
+        // Text file — return JSON content
+        const result = await readFile(filePath, project.path);
         return result;
       } catch (err) {
         return mapError(reply, err);
       }
+    },
+  );
+
+  // ── SSE watch endpoint: fires 'connected' on open and 'change' when file on disk is modified ──
+  fastify.get<{ Querystring: { projectId: string; path: string } }>(
+    "/files/watch",
+    {
+      schema: {
+        description:
+          "Server-Sent Events stream that fires 'connected' on open and 'change' " +
+          "whenever the file on disk is modified (size + mtime). Used by " +
+          "the FileViewerPanel for live reload of open files.",
+        tags: ["files"],
+        querystring: {
+          type: "object",
+          required: ["projectId", "path"],
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            path: { type: "string", minLength: 1 },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await resolveProject(req.query.projectId, reply);
+      if (project === undefined) return reply;
+      const filePath = join(project.path, req.query.path);
+
+      // Verify file exists
+      try {
+        const st = await new Promise<import("node:fs").Stats>((resolve, reject) => {
+          stat(filePath, (err, stats) => (err ? reject(err) : resolve(stats)));
+        });
+        if (!st.isFile()) {
+          return reply.code(400).send({ error: "not_a_file" });
+        }
+      } catch {
+        return reply.code(404).send({ error: "not_found" });
+      }
+
+      // Set SSE headers
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+
+      // Send connected event
+      reply.raw.write("event: connected\ndata: {}\n\n");
+
+      // Watch for changes using fs.watch
+      let lastSize = -1;
+      let lastMtimeMs = -1;
+      let closed = false;
+
+      const checkChange = () => {
+        if (closed) return;
+        stat(filePath, (err, st) => {
+          if (closed) return;
+          if (err) return;
+          if (st.size !== lastSize || st.mtimeMs !== lastMtimeMs) {
+            lastSize = st.size;
+            lastMtimeMs = st.mtimeMs;
+            reply.raw.write(`event: change\ndata: ${JSON.stringify({ size: st.size })}\n\n`);
+          }
+        });
+      };
+
+      // Initial check
+      stat(filePath, (err, st) => {
+        if (!err) {
+          lastSize = st.size;
+          lastMtimeMs = st.mtimeMs;
+        }
+      });
+
+      // Watch the file (or its directory for rename support)
+      const dir = dirname(filePath);
+      const watcher = createFSWatch(dir, () => checkChange());
+
+      // Also poll every 2s as a safety net (fs.watch misses some changes on some OS/filesystems)
+      const pollInterval = setInterval(checkChange, 2000);
+
+      // Cleanup on close
+      req.raw.on("close", () => {
+        closed = true;
+        clearInterval(pollInterval);
+        watcher.close();
+      });
     },
   );
 
