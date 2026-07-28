@@ -365,7 +365,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const openFile = useCallback(async (path: string) => {
     const name = path.split("/").pop() || path;
     openFileViewer(path, name);
-  }, [openFileViewer]);
+    // In overlay mode (mobile), close the explorer so it doesn't float
+    // on top of the full-screen viewer. In flex mode (desktop), keep
+    // the tree open alongside the viewer.
+    if (!flexLayout) onClose();
+  }, [openFileViewer, flexLayout, onClose]);
 
 
 

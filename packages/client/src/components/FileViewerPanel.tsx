@@ -159,14 +159,15 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
 
   return (
     <div
+      className="file-viewer-wrapper"
       style={{
         display: "flex",
         flexDirection: "column",
         height: "100%",
-        width: hasViewer ? (fullWidth ? "100%" : viewerWidth) : 0,
-        minWidth: hasViewer ? (fullWidth ? 0 : VIEWER_MIN_WIDTH) : 0,
+        width: hasViewer ? viewerWidth : 0,
+        minWidth: hasViewer ? VIEWER_MIN_WIDTH : 0,
         overflow: "hidden",
-        flexShrink: fullWidth ? undefined : 0,
+        flexShrink: 0,
         position: "relative",
         borderLeft: hasViewer ? "1px solid var(--border)" : "none",
         background: "var(--bg-solid)",
@@ -212,6 +213,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
               <button
                 onClick={onClose}
                 title="Close viewer"
+                className="viewer-back-btn"
                 style={{
                   background: "none",
                   border: "none",
