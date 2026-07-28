@@ -51,7 +51,19 @@ export function streamSessionSSE(
   let closed = false;
   let reconnectAttempt = 0;
 
-  const abortController = new AbortController();
+  let abortController = new AbortController();
+
+  // Hard-reset backoff on tab return or network recovery, matching pi-web.
+  const forceReconnect = (): void => {
+    reconnectAttempt = 0;
+    abortController.abort();
+    abortController = new AbortController();
+  };
+  const onVisibilityVisible = (): void => {
+    if (document.visibilityState === "visible") forceReconnect();
+  };
+  document.addEventListener("visibilitychange", onVisibilityVisible);
+  window.addEventListener("online", forceReconnect);
 
   async function connect(): Promise<void> {
     while (!closed && !(signal?.aborted ?? false)) {
@@ -146,6 +158,8 @@ export function streamSessionSSE(
     close: () => {
       closed = true;
       abortController.abort();
+      document.removeEventListener("visibilitychange", onVisibilityVisible);
+      window.removeEventListener("online", forceReconnect);
     },
   };
 }
