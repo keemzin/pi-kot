@@ -230,8 +230,27 @@ export async function readAuthSummary(): Promise<AuthSummary> {
 }
 
 export async function writeApiKey(provider: string, apiKey: string): Promise<void> {
+  // Use the SDK's login flow — persists to auth.json via credentials.modify()
+  // with proper file locking and permissions (matching pi-web's approach).
   const modelRuntime = await ModelRuntime.create({ authPath: AUTH_PATH });
-  await modelRuntime.setRuntimeApiKey(provider, apiKey);
+  let keySubmitted = false;
+  await modelRuntime.login(provider, "api_key", {
+    notify: () => {},
+    prompt: async (prompt) => {
+      if (prompt.type === "select") {
+        const keyOption = prompt.options.find(
+          (o: { id: string }) => o.id === "api-key" || o.id === "bearer-token",
+        );
+        if (keyOption) return keyOption.id;
+        throw new Error(`${provider} requires interactive authentication setup`);
+      }
+      if (!keySubmitted && prompt.type === "secret") {
+        keySubmitted = true;
+        return apiKey.trim();
+      }
+      throw new Error(`${provider} requires additional authentication settings`);
+    },
+  });
 }
 
 export async function removeApiKey(provider: string): Promise<void> {
@@ -240,7 +259,7 @@ export async function removeApiKey(provider: string): Promise<void> {
   if (!status.configured) {
     throw new AuthProviderNotFoundError(provider);
   }
-  await modelRuntime.removeRuntimeApiKey(provider);
+  await modelRuntime.logout(provider);
 }
 
 // ── Settings (settings.json) ──────────────────────────────────────────────
