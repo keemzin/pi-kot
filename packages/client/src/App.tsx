@@ -136,6 +136,18 @@ export function App() {
     setShowAddProjectDialog, setExplorerTab, toggleExplorerTab,
     setIsMobile,
   } = useLayoutStore();
+  const viewerTabs = useLayoutStore((s) => s.viewerTabs);
+  const [viewerMinimized, setViewerMinimized] = useState(false);
+  const viewerActive = viewerTabs.length > 0 && !viewerMinimized;
+
+  // Opening a file (viewerTabs adds a tab) un-minimizes the viewer.
+  // This applies on every device — on desktop the viewer is a side panel,
+  // on mobile CSS makes it full-width.
+  useEffect(() => {
+    if (viewerTabs.length > 0) setViewerMinimized(false);
+  }, [viewerTabs.length]);
+
+
 
   // Keep isMobile in sync with viewport
   useEffect(() => {
@@ -1029,7 +1041,7 @@ export function App() {
 
         {/* ── Flex row: chat | file viewer | file tree ── */}
         <div
-          className="main-content-row"
+          className={`main-content-row${viewerActive ? " viewer-active" : ""}`}
           style={{
             flex: 1,
             display: "flex",
@@ -1082,9 +1094,9 @@ export function App() {
             )}
           </div>
 
-          {/* File viewer — slides in when a file is opened */}
+          {/* File viewer — slides in when a file is opened (CSS handles mobile full-width) */}
           {activeProjectId !== undefined && (
-            <FileViewerPanel projectId={activeProjectId} />
+            <FileViewerPanel projectId={activeProjectId} onClose={() => setViewerMinimized(true)} />
           )}
 
           {/* Artifact viewer — slides in when an artifact is clicked */}
@@ -1119,6 +1131,33 @@ export function App() {
           />
         </ErrorBoundary>
       )}
+
+      {/* Mobile CSS: viewer takes full width on small screens */}
+      <style>{`
+/* On mobile, viewer fills the whole width when active */
+@media (max-width: 600px) {
+  .main-content-row.viewer-active .chat-column {
+    display: none;
+  }
+  .main-content-row.viewer-active .file-viewer-wrapper {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* Hide back button on desktop (side panel doesn't need it) */
+@media (min-width: 601px) {
+  .viewer-back-btn {
+    display: none;
+  }
+}
+
+/* Collapse the viewer when minimized (tabs exist but hidden) or empty */
+.main-content-row:not(.viewer-active) .file-viewer-wrapper {
+  width: 0 !important;
+  min-width: 0 !important;
+}
+`}</style>
 
       {/* Session Tree Panel overlay */}
       {activeSessionId !== undefined && activeProjectId !== undefined && (
