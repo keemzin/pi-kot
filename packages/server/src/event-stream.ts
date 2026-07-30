@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyReply } from "fastify";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { LiveSession, SSEClient } from "./session-store.js";
+import { getPendingForSession } from "./ask-user-question/registry.js";
 
 /**
  * One-shot padding flush sent right after `compaction_start` so L7
@@ -152,6 +153,20 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
         buildSnapshot(live) as unknown as { type: string; [k: string]: unknown },
       ),
     );
+
+    // Re-emit any pending ask_user_question events for this session
+    // so clients that reconnect (page refresh, new tab) don't lose them.
+    for (const pending of getPendingForSession(live.sessionId)) {
+      raw.write(
+        serializeSSE({
+          type: "ask_user_question",
+          sessionId: live.sessionId,
+          requestId: pending.requestId,
+          questions: pending.questions,
+        } as unknown as { type: string; [k: string]: unknown }),
+      );
+    }
+
     live.clients.add(client);
 
     raw.on("close", close);
