@@ -3044,18 +3044,18 @@ strong {
   justify-content: flex-end;
 }
 
+.assistant-msg-model-header {
+  margin-bottom: 4px;
+}
 .assistant-msg-model {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px 4px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-dim);
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 260px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .copy-msg-btn {
@@ -4802,24 +4802,55 @@ strong {
   scroll-behavior: smooth;
 }
 
-/* Thinking block — slim variant inside timeline */
+/* Thinking block — collapsible reasoning panel */
 .thinking-block {
-  border-radius: var(--radius-sm);
-  border: 0px solid var(--border);
-  padding: 3px 8px;
-  font-size: 12px;
-  color: var(--text-dim);
-  margin: 2px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 6px 0;
 }
-.thinking-block summary { cursor: pointer; user-select: none; color: var(--text-secondary); list-style: none; }
+.thinking-block summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  transition: background 0.15s;
+}
 .thinking-block summary::-webkit-details-marker { display: none; }
-.thinking-content {
-  margin-top: 4px;
+.thinking-block summary:hover { background: var(--bg-glass-hover); }
+.thinking-block[open] .thinking-block-chevron {
+  transform: rotate(90deg);
+}
+.thinking-block-chevron {
+  font-size: 8px;
+  color: var(--text-dim);
+  width: 12px;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+  text-align: center;
+}
+.thinking-block-label {
+  font-weight: 500;
+}
+.thinking-block-content {
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: inherit;
-  font-size: 12px;
   color: var(--text-dim);
+  font-style: italic;
+  border-top: 1px solid var(--border);
+  background: var(--bg-glass);
 }
 
 /* Legacy badge kept for streaming indicator in ChatView */

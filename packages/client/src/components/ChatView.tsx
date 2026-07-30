@@ -345,9 +345,10 @@ function ThinkingBlock({ text }: { text: string }) {
 					setOpen((o) => !o);
 				}}
 			>
-				{open ? "▾" : "▸"} Thinking…
+				<span className="thinking-block-chevron">{open ? "▶" : "▶"}</span>
+				<span className="thinking-block-label">Thinking</span>
 			</summary>
-			{open && <pre className="thinking-content">{text}</pre>}
+			<div className="thinking-block-content">{text}</div>
 		</details>
 	);
 }
@@ -1891,6 +1892,15 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								}}
 							/>
 						</div>
+						{lastAssistant && (
+							<div className="assistant-msg-model-header">
+								<ModelBadge
+									msg={lastAssistant as unknown as Record<string, unknown>}
+									fallbackModel={modelName}
+									fallbackProvider={providerName}
+								/>
+							</div>
+						)}
 						{renderAssistantParts(currentAssistants)}
 						{combinedAssistantText.length > 0 && (
 							<div className="assistant-msg-footer">
@@ -1901,11 +1911,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 										msg={lastAssistant as unknown as Record<string, unknown>}
 									/>
 								)}
-								<ModelBadge
-									msg={lastAssistant as unknown as Record<string, unknown>}
-									fallbackModel={modelName}
-									fallbackProvider={providerName}
-								/>
 							</div>
 						)}
 					</div>,
@@ -1933,6 +1938,20 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				}
+				if (lastAssistant) {
+					out.push(
+						<div
+							key={`turn-${turnKey}-model`}
+							className="assistant-msg-model-header"
+						>
+							<ModelBadge
+								msg={lastAssistant as unknown as Record<string, unknown>}
+								fallbackModel={modelName}
+								fallbackProvider={providerName}
+							/>
+						</div>,
+					);
+				}
 				if (currentAssistants.length > 0)
 					out.push(...renderAssistantParts(currentAssistants));
 				if (combinedAssistantText.length > 0) {
@@ -1945,11 +1964,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									msg={lastAssistant as unknown as Record<string, unknown>}
 								/>
 							)}
-							<ModelBadge
-								msg={lastAssistant as unknown as Record<string, unknown>}
-								fallbackModel={modelName}
-								fallbackProvider={providerName}
-							/>
 						</div>,
 					);
 				}
