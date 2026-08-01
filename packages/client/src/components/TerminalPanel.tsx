@@ -136,6 +136,18 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     }
   };
 
+  // Reads clipboard and sends text to the active terminal
+  const handlePaste = useCallback(() => {
+    navigator.clipboard.readText().then((text) => {
+      if (!activeTabId) return;
+      const entry = live.get(activeTabId);
+      if (entry && entry.ws.readyState === WebSocket.OPEN) {
+        entry.ws.send(JSON.stringify({ type: "input", data: text }));
+        entry.term.focus();
+      }
+    }).catch(() => {});
+  }, [activeTabId]);
+
   return (
     <div
       className="terminal-panel-root"
@@ -351,6 +363,7 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
           <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x03"); }}>^C</button>
           <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1B"); }}>ESC</button>
           <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x09"); }}>TAB</button>
+          <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); handlePaste(); }}>📋</button>
           <div style={{ width: 1, height: 20, background: "var(--border-color, #313244)", margin: "0 4px" }} />
           <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[A"); }}>↑</button>
           <button className="terminal-quick-key" onPointerDown={(e) => { e.preventDefault(); sendKey("\x1b[B"); }}>↓</button>
@@ -374,6 +387,7 @@ function TerminalHost({
   setCtrlActive: (v: boolean) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const [showCopyBtn, setShowCopyBtn] = useState(false);
 
   const ctrlActiveRef = useRef(ctrlActive);
   useEffect(() => {
@@ -493,6 +507,10 @@ function TerminalHost({
       }
     });
 
+    const selectionDisposable = term.onSelectionChange(() => {
+      setShowCopyBtn(term.hasSelection());
+    });
+
     const observer = new ResizeObserver(() => {
       try {
         const entry = live.get(tab.id);
@@ -504,229 +522,40 @@ function TerminalHost({
     });
     observer.observe(host);
 
-    // --- Touch Gestures (Termius-inspired) ---
-    // Long-press + drag → continuous arrow keys with speed gears (3 levels)
-    // Double-tap → Tab
-    // 3-finger tap → Paste (reads from clipboard)
-    // 2-finger scroll → scroll terminal buffer
-
-    let touchStartX: number | null = null;
-    let touchStartY: number | null = null;
-    let lastTouchY: number | null = null; // Used for 2-finger scrolling
-    let remainderPx = 0;
+    // --- Touch: 2-finger scroll only (all other gestures removed so native
+    //     xterm selection, copy/paste work on mobile) ---
+    let twoFingerTouchY: number | null = null;
+    let twoFingerRemainderPx = 0;
     const lineHeightPx = 16;
 
-    // Long-press + drag state
-    let longPressTimer: ReturnType<typeof setTimeout> | undefined;
-    let isArrowMode = false;
-    let arrowInterval: ReturnType<typeof setInterval> | undefined;
-    let arrowAnchorX = 0;
-    let arrowAnchorY = 0;
-    let lastArrowDir = '';
-    let lastArrowGear = -1;
-
-    // Double-tap state
-    let lastTapTime = 0;
-
-    const LONG_PRESS_MS = 150;
-    const DOUBLE_TAP_MS = 300;
-    const ARROW_GEAR_THRESHOLDS = [
-      { minDist: 0, interval: 150 },   // Gear 1: normal
-      { minDist: 100, interval: 80 },  // Gear 2: fast
-      { minDist: 200, interval: 40 },  // Gear 3: turbo
-    ];
-
-    function getArrowGear(dist: number): number {
-      for (let i = ARROW_GEAR_THRESHOLDS.length - 1; i >= 0; i--) {
-        if (dist >= ARROW_GEAR_THRESHOLDS[i].minDist) return i;
-      }
-      return 0;
-    }
-
-    function stopArrows(): void {
-      if (arrowInterval !== undefined) {
-        clearInterval(arrowInterval);
-        arrowInterval = undefined;
-      }
-      isArrowMode = false;
-      lastArrowDir = '';
-      lastArrowGear = -1;
-      host.style.userSelect = '';
-    }
-
-    function fireArrow(x: number, y: number): void {
-      const deltaX = x - arrowAnchorX;
-      const deltaY = y - arrowAnchorY;
-      const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      if (dist < 15) return; // dead zone near center
-
-      const dir = Math.abs(deltaX) > Math.abs(deltaY)
-        ? (deltaX > 0 ? 'right' : 'left')
-        : (deltaY > 0 ? 'down' : 'up');
-      const gear = getArrowGear(dist);
-
-      if (dir !== lastArrowDir || gear !== lastArrowGear) {
-        lastArrowDir = dir;
-        lastArrowGear = gear;
-        if (arrowInterval !== undefined) clearInterval(arrowInterval);
-
-        const seq = dir === 'right' ? "\x1b[C"
-          : dir === 'left' ? "\x1b[D"
-          : dir === 'down' ? "\x1b[B"
-          : "\x1b[A";
-
-        // Send immediately then on interval
-        const sock = live.get(tab.id)?.ws;
-        if (sock?.readyState === WebSocket.OPEN) {
-          sock.send(JSON.stringify({ type: "input", data: seq }));
-        }
-
-        arrowInterval = setInterval(() => {
-          const sock = live.get(tab.id)?.ws;
-          if (sock?.readyState === WebSocket.OPEN) {
-            sock.send(JSON.stringify({ type: "input", data: seq }));
-          }
-        }, ARROW_GEAR_THRESHOLDS[gear].interval);
-      }
-    }
-
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-
-        // Start long-press timer for arrow mode
-        if (longPressTimer !== undefined) clearTimeout(longPressTimer);
-        longPressTimer = setTimeout(() => {
-          arrowAnchorX = touchStartX!;
-          arrowAnchorY = touchStartY!;
-          isArrowMode = true;
-          host.style.userSelect = 'none';
-        }, LONG_PRESS_MS);
-
-      } else if (e.touches.length === 2) {
-        if (longPressTimer !== undefined) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
-        lastTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        remainderPx = 0;
+      if (e.touches.length === 2) {
+        twoFingerTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        twoFingerRemainderPx = 0;
       }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      // --- 2-Finger Scrolling ---
-      if (e.touches.length === 2 && lastTouchY !== null) {
-        if (longPressTimer !== undefined) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
+      if (e.touches.length === 2 && twoFingerTouchY !== null) {
+        e.preventDefault();
+        e.stopPropagation();
         const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-        const stepY = lastTouchY - currentY;
-        lastTouchY = currentY;
-
+        const stepY = twoFingerTouchY - currentY;
+        twoFingerTouchY = currentY;
         if (Math.abs(stepY) < 1) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const totalPx = remainderPx + stepY;
+        const totalPx = twoFingerRemainderPx + stepY;
         const lines = Math.trunc(totalPx / lineHeightPx);
-        remainderPx = totalPx - (lines * lineHeightPx);
-
-        if (lines !== 0) {
-          term.scrollLines(lines);
-        }
-        return;
-      }
-
-      // --- Arrow Mode (long-press + drag) ---
-      if (e.touches.length === 1 && isArrowMode) {
-        e.preventDefault();
-        e.stopPropagation();
-        fireArrow(e.touches[0].clientX, e.touches[0].clientY);
-        return;
-      }
-
-      // --- Cancel long-press if finger moves before timer fires ---
-      if (e.touches.length === 1 && !isArrowMode && touchStartX !== null && touchStartY !== null && longPressTimer !== undefined) {
-        const dx = e.touches[0].clientX - touchStartX;
-        const dy = e.touches[0].clientY - touchStartY;
-        if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
+        twoFingerRemainderPx = totalPx - lines * lineHeightPx;
+        if (lines !== 0) term.scrollLines(lines);
       }
     };
 
-    const onTouchEnd = (e: TouchEvent) => {
-      // --- 3-finger tap → Paste ---
-      if (e.changedTouches.length === 3) {
-        stopArrows();
-        if (longPressTimer !== undefined) {
-          clearTimeout(longPressTimer);
-          longPressTimer = undefined;
-        }
-        navigator.clipboard.readText().then((text) => {
-          const sock = live.get(tab.id)?.ws;
-          if (sock?.readyState === WebSocket.OPEN) {
-            sock.send(JSON.stringify({ type: "input", data: text }));
-          }
-        }).catch(() => {
-          // Clipboard read failed (permission denied, etc.) — silently ignore
-        });
-        touchStartX = null;
-        touchStartY = null;
-        lastTouchY = null;
-        return;
-      }
-
-      // Stop arrow mode
-      if (isArrowMode) {
-        stopArrows();
-        touchStartX = null;
-        touchStartY = null;
-        lastTouchY = null;
-        return;
-      }
-
-      // Cancel long-press timer if finger lifted before it fired
-      if (longPressTimer !== undefined) {
-        clearTimeout(longPressTimer);
-        longPressTimer = undefined;
-
-        // --- Double-tap detection → Tab ---
-        const now = Date.now();
-        if (touchStartX !== null && touchStartY !== null) {
-          if (now - lastTapTime < DOUBLE_TAP_MS) {
-            const sock = live.get(tab.id)?.ws;
-            if (sock?.readyState === WebSocket.OPEN) {
-              sock.send(JSON.stringify({ type: "input", data: "\x09" }));
-            }
-            lastTapTime = 0;
-          } else {
-            lastTapTime = now;
-          }
-        }
-      }
-
-      // Focus terminal so keyboard appears (preventDefault on touchstart blocks click events)
-      term.focus();
-
-      touchStartX = null;
-      touchStartY = null;
-      lastTouchY = null;
+    const onTouchEnd = (_e: TouchEvent) => {
+      twoFingerTouchY = null;
     };
 
     const onTouchCancel = (): void => {
-      stopArrows();
-      if (longPressTimer !== undefined) {
-        clearTimeout(longPressTimer);
-        longPressTimer = undefined;
-      }
-      touchStartX = null;
-      touchStartY = null;
-      lastTouchY = null;
+      twoFingerTouchY = null;
     };
 
     host.addEventListener("touchstart", onTouchStart, { passive: false });
@@ -734,12 +563,9 @@ function TerminalHost({
     host.addEventListener("touchend", onTouchEnd);
     host.addEventListener("touchcancel", onTouchCancel);
 
-    // Prevent long-press context menu and text selection from browser defaults
+    // Prevent context menu on long-press (browser default interferes with xterm)
     const onContextMenu = (e: Event) => { e.preventDefault(); };
-    const onSelectStart = (e: Event) => { e.preventDefault(); };
     host.addEventListener("contextmenu", onContextMenu);
-    host.addEventListener("selectstart", onSelectStart);
-    host.style.setProperty("-webkit-touch-callout", "none");
 
     live.set(tab.id, {
       term,
@@ -764,8 +590,6 @@ function TerminalHost({
         host.removeEventListener("touchend", onTouchEnd);
         host.removeEventListener("touchcancel", onTouchCancel);
         host.removeEventListener("contextmenu", onContextMenu);
-        host.removeEventListener("selectstart", onSelectStart);
-        host.style.setProperty("-webkit-touch-callout", "");
       } catch {
         // ignore
       }
@@ -805,10 +629,46 @@ function TerminalHost({
         zIndex: visible ? 1 : 0,
         padding: "2px 4px 8px 4px",
         touchAction: "none", // Prevent native browser pinch-zoom/pan inside the terminal area
-        userSelect: "none",
-        WebkitUserSelect: "none",
       }}
-    />
+    >
+      {/* Floating Copy button */}
+      {showCopyBtn && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 12,
+            right: 12,
+            zIndex: 20,
+            display: "flex",
+            gap: 6,
+          }}
+        >
+          <button
+            onClick={() => {
+              const entry = live.get(tab.id);
+              if (entry?.term.hasSelection()) {
+                navigator.clipboard.writeText(entry.term.getSelection());
+                entry.term.clearSelection();
+                setShowCopyBtn(false);
+              }
+            }}
+            style={{
+              all: "unset",
+              padding: "6px 14px",
+              borderRadius: 6,
+              background: "var(--accent, #89b4fa)",
+              color: "#11111b",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            }}
+          >
+            📋 Copy
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
