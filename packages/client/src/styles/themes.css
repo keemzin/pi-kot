@@ -4954,6 +4954,15 @@ strong {
 .trail-full-prose .md-p { margin: 0 0 6px; }
 .trail-full-prose .md-p:last-child { margin-bottom: 0; }
 
+/* Justify-view chunk: justification header + expandable tool+prose content */
+.trail-chunk { display: flex; flex-direction: column; }
+.trail-chunk-content {
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  margin-left: 5px;
+  margin-bottom: 4px;
+}
+
 /* Thinking row inside the trail */
 .trail-thinking-header {
   display: flex;

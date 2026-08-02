@@ -583,6 +583,7 @@ function JustificationRow({
 					}
 				}}
 				className="trail-justification-header"
+				title={open ? "Collapse this step" : "Expand this step"}
 			>
 				<span className="trail-justification-dot" />
 				<span className="trail-justification-label">Justification</span>
@@ -593,11 +594,6 @@ function JustificationRow({
 				)}
 				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
 			</div>
-			{open && (
-				<div className="trail-justification-body">
-					<ChatMarkdown text={text.trim()} />
-				</div>
-			)}
 		</div>
 	);
 }
@@ -605,6 +601,28 @@ function JustificationRow({
 /* ── ToolGroupCard — the "Trail" ────────────────────────────────────────── */
 
 const JUSTIFY_COLLAPSE_THRESHOLD = 3;
+
+/** Groups entries into chunks: each justification + the tools/thinking that follow it. */
+function groupChunks(entries: ToolGroupEntry[]): {
+	leading: ToolGroupEntry[];
+	chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[];
+} {
+	const leading: ToolGroupEntry[] = [];
+	const chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[] = [];
+	let current: { just: ToolGroupEntry; tools: ToolGroupEntry[] } | null = null;
+	for (const e of entries) {
+		if (e.kind === "justification") {
+			if (current) chunks.push(current);
+			current = { just: e, tools: [] };
+		} else if (current) {
+			current.tools.push(e);
+		} else {
+			leading.push(e);
+		}
+	}
+	if (current) chunks.push(current);
+	return { leading, chunks };
+}
 
 export function ToolGroupCard({
 	entries,
@@ -614,11 +632,14 @@ export function ToolGroupCard({
 	isStreaming?: boolean;
 }) {
 	const hasJustifications = entries.some((e) => e.kind === "justification");
-	const [view, setView] = useState<"full" | "justify" | "hidden">(
-		isStreaming ? "full" : hasJustifications ? "justify" : "hidden",
+	// Two-state view: "justify" (per-chunk expandable) ↔ "full" (everything expanded).
+	// Turns without in-between text have nothing to justify, so they default to full.
+	const [view, setView] = useState<"full" | "justify">(
+		isStreaming ? "full" : hasJustifications ? "justify" : "full",
 	);
-	const [showAllJustifications, setShowAllJustifications] = useState(false);
-	const [expandAllProse, setExpandAllProse] = useState(false);
+	// Which chunks are expanded in Justify view (indices into chunks array).
+	const [openChunks, setOpenChunks] = useState<Set<number>>(() => new Set());
+	const [showAllChunks, setShowAllChunks] = useState(false);
 
 	// Track streaming state transitions: force full while streaming,
 	// auto-collapse to justify shortly after streaming stops.
@@ -632,7 +653,8 @@ export function ToolGroupCard({
 		}
 		if (!isStreaming && prevStreaming.current) {
 			const timer = setTimeout(() => {
-				setView(hasJustificationsRef.current ? "justify" : "hidden");
+				setView(hasJustificationsRef.current ? "justify" : "full");
+				setOpenChunks(new Set());
 			}, 3000);
 			prevStreaming.current = isStreaming;
 			return () => clearTimeout(timer);
@@ -644,32 +666,28 @@ export function ToolGroupCard({
 		(e) => e.kind === "tool" && e.result === undefined,
 	);
 
-	const justificationParts = entries.filter((e) => e.kind === "justification");
+	const { leading, chunks } = groupChunks(entries);
 
-	// Per-row expansion state (indices into justificationParts). The global
-	// "Show all prose" toggle overrides it.
-	const [openJustificationIdx, setOpenJustificationIdx] = useState<Set<number>>(
-		() => new Set(),
-	);
-	const isJustificationOpen = (idx: number): boolean =>
-		expandAllProse || openJustificationIdx.has(idx);
-	const toggleJustification = (idx: number): void => {
-		setOpenJustificationIdx((prev) => {
+	const toggleChunk = (idx: number) =>
+		setOpenChunks((prev) => {
 			const next = new Set(prev);
 			if (next.has(idx)) next.delete(idx);
 			else next.add(idx);
 			return next;
 		});
+
+	const cycle = () => {
+		if (view === "full") {
+			if (hasJustifications) {
+				setView("justify");
+				setOpenChunks(new Set());
+			}
+		} else {
+			setView("full");
+		}
 	};
 
-	const cycle = () =>
-		setView((v) => {
-			if (v === "justify") return "full";
-			if (v === "full") return "hidden";
-			return hasJustifications ? "justify" : "full";
-		});
-
-	const viewLabel = view === "full" ? "Full" : view === "justify" ? "Justify" : "Hidden";
+	const viewLabel = view === "full" ? "Full" : "Justify";
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -678,6 +696,7 @@ export function ToolGroupCard({
 		}
 	}, [entries.length, isStreaming, view]);
 
+	/** Render a single entry in Full view (tools, thinking, or full prose). */
 	const renderEntry = (entry: ToolGroupEntry, idx: number): React.ReactNode => {
 		if (entry.kind === "tool") {
 			const name = String(entry.block.name ?? "tool");
@@ -697,9 +716,6 @@ export function ToolGroupCard({
 		if (entry.kind === "thinking") {
 			return <TrailThinkingRow key={`think-${idx}`} text={entry.text} />;
 		}
-		// Full view: in-between agent text renders as full prose directly —
-		// no "Justification" label/preview chrome. (The Justify view keeps
-		// the collapsed JustificationRow previews.)
 		return (
 			<div key={`fullprose-${idx}`} className="trail-full-prose">
 				<ChatMarkdown text={entry.text.trim()} />
@@ -707,17 +723,42 @@ export function ToolGroupCard({
 		);
 	};
 
-	const renderJustification = (entry: ToolGroupEntry, idx: number) => (
-		<JustificationRow
-			key={`just-${idx}`}
-			text={(entry as { text: string }).text}
-			open={isJustificationOpen(idx)}
-			onToggle={() => toggleJustification(idx)}
-		/>
-	);
+	/** Render a chunk in Justify view: header preview + expandable content. */
+	const renderChunk = (
+		chunk: { just: ToolGroupEntry; tools: ToolGroupEntry[] },
+		chunkIdx: number,
+		keyPrefix: string,
+	) => {
+		const isOpen = openChunks.has(chunkIdx);
+		return (
+			<div key={keyPrefix} className="trail-chunk">
+				<JustificationRow
+					text={(chunk.just as { text: string }).text}
+					open={isOpen}
+					onToggle={() => toggleChunk(chunkIdx)}
+				/>
+				{isOpen && (
+					<div className="trail-chunk-content">
+						<div className="trail-full-prose">
+							<ChatMarkdown text={(chunk.just as { text: string }).text.trim()} />
+						</div>
+						{chunk.tools.map((e, i) => renderEntry(e, i))}
+					</div>
+				)}
+			</div>
+		);
+	};
 
-	const shouldCollapseJustifications =
-		justificationParts.length > JUSTIFY_COLLAPSE_THRESHOLD;
+	const shouldCollapseChunks = chunks.length > JUSTIFY_COLLAPSE_THRESHOLD;
+	const visibleChunks =
+		shouldCollapseChunks && !showAllChunks
+			? chunks.slice(-JUSTIFY_COLLAPSE_THRESHOLD)
+			: chunks;
+	// Visible chunk indices are offset when collapsed (we show the last N).
+	const chunkIdxOffset =
+		shouldCollapseChunks && !showAllChunks
+			? chunks.length - JUSTIFY_COLLAPSE_THRESHOLD
+			: 0;
 
 	return (
 		<div className="trail-group">
@@ -725,7 +766,7 @@ export function ToolGroupCard({
 				<button
 					type="button"
 					className="trail-toggle"
-					title={`Trail view: ${view}. Click to cycle: Full → Justify → Hidden`}
+					title={`Trail view: ${view}. Click to toggle Full ↔ Justify`}
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
@@ -740,24 +781,6 @@ export function ToolGroupCard({
 					<span className="trail-toggle-view">{viewLabel}</span>
 					{anyRunning && <span className="trail-running-label">running</span>}
 				</button>
-				{view === "justify" && hasJustifications && (
-					<button
-						type="button"
-						className="trail-show-all"
-						onClick={() => {
-							if (expandAllProse) {
-								setExpandAllProse(false);
-								setShowAllJustifications(false);
-							} else {
-								setExpandAllProse(true);
-								setShowAllJustifications(true);
-							}
-						}}
-						title={expandAllProse ? "Collapse all justifications" : "Expand all justifications to full text"}
-					>
-						{expandAllProse ? "Collapse all prose" : "Show all prose"}
-					</button>
-				)}
 			</div>
 
 			{view === "full" && (
@@ -772,23 +795,19 @@ export function ToolGroupCard({
 			{view === "justify" && hasJustifications && (
 				<div className="trail-body trail-body-justify">
 					<div className="trail-list">
-						{shouldCollapseJustifications &&
-							!showAllJustifications &&
-							!expandAllProse && (
-								<button
-									type="button"
-									className="trail-earlier"
-									onClick={() => setShowAllJustifications(true)}
-								>
-									▼ {justificationParts.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
-								</button>
-							)}
-						{(shouldCollapseJustifications &&
-						!showAllJustifications &&
-						!expandAllProse
-							? justificationParts.slice(-JUSTIFY_COLLAPSE_THRESHOLD)
-							: justificationParts
-						).map((entry, idx) => renderJustification(entry, idx))}
+						{shouldCollapseChunks && !showAllChunks && (
+							<button
+								type="button"
+								className="trail-earlier"
+								onClick={() => setShowAllChunks(true)}
+							>
+								▼ {chunks.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
+							</button>
+						)}
+						{visibleChunks.map((chunk, i) =>
+							renderChunk(chunk, chunkIdxOffset + i, `chunk-${chunkIdxOffset + i}`),
+						)}
+						{/* Leading tools (before first justification) are visible in Full view only. */}
 					</div>
 				</div>
 			)}
