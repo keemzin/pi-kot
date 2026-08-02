@@ -358,9 +358,8 @@ No frontend changes are needed — the existing `AskUserQuestionPanel` component
 Add the new tool function to ALL 4 arrays. If a session was created before your change, it won't include the new tool until the session is rebuilt (restart server + new session).
 
 ### Step 5: Add to recommended extensions
-Update 3 files to show the extension in the web UI:
+Update 2 files to show the extension in the web UI:
 - `README.md` — add row to the extensions table + mention in tip section
-- `HOWTO.md` — add row to the extensions table
 - `packages/server/src/extension-manager.ts` — add entry to the EXTENSIONS array (category, verified, enablesFeatures, icon)
 
 ### SSE observation only (don't use as interception)

@@ -7,6 +7,8 @@
 
 pi-kot wraps the `@earendil-works/pi-coding-agent` SDK in an HTTP bridge with a React-based web UI. It exposes the agent's capabilities through REST, SSE, and WebSocket, giving you a fully interactive chat-and-terminal environment in your browser — no desktop app required.
 
+Changes and SDK upgrades are tracked in [CHANGELOG.md](./CHANGELOG.md).
+
 ---
 
 ## Motivation
@@ -82,7 +84,7 @@ npx pi-kot --port 3333 --host 127.0.0.1 --password secret --workspace ~/Code
 ```bash
 npm run dev
 
-# Open http://localhost:5173
+# Backend on :3332, UI at http://localhost:5173 (Vite proxies /api → :3332)
 ```
 
 ### Production
@@ -94,13 +96,7 @@ npm run start
 # Open http://localhost:3333
 ```
 
-Or build for production:
-
-```bash
-npm run build
-npm run start
-# Open http://localhost:3333
-```
+All flags also work as environment variables (`PORT`, `HOST`, `UI_PASSWORD`, `API_KEY`, `WORKSPACE_PATH`, `LOG_LEVEL`, `MINIMAL_UI`, ...) — full reference in [Configuration](#configuration).
 
 ---
 
@@ -172,7 +168,72 @@ The server exposes tunnel controls under `/api/v1/tunnel`:
 
 ## Configuration
 
-See [START.md](./START.md) for the full configuration reference — ports, auth, storage paths, and more.
+All options can be set as environment variables **or** CLI flags (with `npx pi-kot` / `pi-kot`). Flags not listed below are in `npx pi-kot --help`.
+
+### Network
+
+| Variable | Flag | Default | Description |
+|---|---|---|---|
+| `PORT` | `--port` | `3333` | HTTP listen port |
+| `HOST` | `--host` | `0.0.0.0` | Bind address (`127.0.0.1` for loopback-only) |
+| `TRUST_PROXY` | — | `false` | Trust `X-Forwarded-*` headers when behind a reverse proxy |
+| `CORS_ORIGIN` | — | `true` | CORS origin. `true` = reflect request origin; set a specific origin in production |
+
+### Authentication
+
+| Variable | Flag | Default | Description |
+|---|---|---|---|
+| `UI_PASSWORD` | `--password` | — | Enable password auth; browser shows a login form |
+| `API_KEY` | `--api-key` | — | Static API key for scripts/CI; also accepted as password in the login form |
+
+If both are unset, auth is **disabled** and the UI opens freely.
+
+### Storage paths
+
+| Variable | Flag | Default | Description |
+|---|---|---|---|
+| `WORKSPACE_PATH` | `--workspace` | `~/.pi-kot/workspace/default` | Default project workspace directory |
+| `SESSION_DIR` | — | `~/.pi-kot/sessions` | Session data directory |
+| `FORGE_DATA_DIR` | — | `~/.pi-kot` | Base config/data directory (MCP config, tool/skill overrides) |
+| `PI_CONFIG_DIR` | — | `~/.pi/agent` | pi agent configuration directory (used by the SDK; `~/.pi/agent-dev` in dev mode) |
+
+### Data files (under `FORGE_DATA_DIR` by default)
+
+| Variable | Default | Description |
+|---|---|---|
+| `MCP_CONFIG_FILE` | `$FORGE_DATA_DIR/mcp.json` | MCP server configurations |
+| `MCP_STDIO_TRUST_FILE` | `$FORGE_DATA_DIR/mcp-stdio-trust.json` | Trusted stdio MCP servers |
+| `TOOL_OVERRIDES_FILE` | `$FORGE_DATA_DIR/tool-overrides.json` | Per-project tool enable/disable overrides |
+| `SKILL_OVERRIDES_FILE` | `$FORGE_DATA_DIR/skill-overrides.json` | Per-project skill enable/disable overrides |
+
+### Logging & Environment
+
+| Variable | Flag | Default | Description |
+|---|---|---|---|
+| `LOG_LEVEL` | `--log-level` | `info` | Server log level: `info`, `debug`, `warn`, `error` |
+| `PIKOT_MODE` | — | — | Set to `dev` to use `-dev`-suffixed data dirs (`~/.pi-kot-dev/`) so dev data doesn't mix with production |
+| `NODE_ENV` | — | `production` | Set automatically by the server; `test` disables request logging |
+| `MOUNT_CWD_PROJECT` | — | auto-set by CLI | When set, auto-creates a project for the given directory; the CLI shim sets it to the current working directory |
+
+### Static client serving
+
+| Variable | Default | Description |
+|---|---|---|
+| `SERVE_CLIENT` | `true` | Serve the built Vite client from `CLIENT_DIST_PATH`; set `false` to run API-only (e.g. behind a separate reverse proxy serving the client) |
+| `CLIENT_DIST_PATH` | `packages/client/dist` (in-repo) or `dist/client` (npm install) | Path to the built client dist directory; auto-detected |
+
+### Orchestration & UI
+
+| Variable | Default | Description |
+|---|---|---|
+| `ORCHESTRATION_ENABLED` | `true` | Enable supervisor/worker orchestration |
+| `MINIMAL_UI` | `false` | Hide optional UI panels (terminal, git, changes). Useful for locked-down deployments |
+
+### Dev-mode only (Vite)
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_PORT` | `3332` | Backend port that the Vite dev proxy forwards `/api` requests to (the `dev` script sets this to `3332`) |
 
 ---
 
@@ -203,6 +264,33 @@ The Git panel shows the current repository's status — modified files, staged c
 - **Branch**: Switch branches
 - **Commit history**: Browse commits and expand each one to see changed files
 - **Inline commit diffs**: Click a file inside a commit to view its unified diff directly in the panel
+
+---
+
+## MCP Servers
+
+pi-kot supports Model Context Protocol (MCP) servers — tools, resources, and prompts exposed by external services.
+
+### Adding a server
+
+1. Open **Settings** → **MCP** tab
+2. Click **Add Server**
+3. Choose **Stdio** (local command) or **HTTP** (remote URL)
+4. Configure and save
+
+### Managing tools
+
+Each MCP server exposes tools that the agent can use. You can enable/disable individual tools per project from the MCP settings panel.
+
+---
+
+## Orchestration
+
+pi-kot supports multi-agent workflows — a supervisor session can spawn worker sub-agents to handle tasks in parallel.
+
+- Click the **⚡ (Orchestration)** toggle in the toolbar to enable it
+- Workers appear nested under their supervisor in the sidebar and show their own message stream
+- Workers can be interrupted, killed, or detached individually
 
 ---
 
@@ -244,7 +332,7 @@ Ask the agent:
 > "Create a futuristic button with hover effects"
 
 The agent will:
-1. Write the HTML to `.pi/web/artifacts/button.html`
+1. Write the HTML to `.pi/artifacts/button.html`
 2. Output: `[Live Preview](/api/v1/artifacts/button.html)`
 3. You see the rendered button inline in chat
 
@@ -276,6 +364,38 @@ You can toggle automatic client-side image compression before sending images to 
 
 ---
 
+## Troubleshooting
+
+### "Connection lost" in terminal
+
+The terminal reconnects automatically with exponential backoff. If it doesn't reconnect:
+
+1. Check that the server is still running
+2. Refresh the page — tabs are restored from sessionStorage
+3. If the server restarted, PTY sessions are lost — close and reopen tabs
+
+### Login form keeps showing
+
+Your token expired or the server password changed. Sign out and log in again (or use **Clear stored token** on the login form).
+
+### Terminal feels laggy on mobile
+
+- Tap responsiveness uses native touch events with minimal delay
+- Arrow keys and input travel over WebSocket to the server — if the server is far away, you'll feel it. Try a local server for snappier response
+- Try the **CTRL toggle** (quick-keys bar) instead of long-press for Ctrl+letter combinations
+
+### Touch gestures not working
+
+- Make sure you're touching the terminal area, not the tab bar or quick-keys bar
+- For long-press + drag: **hold still for 150ms first**, then drag — don't swipe immediately
+- If text gets selected, the browser's default behavior is interfering — tap once to focus the terminal first
+
+### Keyboard not appearing on mobile
+
+Tap anywhere on the terminal area to focus it. The quick-keys bar should appear, and the system keyboard should open.
+
+---
+
 ## Project Structure
 
 ```
@@ -288,7 +408,7 @@ pi-kot/
 │   │       ├── hooks/        # Custom hooks (touch swipe, extensions, ...)
 │   │       └── lib/          # Utilities (API client, SSE, theme, tool-registry, ...)
 │   │                          # Note: no normalize.ts — SDK types consumed directly
-│   └── server/          # Express server (REST, SSE, WebSocket, PTY)
+│   └── server/          # Fastify server (REST, SSE, WebSocket, PTY)
 │       └── src/
 │           ├── routes/       # API routes (sessions, terminal, git, files, projects, extensions, tunnel, ...)
 │           ├── mcp/          # MCP server registry & manager
@@ -296,7 +416,7 @@ pi-kot/
 │           ├── ask-user-question/ # Web-compatible tool wrappers (e.g. plan_mode_question)
 │           ├── tunnel/       # Tunnel providers, registry, service, install/doctor helpers
 │           └── ...           # Config, auth, PTY manager, extension manager, etc.
-├── START.md             # Configuration & running guide
+├── CHANGELOG.md         # Release notes & SDK upgrade history
 ```
 
 ---
@@ -306,8 +426,8 @@ pi-kot/
 | Layer | Technology |
 |---|---|
 | **UI** | React, TypeScript, Vite, xterm.js, CodeMirror, Zustand |
-| **Server** | Express, ws (WebSocket), node-pty |
-| **SDK** | `@earendil-works/pi-coding-agent` |
+| **Server** | Fastify, ws (WebSocket), node-pty |
+| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.83.0) |
 | **Auth** | JWT, scrypt password hashing |
 | **State** | Zustand (client), JSONL session files (server) |
 
