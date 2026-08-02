@@ -1,0 +1,816 @@
+import { useEffect, useRef, useState } from "react";
+import { ChatMarkdown } from "./ChatMarkdown";
+import { ChatEditDiff } from "./ChatEditDiff";
+import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
+import { usePreferencesStore } from "../stores/preferences-store";
+
+/* ── Types ─────────────────────────────────────────────────────────────── */
+
+/** Local mirror of tool-result message shape (SDK toolResult role). */
+export interface PairableMessage {
+	role?: string;
+	type?: string;
+	content?: unknown;
+	toolCallId?: unknown;
+	details?: unknown;
+	isError?: boolean;
+	[key: string]: unknown;
+}
+
+export type ToolGroupEntry =
+	| { kind: "tool"; block: Record<string, unknown>; result?: PairableMessage | undefined }
+	| { kind: "thinking"; text: string }
+	| { kind: "justification"; text: string };
+
+export type TrailSegment = {
+	entries: ToolGroupEntry[];
+	/** Stable id of the first tool call — used as a React key so the card
+	 *  instance survives as more tools stream in and join the group. */
+	firstToolId?: string;
+};
+
+export type GroupedTurn = {
+	/** Trail runs, each rendered as one ToolGroupCard. */
+	segments: TrailSegment[];
+	/** Tool calls handled by a registered custom renderer (break out of the trail). */
+	customTools: {
+		name: string;
+		id: string;
+		args: Record<string, unknown>;
+		result?: PairableMessage | undefined;
+		msgId?: string;
+	}[];
+	/** Non-assistant role messages (bashExecution, branchSummary, custom…). */
+	specials: Record<string, unknown>[];
+	/** Text/thinking after the last tool call — the actual answer. */
+	finalParts: { type: "text" | "thinking"; text: string }[];
+};
+
+/** Noise tools that never surface as trail rows (openkot skips these too). */
+const SKIP_TOOL_NAMES = new Set([
+	"step-start",
+	"step_start",
+	"reasoning",
+	"thinking",
+	"snapshot",
+]);
+
+/**
+ * Split SDK assistant messages of one turn into trail segments + final answer.
+ * Pure function — testable without React.
+ *
+ * Rules (mirroring openkot's ChatMessages trail slicing):
+ *  - text blocks between tool calls → `justification` entries in the trail
+ *  - text after the LAST tool call → `finalParts` (the answer)
+ *  - thinking/reasoning blocks → `thinking` entries (rendered only if showThinking)
+ *  - custom-rendered tools break the trail into a new segment
+ *  - non-assistant role messages are collected as `specials`
+ */
+export function buildGroupedTurn(
+	msgs: Record<string, unknown>[],
+	getResult: (id: string) => PairableMessage | undefined,
+	isCustomTool: (name: string) => boolean,
+): GroupedTurn {
+	const segments: TrailSegment[] = [];
+	const customTools: GroupedTurn["customTools"] = [];
+	const specials: Record<string, unknown>[] = [];
+	let current: ToolGroupEntry[] | undefined;
+	let currentFirstToolId: string | undefined;
+	let prose: { type: "text" | "thinking"; text: string }[] = [];
+
+	const pushSegment = (): void => {
+		if (current !== undefined && current.length > 0) {
+			segments.push({ entries: current, firstToolId: currentFirstToolId });
+		}
+		current = undefined;
+		currentFirstToolId = undefined;
+	};
+
+	const flushProseToTrail = (): void => {
+		if (prose.length === 0) return;
+		if (current === undefined) current = [];
+		for (const p of prose) {
+			current.push(
+				p.type === "text"
+					? { kind: "justification", text: p.text }
+					: { kind: "thinking", text: p.text },
+			);
+		}
+		prose = [];
+	};
+
+	for (const m of msgs) {
+		const role = m.role as string | undefined;
+		if (role !== "assistant") {
+			// bashExecution / branchSummary / custom / unknown roles
+			pushSegment();
+			specials.push(m);
+			continue;
+		}
+
+		const content = m.content;
+		if (!Array.isArray(content)) {
+			const text = typeof content === "string" ? content : "";
+			if (text.trim().length > 0) prose.push({ type: "text", text });
+			continue;
+		}
+
+		for (const chunk of content as Record<string, unknown>[]) {
+			const blockType = chunk.type as string | undefined;
+
+			if (blockType === "toolCall") {
+				const toolName = String(chunk.name ?? "tool");
+				const id = String(chunk.id ?? "");
+				const args = (chunk.arguments ?? {}) as Record<string, unknown>;
+
+				if (SKIP_TOOL_NAMES.has(toolName.toLowerCase())) {
+					// Noise tool — drop it but keep surrounding prose in the trail
+					continue;
+				}
+
+				flushProseToTrail();
+
+				if (isCustomTool(toolName)) {
+					pushSegment();
+					customTools.push({
+						name: toolName,
+						id,
+						args,
+						result: id ? getResult(id) : undefined,
+						msgId: String(m.id ?? ""),
+					});
+				} else {
+					if (current === undefined) current = [];
+					if (!currentFirstToolId && id) currentFirstToolId = id;
+					current.push({
+						kind: "tool",
+						block: { name: toolName, arguments: args, id },
+						result: id ? getResult(id) : undefined,
+					});
+				}
+			} else if (
+				blockType === "text" &&
+				typeof chunk.text === "string" &&
+				chunk.text.trim() !== ""
+			) {
+				prose.push({ type: "text", text: chunk.text as string });
+			} else if (
+				(blockType === "thinking" || blockType === "reasoning") &&
+				typeof chunk.thinking === "string" &&
+				chunk.thinking.trim() !== ""
+			) {
+				prose.push({ type: "thinking", text: chunk.thinking as string });
+			}
+		}
+	}
+
+	// Prose remaining after the last tool call = the answer
+	const finalParts = prose;
+	pushSegment();
+
+	return { segments, customTools, specials, finalParts };
+}
+
+/* ── Tool presentation helpers (openkot-style friendly names/icons) ────── */
+
+export function getToolDisplayName(toolName: string): string {
+	const t = toolName.toLowerCase();
+	const map: Record<string, string> = {
+		edit: "Edited", apply_patch: "Edited", str_replace: "Edited",
+		multiedit: "Edited",
+		write: "Wrote", create: "Wrote", file_write: "Wrote",
+		read: "Read", view: "Read", cat: "Read", file_read: "Read",
+		bash: "Shell Command", shell: "Shell Command", cmd: "Shell Command", terminal: "Shell Command",
+		list: "Listed", ls: "Listed", dir: "Listed", list_files: "Listed",
+		grep: "Searched", search: "Searched", ripgrep: "Searched",
+		find: "Found", glob: "Found",
+		webfetch: "Fetched", fetch: "Fetched", fetch_content: "Fetched", curl: "Fetched", wget: "Fetched",
+		websearch: "Searched Web", web_search: "Searched Web", web_fetch: "Fetched",
+		searxng_searxng_web_search: "Searched", codesearch: "Searched",
+		todowrite: "Updated Todos", todoread: "Read Todos",
+		ask_user_question: "Asked", plan_mode_question: "Asked",
+		task: "Delegated Task",
+		javascript_repl: "Repl",
+	};
+	if (map[t]) return map[t];
+	if (t.startsWith("ctx_"))
+		return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+	if (t.startsWith("git"))
+		return "Git " + t.slice(3).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+	// MCP-style / default: snake_case → Title Case
+	return toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** SVG path for a tool's icon (openkot-style). */
+export function getToolIconPath(toolName: string): string {
+	const t = toolName.toLowerCase();
+	if (t === "edit" || t === "multiedit" || t === "apply_patch" || t === "str_replace")
+		return "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z";
+	if (t === "write" || t === "create" || t === "file_write")
+		return "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6";
+	if (t === "read" || t === "view" || t === "file_read" || t === "cat")
+		return "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
+	if (t === "bash" || t === "shell" || t === "cmd" || t === "terminal")
+		return "M4 17l6-6-6-6M12 19h8";
+	if (t === "list" || t === "ls" || t === "dir" || t === "list_files")
+		return "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z";
+	if (t === "grep" || t === "search" || t === "find" || t === "ripgrep")
+		return "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0zM10 7v3m0 0v3m0-3h3m-3 0H7";
+	if (t === "glob")
+		return "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z";
+	if (t === "webfetch" || t === "fetch" || t === "fetch_content" || t === "curl" || t === "wget")
+		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z";
+	if (t.includes("web_search") || t.includes("searxng") || t === "websearch" || t === "codesearch")
+		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z";
+	if (t === "todowrite" || t === "todoread")
+		return "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11";
+	if (t === "task")
+		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 8v4l3 3";
+	if (t === "ask_user_question" || t === "plan_mode_question" || t.includes("question"))
+		return "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01";
+	if (t.startsWith("git"))
+		return "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9";
+	// default wrench
+	return "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z";
+}
+
+/** One-line description of a tool call derived from its input args. */
+export function getToolDescription(
+	toolName: string,
+	args: Record<string, unknown>,
+): string {
+	const t = toolName.toLowerCase();
+	if (t === "bash" || t === "shell" || t === "cmd" || t === "terminal") {
+		const cmd = args.command ?? args.cmd ?? "";
+		return typeof cmd === "string" ? cmd.split("\n")[0]!.slice(0, 80) : "";
+	}
+	if (
+		t === "read" || t === "view" || t === "cat" || t === "write" ||
+		t === "create" || t === "edit" || t === "apply_patch" || t === "multiedit"
+	) {
+		const p = args.filePath ?? args.file_path ?? args.path ?? args.file ?? "";
+		if (typeof p === "string" && p) {
+			const parts = p.replace(/\\/g, "/").split("/");
+			return parts[parts.length - 1] ?? p;
+		}
+	}
+	if (t === "grep" || t === "search" || t === "find" || t === "ripgrep") {
+		const q = args.pattern ?? args.query ?? "";
+		return typeof q === "string" ? `"${q.slice(0, 60)}"` : "";
+	}
+	if (t === "glob") {
+		const p = args.pattern ?? args.glob ?? "";
+		return typeof p === "string" ? `"${p.slice(0, 60)}"` : "";
+	}
+	if (t === "webfetch" || t === "fetch" || t === "fetch_content" || t === "curl" || t === "wget") {
+		const url = args.url ?? args.URL ?? "";
+		return typeof url === "string" ? url.slice(0, 80) : "";
+	}
+	if (t.includes("web_search") || t.includes("searxng") || t === "websearch" || t === "codesearch") {
+		const q = args.query ?? args.q ?? "";
+		return typeof q === "string" ? `"${q.slice(0, 60)}"` : "";
+	}
+	if (t === "ask_user_question" || t === "plan_mode_question") {
+		const qs = args.questions;
+		if (Array.isArray(qs) && qs.length > 0) {
+			const first = qs[0] as Record<string, unknown>;
+			const q = typeof first?.question === "string" ? first.question : "";
+			return q.slice(0, 80);
+		}
+	}
+	if (t.startsWith("ctx_")) {
+		const queries = args.queries;
+		if (Array.isArray(queries) && queries.length > 0)
+			return `"${String(queries[0]).slice(0, 60)}"`;
+		const path = args.path ?? args.source;
+		if (typeof path === "string") return path.slice(0, 80);
+	}
+	const fallback =
+		args.url ?? args.query ?? args.pattern ?? args.path ?? args.filePath ?? "";
+	return typeof fallback === "string" ? fallback.slice(0, 80) : "";
+}
+
+/* ── Tool icon (emoji) + filename/diff helpers ─────────────────────────── */
+
+/** Map a tool name to a descriptive emoji icon. */
+export function getToolIcon(name: string): string {
+	const n = name.toLowerCase();
+	if (n.includes("bash") || n.includes("shell") || n.includes("exec") || n.includes("run"))
+		return "⚡";
+	if (n.includes("read") || n.includes("cat") || n.includes("view") || n.includes("get"))
+		return "📄";
+	if (n.includes("write") || n.includes("create") || n.includes("save") || n.includes("put"))
+		return "✏️";
+	if (n.includes("edit") || n.includes("patch") || n.includes("update") || n.includes("replace"))
+		return "🔧";
+	if (n.includes("search") || n.includes("grep") || n.includes("find") || n.includes("ls") || n.includes("list"))
+		return "🔍";
+	if (n.includes("delete") || n.includes("remove") || n.includes("rm"))
+		return "🗑️";
+	if (n.includes("move") || n.includes("rename") || n.includes("mv"))
+		return "📦";
+	if (n.includes("git") || n.includes("commit") || n.includes("branch"))
+		return "🌿";
+	if (n.includes("web") || n.includes("fetch") || n.includes("http") || n.includes("url"))
+		return "🌐";
+	if (n.includes("test") || n.includes("spec")) return "🧪";
+	if (n.includes("ask") || n.includes("question") || n.includes("prompt"))
+		return "💬";
+	return "🔩";
+}
+
+/**
+ * Extract a human-friendly filename from a tool result/block for display
+ * in the tool entry header. Reads from `details` or `input` since the
+ * SDK stores it on different fields depending on the tool and version.
+ */
+export function extractFilename(
+	message: Record<string, unknown>,
+): string | undefined {
+	const details = message.details as
+		| { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+		| undefined;
+	const input = message.input as
+		| { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+		| undefined;
+	for (const src of [details, input]) {
+		if (src === undefined) continue;
+		if (typeof src.path === "string") return src.path;
+		if (typeof src.filename === "string") return src.filename;
+		if (typeof src.file === "string") return src.file;
+		if (typeof src.file_path === "string") return src.file_path;
+	}
+	return undefined;
+}
+
+/**
+ * Cheap +/- counter for a unified diff string. Skips `---`/`+++` header lines
+ * so only actual additions/deletions are counted.
+ */
+export function countDiffLines(diff: string): { adds: number; dels: number } {
+	let adds = 0;
+	let dels = 0;
+	for (const line of diff.split("\n")) {
+		if (line.startsWith("+++") || line.startsWith("---")) continue;
+		if (line.startsWith("+")) adds += 1;
+		else if (line.startsWith("-")) dels += 1;
+	}
+	return { adds, dels };
+}
+
+/* ── ToolCallEntry — single tool call + result as a timeline node ──────── */
+
+export function ToolCallEntry({
+	block,
+	result,
+	initialExpanded = false,
+	displayName,
+	previewOverride,
+	icon,
+	suppressRunning = false,
+}: {
+	block: Record<string, unknown>;
+	result: PairableMessage | undefined;
+	initialExpanded?: boolean;
+	/** Friendly label override (grouped mode shows "Read"/"Wrote"/…). */
+	displayName?: string;
+	/** One-line description override (grouped mode derives from args). */
+	previewOverride?: string;
+	/** Custom icon node (grouped mode uses SVG paths). */
+	icon?: React.ReactNode;
+	/** When true, a missing result is treated as cancelled/aborted rather than
+	 *  running (used after the turn stopped streaming). */
+	suppressRunning?: boolean;
+}) {
+	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
+	const [justCompleted, setJustCompleted] = useState(false);
+	const wasRunning = useRef(result === undefined);
+	const argsPreRef = useRef<HTMLPreElement>(null);
+	useEffect(() => {
+		if (wasRunning.current && result !== undefined) {
+			setJustCompleted(true);
+			const t = setTimeout(() => setJustCompleted(false), 600);
+			return () => clearTimeout(t);
+		}
+		wasRunning.current = result === undefined;
+	}, [result]);
+	const name = String(block.name ?? "tool");
+	const args = block.arguments ?? block.input ?? {};
+	const argsText = typeof args === "string" ? args : JSON.stringify(args, null, 2);
+
+	const isError = result?.isError === true;
+	const isRunning = result === undefined && !suppressRunning;
+
+	// Auto-scroll the args pane to bottom while the tool is streaming
+	useEffect(() => {
+		if (isRunning && detailsOpen && argsPreRef.current) {
+			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
+		}
+	});
+
+	const resultContent = Array.isArray(result?.content) ? result?.content : [];
+	const outputText = resultContent
+		.filter((c): c is { type: "text"; text: string } => {
+			const o = c as { type?: unknown; text?: unknown };
+			return o.type === "text" && typeof o.text === "string";
+		})
+		.map((c) => c.text)
+		.join("\n");
+
+	// Smart disclosure: first line of output shown inline
+	const outputPreview =
+		outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
+
+	const preview =
+		previewOverride ?? toolPreviewFromArgs(name, args) ?? undefined;
+	const iconNode = icon ?? getToolIcon(name);
+
+	// For `edit`, prefer the unified diff string the SDK puts on
+	// result.details (details.diff). When absent (e.g. some providers),
+	// fall back to outputText so the diff card still renders.
+	const editDiff =
+		name === "edit" && result !== undefined
+			? (() => {
+					const d = (result.details as { diff?: unknown } | undefined)?.diff;
+					return typeof d === "string" ? d : outputText;
+				})()
+			: undefined;
+	const editFn =
+		name === "edit" && result !== undefined
+			? extractFilename(result)
+			: undefined;
+	const editStats =
+		editDiff !== undefined ? countDiffLines(editDiff) : undefined;
+
+	return (
+		<div
+			className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
+		>
+			<span
+				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}${justCompleted ? " just-completed" : ""}`}
+				aria-hidden="true"
+			>
+				{iconNode}
+			</span>
+			<div className="tool-timeline-content">
+				<div className="tool-timeline-row">
+					<span className="tool-timeline-name">{displayName ?? name}</span>
+					{preview && (
+						<span className="tool-timeline-arg" title={preview}>
+							{preview}
+						</span>
+					)}
+					{isRunning && (
+						<span className="tool-timeline-running" aria-label="running">
+							running…
+						</span>
+					)}
+					{(argsText.length > 2 || outputText.length > 0) && (
+						<button
+							type="button"
+							className="tool-timeline-details-btn"
+							onClick={() => setDetailsOpen((o) => !o)}
+							aria-expanded={detailsOpen}
+							aria-label={detailsOpen ? "Hide details" : "Show details"}
+						>
+							{detailsOpen ? "hide" : "details"}
+						</button>
+					)}
+				</div>
+				{/* Smart-disclosure output preview (always shown when not expanded) */}
+				{!isRunning && !detailsOpen && outputPreview.length > 0 && (
+					<div className="tool-timeline-output-preview" title={outputPreview}>
+						{isError ? "✖ " : "✓ "}
+						{outputPreview}
+					</div>
+				)}
+				{/* Expanded details pane */}
+				{detailsOpen && (
+					<div className="tool-timeline-details">
+						{argsText.length > 2 && (
+							<div>
+								<div className="tool-timeline-section-label">input</div>
+								<pre className="tool-timeline-code" ref={argsPreRef}>{argsText}</pre>
+							</div>
+						)}
+						{editDiff !== undefined && editStats !== undefined ? (
+							<div className="overflow-hidden px-3 pb-2">
+								<ChatEditDiff
+									diff={editDiff}
+									filename={editFn}
+									adds={editStats.adds}
+									dels={editStats.dels}
+								/>
+							</div>
+						) : outputText.length > 0 ? (
+							<div>
+								<div className="tool-timeline-section-label">
+									{isError ? "error" : "output"}
+									{editStats !== undefined && !isError && (
+										<span className="ml-2 font-mono text-[10px]">
+											<span className="text-emerald-400 light:text-emerald-700">
+												+{editStats.adds}
+											</span>{" "}
+											<span className="text-red-400 light:text-red-700">
+												-{editStats.dels}
+											</span>
+											{editFn !== undefined && (
+												<span className="ml-1 text-neutral-500">{editFn}</span>
+											)}
+										</span>
+									)}
+								</div>
+								<pre className="tool-timeline-code">{outputText}</pre>
+							</div>
+						) : null}
+					</div>
+				)}
+			</div>
+		</div>
+	);
+}
+
+/* ── Thinking row (only rendered when showThinking is on) ───────────────── */
+
+function TrailThinkingRow({ text }: { text: string }) {
+	const showThinking = usePreferencesStore((s) => s.showThinking);
+	const [open, setOpen] = useState(false);
+	if (!showThinking) return null;
+	return (
+		<div className="trail-thinking">
+			<div
+				role="button"
+				onClick={() => setOpen((o) => !o)}
+				className="trail-thinking-header"
+			>
+				<span className="trail-justification-dot" />
+				<span className="trail-thinking-label">Thinking</span>
+				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
+			</div>
+			{open && <div className="trail-thinking-body">{text}</div>}
+		</div>
+	);
+}
+
+/* ── Justification row — collapsed preview of in-between agent text ────── */
+
+const JUSTIFICATION_PREVIEW_LEN = 120;
+
+function JustificationRow({
+	text,
+	open,
+	onToggle,
+}: {
+	text: string;
+	open: boolean;
+	onToggle: () => void;
+}) {
+	const trimmed = text.trim().replace(/\s+/g, " ");
+	const truncated = trimmed.length > JUSTIFICATION_PREVIEW_LEN;
+	const preview = truncated
+		? trimmed.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
+		: trimmed;
+	return (
+		<div className={`trail-justification${open ? " expanded" : " collapsed"}`}>
+			<div
+				role="button"
+				tabIndex={0}
+				onClick={onToggle}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onToggle();
+					}
+				}}
+				className="trail-justification-header"
+			>
+				<span className="trail-justification-dot" />
+				<span className="trail-justification-label">Justification</span>
+				{!open && (
+					<span className="trail-justification-preview" title={preview}>
+						{preview}
+					</span>
+				)}
+				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
+			</div>
+			{open && (
+				<div className="trail-justification-body">
+					<ChatMarkdown text={text.trim()} />
+				</div>
+			)}
+		</div>
+	);
+}
+
+/* ── ToolGroupCard — the "Trail" ────────────────────────────────────────── */
+
+const JUSTIFY_COLLAPSE_THRESHOLD = 3;
+
+export function ToolGroupCard({
+	entries,
+	isStreaming = false,
+}: {
+	entries: ToolGroupEntry[];
+	isStreaming?: boolean;
+}) {
+	const hasJustifications = entries.some((e) => e.kind === "justification");
+	const [view, setView] = useState<"full" | "justify" | "hidden">(
+		isStreaming ? "full" : hasJustifications ? "justify" : "hidden",
+	);
+	const [showAllJustifications, setShowAllJustifications] = useState(false);
+	const [expandAllProse, setExpandAllProse] = useState(false);
+
+	// Track streaming state transitions: force full while streaming,
+	// auto-collapse to justify shortly after streaming stops.
+	const prevStreaming = useRef(isStreaming);
+	const hasJustificationsRef = useRef(hasJustifications);
+	hasJustificationsRef.current = hasJustifications;
+
+	useEffect(() => {
+		if (isStreaming && !prevStreaming.current) {
+			setView("full");
+		}
+		if (!isStreaming && prevStreaming.current) {
+			const timer = setTimeout(() => {
+				setView(hasJustificationsRef.current ? "justify" : "hidden");
+			}, 3000);
+			prevStreaming.current = isStreaming;
+			return () => clearTimeout(timer);
+		}
+		prevStreaming.current = isStreaming;
+	}, [isStreaming]);
+
+	const anyRunning = isStreaming && entries.some(
+		(e) => e.kind === "tool" && e.result === undefined,
+	);
+
+	const justificationParts = entries.filter((e) => e.kind === "justification");
+
+	// Per-row expansion state (indices into justificationParts). The global
+	// "Show all prose" toggle overrides it.
+	const [openJustificationIdx, setOpenJustificationIdx] = useState<Set<number>>(
+		() => new Set(),
+	);
+	const isJustificationOpen = (idx: number): boolean =>
+		expandAllProse || openJustificationIdx.has(idx);
+	const toggleJustification = (idx: number): void => {
+		setOpenJustificationIdx((prev) => {
+			const next = new Set(prev);
+			if (next.has(idx)) next.delete(idx);
+			else next.add(idx);
+			return next;
+		});
+	};
+
+	const cycle = () =>
+		setView((v) => {
+			if (v === "justify") return "full";
+			if (v === "full") return "hidden";
+			return hasJustifications ? "justify" : "full";
+		});
+
+	const viewLabel = view === "full" ? "Full" : view === "justify" ? "Justify" : "Hidden";
+
+	const scrollRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (isStreaming && view === "full" && scrollRef.current) {
+			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+		}
+	}, [entries.length, isStreaming, view]);
+
+	const renderEntry = (entry: ToolGroupEntry, idx: number): React.ReactNode => {
+		if (entry.kind === "tool") {
+			const name = String(entry.block.name ?? "tool");
+			const args = (entry.block.arguments ?? {}) as Record<string, unknown>;
+			return (
+				<ToolCallEntry
+					key={`tool-${idx}-${String(entry.block.id ?? "")}`}
+					block={entry.block}
+					result={entry.result}
+					displayName={getToolDisplayName(name)}
+					previewOverride={getToolDescription(name, args) || undefined}
+					icon={<TrailIcon toolName={name} />}
+					suppressRunning={!isStreaming}
+				/>
+			);
+		}
+		if (entry.kind === "thinking") {
+			return <TrailThinkingRow key={`think-${idx}`} text={entry.text} />;
+		}
+		// Full view: in-between agent text renders as full prose directly —
+		// no "Justification" label/preview chrome. (The Justify view keeps
+		// the collapsed JustificationRow previews.)
+		return (
+			<div key={`fullprose-${idx}`} className="trail-full-prose">
+				<ChatMarkdown text={entry.text.trim()} />
+			</div>
+		);
+	};
+
+	const renderJustification = (entry: ToolGroupEntry, idx: number) => (
+		<JustificationRow
+			key={`just-${idx}`}
+			text={(entry as { text: string }).text}
+			open={isJustificationOpen(idx)}
+			onToggle={() => toggleJustification(idx)}
+		/>
+	);
+
+	const shouldCollapseJustifications =
+		justificationParts.length > JUSTIFY_COLLAPSE_THRESHOLD;
+
+	return (
+		<div className="trail-group">
+			<div className="trail-header">
+				<button
+					type="button"
+					className="trail-toggle"
+					title={`Trail view: ${view}. Click to cycle: Full → Justify → Hidden`}
+					onClick={cycle}
+				>
+					<span className="trail-toggle-icon">
+						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+							<circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
+							<circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+							<circle cx="19" cy="12" r="2" fill="currentColor" stroke="none" />
+							<path d="M7 12h3M14 12h3" />
+						</svg>
+					</span>
+					<span className="trail-toggle-label">Trail</span>
+					<span className="trail-toggle-view">{viewLabel}</span>
+					{anyRunning && <span className="trail-running-label">running</span>}
+				</button>
+				{view === "justify" && hasJustifications && (
+					<button
+						type="button"
+						className="trail-show-all"
+						onClick={() => {
+							if (expandAllProse) {
+								setExpandAllProse(false);
+								setShowAllJustifications(false);
+							} else {
+								setExpandAllProse(true);
+								setShowAllJustifications(true);
+							}
+						}}
+						title={expandAllProse ? "Collapse all justifications" : "Expand all justifications to full text"}
+					>
+						{expandAllProse ? "Collapse all prose" : "Show all prose"}
+					</button>
+				)}
+			</div>
+
+			{view === "full" && (
+				<div
+					ref={scrollRef}
+					className={`trail-body trail-body-full${isStreaming ? " streaming" : ""}`}
+				>
+					<div className="trail-list">{entries.map(renderEntry)}</div>
+				</div>
+			)}
+
+			{view === "justify" && hasJustifications && (
+				<div className="trail-body trail-body-justify">
+					<div className="trail-list">
+						{shouldCollapseJustifications &&
+							!showAllJustifications &&
+							!expandAllProse && (
+								<button
+									type="button"
+									className="trail-earlier"
+									onClick={() => setShowAllJustifications(true)}
+								>
+									▼ {justificationParts.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
+								</button>
+							)}
+						{(shouldCollapseJustifications &&
+						!showAllJustifications &&
+						!expandAllProse
+							? justificationParts.slice(-JUSTIFY_COLLAPSE_THRESHOLD)
+							: justificationParts
+						).map((entry, idx) => renderJustification(entry, idx))}
+					</div>
+				</div>
+			)}
+
+		</div>
+	);
+}
+
+function TrailIcon({ toolName }: { toolName: string }) {
+	return (
+		<svg
+			width="11"
+			height="11"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="2"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			style={{ flexShrink: 0 }}
+		>
+			<path d={getToolIconPath(toolName)} />
+		</svg>
+	);
+}

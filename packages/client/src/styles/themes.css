@@ -4802,6 +4802,198 @@ strong {
   scroll-behavior: smooth;
 }
 
+/* ── Tool trail (grouped mode, openkot-style) ───────────────────────── */
+.trail-group {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0;
+  animation: toolNodeIn 0.2s ease-out;
+}
+.trail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trail-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 2px 0;
+}
+.trail-toggle:hover .trail-toggle-label { color: var(--text-secondary); }
+.trail-toggle-icon {
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+}
+.trail-toggle-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.trail-toggle-view {
+  font-size: 10px;
+  color: var(--text-dim);
+  opacity: 0.75;
+  font-family: var(--font-mono);
+}
+.trail-running-label {
+  font-size: 10px;
+  color: var(--accent);
+  animation: toolPulse 1.4s ease-in-out infinite;
+  font-family: var(--font-mono);
+}
+.trail-show-all {
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 2px 0;
+}
+.trail-show-all:hover { color: var(--accent-strong, var(--accent-text)); }
+
+/* Trail body — vertical rail with rows */
+.trail-body {
+  margin-top: 2px;
+}
+/* During streaming let the trail grow the page (openkot behavior). */
+.trail-body-full.streaming {
+  min-height: 40px;
+}
+.trail-list {
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* Justification row — collapsed preview of in-between agent text */
+.trail-justification {
+  display: flex;
+  flex-direction: column;
+}
+.trail-justification-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+.trail-justification-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-dim);
+  opacity: 0.7;
+}
+.trail-justification-icon {
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.trail-justification-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.trail-justification-preview {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.trail-justification-chevron {
+  font-size: 9px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: transform 0.15s var(--ease);
+}
+.trail-justification.expanded .trail-justification-chevron {
+  transform: rotate(90deg);
+}
+.trail-justification-body {
+  padding-left: 23px;
+  padding-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.trail-justification-body .md-p { margin: 0 0 6px; }
+.trail-justification-body .md-p:last-child { margin-bottom: 0; }
+
+/* Full-prose rendering of in-between agent text inside the trail */
+.trail-full-prose {
+  padding-left: 23px;
+  padding-top: 2px;
+  padding-bottom: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.trail-full-prose .md-p { margin: 0 0 6px; }
+.trail-full-prose .md-p:last-child { margin-bottom: 0; }
+
+/* Thinking row inside the trail */
+.trail-thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.trail-thinking-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.trail-thinking-body {
+  padding-left: 23px;
+  padding-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+
+/* "▼ N earlier steps" button in justify view */
+.trail-earlier {
+  appearance: none;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.trail-earlier:hover { color: var(--text-secondary); }
+
 /* Thinking block — collapsible reasoning panel */
 .thinking-block {
   border: 1px solid var(--border);

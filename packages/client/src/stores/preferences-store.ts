@@ -4,6 +4,17 @@ const LS_STICKY_USER_HEADER = "pi-kot/sticky-user-header";
 const LS_SHOW_TOKEN_USAGE = "pi-kot/show-token-usage";
 const LS_COMPRESS_IMAGES = "pi-kot/compress-images";
 const LS_SHOW_THINKING = "pi-kot/show-thinking";
+const LS_GROUPED_TOOL_DISPLAY = "pi-kot/grouped-tool-display";
+
+function loadGroupedToolDisplay(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const v = localStorage.getItem(LS_GROUPED_TOOL_DISPLAY);
+    return v === null ? true : v === "true";
+  } catch {
+    return true;
+  }
+}
 
 function loadStickyUserHeader(): boolean {
   if (typeof window === "undefined") return true;
@@ -54,6 +65,10 @@ export interface PreferencesState {
   setCompressImages: (enabled: boolean) => void;
   showThinking: boolean;
   setShowThinking: (enabled: boolean) => void;
+  /** openkot-style tool trail grouping (one Trail card per turn, interstitial
+   *  text collapsed into justification previews). */
+  groupedToolDisplay: boolean;
+  setGroupedToolDisplay: (enabled: boolean) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>((set) => ({
@@ -90,6 +105,7 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
   },
 
   showThinking: loadShowThinking(),
+  groupedToolDisplay: loadGroupedToolDisplay(),
 
   setShowThinking: (enabled) => {
     try {
@@ -98,5 +114,14 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
       // private mode
     }
     set({ showThinking: enabled });
+  },
+
+  setGroupedToolDisplay: (enabled) => {
+    try {
+      localStorage.setItem(LS_GROUPED_TOOL_DISPLAY, String(enabled));
+    } catch {
+      // private mode
+    }
+    set({ groupedToolDisplay: enabled });
   },
 }));
