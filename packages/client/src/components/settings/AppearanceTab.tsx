@@ -18,6 +18,7 @@ type UiSettings = {
   showTokenUsage?: boolean;
   compressImages?: boolean;
   showThinking?: boolean;
+  groupedToolDisplay?: boolean;
   userBubbleColor?: string | null;
   userBubbleTextColor?: string | null;
   userBubbleBorderColor?: string | null;
@@ -78,15 +79,18 @@ export function AppearanceTab() {
   const zToken = usePreferencesStore((s) => s.showTokenUsage);
   const zCompress = usePreferencesStore((s) => s.compressImages);
   const zThinking = usePreferencesStore((s) => s.showThinking);
+  const zGrouped = usePreferencesStore((s) => s.groupedToolDisplay);
   const zSetSticky = usePreferencesStore((s) => s.setStickyUserHeader);
   const zSetToken = usePreferencesStore((s) => s.setShowTokenUsage);
   const zSetCompress = usePreferencesStore((s) => s.setCompressImages);
   const zSetThinking = usePreferencesStore((s) => s.setShowThinking);
+  const zSetGrouped = usePreferencesStore((s) => s.setGroupedToolDisplay);
 
   const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
   const [showTokenUsage, setShowTokenUsage] = useState(zToken);
   const [compressImages, setCompressImages] = useState(zCompress);
   const [showThinking, setShowThinking] = useState(zThinking);
+  const [groupedToolDisplay, setGroupedToolDisplay] = useState(zGrouped);
 
   // ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
   const [bubbleBg, setBubbleBg] = useState<string | null>(() => loadLocalBubble(LS_BUBBLE_BG));
@@ -139,6 +143,10 @@ export function AppearanceTab() {
         if (typeof server.showThinking === "boolean") {
           setShowThinking(server.showThinking);
           zSetThinking(server.showThinking);
+        }
+        if (typeof server.groupedToolDisplay === "boolean") {
+          setGroupedToolDisplay(server.groupedToolDisplay);
+          zSetGrouped(server.groupedToolDisplay);
         }
 
         // Bubble overrides — use server value, or fallback to localStorage, or null
@@ -204,6 +212,11 @@ export function AppearanceTab() {
     setShowThinking(val);
     zSetThinking(val);
     persist({ showThinking: val });
+  };
+  const toggleGrouped = (val: boolean) => {
+    setGroupedToolDisplay(val);
+    zSetGrouped(val);
+    persist({ groupedToolDisplay: val });
   };
 
   const selectBubblePreset = (idx: number) => {
@@ -473,6 +486,17 @@ export function AppearanceTab() {
           <input type="checkbox" checked={showThinking} onChange={(e) => toggleThinking(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
           Show thinking blocks
         </label>
+      </div>
+
+      <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none", fontSize: 13, color: "var(--text-secondary)" }}>
+          <input type="checkbox" checked={groupedToolDisplay} onChange={(e) => toggleGrouped(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
+          Grouped tool trail
+        </label>
+        <p className="settings-hint" style={{ marginTop: 4 }}>
+          One Trail card per turn; in-between agent text collapses into justification previews.
+        </p>
       </div>
     </div>
   );

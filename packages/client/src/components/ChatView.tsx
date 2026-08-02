@@ -14,9 +14,16 @@ import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
 import { CompactionNotice } from "./CompactionNotice";
 import type { ActiveCompaction } from "../stores/session-store";
-import { ChatEditDiff, ChatDiffViewProvider } from "./ChatEditDiff";
+import { ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
+import {
+	ToolCallEntry,
+	ToolGroupCard,
+	buildGroupedTurn,
+	type GroupedTurn,
+	type PairableMessage,
+} from "./ToolGroupCard";
 
 // Register custom tool renderers
 toolRegistry.register("javascript_repl", ({ part }) => (
@@ -35,7 +42,6 @@ toolRegistry.register("javascript_repl", ({ part }) => (
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
-import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 
 // ── Tool batch expand/collapse preference (shared across all batch cards) ──
 import { createContext, useContext } from "react";
@@ -75,15 +81,6 @@ interface ToolCallPart {
 export type { ToolCallPart as ToolCallPartExport } from "../lib/tool-registry";
 
 /** Local mirror of tool-call-pairing types (for ToolCallEntry/ToolCallBatchCard compat). */
-interface PairableMessage {
-	role?: string;
-	type?: string;
-	content?: unknown;
-	toolCallId?: unknown;
-	details?: unknown;
-	isError?: boolean;
-	[key: string]: unknown;
-}
 interface ToolBatchEntry {
 	kind: "tool" | "thinking";
 	block: Record<string, unknown>;
@@ -225,111 +222,6 @@ const ArchivedMessages = memo(function ArchivedMessages({
 
 /* ── Tool Call Components ── */
 
-/** Map a tool name to a descriptive emoji icon. */
-function getToolIcon(name: string): string {
-	const n = name.toLowerCase();
-	if (
-		n.includes("bash") ||
-		n.includes("shell") ||
-		n.includes("exec") ||
-		n.includes("run")
-	)
-		return "⚡";
-	if (
-		n.includes("read") ||
-		n.includes("cat") ||
-		n.includes("view") ||
-		n.includes("get")
-	)
-		return "📄";
-	if (
-		n.includes("write") ||
-		n.includes("create") ||
-		n.includes("save") ||
-		n.includes("put")
-	)
-		return "✏️";
-	if (
-		n.includes("edit") ||
-		n.includes("patch") ||
-		n.includes("update") ||
-		n.includes("replace")
-	)
-		return "🔧";
-	if (
-		n.includes("search") ||
-		n.includes("grep") ||
-		n.includes("find") ||
-		n.includes("ls") ||
-		n.includes("list")
-	)
-		return "🔍";
-	if (n.includes("delete") || n.includes("remove") || n.includes("rm"))
-		return "🗑️";
-	if (n.includes("move") || n.includes("rename") || n.includes("mv"))
-		return "📦";
-	if (n.includes("git") || n.includes("commit") || n.includes("branch"))
-		return "🌿";
-	if (
-		n.includes("web") ||
-		n.includes("fetch") ||
-		n.includes("http") ||
-		n.includes("url")
-	)
-		return "🌐";
-	if (n.includes("test") || n.includes("spec")) return "🧪";
-	if (n.includes("ask") || n.includes("question") || n.includes("prompt"))
-		return "💬";
-	return "🔩";
-}
-
-/**
- * Extract a human-friendly filename from a tool result/block for display
- * in the tool entry header. Reads from `details` or `input` since the
- * SDK stores it on different fields depending on the tool and version.
- */
-function extractFilename(message: Record<string, unknown>): string | undefined {
-	const details = message.details as
-		| {
-				path?: unknown;
-				filename?: unknown;
-				file?: unknown;
-				file_path?: unknown;
-		  }
-		| undefined;
-	const input = message.input as
-		| {
-				path?: unknown;
-				filename?: unknown;
-				file?: unknown;
-				file_path?: unknown;
-		  }
-		| undefined;
-	for (const src of [details, input]) {
-		if (src === undefined) continue;
-		if (typeof src.path === "string") return src.path;
-		if (typeof src.filename === "string") return src.filename;
-		if (typeof src.file === "string") return src.file;
-		if (typeof src.file_path === "string") return src.file_path;
-	}
-	return undefined;
-}
-
-/**
- * Cheap +/- counter for a unified diff string. Skips `---`/`+++` header lines
- * so only actual additions/deletions are counted.
- */
-function countDiffLines(diff: string): { adds: number; dels: number } {
-	let adds = 0;
-	let dels = 0;
-	for (const line of diff.split("\n")) {
-		if (line.startsWith("+++") || line.startsWith("---")) continue;
-		if (line.startsWith("+")) adds += 1;
-		else if (line.startsWith("-")) dels += 1;
-	}
-	return { adds, dels };
-}
-
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
 	const showThinking = usePreferencesStore((s) => s.showThinking);
@@ -391,165 +283,6 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 				result={undefined}
 				initialExpanded={false}
 			/>
-		</div>
-	);
-}
-
-/** Render a single tool call + its result as a timeline node. */
-function ToolCallEntry({
-	block,
-	result,
-	initialExpanded = false,
-}: {
-	block: Record<string, unknown>;
-	result: PairableMessage | undefined;
-	initialExpanded?: boolean;
-}) {
-	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
-	const [justCompleted, setJustCompleted] = useState(false);
-	const wasRunning = useRef(result === undefined);
-	const argsPreRef = useRef<HTMLPreElement>(null);
-	useEffect(() => {
-		if (wasRunning.current && result !== undefined) {
-			setJustCompleted(true);
-			const t = setTimeout(() => setJustCompleted(false), 600);
-			return () => clearTimeout(t);
-		}
-		wasRunning.current = result === undefined;
-	}, [result]);
-	const name = String(block.name ?? "tool");
-	const args = block.arguments ?? block.input ?? {};
-	const argsText =
-		typeof args === "string" ? args : JSON.stringify(args, null, 2);
-
-	const isError = result?.isError === true;
-	const isRunning = result === undefined;
-
-	// Auto-scroll the args pane to bottom while the tool is streaming
-	useEffect(() => {
-		if (isRunning && detailsOpen && argsPreRef.current) {
-			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
-		}
-	});
-
-	const resultContent = Array.isArray(result?.content) ? result?.content : [];
-	const outputText = resultContent
-		.filter((c): c is { type: "text"; text: string } => {
-			const o = c as { type?: unknown; text?: unknown };
-			return o.type === "text" && typeof o.text === "string";
-		})
-		.map((c) => c.text)
-		.join("\n");
-
-	// Smart disclosure: first line of output shown inline
-	const outputPreview =
-		outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
-
-	const preview = toolPreviewFromArgs(name, args);
-	const icon = getToolIcon(name);
-
-	// For `edit`, prefer the unified diff string the SDK puts on
-	// result.details (details.diff). When absent (e.g. some providers),
-	// fall back to
-	// outputText so the diff card still renders.
-	const editDiff =
-		name === "edit" && result !== undefined
-			? (() => {
-					const d = (result.details as { diff?: unknown } | undefined)?.diff;
-					return typeof d === "string" ? d : outputText;
-				})()
-			: undefined;
-	const editFn =
-		name === "edit" && result !== undefined
-			? extractFilename(result)
-			: undefined;
-	const editStats =
-		editDiff !== undefined ? countDiffLines(editDiff) : undefined;
-
-	return (
-		<div
-			className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
-		>
-			<span
-				className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}${justCompleted ? " just-completed" : ""}`}
-				aria-hidden="true"
-			>
-				{icon}
-			</span>
-			<div className="tool-timeline-content">
-				<div className="tool-timeline-row">
-					<span className="tool-timeline-name">{name}</span>
-					{preview && (
-						<span className="tool-timeline-arg" title={preview}>
-							{preview}
-						</span>
-					)}
-					{isRunning && (
-						<span className="tool-timeline-running" aria-label="running">
-							running…
-						</span>
-					)}
-					{(argsText.length > 2 || outputText.length > 0) && (
-						<button
-							type="button"
-							className="tool-timeline-details-btn"
-							onClick={() => setDetailsOpen((o) => !o)}
-							aria-expanded={detailsOpen}
-							aria-label={detailsOpen ? "Hide details" : "Show details"}
-						>
-							{detailsOpen ? "hide" : "details"}
-						</button>
-					)}
-				</div>
-				{/* Smart-disclosure output preview (always shown when not expanded) */}
-				{!isRunning && !detailsOpen && outputPreview.length > 0 && (
-					<div className="tool-timeline-output-preview" title={outputPreview}>
-						{isError ? "✖ " : "✓ "}
-						{outputPreview}
-					</div>
-				)}
-				{/* Expanded details pane */}
-				{detailsOpen && (
-					<div className="tool-timeline-details">
-						{argsText.length > 2 && (
-							<div>
-								<div className="tool-timeline-section-label">input</div>
-								<pre className="tool-timeline-code" ref={argsPreRef}>{argsText}</pre>
-							</div>
-						)}
-						{editDiff !== undefined && editStats !== undefined ? (
-							<div className="overflow-hidden px-3 pb-2">
-								<ChatEditDiff
-									diff={editDiff}
-									filename={editFn}
-									adds={editStats.adds}
-									dels={editStats.dels}
-								/>
-							</div>
-						) : outputText.length > 0 ? (
-							<div>
-								<div className="tool-timeline-section-label">
-									{isError ? "error" : "output"}
-									{editStats !== undefined && !isError && (
-										<span className="ml-2 font-mono text-[10px]">
-											<span className="text-emerald-400 light:text-emerald-700">
-												+{editStats.adds}
-											</span>{" "}
-											<span className="text-red-400 light:text-red-700">
-												-{editStats.dels}
-											</span>
-											{editFn !== undefined && (
-												<span className="ml-1 text-neutral-500">{editFn}</span>
-											)}
-										</span>
-									)}
-								</div>
-								<pre className="tool-timeline-code">{outputText}</pre>
-							</div>
-						) : null}
-					</div>
-				)}
-			</div>
 		</div>
 	);
 }
@@ -1279,6 +1012,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 	const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 	const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
+	const groupedToolDisplay = usePreferencesStore((s) => s.groupedToolDisplay);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -1830,6 +1564,203 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			return elements;
 		};
 
+		// ── Grouped (openkot-style) assistant turn rendering ──
+		// Groups all tool calls of the turn into one "Trail" card and collapses
+		// the in-between agent text into expandable justification previews.
+		const getToolResult = (id: string): PairableMessage | undefined =>
+			toolResults.get(id) as PairableMessage | undefined;
+		const isCustomTool = (name: string): boolean =>
+			toolRegistry.get(name) !== undefined;
+
+		const renderSpecialMessage = (
+			m: Record<string, unknown>,
+			key: string,
+		): React.ReactNode | null => {
+			const role = m.role as string | undefined;
+			if (role === "bashExecution") {
+				return (
+					<BashExecBubble
+						key={key}
+						msg={m as unknown as BashExecMessage}
+						sessionId={sessionId}
+					/>
+				);
+			}
+			if (role === "branchSummary") {
+				const summary = (m.summary as string) ?? "";
+				const fromId = m.fromId as string | undefined;
+				return (
+					<div key={key} className="message-row assistant">
+						<div className="message-bubble assistant">
+							<div className="branch-summary-block">
+								<div className="branch-summary-label">Branch Summary</div>
+								<ChatMarkdown text={summary} />
+								{fromId && (
+									<div className="branch-summary-from" title={fromId}>
+										from {fromId.slice(0, 8)}...
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+				);
+			}
+			if (role === "custom") {
+				const customType = (m.customType as string) ?? "custom";
+				const customContent = m.content;
+				const details = m.details;
+				let renderedContent: React.ReactNode;
+				if (typeof customContent === "string") {
+					renderedContent = <ChatMarkdown text={customContent} />;
+				} else if (Array.isArray(customContent)) {
+					renderedContent = (
+						<div>
+							{customContent.map(
+								(block: Record<string, unknown>, i: number) =>
+									block.type === "text" ? (
+										<ChatMarkdown key={i} text={String(block.text ?? "")} />
+									) : block.type === "image" ? (
+										<img
+											key={i}
+											src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
+											alt="Custom message image"
+											style={{ maxWidth: "100%", height: "auto" }}
+										/>
+									) : null,
+							)}
+						</div>
+					);
+				} else {
+					renderedContent = null;
+				}
+				return (
+					<div key={key} className="message-row assistant">
+						<div className="message-bubble assistant">
+							<div className="custom-message-block">
+								{customType !== "custom" && (
+									<div className="custom-message-type">{customType}</div>
+								)}
+								{renderedContent}
+								{details != null && (
+									<details className="custom-message-details">
+										<summary>Details</summary>
+										<pre>{JSON.stringify(details, null, 2)}</pre>
+									</details>
+								)}
+							</div>
+						</div>
+					</div>
+				);
+			}
+			return null;
+		};
+
+		const renderGroupedTurn = (
+			turn: GroupedTurn,
+			turnKey: string,
+		): React.ReactNode[] => {
+			const elements: React.ReactNode[] = [];
+
+			const pushSegment = (seg: GroupedTurn["segments"][number], idx: number) => {
+				if (seg.entries.length === 0) return;
+				const stableKey = seg.firstToolId
+					? `trail-${turnKey}-${seg.firstToolId}`
+					: `trail-${turnKey}-${idx}`;
+				elements.push(
+					<div key={stableKey} className="message-row assistant">
+						<div className="message-bubble assistant">
+							<ToolGroupCard
+								entries={seg.entries}
+								isStreaming={isStreaming}
+							/>
+						</div>
+					</div>,
+				);
+			};
+
+			turn.segments.forEach((seg, i) => pushSegment(seg, i));
+
+			// Custom-rendered tools break out of the trail into their own bubble
+			for (const ct of turn.customTools) {
+				const CustomRenderer = toolRegistry.get(ct.name);
+				const part: ToolCallPart = {
+					type: "tool-call",
+					toolName: ct.name,
+					toolCallId: ct.id,
+					args: ct.args,
+					state: ct.result
+						? ct.result.isError === true
+							? "error"
+							: "success"
+						: "running",
+					output: ct.result ? extractContentText(ct.result.content) : undefined,
+					errorText:
+						ct.result && ct.result.isError === true
+							? extractContentText(ct.result.content) || "Tool returned error"
+							: undefined,
+					details: ct.result?.details,
+				};
+				if (CustomRenderer) {
+					elements.push(
+						<div
+							key={`custom-${turnKey}-${ct.id}`}
+							className="message-row assistant"
+						>
+							<div className="message-bubble assistant">
+								<CustomRenderer part={part} messageId={ct.msgId ?? turnKey} />
+							</div>
+						</div>,
+					);
+				} else {
+					// Defensive fallback — registry lookups stay in sync, but keep
+					// the call visible if one is ever missing.
+					pushSegment(
+						{
+							entries: [
+								{
+									kind: "tool",
+									block: { name: ct.name, arguments: ct.args, id: ct.id },
+									result: ct.result,
+								},
+							],
+							firstToolId: ct.id,
+						},
+						0,
+					);
+				}
+			}
+
+			for (const m of turn.specials) {
+				const el = renderSpecialMessage(m, `special-${turnKey}-${elements.length}`);
+				if (el) elements.push(el);
+			}
+
+			// Final answer text after the last tool call
+			let serial = 0;
+			for (const fp of turn.finalParts) {
+				if (fp.type === "text") {
+					elements.push(
+						<div
+							key={`final-${turnKey}-${serial++}`}
+							className="message-row assistant"
+						>
+							<div className="message-bubble assistant">
+								<div className="assistant-blocks">
+									<ChatMarkdown text={fp.text} />
+								</div>
+							</div>
+						</div>,
+					);
+				} else {
+					elements.push(
+						<ThinkingBlock key={`final-${turnKey}-${serial++}`} text={fp.text} />,
+					);
+				}
+			}
+
+			return elements;
+		};
+
 		// ── Turn-grouped rendering ──
 		let turnIdx = 0;
 		let currentUser: Record<string, unknown> | undefined;
@@ -1837,13 +1768,31 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 		const flushTurn = (): void => {
 			if (currentUser === undefined) return;
-			const turnKey = currentUser.id ?? `turn-${turnIdx}`;
+			const turnKey =
+				typeof currentUser.id === "string"
+					? currentUser.id
+					: `turn-${turnIdx}`;
 			turnIdx++;
 			const text = extractContentText(currentUser.content);
-			const combinedAssistantText = currentAssistants
-				.map((m) => extractContentText(m.content))
-				.filter((t) => t.length > 0)
-				.join("\n\n");
+
+			// Grouped mode: interstitial text between tool calls is collapsed into
+			// the trail; the copy footer uses only the final answer text.
+			let combinedAssistantText: string;
+			let assistantElements: React.ReactNode[];
+			if (groupedToolDisplay) {
+				const turn = buildGroupedTurn(currentAssistants, getToolResult, isCustomTool);
+				combinedAssistantText = turn.finalParts
+					.filter((p) => p.type === "text")
+					.map((p) => p.text)
+					.join("\n\n");
+				assistantElements = renderGroupedTurn(turn, turnKey);
+			} else {
+				combinedAssistantText = currentAssistants
+					.map((m) => extractContentText(m.content))
+					.filter((t) => t.length > 0)
+					.join("\n\n");
+				assistantElements = renderAssistantParts(currentAssistants);
+			}
 
 			const isSteer =
 				(currentUser.metadata as { steer?: boolean } | undefined)?.steer ===
@@ -1901,7 +1850,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								/>
 							</div>
 						)}
-						{renderAssistantParts(currentAssistants)}
+						{assistantElements}
 						{combinedAssistantText.length > 0 && (
 							<div className="assistant-msg-footer">
 								<CopyMsgButton getText={() => combinedAssistantText} />
@@ -1952,8 +1901,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				}
-				if (currentAssistants.length > 0)
-					out.push(...renderAssistantParts(currentAssistants));
+				if (currentAssistants.length > 0) out.push(...assistantElements);
 				if (combinedAssistantText.length > 0) {
 					out.push(
 						<div key={`turn-${turnKey}-copy`} className="assistant-msg-footer">
@@ -2004,6 +1952,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// Assistant / bashExecution / branchSummary / custom
 				if (currentUser !== undefined) {
 					currentAssistants.push(msg);
+				} else if (groupedToolDisplay) {
+					const turn = buildGroupedTurn([msg], getToolResult, isCustomTool);
+					out.push(...renderGroupedTurn(turn, `orphan-${idx}`));
 				} else {
 					out.push(...renderAssistantParts([msg]));
 				}
@@ -2039,6 +1990,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		sessionId,
 		rewindAvailable,
 		rawMessages,
+		groupedToolDisplay,
 	]);
 
 	return (

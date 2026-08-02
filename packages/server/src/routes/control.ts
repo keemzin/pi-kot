@@ -206,7 +206,13 @@ export const controlRoutes: FastifyPluginAsync = async (fastify) => {
         try {
           // Refresh the session's internal model runtime so it picks up
           // any API keys added after session creation.
-          await live.session.modelRuntime.reloadConfig();
+          // 0.83.0: reloadConfig() was removed. refresh() without options
+          // defaults to a NETWORK catalog refresh (modelNetworkEnabled is
+          // true unless PI_OFFLINE is set) — that hangs on slow/dead
+          // provider endpoints and blocked model selection. A local refresh
+          // reloads ModelConfig + rebuilds providers + re-checks auth from
+          // auth.json, which is all this route needs.
+          await live.session.modelRuntime.refresh({ allowNetwork: false });
 
           // Pass the full model object from the registry, not a {provider, id} stub.
           // ⚠️ The SDK's setModel() stores the model object in agent.state.model, and
