@@ -632,10 +632,11 @@ export function ToolGroupCard({
 	isStreaming?: boolean;
 }) {
 	const hasJustifications = entries.some((e) => e.kind === "justification");
-	// Two-state view: "justify" (per-chunk expandable) ↔ "full" (everything expanded).
-	// Turns without in-between text have nothing to justify, so they default to full.
+	// Two-state view: "justify" (collapsed) ↔ "full" (everything expanded).
+	// Justify works for all turns: tool-only turns show collapsed tool rows;
+	// turns with justifications show per-chunk expandable previews.
 	const [view, setView] = useState<"full" | "justify">(
-		isStreaming ? "full" : hasJustifications ? "justify" : "full",
+		isStreaming ? "full" : "justify",
 	);
 	// Which chunks are expanded in Justify view (indices into chunks array).
 	const [openChunks, setOpenChunks] = useState<Set<number>>(() => new Set());
@@ -653,7 +654,7 @@ export function ToolGroupCard({
 		}
 		if (!isStreaming && prevStreaming.current) {
 			const timer = setTimeout(() => {
-				setView(hasJustificationsRef.current ? "justify" : "full");
+				setView("justify");
 				setOpenChunks(new Set());
 			}, 3000);
 			prevStreaming.current = isStreaming;
@@ -678,10 +679,8 @@ export function ToolGroupCard({
 
 	const cycle = () => {
 		if (view === "full") {
-			if (hasJustifications) {
-				setView("justify");
-				setOpenChunks(new Set());
-			}
+			setView("justify");
+			setOpenChunks(new Set());
 		} else {
 			setView("full");
 		}
@@ -792,7 +791,7 @@ export function ToolGroupCard({
 				</div>
 			)}
 
-			{view === "justify" && hasJustifications && (
+			{view === "justify" && (
 				<div className="trail-body trail-body-justify">
 					<div className="trail-list">
 						{shouldCollapseChunks && !showAllChunks && (
