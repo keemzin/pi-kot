@@ -47,6 +47,8 @@ interface Props {
   onSave?: () => void;
   fileName: string;
   wordWrap?: boolean;
+  /** Reports the currently selected line range (1-based, inclusive), or null when the selection is empty. */
+  onSelectionChange?: (sel: { startLine: number; endLine: number } | null) => void;
 }
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -178,14 +180,17 @@ export function CodeMirrorEditor({
   onSave,
   fileName,
   wordWrap = false,
+  onSelectionChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const wrappingCompartment = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
+  onSelectionChangeRef.current = onSelectionChange;
 
   const language = useMemo(() => languageFromExt(fileName), [fileName]);
 
@@ -198,6 +203,21 @@ export function CodeMirrorEditor({
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         onChangeRef.current(update.state.doc.toString());
+      }
+      if (update.selectionSet) {
+        const cb = onSelectionChangeRef.current;
+        if (cb !== undefined) {
+          const sel = update.state.selection.main;
+          if (sel.empty) {
+            cb(null);
+          } else {
+            const from = update.state.doc.lineAt(sel.from).number;
+            const to = update.state.doc.lineAt(sel.to).number;
+            const startLine = Math.min(from, to);
+            const endLine = Math.max(from, to);
+            cb({ startLine, endLine });
+          }
+        }
       }
     });
 

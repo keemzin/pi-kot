@@ -4,6 +4,7 @@ import { FileViewer } from "./FileViewer";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite, getUiSettings, updateUiSettings } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
+import { useSelectionBridge } from "../stores/selection-bridge";
 import { ConfirmDialog } from "./Modal";
 import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 
@@ -12,6 +13,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const viewerActivePath = useLayoutStore((s) => s.viewerActivePath);
   const viewerWidth = useLayoutStore((s) => s.viewerWidth);
   const setViewerActivePath = useLayoutStore((s) => s.setViewerActivePath);
+  const sendSelection = useSelectionBridge((s) => s.sendSelection);
   const closeFileViewerTab = useLayoutStore((s) => s.closeFileViewerTab);
   const closeAllViewerTabs = useLayoutStore((s) => s.closeAllViewerTabs);
   const setViewerWidth = useLayoutStore((s) => s.setViewerWidth);
@@ -381,6 +383,9 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                     savedAt={savedAt}
                     error={error}
                     size={fileSize}
+                    onSendSelection={(range) =>
+                      sendSelection({ path: activeFile.path, ...range })
+                    }
                   />
                 )}
               </>

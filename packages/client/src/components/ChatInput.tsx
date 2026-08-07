@@ -5,6 +5,7 @@ import type { ImageContent } from "../lib/api-client";
 import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 import { getSessionModel, setSessionThinking } from "../lib/api-client";
+import { useSelectionBridge } from "../stores/selection-bridge";
 
 interface Props {
   sessionId: string;
@@ -28,6 +29,8 @@ interface SlashCommand {
 
 export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onModelSelect, onModelError }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSend = useSelectionBridge((s) => s.pendingSend);
+  const consumeSend = useSelectionBridge((s) => s.consumeSend);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
@@ -298,6 +301,31 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     }
   }, []);
+
+  // ── Editor → chat: insert a selected-lines reference at the caret ──
+  // When the user clicks "Send selection to chat" in the file editor, the
+  // selection-bridge store carries the path + 1-based line range here. We
+  // insert the `@path#L<start>-<end>` marker (or the quoted form for paths
+  // with spaces) at the caret and focus the box.
+  useEffect(() => {
+    if (pendingSend === undefined) return;
+    const el = textareaRef.current;
+    const existing = el?.value ?? "";
+    const caret = el?.selectionStart ?? existing.length;
+    const marker = /\s/.test(pendingSend.path)
+      ? `@\"${pendingSend.path}\"#L${pendingSend.startLine}-${pendingSend.endLine}`
+      : `@${pendingSend.path}#L${pendingSend.startLine}-${pendingSend.endLine}`;
+    const next = `${existing.slice(0, caret)}${marker} ${existing.slice(caret)}`;
+    if (el !== null) {
+      el.value = next;
+      const pos = caret + marker.length + 1;
+      el.setSelectionRange(pos, pos);
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+      el.focus();
+    }
+    consumeSend();
+  }, [pendingSend]);
 
   // ── @-autocomplete logic ──
 
