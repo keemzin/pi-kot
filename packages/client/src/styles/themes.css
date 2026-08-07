@@ -3416,23 +3416,25 @@ strong {
 	font-size: 12px;
 	line-height: 1.5;
 	vertical-align: middle;
-	background: var(--bg-raised, rgba(128, 128, 128, 0.08));
-	border: 1px solid var(--border-hover);
-	color: var(--text-primary);
+	/* inherit the bubble's text color so theme text-color changes cascade */
+	color: inherit;
+	background: var(--chip-bg, color-mix(in srgb, currentColor 10%, transparent));
+	border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
 	white-space: nowrap;
 }
 .msg-ref-name {
+	color: inherit;
 	font-family: var(--font-mono, ui-monospace, monospace);
 }
 .msg-ref-range {
 	color: var(--accent-text, #4dabf7);
 	font-family: var(--font-mono, ui-monospace, monospace);
 }
-.msg-ref-ok { border-color: var(--border-bright); }
+.msg-ref-ok { border-color: color-mix(in srgb, currentColor 25%, transparent); }
 .msg-ref-missing {
-	border-color: rgba(255, 92, 92, 0.55);
+	border-color: color-mix(in srgb, var(--danger, #ff5c5c) 55%, transparent);
 	color: var(--danger, #ff5c5c);
-	background: rgba(255, 92, 92, 0.07);
+	background: color-mix(in srgb, var(--danger, #ff5c5c) 8%, transparent);
 }
 .msg-ref-reason {
 	font-size: 11px;
@@ -3444,6 +3446,7 @@ strong {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  color: var(--text-primary);
 }
 
 .ti-chip {
@@ -3454,9 +3457,9 @@ strong {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.4;
-  background: var(--bg-raised, rgba(128, 128, 128, 0.08));
-  border: 1px solid var(--border-hover);
-  color: var(--text-primary);
+  color: inherit;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
   max-width: 100%;
 }
 

@@ -107,17 +107,6 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
     return () => { cancelled = true; };
   }, [activeFile?.path, projectId, isBinaryFile]);
 
-  // Detect an external disk change on the ACTIVE file (rev bump) and flag it
-  // for a manual reload — we never auto-reload the editor.
-  useEffect(() => {
-    if (!activeFile || activeFile.path !== lastPathRef.current) return;
-    const rev = fileRev ?? 0;
-    if (rev > lastRevRef.current) {
-      setExternalChange(true);
-    }
-    lastRevRef.current = rev;
-  }, [fileRev, activeFile?.path]);
-
   // Manual reload from disk (banner button). Discards in-buffer edits.
   const handleReload = useCallback(async () => {
     if (!activeFile) return;
@@ -140,6 +129,24 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
       setLoading(false);
     }
   }, [activeFile, projectId]);
+
+  // Detect an external disk change on the ACTIVE file (rev bump).
+  // If the file is NOT dirty (no unsaved manual edits), auto-reload it instantly.
+  // If the file IS dirty, flag it for manual reload via banner.
+  useEffect(() => {
+    if (!activeFile || activeFile.path !== lastPathRef.current) return;
+    const rev = fileRev ?? 0;
+    if (rev > lastRevRef.current) {
+      if (!isDirty) {
+        // Auto-reload since user hasn't made manual edits
+        void handleReload();
+      } else {
+        // User has unsaved edits, show banner to prevent data loss
+        setExternalChange(true);
+      }
+    }
+    lastRevRef.current = rev;
+  }, [fileRev, activeFile?.path, isDirty, handleReload]);
 
   const handleSave = useCallback(async () => {
     if (!activeFile || !isDirty || saving) return;

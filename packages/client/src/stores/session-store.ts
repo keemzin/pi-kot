@@ -31,6 +31,11 @@ export const EMPTY_QUEUED: { steering: string[]; followUp: string[] } = {
 	followUp: [],
 };
 
+// Tool input args captured from `tool_execution_start` (which always fires and
+// carries `args`, incl. `path` for write/edit tools). Used at
+// `tool_execution_end` to bump the exact file the agent edited.
+const pendingToolArgs = new Map<string, Record<string, unknown>>();
+
 const ACTIVE_PROJECT_KEY = "pi-kot/active-project-id";
 const ACTIVE_SESSION_KEY = "pi-kot/active-session-id";
 
@@ -422,6 +427,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 					}
 					case "tool_execution_start": {
 						const toolName = event.toolName as string;
+						const { toolCallId, args } = event as unknown as {
+							toolCallId?: string;
+							args?: unknown;
+						};
+						if (toolCallId && typeof args === "object" && args !== null) {
+							pendingToolArgs.set(toolCallId, args as Record<string, unknown>);
+						}
 						set((s) => ({
 							streamState: {
 								...s.streamState,
@@ -459,18 +471,41 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 								} as never,
 							],
 						}));
-						// Live file refresh: when the agent completes a tool that can
-						// modify the workspace, reload the open viewer file (guarded by
-						// its dirty state) and refresh git status. A tiny delay lets the
-						// filesystem write flush before we re-read.
+						// Live file refresh: bump the EXACT file the tool edited using
+						// the `args` captured at `tool_execution_start` (that event
+						// always fires and carries `path` for write/edit tools). A tool
+						// with no file path (bash etc.) only refreshes the git tick, so
+						// the open tab's "file changed on disk" banner never appears
+						// for edits to OTHER files.
+						const capturedArgs = toolCallId
+							? pendingToolArgs.get(toolCallId)
+							: undefined;
+						if (toolCallId) pendingToolArgs.delete(toolCallId);
 						if (toolName) {
 							const changing = /[_-]?(write|write_file|edit|edit_file|apply_patch|patch|bash|shell|run|exec|mv|cp|rm|mkdir|create|rename|delete|remove|move|copy)[_-]?/i.test(
 								toolName,
 							);
 							if (changing) {
+								const rawPath = capturedArgs?.path;
 								setTimeout(() => {
 									const ls = useLayoutStore.getState();
-									if (ls.viewerActivePath) ls.fileChanged(ls.viewerActivePath);
+									let matchedPath: string | undefined = undefined;
+									if (typeof rawPath === "string" && rawPath.length > 0) {
+										// The agent might use absolute paths (/home/...) while the UI
+										// uses project-relative paths (src/App.tsx).
+										// Check if any open tab's path is a suffix of the agent's path.
+										const match = ls.viewerTabs.find(
+											(t) => rawPath === t.path || rawPath.endsWith("/" + t.path)
+										);
+										if (match) {
+											matchedPath = match.path;
+										} else {
+											// Fallback to exactly what the agent passed (cleaned)
+											matchedPath = rawPath.startsWith("./") ? rawPath.slice(2) : rawPath;
+										}
+									}
+
+									if (matchedPath !== undefined) ls.fileChanged(matchedPath);
 									else ls.bumpFileTick();
 								}, 80);
 							}
@@ -673,13 +708,13 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						}
 
 						refetchMessages();
-						// Safety net for the open file + git status after a turn ends
-						// (also covers sub-agent / orchestration edits that don't emit a
-						// `tool_execution_end` on this stream).
+						// Safety net after a turn ends (also covers sub-agent /
+						// orchestration edits that don't emit `tool_result` on this
+						// stream). We only bump the git tick here — the specific file
+						// is unknown, so we must NOT banner the open tab (that would
+						// prompt a reload even when the agent edited a different file).
 						setTimeout(() => {
-							const ls = useLayoutStore.getState();
-							if (ls.viewerActivePath) ls.fileChanged(ls.viewerActivePath);
-							else ls.bumpFileTick();
+							useLayoutStore.getState().bumpFileTick();
 						}, 150);
 						break;
 					}
