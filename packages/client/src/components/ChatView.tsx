@@ -5,11 +5,12 @@ import {
 	useMemo,
 	memo,
 } from "react";
-import { Copy, Check, CornerUpLeft, ImageDown } from "lucide-react";
+import { Copy, Check, CornerUpLeft, ImageDown, FileText, XCircle } from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
 import { invokeExtensionCommand, cancelExec } from "../lib/api-client";
 import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
+import { parseRefChips, type RefChip } from "../lib/ref-chips";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
 import { CompactionNotice } from "./CompactionNotice";
@@ -208,7 +209,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 						{isUser ? (
 							<>
 								<UserImages images={imgs} />
-								{text}
+								{renderUserRefs(text)}
 							</>
 						) : (
 							<ChatMarkdown text={text} />
@@ -386,6 +387,79 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 
 /* ── Sticky user message component ── */
 
+/**
+ * Render `@file` / `@file#L5-12` references and server "not included"
+ * failure markers inside a user message as inline chips, instead of raw
+ * bracketed text like `[@x.ts not included: file not found]`.
+ */
+function renderUserRefs(text: string): React.ReactNode {
+	interface Seg {
+		start: number;
+		end: number;
+		kind: "fail" | "ref";
+		raw: string;
+		ref?: RefChip;
+	}
+	const segs: Seg[] = [];
+
+	// Server failure markers: `[@path#L5-6 not included: reason]`
+	const failRe = /\[@?[^\]]+? not included: [^\]]+\]/g;
+	let fm: RegExpExecArray | null;
+	failRe.lastIndex = 0;
+	while ((fm = failRe.exec(text)) !== null) {
+		segs.push({ start: fm.index, end: fm.index + fm[0].length, kind: "fail", raw: fm[0] });
+	}
+
+	// Leftover `@path` markers (large files / deferred refs) still in the text.
+	// parseRefChips intentionally ignores `@` inside `[...]`, so no overlap.
+	for (const c of parseRefChips(text)) {
+		segs.push({ start: c.start, end: c.end, kind: "ref", raw: c.raw, ref: c });
+	}
+
+	segs.sort((a, b) => a.start - b.start);
+	const kept: Seg[] = [];
+	for (const g of segs) {
+		if (kept.length > 0 && g.start < kept[kept.length - 1].end) continue;
+		kept.push(g);
+	}
+
+	const nodes: React.ReactNode[] = [];
+	let cur = 0;
+	kept.forEach((g, i) => {
+		if (g.start > cur) nodes.push(text.slice(cur, g.start));
+		if (g.kind === "fail") {
+			const mm = g.raw.match(/\[@?(.+?)(?:#L\d+(?:-L?\d+)?)? not included: ([^\]]+)\]$/);
+			const path = mm?.[1] ?? g.raw.replace(/^\[/, "").replace(/\]$/, "");
+			const reason = mm?.[2] ?? "not included";
+			nodes.push(
+				<span key={`f${i}`} className="msg-ref-chip msg-ref-missing" title={reason}>
+					<XCircle size={12} />
+					<span className="msg-ref-name">{path}</span>
+					<span className="msg-ref-reason">not found</span>
+				</span>,
+			);
+		} else {
+			const c = g.ref as RefChip;
+			const range =
+				c.startLine !== undefined
+					? c.endLine !== undefined && c.endLine !== c.startLine
+						? `:L${c.startLine}-${c.endLine}`
+						: `:L${c.startLine}`
+					: "";
+			nodes.push(
+				<span key={`r${i}`} className="msg-ref-chip msg-ref-ok">
+					<FileText size={12} />
+					<span className="msg-ref-name">{c.path}</span>
+					{range !== "" && <span className="msg-ref-range">{range}</span>}
+				</span>,
+			);
+		}
+		cur = g.end;
+	});
+	if (cur < text.length) nodes.push(text.slice(cur));
+	return nodes;
+}
+
 function UserMessageBubble({
 	text,
 	isSteer,
@@ -440,7 +514,7 @@ function UserMessageBubble({
 						} as React.CSSProperties
 					}
 				>
-					{text}
+					{renderUserRefs(text)}
 				</div>
 				{isLong && (
 					<div

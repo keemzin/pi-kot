@@ -1,4 +1,5 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
+import { FileText, X } from "lucide-react";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import type { ImageContent } from "../lib/api-client";
@@ -6,6 +7,7 @@ import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles }
 import { ModelDropdown } from "./ModelDropdown";
 import { getSessionModel, setSessionThinking } from "../lib/api-client";
 import { useSelectionBridge } from "../stores/selection-bridge";
+import { parseRefChips, type RefChip } from "../lib/ref-chips";
 
 interface Props {
   sessionId: string;
@@ -62,6 +64,54 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [acSuggestions, setAcSuggestions] = useState<string[]>([]);
   const [acSelectedIdx, setAcSelectedIdx] = useState(0);
   const acFetchSeqRef = useRef(0);
+
+  // ── Live file chips (parsed from `@path` markers in the input) ──
+  const [chips, setChips] = useState<RefChip[]>([]);
+  const [chipStatus, setChipStatus] = useState<Record<string, "checking" | "ok" | "missing">>({});
+  const validatedRef = useRef<Set<string>>(new Set());
+
+  /** Re-parse `@` markers from the textarea into `chips`. */
+  const syncChips = useCallback(() => {
+    const el = textareaRef.current;
+    setChips(el === null ? [] : parseRefChips(el.value));
+  }, []);
+
+  // Validate file existence for chips once per path (green = resolvable,
+  // red = missing). Directories (trailing `/`) are left neutral.
+  useEffect(() => {
+    if (project === undefined) return;
+    if (chips.length === 0) {
+      setChipStatus({});
+      return;
+    }
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      const toCheck: string[] = [];
+      for (const c of chips) {
+        if (c.path.length === 0 || c.path.endsWith("/")) continue;
+        if (validatedRef.current.has(c.path)) continue;
+        toCheck.push(c.path);
+      }
+      if (toCheck.length === 0) return;
+      for (const p of toCheck) {
+        setChipStatus((s0) => ({ ...s0, [p]: s0[p] ?? "checking" }));
+      }
+      void Promise.all(
+        toCheck.map(async (path) => {
+          try {
+            const { paths } = await completeFiles(project.id, path, { limit: 50 });
+            const target = path.toLowerCase();
+            const ok = paths.some((x) => x.toLowerCase() === target);
+            if (!cancelled) setChipStatus((s0) => ({ ...s0, [path]: ok ? "ok" : "missing" }));
+          } catch {
+            if (!cancelled) setChipStatus((s0) => ({ ...s0, [path]: "ok" }));
+          }
+          validatedRef.current.add(path);
+        }),
+      );
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, [chips, project]);
 
   // ── Bang mode (! / !!) ──
   const bangMode: "context" | "local" | undefined = (() => {
@@ -323,9 +373,10 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       el.style.height = "auto";
       el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
       el.focus();
+      syncChips();
     }
     consumeSend();
-  }, [pendingSend]);
+  }, [pendingSend, syncChips]);
 
   // ── @-autocomplete logic ──
 
@@ -386,11 +437,26 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.setSelectionRange(newCaret, newCaret);
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    syncChips();
   };
 
   const acClose = (): void => {
     setAcToken(undefined);
     setAcSuggestions([]);
+  };
+
+  /** Remove a chip and delete its marker from the textarea. */
+  const removeChip = (c: RefChip): void => {
+    const el = textareaRef.current;
+    if (el === null) return;
+    const next = `${el.value.slice(0, c.start)}${el.value.slice(c.end)}`;
+    el.value = next;
+    const pos = Math.min(c.start, next.length);
+    el.setSelectionRange(pos, pos);
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    syncChips();
+    el.focus();
   };
 
   // ── Fetch thinking level when session changes ──
@@ -441,6 +507,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         setSlashSuggestions([]);
         setImages([]);
         acClose();
+        syncChips();
         await matched.handler(sessionId);
         return;
       }
@@ -459,6 +526,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       setSlashSuggestions([]);
       setImages([]);
       acClose();
+      syncChips();
 
       const { promise } = execCommandStream(sessionId, command, { excludeFromContext });
       try {
@@ -491,6 +559,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.style.height = "auto";
     setSlashSuggestions([]);
     acClose();
+    syncChips();
 
     // Keep blob URLs alive for optimistic display
     setImages([]);
@@ -629,7 +698,8 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     } else {
       acClose();
     }
-  }, [extensionCommands, allSlashCommands, isStreaming]);
+    syncChips();
+  }, [extensionCommands, allSlashCommands, isStreaming, syncChips]);
 
   const handleSlashCommand = async (cmd: SlashCommand) => {
     const el = textareaRef.current;
@@ -638,6 +708,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     el.style.height = "auto";
     setSlashSuggestions([]);
     acClose();
+    syncChips();
     setCompacting(true);
     try {
       await cmd.handler(sessionId);
@@ -767,6 +838,33 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {chips.length > 0 && (
+          <div className="ti-chips">
+            {chips.map((c) => {
+              const st = chipStatus[c.path] ?? "checking";
+              const range =
+                c.startLine !== undefined
+                  ? `L${c.startLine}${c.endLine !== undefined && c.endLine !== c.startLine ? `-${c.endLine}` : ""}`
+                  : undefined;
+              return (
+                <span key={c.key} className={`ti-chip ti-chip-${st}`} title={`${c.path}${range ? ` ${range}` : ""}`}>
+                  <FileText size={12} />
+                  <span className="ti-chip-name">{c.path}</span>
+                  {range !== undefined && <span className="ti-chip-range">{range}</span>}
+                  <button
+                    type="button"
+                    className="ti-chip-x"
+                    aria-label={`Remove ${c.path}`}
+                    onClick={() => removeChip(c)}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              );
+            })}
           </div>
         )}
 

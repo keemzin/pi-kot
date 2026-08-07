@@ -3404,6 +3404,103 @@ strong {
 /* ═══ Input Area ═══ */
 /* ═══ Chat input — OpenWebUI-style card ═══ */
 
+
+/* ── In-message file ref chips ── */
+.msg-ref-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 1px 8px;
+	margin: 0 2px;
+	border-radius: 999px;
+	font-size: 12px;
+	line-height: 1.5;
+	vertical-align: middle;
+	background: var(--bg-raised, rgba(128, 128, 128, 0.08));
+	border: 1px solid var(--border-hover);
+	color: var(--text-primary);
+	white-space: nowrap;
+}
+.msg-ref-name {
+	font-family: var(--font-mono, ui-monospace, monospace);
+}
+.msg-ref-range {
+	color: var(--accent-text, #4dabf7);
+	font-family: var(--font-mono, ui-monospace, monospace);
+}
+.msg-ref-ok { border-color: var(--border-bright); }
+.msg-ref-missing {
+	border-color: rgba(255, 92, 92, 0.55);
+	color: var(--danger, #ff5c5c);
+	background: rgba(255, 92, 92, 0.07);
+}
+.msg-ref-reason {
+	font-size: 11px;
+	opacity: 0.85;
+	font-style: italic;
+}
+/* ── File chips (live `@path` markers) ── */
+.ti-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ti-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--bg-raised, rgba(128, 128, 128, 0.08));
+  border: 1px solid var(--border-hover);
+  color: var(--text-primary);
+  max-width: 100%;
+}
+
+.ti-chip-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.ti-chip-range {
+  color: var(--accent-text, #4dabf7);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.ti-chip-checking { opacity: 0.65; }
+
+.ti-chip-ok { border-color: var(--border-bright); }
+
+.ti-chip-missing {
+  border-color: rgba(255, 92, 92, 0.55);
+  color: var(--danger, #ff5c5c);
+}
+.ti-chip-missing .ti-chip-name { color: var(--danger, #ff5c5c); }
+
+.ti-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+}
+.ti-chip-x:hover {
+  color: var(--text-primary);
+  background: var(--bg-raised, rgba(128, 128, 128, 0.15));
+}
+
 .ti-area {
   width: 100%;
   background: var(--bg-solid);
