@@ -68,6 +68,16 @@ interface LayoutState {
   /* ── Derived ── */
   isMobile: boolean;
 
+  /* ── External file changes (agent tool completion triggers refresh) ── */
+  /** Per-path revision counters — bumped when an open file changes on disk. */
+  fileRev: Record<string, number>;
+  /** Monotonic tick for "anything changed" (drives git status refresh). */
+  fileChangeTick: number;
+  /** Signal a file changed on disk. */
+  fileChanged: (path: string) => void;
+  /** Bump only the global git-refresh tick (no specific open file). */
+  bumpFileTick: () => void;
+
   /* ── Actions ── */
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -174,6 +184,16 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       ? Math.max(VIEWER_MIN_WIDTH, Math.min(readStoredViewerWidth(), window.innerWidth - 40))
       : readStoredViewerWidth(),
   isMobile: typeof window !== "undefined" ? window.innerWidth <= 600 : false,
+
+  /* ── External file changes ── */
+  fileRev: {},
+  fileChangeTick: 0,
+  fileChanged: (path) =>
+    set((s) => ({
+      fileRev: { ...s.fileRev, [path]: (s.fileRev[path] ?? 0) + 1 },
+      fileChangeTick: s.fileChangeTick + 1,
+    })),
+  bumpFileTick: () => set((s) => ({ fileChangeTick: s.fileChangeTick + 1 })),
 
   /* ── Sidebar actions ── */
 

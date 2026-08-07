@@ -22,6 +22,7 @@ import type { CompactionEvent } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 import { useAskUserQuestionStore } from "./ask-user-question-store";
 import { useExtensionUIStore } from "./extension-ui-store";
+import { useLayoutStore } from "./layout-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
@@ -458,6 +459,22 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 								} as never,
 							],
 						}));
+						// Live file refresh: when the agent completes a tool that can
+						// modify the workspace, reload the open viewer file (guarded by
+						// its dirty state) and refresh git status. A tiny delay lets the
+						// filesystem write flush before we re-read.
+						if (toolName) {
+							const changing = /[_-]?(write|write_file|edit|edit_file|apply_patch|patch|bash|shell|run|exec|mv|cp|rm|mkdir|create|rename|delete|remove|move|copy)[_-]?/i.test(
+								toolName,
+							);
+							if (changing) {
+								setTimeout(() => {
+									const ls = useLayoutStore.getState();
+									if (ls.viewerActivePath) ls.fileChanged(ls.viewerActivePath);
+									else ls.bumpFileTick();
+								}, 80);
+							}
+						}
 						break;
 					}
 					case "tool_result": {
@@ -656,6 +673,14 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						}
 
 						refetchMessages();
+						// Safety net for the open file + git status after a turn ends
+						// (also covers sub-agent / orchestration edits that don't emit a
+						// `tool_execution_end` on this stream).
+						setTimeout(() => {
+							const ls = useLayoutStore.getState();
+							if (ls.viewerActivePath) ls.fileChanged(ls.viewerActivePath);
+							else ls.bumpFileTick();
+						}, 150);
 						break;
 					}
 					case "auto_retry_start": {

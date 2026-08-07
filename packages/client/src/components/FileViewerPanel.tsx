@@ -37,12 +37,20 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const isDirty = content !== savedContent;
   const isBinaryFile = activeFile !== undefined && (isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path));
 
+  // External disk changes (agent edits / write / bash) bump `fileRev` for the
+  // open path. We reload in place unless the user has unsaved edits.
+  const fileRev = useLayoutStore((s) => (activeFile ? s.fileRev[activeFile.path] : undefined));
+  const lastPathRef = useRef<string | undefined>(undefined);
+  const lastRevRef = useRef(0);
+
   // Load file content when active file changes
   useEffect(() => {
     if (!activeFile) {
       setContent("");
       setSavedContent("");
       setError(undefined);
+      lastPathRef.current = undefined;
+      lastRevRef.current = 0;
       return;
     }
     // Binary files (images, audio, PDF) are streamed directly by FileViewer
@@ -55,8 +63,24 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
       setFileSize(undefined);
       setSavedAt(undefined);
       setLoading(false);
+      lastPathRef.current = activeFile.path;
+      lastRevRef.current = fileRev ?? 0;
       return;
     }
+
+    // If this run was triggered by an external disk change on the SAME path
+    // (rev bump) and the user has pending unsaved edits, don't clobber them.
+    // `samePath`/`isDirty` come from this render's scope, so they're fresh at
+    // the moment the tool fired the bump.
+    const samePath = lastPathRef.current === activeFile.path;
+    const isExternalBump =
+      samePath && fileRev !== undefined && fileRev > lastRevRef.current;
+    lastPathRef.current = activeFile.path;
+    lastRevRef.current = fileRev ?? 0;
+    if (isExternalBump && isDirty) {
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(undefined);
@@ -86,7 +110,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [activeFile?.path, projectId, isBinaryFile]);
+  }, [activeFile?.path, projectId, isBinaryFile, fileRev]);
 
   const handleSave = useCallback(async () => {
     if (!activeFile || !isDirty || saving) return;
