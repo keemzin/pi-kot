@@ -1,11 +1,12 @@
+import { useEffect, useRef, useState, useMemo, memo } from "react";
 import {
-	useEffect,
-	useRef,
-	useState,
-	useMemo,
-	memo,
-} from "react";
-import { Copy, Check, CornerUpLeft, ImageDown, FileText, XCircle } from "lucide-react";
+	Copy,
+	Check,
+	CornerUpLeft,
+	ImageDown,
+	FileText,
+	XCircle,
+} from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
 import { invokeExtensionCommand, cancelExec } from "../lib/api-client";
 import type { CompactionEvent } from "../lib/api-client";
@@ -55,13 +56,22 @@ const ToolBatchOpenContext = createContext<{
 }>({ open: false, toggle: () => undefined });
 function ToolBatchOpenProvider({ children }: { children: React.ReactNode }) {
 	const [open, setOpen] = useState<boolean>(() => {
-		try { return localStorage.getItem(BATCH_OPEN_KEY) === "true"; } catch { return false; }
+		try {
+			return localStorage.getItem(BATCH_OPEN_KEY) === "true";
+		} catch {
+			return false;
+		}
 	});
-	const toggle = () => setOpen((o) => {
-		const next = !o;
-		try { localStorage.setItem(BATCH_OPEN_KEY, String(next)); } catch { /* ignore */ }
-		return next;
-	});
+	const toggle = () =>
+		setOpen((o) => {
+			const next = !o;
+			try {
+				localStorage.setItem(BATCH_OPEN_KEY, String(next));
+			} catch {
+				/* ignore */
+			}
+			return next;
+		});
 	return (
 		<ToolBatchOpenContext.Provider value={{ open, toggle }}>
 			{children}
@@ -202,7 +212,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 							padding: "8px 10px",
 							fontSize: "12px",
 							lineHeight: "1.5",
-							color: "var(--text-primary)",
+							color: isUser ? "var(--user-bubble-text)" : "var(--text-primary)",
 							background: isUser ? "var(--user-bubble)" : "transparent",
 							border: isUser ? "1px solid var(--user-bubble-border)" : "none",
 							whiteSpace: isUser ? "pre-wrap" : undefined,
@@ -254,7 +264,11 @@ function ThinkingBlock({ text }: { text: string }) {
  * for EXIT_MS before unmounting.
  */
 const EXIT_MS = 320;
-function RunningToolCard({ running }: { running: { block: Record<string, unknown> } | undefined }) {
+function RunningToolCard({
+	running,
+}: {
+	running: { block: Record<string, unknown> } | undefined;
+}) {
 	const [displayed, setDisplayed] = useState(running);
 	const [exiting, setExiting] = useState(false);
 	const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -274,7 +288,7 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 		return () => {
 			if (exitTimer.current) clearTimeout(exitTimer.current);
 		};
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [running]);
 
 	if (!displayed) return null;
@@ -292,7 +306,8 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 
 /** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
-	const { open: sharedOpen, toggle: sharedToggle } = useContext(ToolBatchOpenContext);
+	const { open: sharedOpen, toggle: sharedToggle } =
+		useContext(ToolBatchOpenContext);
 	// Each card owns its own open state, seeded from the shared preference once on mount.
 	// This prevents all cards from snapping open/closed when one card's preference changes
 	// (e.g. when a live card finishes and re-joins the group as a batch card).
@@ -307,7 +322,9 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 	const completedCount = toolEntries.filter(
 		(e) => e.result !== undefined && !e.result?.isError,
 	).length;
-	const erroredCount = toolEntries.filter((e) => e.result?.isError === true).length;
+	const erroredCount = toolEntries.filter(
+		(e) => e.result?.isError === true,
+	).length;
 	const errored = erroredCount > 0;
 	const runningCount = toolEntries.filter((e) => e.result === undefined).length;
 	const allDone = runningCount === 0 && toolCount > 0;
@@ -344,8 +361,14 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 					<span className="tool-timeline-batch-count">
 						{allDone ? (
 							<>
-								{completedCount > 0 && <span className="done">✓ {completedCount}</span>}
-								{erroredCount > 0 && <span className="tool-timeline-badge error">✖ {erroredCount}</span>}
+								{completedCount > 0 && (
+									<span className="done">✓ {completedCount}</span>
+								)}
+								{erroredCount > 0 && (
+									<span className="tool-timeline-badge error">
+										✖ {erroredCount}
+									</span>
+								)}
 							</>
 						) : (
 							<>
@@ -353,7 +376,12 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 									<span className="done">✓ {completedCount}</span>
 								)}
 								{erroredCount > 0 && (
-									<span className="tool-timeline-badge error" style={{ marginLeft: "4px" }}>✖ {erroredCount}</span>
+									<span
+										className="tool-timeline-badge error"
+										style={{ marginLeft: "4px" }}
+									>
+										✖ {erroredCount}
+									</span>
 								)}
 								{runningCount > 0 && (
 									<span className="pending"> ⟳ {runningCount}</span>
@@ -409,7 +437,12 @@ function renderUserRefs(text: string): React.ReactNode {
 	let fm: RegExpExecArray | null;
 	failRe.lastIndex = 0;
 	while ((fm = failRe.exec(text)) !== null) {
-		segs.push({ start: fm.index, end: fm.index + fm[0].length, kind: "fail", raw: fm[0] });
+		segs.push({
+			start: fm.index,
+			end: fm.index + fm[0].length,
+			kind: "fail",
+			raw: fm[0],
+		});
 	}
 
 	// Leftover `@path` markers (large files / deferred refs) still in the text.
@@ -430,11 +463,17 @@ function renderUserRefs(text: string): React.ReactNode {
 	kept.forEach((g, i) => {
 		if (g.start > cur) nodes.push(text.slice(cur, g.start));
 		if (g.kind === "fail") {
-			const mm = g.raw.match(/\[@?(.+?)(?:#L\d+(?:-L?\d+)?)? not included: ([^\]]+)\]$/);
+			const mm = g.raw.match(
+				/\[@?(.+?)(?:#L\d+(?:-L?\d+)?)? not included: ([^\]]+)\]$/,
+			);
 			const path = mm?.[1] ?? g.raw.replace(/^\[/, "").replace(/\]$/, "");
 			const reason = mm?.[2] ?? "not included";
 			nodes.push(
-				<span key={`f${i}`} className="msg-ref-chip msg-ref-missing" title={reason}>
+				<span
+					key={`f${i}`}
+					className="msg-ref-chip msg-ref-missing"
+					title={reason}
+				>
 					<XCircle size={12} />
 					<span className="msg-ref-name">{path}</span>
 					<span className="msg-ref-reason">not found</span>
@@ -1146,12 +1185,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					} else if (/^data:image\//.test(trimmed)) {
 						artType = "image";
 					} else if (/^\s*[[{]/.test(trimmed)) {
-					try {
-						JSON.parse(trimmed);
-						artType = "json";
-					} catch {
-						// Not JSON — leave artType as-is and render as text.
-					}
+						try {
+							JSON.parse(trimmed);
+							artType = "json";
+						} catch {
+							// Not JSON — leave artType as-is and render as text.
+						}
 					}
 
 					if (artType) {
@@ -1220,7 +1259,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingBottomRef = useRef(true);
 	const lastScrollTopRef = useRef(0);
-	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(undefined);
+	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(
+		undefined,
+	);
 
 	const NEAR_BOTTOM_PX = 24;
 
@@ -1249,7 +1290,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	// catches layout changes from any source, even inside memo'd children.
 	useEffect(() => {
 		const el = scrollRef.current;
-		if (!el || typeof ResizeObserver === 'undefined') return;
+		if (!el || typeof ResizeObserver === "undefined") return;
 
 		const streamingJustEnded =
 			prevStreamingRef.current !== undefined && streamingMessage === undefined;
@@ -1385,8 +1426,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// `batch-${key}` caused React to remount the card every time the batch
 				// grew or the contentSerial changed, producing a visible flash.
 				if (completed.length > 0) {
-					const firstToolId = completed.find((e) => e.kind === "tool")?.block?.id as string | undefined;
-					const stableKey = firstToolId ? `batch-id-${firstToolId}` : `batch-${key}`;
+					const firstToolId = completed.find((e) => e.kind === "tool")?.block
+						?.id as string | undefined;
+					const stableKey = firstToolId
+						? `batch-id-${firstToolId}`
+						: `batch-${key}`;
 					elements.push(
 						<div key={stableKey} className="message-row assistant">
 							<div className="message-bubble assistant">
@@ -1695,18 +1739,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				} else if (Array.isArray(customContent)) {
 					renderedContent = (
 						<div>
-							{customContent.map(
-								(block: Record<string, unknown>, i: number) =>
-									block.type === "text" ? (
-										<ChatMarkdown key={i} text={String(block.text ?? "")} />
-									) : block.type === "image" ? (
-										<img
-											key={i}
-											src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
-											alt="Custom message image"
-											style={{ maxWidth: "100%", height: "auto" }}
-										/>
-									) : null,
+							{customContent.map((block: Record<string, unknown>, i: number) =>
+								block.type === "text" ? (
+									<ChatMarkdown key={i} text={String(block.text ?? "")} />
+								) : block.type === "image" ? (
+									<img
+										key={i}
+										src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
+										alt="Custom message image"
+										style={{ maxWidth: "100%", height: "auto" }}
+									/>
+								) : null,
 							)}
 						</div>
 					);
@@ -1741,7 +1784,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		): React.ReactNode[] => {
 			const elements: React.ReactNode[] = [];
 
-			const pushSegment = (seg: GroupedTurn["segments"][number], idx: number) => {
+			const pushSegment = (
+				seg: GroupedTurn["segments"][number],
+				idx: number,
+			) => {
 				if (seg.entries.length === 0) return;
 				const stableKey = seg.firstToolId
 					? `trail-${turnKey}-${seg.firstToolId}`
@@ -1749,10 +1795,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				elements.push(
 					<div key={stableKey} className="message-row assistant">
 						<div className="message-bubble assistant">
-							<ToolGroupCard
-								entries={seg.entries}
-								isStreaming={isStreaming}
-							/>
+							<ToolGroupCard entries={seg.entries} isStreaming={isStreaming} />
 						</div>
 					</div>,
 				);
@@ -1811,7 +1854,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			}
 
 			for (const m of turn.specials) {
-				const el = renderSpecialMessage(m, `special-${turnKey}-${elements.length}`);
+				const el = renderSpecialMessage(
+					m,
+					`special-${turnKey}-${elements.length}`,
+				);
 				if (el) elements.push(el);
 			}
 
@@ -1833,7 +1879,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					);
 				} else {
 					elements.push(
-						<ThinkingBlock key={`final-${turnKey}-${serial++}`} text={fp.text} />,
+						<ThinkingBlock
+							key={`final-${turnKey}-${serial++}`}
+							text={fp.text}
+						/>,
 					);
 				}
 			}
@@ -1850,14 +1899,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		const flushTurn = (): void => {
 			if (currentUser === undefined) return;
 			const turnEndIdx = msgIdx;
-			const turnFiles = extractTurnFilePaths(
-				currentAssistants,
-				(id) => (id === undefined ? undefined : getToolResult(id)),
+			const turnFiles = extractTurnFilePaths(currentAssistants, (id) =>
+				id === undefined ? undefined : getToolResult(id),
 			);
 			const turnKey =
-				typeof currentUser.id === "string"
-					? currentUser.id
-					: `turn-${turnIdx}`;
+				typeof currentUser.id === "string" ? currentUser.id : `turn-${turnIdx}`;
 			turnIdx++;
 			const text = extractContentText(currentUser.content);
 
@@ -1866,7 +1912,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			let combinedAssistantText: string;
 			let assistantElements: React.ReactNode[];
 			if (groupedToolDisplay) {
-				const turn = buildGroupedTurn(currentAssistants, getToolResult, isCustomTool);
+				const turn = buildGroupedTurn(
+					currentAssistants,
+					getToolResult,
+					isCustomTool,
+				);
 				combinedAssistantText = turn.finalParts
 					.filter((p) => p.type === "text")
 					.map((p) => p.text)
@@ -1884,8 +1934,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				(currentUser.metadata as { steer?: boolean } | undefined)?.steer ===
 				true;
 			const isFollowUp =
-				(currentUser.metadata as { followUp?: boolean } | undefined)?.followUp ===
-				true;
+				(currentUser.metadata as { followUp?: boolean } | undefined)
+					?.followUp === true;
 			const lastAssistant = currentAssistants[currentAssistants.length - 1];
 
 			if (stickyUserHeader && text.length > 0) {
@@ -1952,7 +2002,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							<TurnFileChips
 								files={turnFiles}
 								sessionId={sessionId}
-								startIndex={currentTurnStart >= 0 ? currentTurnStart : undefined}
+								startIndex={
+									currentTurnStart >= 0 ? currentTurnStart : undefined
+								}
 								endIndex={turnEndIdx}
 								onOpen={(path) =>
 									openFileViewer(path, path.split(/[\\/]/).pop() ?? path)
@@ -2108,89 +2160,92 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 	return (
 		<ToolBatchOpenProvider>
-		<ChatDiffViewProvider>
-			<div
-				className="messages-container"
-				style={stickyUserHeader ? { paddingTop: 50 } : undefined}
-			>
-				{error !== undefined && (
-					<div onClick={clearError} className="error-banner">
-						{error} — click to dismiss
-					</div>
-				)}
-
-				{rawMessages.length === 0 && !isStreaming ? (
-					<div className="welcome">
-						<div className="welcome-icon">💬</div>
-						<div className="welcome-text">Send a message to start chatting</div>
-						<div className="welcome-hint">with the pi coding agent</div>
-					</div>
-				) : (
-					<div
-						ref={scrollRef}
-						onScroll={onScroll}
-						style={stickyUserHeader ? { paddingTop: 0 } : undefined}
-						className="chat-scroll"
-					>
-						<div className="chat-message-list">
-							{renderedRows}
-
-							{isStreaming && streamingMessage !== undefined && (() => {
-							// Streaming content is always rendered inside renderedRows via
-							// currentAssistants injection. No standalone row needed.
-							return null;
-							return (
-								<div className="message-row assistant streaming-row">
-									<div className="message-bubble assistant streaming-bubble">
-										{activeToolName && (
-											<div className="tool-badge">
-												<span className="tool-badge-dot" />
-												{activeToolName}
-											</div>
-										)}
-										{renderStreamingContent(
-											streamingMessage as Record<string, unknown>,
-										)}
-									</div>
-								</div>
-							);
-						})()}
-
-
-
-							{activeCompaction !== null && (
-								<CompactionNotice compaction={activeCompaction} />
-							)}
-
-							{queued !== undefined &&
-								(queued.steering.length > 0 || queued.followUp.length > 0) && (
-									<div className="queued-msgs">
-										{[
-											...queued.steering.map((t) => ({
-												kind: "steer" as const,
-												text: t,
-											})),
-											...queued.followUp.map((t) => ({
-												kind: "followUp" as const,
-												text: t,
-											})),
-										].map((q, i) => (
-											<div key={i} className="queued-msg-item">
-												<span className={`queued-badge ${q.kind}`}>
-													{q.kind === "steer" ? "steer" : "follow-up"}
-												</span>
-												<span className="queued-msg-text" title={q.text}>
-													{q.text}
-												</span>
-											</div>
-										))}
-									</div>
-								)}
+			<ChatDiffViewProvider>
+				<div
+					className="messages-container"
+					style={stickyUserHeader ? { paddingTop: 50 } : undefined}
+				>
+					{error !== undefined && (
+						<div onClick={clearError} className="error-banner">
+							{error} — click to dismiss
 						</div>
-					</div>
-				)}
-			</div>
-		</ChatDiffViewProvider>
+					)}
+
+					{rawMessages.length === 0 && !isStreaming ? (
+						<div className="welcome">
+							<div className="welcome-icon">💬</div>
+							<div className="welcome-text">
+								Send a message to start chatting
+							</div>
+							<div className="welcome-hint">with the pi coding agent</div>
+						</div>
+					) : (
+						<div
+							ref={scrollRef}
+							onScroll={onScroll}
+							style={stickyUserHeader ? { paddingTop: 0 } : undefined}
+							className="chat-scroll"
+						>
+							<div className="chat-message-list">
+								{renderedRows}
+
+								{isStreaming &&
+									streamingMessage !== undefined &&
+									(() => {
+										// Streaming content is always rendered inside renderedRows via
+										// currentAssistants injection. No standalone row needed.
+										return null;
+										return (
+											<div className="message-row assistant streaming-row">
+												<div className="message-bubble assistant streaming-bubble">
+													{activeToolName && (
+														<div className="tool-badge">
+															<span className="tool-badge-dot" />
+															{activeToolName}
+														</div>
+													)}
+													{renderStreamingContent(
+														streamingMessage as Record<string, unknown>,
+													)}
+												</div>
+											</div>
+										);
+									})()}
+
+								{activeCompaction !== null && (
+									<CompactionNotice compaction={activeCompaction} />
+								)}
+
+								{queued !== undefined &&
+									(queued.steering.length > 0 ||
+										queued.followUp.length > 0) && (
+										<div className="queued-msgs">
+											{[
+												...queued.steering.map((t) => ({
+													kind: "steer" as const,
+													text: t,
+												})),
+												...queued.followUp.map((t) => ({
+													kind: "followUp" as const,
+													text: t,
+												})),
+											].map((q, i) => (
+												<div key={i} className="queued-msg-item">
+													<span className={`queued-badge ${q.kind}`}>
+														{q.kind === "steer" ? "steer" : "follow-up"}
+													</span>
+													<span className="queued-msg-text" title={q.text}>
+														{q.text}
+													</span>
+												</div>
+											))}
+										</div>
+									)}
+							</div>
+						</div>
+					)}
+				</div>
+			</ChatDiffViewProvider>
 		</ToolBatchOpenProvider>
 	);
 }
