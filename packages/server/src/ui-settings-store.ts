@@ -23,6 +23,10 @@ export type UiSettings = {
   /** openkot-style tool trail grouping (one Trail card per turn, interstitial
    *  text collapsed into justification previews). */
   groupedToolDisplay: boolean;
+  /** Turn-written-file chips under each reply. */
+  showTurnFiles: boolean;
+  /** Horizontal swipe on touch screens opens/collapses the sidebar. */
+  swipeToOpenSidebar: boolean;
   viewerWidth: number;
   artifactViewerWidth: number;
   // User bubble customization (null = use accent default)
@@ -42,6 +46,8 @@ const DEFAULTS: UiSettings = {
   compressImages: true,
   showThinking: false,
   groupedToolDisplay: true,
+  showTurnFiles: true,
+  swipeToOpenSidebar: true,
   viewerWidth: 480,
   artifactViewerWidth: 480,
   userBubbleColor: null,
@@ -70,6 +76,8 @@ function normalize(value: unknown): UiSettings {
   if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
   if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
   if (typeof v.groupedToolDisplay === "boolean") settings.groupedToolDisplay = v.groupedToolDisplay;
+  if (typeof v.showTurnFiles === "boolean") settings.showTurnFiles = v.showTurnFiles;
+  if (typeof v.swipeToOpenSidebar === "boolean") settings.swipeToOpenSidebar = v.swipeToOpenSidebar;
   if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
   if (typeof v.artifactViewerWidth === "number") settings.artifactViewerWidth = v.artifactViewerWidth;
   // User bubble: null = use accent default, string = custom hex

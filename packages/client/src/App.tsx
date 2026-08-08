@@ -23,6 +23,7 @@ import { LoadingSkeleton } from "./components/LoadingSkeleton";
 import { SystemPromptTab } from "./components/SystemPromptTab";
 import { useTouchSwipe } from "./hooks/useTouchSwipe";
 import { useLayoutStore } from "./stores/layout-store";
+import { usePreferencesStore } from "./stores/preferences-store";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -137,6 +138,7 @@ export function App() {
     setIsMobile,
   } = useLayoutStore();
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
+  const swipeToOpenSidebar = usePreferencesStore((s) => s.swipeToOpenSidebar);
   const [viewerMinimized, setViewerMinimized] = useState(false);
   const viewerActive = viewerTabs.length > 0 && !viewerMinimized;
 
@@ -160,6 +162,7 @@ export function App() {
     onSwipeLeft: () => setSidebarCollapsed(true),
     onSwipeRight: () => setSidebarCollapsed(false),
     threshold: 60,
+    enabled: swipeToOpenSidebar,
   });
 
   // Bootstrap: check auth, load projects, fetch models

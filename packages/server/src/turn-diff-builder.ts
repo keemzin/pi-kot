@@ -90,6 +90,7 @@ interface ToolCallResultPair {
 export function collectTurnTouches(
   messages: readonly unknown[],
   explicitStartIndex?: number,
+  explicitEndIndex?: number,
 ): ToolCallResultPair[] {
   let startIndex = 0;
   if (
@@ -107,11 +108,17 @@ export function collectTurnTouches(
       }
     }
   }
+  const endIndex =
+    explicitEndIndex !== undefined &&
+    explicitEndIndex >= startIndex &&
+    explicitEndIndex <= messages.length
+      ? explicitEndIndex
+      : messages.length;
 
   // Build callId → ToolCallInfo from assistant messages first.
   // The SDK's `ToolCall` block uses `arguments` for the input object.
   const callsById = new Map<string, ToolCallInfo>();
-  for (let i = startIndex; i < messages.length; i++) {
+  for (let i = startIndex; i < endIndex; i++) {
     const m = messages[i] as { role?: unknown; content?: unknown };
     if (m.role !== "assistant" || !Array.isArray(m.content)) continue;
     for (const block of m.content) {
@@ -148,7 +155,7 @@ export function collectTurnTouches(
   // Walk toolResults in order so multiple edits to the same file land
   // in chronological sequence.
   const out: ToolCallResultPair[] = [];
-  for (let i = startIndex; i < messages.length; i++) {
+  for (let i = startIndex; i < endIndex; i++) {
     const m = messages[i] as {
       role?: unknown;
       toolCallId?: unknown;
@@ -180,8 +187,9 @@ export async function buildTurnDiff(
   session: Pick<AgentSession, "messages">,
   projectPath: string,
   explicitStartIndex?: number,
+  explicitEndIndex?: number,
 ): Promise<TurnDiffEntry[]> {
-  const touches = collectTurnTouches(session.messages, explicitStartIndex);
+  const touches = collectTurnTouches(session.messages, explicitStartIndex, explicitEndIndex);
   if (touches.length === 0) return [];
 
   const isGitRepo = await checkGitRepo(projectPath);

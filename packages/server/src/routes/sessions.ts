@@ -815,23 +815,35 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // GET /sessions/:id/turn-diff — aggregate write/edit changes from latest turn
-  fastify.get<{ Params: { id: string } }>(
+  // GET /sessions/:id/turn-diff — aggregate write/edit changes from a turn
+  fastify.get<{
+    Params: { id: string };
+    Querystring: { startIndex?: number; endIndex?: number };
+  }>(
     "/sessions/:id/turn-diff",
     {
       schema: {
         description:
-          "Aggregate every write/edit tool result from the session's most " +
-          "recent turn into one reviewable changeset. Returns " +
+          "Aggregate every write/edit tool result from a single turn into " +
+          "one reviewable changeset. Returns " +
           "`{ entries: [{ file, tool, diff, additions, deletions, isPureAddition }] }`. " +
-          "Prefers the tool result's turn-scoped diff; falls back to " +
-          "`git diff HEAD -- <path>` and then a pure-addition diff when " +
-          "needed. 404 if the session isn't currently live.",
+          "Scoped to the session's most recent turn by default; pass optional " +
+          "`startIndex`/`endIndex` (raw message-array bounds, end exclusive) to " +
+          "target an earlier turn. Prefers the tool result's turn-scoped diff; " +
+          "falls back to `git diff HEAD -- <path>` and then a pure-addition " +
+          "diff when needed. 404 if the session isn't currently live.",
         tags: ["sessions"],
         params: {
           type: "object",
           required: ["id"],
           properties: { id: { type: "string" } },
+        },
+        querystring: {
+          type: "object",
+          properties: {
+            startIndex: { type: "integer", minimum: 0 },
+            endIndex: { type: "integer", minimum: 1 },
+          },
         },
         response: {
           200: {
@@ -865,11 +877,16 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const live = getSession(req.params.id);
       if (live === undefined) return reply.code(404).send({ error: "session_not_found" });
-      const entries = await buildTurnDiff(
-        live.session,
-        live.workspacePath,
-        live.lastAgentStartIndex,
-      );
+      const qStart = req.query.startIndex;
+      const start =
+        typeof qStart === "number" && Number.isInteger(qStart) && qStart >= 0
+          ? qStart
+          : live.lastAgentStartIndex;
+      const end =
+        typeof req.query.endIndex === "number" && Number.isInteger(req.query.endIndex)
+          ? req.query.endIndex
+          : undefined;
+      const entries = await buildTurnDiff(live.session, live.workspacePath, start, end);
       return { entries };
     },
   );

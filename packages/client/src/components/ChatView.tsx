@@ -11,8 +11,10 @@ import { invokeExtensionCommand, cancelExec } from "../lib/api-client";
 import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
 import { parseRefChips, type RefChip } from "../lib/ref-chips";
+import { extractTurnFilePaths } from "../lib/turn-file-chips";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { TurnFileChips } from "./TurnFileChips";
 import { CompactionNotice } from "./CompactionNotice";
 import type { ActiveCompaction } from "../stores/session-store";
 import { ChatDiffViewProvider } from "./ChatEditDiff";
@@ -1087,6 +1089,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
 	const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 	const groupedToolDisplay = usePreferencesStore((s) => s.groupedToolDisplay);
+	const showTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -1104,6 +1107,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 	// Push artifacts to the Artifacts Panel
 	const pushArtifact = useLayoutStore((s) => s.pushArtifact);
+	const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 	const seenArtifactIds = useRef(new Set<string>());
 	useEffect(() => {
 		const allMsgs = [
@@ -1142,10 +1146,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					} else if (/^data:image\//.test(trimmed)) {
 						artType = "image";
 					} else if (/^\s*[[{]/.test(trimmed)) {
-						try {
-							JSON.parse(trimmed);
-							artType = "json";
-						} catch {}
+					try {
+						JSON.parse(trimmed);
+						artType = "json";
+					} catch {
+						// Not JSON — leave artType as-is and render as text.
+					}
 					}
 
 					if (artType) {
@@ -1839,9 +1845,15 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		let turnIdx = 0;
 		let currentUser: Record<string, unknown> | undefined;
 		let currentAssistants: Record<string, unknown>[] = [];
+		let currentTurnStart = -1;
 
 		const flushTurn = (): void => {
 			if (currentUser === undefined) return;
+			const turnEndIdx = msgIdx;
+			const turnFiles = extractTurnFilePaths(
+				currentAssistants,
+				(id) => (id === undefined ? undefined : getToolResult(id)),
+			);
 			const turnKey =
 				typeof currentUser.id === "string"
 					? currentUser.id
@@ -1936,6 +1948,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								)}
 							</div>
 						)}
+						{turnFiles.length > 0 && showTurnFiles && (
+							<TurnFileChips
+								files={turnFiles}
+								sessionId={sessionId}
+								startIndex={currentTurnStart >= 0 ? currentTurnStart : undefined}
+								endIndex={turnEndIdx}
+								onOpen={(path) =>
+									openFileViewer(path, path.split(/[\\/]/).pop() ?? path)
+								}
+							/>
+						)}
 					</div>,
 				);
 			} else {
@@ -1989,6 +2012,20 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				}
+				if (turnFiles.length > 0 && showTurnFiles) {
+					out.push(
+						<TurnFileChips
+							key={`${turnKey}-files`}
+							files={turnFiles}
+							sessionId={sessionId}
+							startIndex={currentTurnStart >= 0 ? currentTurnStart : undefined}
+							endIndex={turnEndIdx}
+							onOpen={(path) =>
+								openFileViewer(path, path.split(/[\\/]/).pop() ?? path)
+							}
+						/>,
+					);
+				}
 			}
 
 			currentUser = undefined;
@@ -2021,6 +2058,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			if (role === "user" || role === "user-with-attachments") {
 				flushTurn();
 				currentUser = msg;
+				currentTurnStart = idx;
 			} else if (role === "toolResult") {
 			} else {
 				// Assistant / bashExecution / branchSummary / custom
@@ -2065,6 +2103,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		rewindAvailable,
 		rawMessages,
 		groupedToolDisplay,
+		showTurnFiles,
 	]);
 
 	return (

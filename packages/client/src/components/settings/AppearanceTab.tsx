@@ -19,6 +19,8 @@ type UiSettings = {
   compressImages?: boolean;
   showThinking?: boolean;
   groupedToolDisplay?: boolean;
+  showTurnFiles?: boolean;
+  swipeToOpenSidebar?: boolean;
   userBubbleColor?: string | null;
   userBubbleTextColor?: string | null;
   userBubbleBorderColor?: string | null;
@@ -80,17 +82,23 @@ export function AppearanceTab() {
   const zCompress = usePreferencesStore((s) => s.compressImages);
   const zThinking = usePreferencesStore((s) => s.showThinking);
   const zGrouped = usePreferencesStore((s) => s.groupedToolDisplay);
+  const zTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
+  const zSwipeSidebar = usePreferencesStore((s) => s.swipeToOpenSidebar);
   const zSetSticky = usePreferencesStore((s) => s.setStickyUserHeader);
   const zSetToken = usePreferencesStore((s) => s.setShowTokenUsage);
   const zSetCompress = usePreferencesStore((s) => s.setCompressImages);
   const zSetThinking = usePreferencesStore((s) => s.setShowThinking);
   const zSetGrouped = usePreferencesStore((s) => s.setGroupedToolDisplay);
+  const zSetTurnFiles = usePreferencesStore((s) => s.setShowTurnFiles);
+  const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
 
   const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
   const [showTokenUsage, setShowTokenUsage] = useState(zToken);
   const [compressImages, setCompressImages] = useState(zCompress);
   const [showThinking, setShowThinking] = useState(zThinking);
   const [groupedToolDisplay, setGroupedToolDisplay] = useState(zGrouped);
+  const [showTurnFiles, setShowTurnFiles] = useState(zTurnFiles);
+  const [swipeToOpenSidebar, setSwipeToOpenSidebar] = useState(zSwipeSidebar);
 
   // ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
   const [bubbleBg, setBubbleBg] = useState<string | null>(() => loadLocalBubble(LS_BUBBLE_BG));
@@ -147,6 +155,14 @@ export function AppearanceTab() {
         if (typeof server.groupedToolDisplay === "boolean") {
           setGroupedToolDisplay(server.groupedToolDisplay);
           zSetGrouped(server.groupedToolDisplay);
+        }
+        if (typeof server.showTurnFiles === "boolean") {
+          setShowTurnFiles(server.showTurnFiles);
+          zSetTurnFiles(server.showTurnFiles);
+        }
+        if (typeof server.swipeToOpenSidebar === "boolean") {
+          setSwipeToOpenSidebar(server.swipeToOpenSidebar);
+          zSetSwipeSidebar(server.swipeToOpenSidebar);
         }
 
         // Bubble overrides — use server value, or fallback to localStorage, or null
@@ -217,6 +233,16 @@ export function AppearanceTab() {
     setGroupedToolDisplay(val);
     zSetGrouped(val);
     persist({ groupedToolDisplay: val });
+  };
+  const toggleTurnFiles = (val: boolean) => {
+    setShowTurnFiles(val);
+    zSetTurnFiles(val);
+    persist({ showTurnFiles: val });
+  };
+  const toggleSwipeSidebar = (val: boolean) => {
+    setSwipeToOpenSidebar(val);
+    zSetSwipeSidebar(val);
+    persist({ swipeToOpenSidebar: val });
   };
 
   const selectBubblePreset = (idx: number) => {
@@ -473,6 +499,17 @@ export function AppearanceTab() {
       </div>
 
       <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none", fontSize: 13, color: "var(--text-secondary)" }}>
+          <input type="checkbox" checked={showTurnFiles} onChange={(e) => toggleTurnFiles(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
+          Show turn-written files
+        </label>
+        <p className="settings-hint" style={{ marginTop: 4 }}>
+          File chips under each reply for files the agent wrote, with per-turn diff.
+        </p>
+      </div>
+
+      <div className="settings-field">
         <label className="settings-label">Images</label>
         <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none", fontSize: 13, color: "var(--text-secondary)" }}>
           <input type="checkbox" checked={compressImages} onChange={(e) => toggleCompress(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
@@ -496,6 +533,16 @@ export function AppearanceTab() {
         </label>
         <p className="settings-hint" style={{ marginTop: 4 }}>
           One Trail card per turn; in-between agent text collapses into justification previews.
+        </p>
+      </div>
+      <div className="settings-field">
+        <label className="settings-label">Chat</label>
+        <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none", fontSize: 13, color: "var(--text-secondary)" }}>
+          <input type="checkbox" checked={swipeToOpenSidebar} onChange={(e) => toggleSwipeSidebar(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer" }} />
+          Swipe left/right opens sidebar
+        </label>
+        <p className="settings-hint" style={{ marginTop: 4 }}>
+          Touch screens: horizontal swipes open/collapse the sidebar. Turn off if scrolling triggers it.
         </p>
       </div>
     </div>

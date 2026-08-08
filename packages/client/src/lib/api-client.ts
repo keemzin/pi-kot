@@ -1080,10 +1080,18 @@ export interface TurnDiffResponse {
   entries: TurnDiffEntry[];
 }
 
-export async function getTurnDiff(sessionId: string): Promise<TurnDiffResponse> {
+export async function getTurnDiff(
+  sessionId: string,
+  startIndex?: number,
+  endIndex?: number,
+): Promise<TurnDiffResponse> {
+  const params = new URLSearchParams();
+  if (startIndex !== undefined) params.set("startIndex", String(startIndex));
+  if (endIndex !== undefined) params.set("endIndex", String(endIndex));
+  const qs = params.toString();
   return request<TurnDiffResponse>(
     "GET",
-    `/api/v1/sessions/${encodeURIComponent(sessionId)}/turn-diff`,
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/turn-diff${qs.length > 0 ? `?${qs}` : ""}`,
   );
 }
 
