@@ -18,7 +18,11 @@ export interface PairableMessage {
 }
 
 export type ToolGroupEntry =
-	| { kind: "tool"; block: Record<string, unknown>; result?: PairableMessage | undefined }
+	| {
+			kind: "tool";
+			block: Record<string, unknown>;
+			result?: PairableMessage | undefined;
+	  }
 	| { kind: "thinking"; text: string }
 	| { kind: "justification"; text: string };
 
@@ -176,19 +180,44 @@ export function buildGroupedTurn(
 export function getToolDisplayName(toolName: string): string {
 	const t = toolName.toLowerCase();
 	const map: Record<string, string> = {
-		edit: "Edited", apply_patch: "Edited", str_replace: "Edited",
+		edit: "Edited",
+		apply_patch: "Edited",
+		str_replace: "Edited",
 		multiedit: "Edited",
-		write: "Wrote", create: "Wrote", file_write: "Wrote",
-		read: "Read", view: "Read", cat: "Read", file_read: "Read",
-		bash: "Shell Command", shell: "Shell Command", cmd: "Shell Command", terminal: "Shell Command",
-		list: "Listed", ls: "Listed", dir: "Listed", list_files: "Listed",
-		grep: "Searched", search: "Searched", ripgrep: "Searched",
-		find: "Found", glob: "Found",
-		webfetch: "Fetched", fetch: "Fetched", fetch_content: "Fetched", curl: "Fetched", wget: "Fetched",
-		websearch: "Searched Web", web_search: "Searched Web", web_fetch: "Fetched",
-		searxng_searxng_web_search: "Searched", codesearch: "Searched",
-		todowrite: "Updated Todos", todoread: "Read Todos",
-		ask_user_question: "Asked", plan_mode_question: "Asked",
+		write: "Wrote",
+		create: "Wrote",
+		file_write: "Wrote",
+		read: "Read",
+		view: "Read",
+		cat: "Read",
+		file_read: "Read",
+		bash: "Shell Command",
+		shell: "Shell Command",
+		cmd: "Shell Command",
+		terminal: "Shell Command",
+		list: "Listed",
+		ls: "Listed",
+		dir: "Listed",
+		list_files: "Listed",
+		grep: "Searched",
+		search: "Searched",
+		ripgrep: "Searched",
+		find: "Found",
+		glob: "Found",
+		webfetch: "Fetched",
+		fetch: "Fetched",
+		fetch_content: "Fetched",
+		curl: "Fetched",
+		wget: "Fetched",
+		websearch: "Searched Web",
+		web_search: "Searched Web",
+		web_fetch: "Fetched",
+		searxng_searxng_web_search: "Searched",
+		codesearch: "Searched",
+		todowrite: "Updated Todos",
+		todoread: "Read Todos",
+		ask_user_question: "Asked",
+		plan_mode_question: "Asked",
 		task: "Delegated Task",
 		javascript_repl: "Repl",
 	};
@@ -196,7 +225,13 @@ export function getToolDisplayName(toolName: string): string {
 	if (t.startsWith("ctx_"))
 		return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 	if (t.startsWith("git"))
-		return "Git " + t.slice(3).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+		return (
+			"Git " +
+			t
+				.slice(3)
+				.replace(/_/g, " ")
+				.replace(/\b\w/g, (c) => c.toUpperCase())
+		);
 	// MCP-style / default: snake_case → Title Case
 	return toolName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -204,7 +239,12 @@ export function getToolDisplayName(toolName: string): string {
 /** SVG path for a tool's icon (openkot-style). */
 export function getToolIconPath(toolName: string): string {
 	const t = toolName.toLowerCase();
-	if (t === "edit" || t === "multiedit" || t === "apply_patch" || t === "str_replace")
+	if (
+		t === "edit" ||
+		t === "multiedit" ||
+		t === "apply_patch" ||
+		t === "str_replace"
+	)
 		return "M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z";
 	if (t === "write" || t === "create" || t === "file_write")
 		return "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6";
@@ -216,17 +256,31 @@ export function getToolIconPath(toolName: string): string {
 		return "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z";
 	if (t === "grep" || t === "search" || t === "find" || t === "ripgrep")
 		return "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0zM10 7v3m0 0v3m0-3h3m-3 0H7";
-	if (t === "glob")
-		return "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z";
-	if (t === "webfetch" || t === "fetch" || t === "fetch_content" || t === "curl" || t === "wget")
+	if (t === "glob") return "M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z";
+	if (
+		t === "webfetch" ||
+		t === "fetch" ||
+		t === "fetch_content" ||
+		t === "curl" ||
+		t === "wget"
+	)
 		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z";
-	if (t.includes("web_search") || t.includes("searxng") || t === "websearch" || t === "codesearch")
+	if (
+		t.includes("web_search") ||
+		t.includes("searxng") ||
+		t === "websearch" ||
+		t === "codesearch"
+	)
 		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z";
 	if (t === "todowrite" || t === "todoread")
 		return "M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11";
 	if (t === "task")
 		return "M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM12 8v4l3 3";
-	if (t === "ask_user_question" || t === "plan_mode_question" || t.includes("question"))
+	if (
+		t === "ask_user_question" ||
+		t === "plan_mode_question" ||
+		t.includes("question")
+	)
 		return "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01";
 	if (t.startsWith("git"))
 		return "M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9";
@@ -245,8 +299,14 @@ export function getToolDescription(
 		return typeof cmd === "string" ? cmd.split("\n")[0]!.slice(0, 80) : "";
 	}
 	if (
-		t === "read" || t === "view" || t === "cat" || t === "write" ||
-		t === "create" || t === "edit" || t === "apply_patch" || t === "multiedit"
+		t === "read" ||
+		t === "view" ||
+		t === "cat" ||
+		t === "write" ||
+		t === "create" ||
+		t === "edit" ||
+		t === "apply_patch" ||
+		t === "multiedit"
 	) {
 		const p = args.filePath ?? args.file_path ?? args.path ?? args.file ?? "";
 		if (typeof p === "string" && p) {
@@ -262,11 +322,22 @@ export function getToolDescription(
 		const p = args.pattern ?? args.glob ?? "";
 		return typeof p === "string" ? `"${p.slice(0, 60)}"` : "";
 	}
-	if (t === "webfetch" || t === "fetch" || t === "fetch_content" || t === "curl" || t === "wget") {
+	if (
+		t === "webfetch" ||
+		t === "fetch" ||
+		t === "fetch_content" ||
+		t === "curl" ||
+		t === "wget"
+	) {
 		const url = args.url ?? args.URL ?? "";
 		return typeof url === "string" ? url.slice(0, 80) : "";
 	}
-	if (t.includes("web_search") || t.includes("searxng") || t === "websearch" || t === "codesearch") {
+	if (
+		t.includes("web_search") ||
+		t.includes("searxng") ||
+		t === "websearch" ||
+		t === "codesearch"
+	) {
 		const q = args.query ?? args.q ?? "";
 		return typeof q === "string" ? `"${q.slice(0, 60)}"` : "";
 	}
@@ -295,15 +366,41 @@ export function getToolDescription(
 /** Map a tool name to a descriptive emoji icon. */
 export function getToolIcon(name: string): string {
 	const n = name.toLowerCase();
-	if (n.includes("bash") || n.includes("shell") || n.includes("exec") || n.includes("run"))
+	if (
+		n.includes("bash") ||
+		n.includes("shell") ||
+		n.includes("exec") ||
+		n.includes("run")
+	)
 		return "⚡";
-	if (n.includes("read") || n.includes("cat") || n.includes("view") || n.includes("get"))
+	if (
+		n.includes("read") ||
+		n.includes("cat") ||
+		n.includes("view") ||
+		n.includes("get")
+	)
 		return "📄";
-	if (n.includes("write") || n.includes("create") || n.includes("save") || n.includes("put"))
+	if (
+		n.includes("write") ||
+		n.includes("create") ||
+		n.includes("save") ||
+		n.includes("put")
+	)
 		return "✏️";
-	if (n.includes("edit") || n.includes("patch") || n.includes("update") || n.includes("replace"))
+	if (
+		n.includes("edit") ||
+		n.includes("patch") ||
+		n.includes("update") ||
+		n.includes("replace")
+	)
 		return "🔧";
-	if (n.includes("search") || n.includes("grep") || n.includes("find") || n.includes("ls") || n.includes("list"))
+	if (
+		n.includes("search") ||
+		n.includes("grep") ||
+		n.includes("find") ||
+		n.includes("ls") ||
+		n.includes("list")
+	)
 		return "🔍";
 	if (n.includes("delete") || n.includes("remove") || n.includes("rm"))
 		return "🗑️";
@@ -311,7 +408,12 @@ export function getToolIcon(name: string): string {
 		return "📦";
 	if (n.includes("git") || n.includes("commit") || n.includes("branch"))
 		return "🌿";
-	if (n.includes("web") || n.includes("fetch") || n.includes("http") || n.includes("url"))
+	if (
+		n.includes("web") ||
+		n.includes("fetch") ||
+		n.includes("http") ||
+		n.includes("url")
+	)
 		return "🌐";
 	if (n.includes("test") || n.includes("spec")) return "🧪";
 	if (n.includes("ask") || n.includes("question") || n.includes("prompt"))
@@ -328,10 +430,20 @@ export function extractFilename(
 	message: Record<string, unknown>,
 ): string | undefined {
 	const details = message.details as
-		| { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+		| {
+				path?: unknown;
+				filename?: unknown;
+				file?: unknown;
+				file_path?: unknown;
+		  }
 		| undefined;
 	const input = message.input as
-		| { path?: unknown; filename?: unknown; file?: unknown; file_path?: unknown }
+		| {
+				path?: unknown;
+				filename?: unknown;
+				file?: unknown;
+				file_path?: unknown;
+		  }
 		| undefined;
 	for (const src of [details, input]) {
 		if (src === undefined) continue;
@@ -396,7 +508,8 @@ export function ToolCallEntry({
 	}, [result]);
 	const name = String(block.name ?? "tool");
 	const args = block.arguments ?? block.input ?? {};
-	const argsText = typeof args === "string" ? args : JSON.stringify(args, null, 2);
+	const argsText =
+		typeof args === "string" ? args : JSON.stringify(args, null, 2);
 
 	const isError = result?.isError === true;
 	const isRunning = result === undefined && !suppressRunning;
@@ -490,7 +603,9 @@ export function ToolCallEntry({
 						{argsText.length > 2 && (
 							<div>
 								<div className="tool-timeline-section-label">input</div>
-								<pre className="tool-timeline-code" ref={argsPreRef}>{argsText}</pre>
+								<pre className="tool-timeline-code" ref={argsPreRef}>
+									{argsText}
+								</pre>
 							</div>
 						)}
 						{editDiff !== undefined && editStats !== undefined ? (
@@ -602,6 +717,27 @@ function JustificationRow({
 
 const JUSTIFY_COLLAPSE_THRESHOLD = 3;
 
+/**
+ * Live "follow the agent" rule for the Justify view: while the turn is
+ * still streaming and the trail is in Justify, only the NEWEST
+ * justification chunk stays expanded. When the next chunk arrives it
+ * takes over and the previous one collapses — so the step the agent
+ * is currently working on is never hidden behind older steps.
+ * Manual expansions/collapses survive until the next chunk arrives
+ * (this only fires when streaming/view/chunk-count change).
+ */
+export function nextOpenChunks(
+	current: Set<number>,
+	chunkCount: number,
+	isStreaming: boolean,
+	view: "full" | "justify",
+): Set<number> {
+	if (isStreaming && view === "justify" && chunkCount > 0) {
+		return new Set([chunkCount - 1]);
+	}
+	return current;
+}
+
 /** Groups entries into chunks: each justification + the tools/thinking that follow it. */
 function groupChunks(entries: ToolGroupEntry[]): {
 	leading: ToolGroupEntry[];
@@ -663,11 +799,22 @@ export function ToolGroupCard({
 		prevStreaming.current = isStreaming;
 	}, [isStreaming]);
 
-	const anyRunning = isStreaming && entries.some(
-		(e) => e.kind === "tool" && e.result === undefined,
-	);
+	const anyRunning =
+		isStreaming &&
+		entries.some((e) => e.kind === "tool" && e.result === undefined);
 
-	const { leading, chunks } = groupChunks(entries);
+	const { chunks } = groupChunks(entries);
+
+	// Live-turn "only the step being worked on" focus: while the turn is
+	// streaming in Justify view, the newest chunk expands automatically
+	// and older expanded chunks collapse as new justifications arrive -
+	// the current agent step is never hidden behind collapsed older ones.
+	const chunkCount = chunks.length;
+	useEffect(() => {
+		setOpenChunks((prev) =>
+			nextOpenChunks(prev, chunkCount, isStreaming, view),
+		);
+	}, [isStreaming, view, chunkCount]);
 
 	const toggleChunk = (idx: number) =>
 		setOpenChunks((prev) => {
@@ -739,7 +886,9 @@ export function ToolGroupCard({
 				{isOpen && (
 					<div className="trail-chunk-content">
 						<div className="trail-full-prose">
-							<ChatMarkdown text={(chunk.just as { text: string }).text.trim()} />
+							<ChatMarkdown
+								text={(chunk.just as { text: string }).text.trim()}
+							/>
 						</div>
 						{chunk.tools.map((e, i) => renderEntry(e, i))}
 					</div>
@@ -769,7 +918,15 @@ export function ToolGroupCard({
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+						>
 							<circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
 							<circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
 							<circle cx="19" cy="12" r="2" fill="currentColor" stroke="none" />
@@ -804,13 +961,16 @@ export function ToolGroupCard({
 							</button>
 						)}
 						{visibleChunks.map((chunk, i) =>
-							renderChunk(chunk, chunkIdxOffset + i, `chunk-${chunkIdxOffset + i}`),
+							renderChunk(
+								chunk,
+								chunkIdxOffset + i,
+								`chunk-${chunkIdxOffset + i}`,
+							),
 						)}
 						{/* Leading tools (before first justification) are visible in Full view only. */}
 					</div>
 				</div>
 			)}
-
 		</div>
 	);
 }
