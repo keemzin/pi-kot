@@ -699,6 +699,7 @@ function JustificationRow({
 				}}
 				className="trail-justification-header"
 				title={open ? "Collapse this step" : "Expand this step"}
+				aria-expanded={open}
 			>
 				<span className="trail-justification-dot" />
 				<span className="trail-justification-label">Justification</span>
@@ -877,13 +878,17 @@ export function ToolGroupCard({
 	) => {
 		const isOpen = openChunks.has(chunkIdx);
 		return (
-			<div key={keyPrefix} className="trail-chunk">
+			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}`}>
 				<JustificationRow
 					text={(chunk.just as { text: string }).text}
 					open={isOpen}
 					onToggle={() => toggleChunk(chunkIdx)}
 				/>
-				{isOpen && (
+				{/* Always mounted: the 0fr↔1fr grid animation (see themes.css)
+				    animates the body in and out, so a closed step's collapse
+				    is as smooth as the new step's expansion — no snap between
+				    justifications during heavy tool calling. */}
+				<div className="trail-chunk-body" aria-hidden={!isOpen}>
 					<div className="trail-chunk-content">
 						<div className="trail-full-prose">
 							<ChatMarkdown
@@ -892,7 +897,7 @@ export function ToolGroupCard({
 						</div>
 						{chunk.tools.map((e, i) => renderEntry(e, i))}
 					</div>
-				)}
+				</div>
 			</div>
 		);
 	};
