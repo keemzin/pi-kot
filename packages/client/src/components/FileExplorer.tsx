@@ -3,7 +3,6 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
 import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
-import { TurnDiffPanel } from "./TurnDiffPanel";
 import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
@@ -78,7 +77,7 @@ async function collectDroppedUploadFiles(dataTransfer: DataTransfer): Promise<Fi
   return files;
 }
 
-export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt" | "diff";
+export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt";
 
 interface Props {
   projectId: string;
@@ -663,7 +662,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           [
             { key: "files",         label: "Files",    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); } },
             { key: "git",           label: "Git",      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
-            { key: "diff",          label: "Diff",     icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>, onClick: () => setTab("diff") },
             { key: "artifacts",     label: "Artifacts",icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
           ] as { key: string; label: string; icon: React.ReactNode; onClick: () => void }[]
         ).map(({ key, label, icon, onClick }) => (
@@ -709,13 +707,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         </div>
       )}
 
-      {/* ── Diff tab ── */}
-      {tab === "diff" && (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-          <TurnDiffPanel />
-        </div>
-      )}
-
       {/* ── Files tab ── */}
       {tab === "files" && (
         <>
@@ -730,7 +721,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           <input
             ref={uploadFolderRef}
             type="file"
-            /* @ts-ignore — webkitdirectory is a webkit extension but works in all major browsers */
+            /* @ts-expect-error — webkitdirectory is a webkit extension but works in all major browsers */
             webkitdirectory="true"
             style={{ display: "none" }}
             onChange={(e) => { handleUpload(e.target.files ? Array.from(e.target.files) : null); e.target.value = ""; }}
