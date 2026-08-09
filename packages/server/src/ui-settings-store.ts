@@ -13,79 +13,123 @@ import { config } from "./config.js";
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export type UiSettings = {
-  version: 1;
-  theme?: string;
-  accent?: string;
-  stickyUserHeader: boolean;
-  showTokenUsage: boolean;
-  compressImages: boolean;
-  showThinking: boolean;
-  /** openkot-style tool trail grouping (one Trail card per turn, interstitial
-   *  text collapsed into justification previews). */
-  groupedToolDisplay: boolean;
-  /** Turn-written-file chips under each reply. */
-  showTurnFiles: boolean;
-  /** Horizontal swipe on touch screens opens/collapses the sidebar. */
-  swipeToOpenSidebar: boolean;
-  viewerWidth: number;
-  artifactViewerWidth: number;
-  // User bubble customization (null = use accent default)
-  userBubbleColor?: string | null;
-  userBubbleTextColor?: string | null;
-  userBubbleBorderColor?: string | null;
+	version: 1;
+	theme?: string;
+	accent?: string;
+	stickyUserHeader: boolean;
+	showTokenUsage: boolean;
+	compressImages: boolean;
+	showThinking: boolean;
+	/** openkot-style tool trail grouping (one Trail card per turn, interstitial
+	 *  text collapsed into justification previews). */
+	groupedToolDisplay: boolean;
+	/** Turn-written-file chips under each reply. */
+	showTurnFiles: boolean;
+	/** Horizontal swipe on touch screens opens/collapses the sidebar. */
+	swipeToOpenSidebar: boolean;
+	viewerWidth: number;
+	artifactViewerWidth: number;
+	// User bubble customization (null = use accent default)
+	userBubbleColor?: string | null;
+	userBubbleTextColor?: string | null;
+	userBubbleBorderColor?: string | null;
+	/** Split-flap departure board on the empty chat state (PI-KOT → PI-SDK). */
+	emptyFlapEnabled: boolean;
+	/** Phrases shown/cycled by the board when the chat is empty. */
+	emptyFlapWords: string[];
+	/** Board font size in px. */
+	emptyFlapSize: number;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
 
 const DEFAULTS: UiSettings = {
-  version: 1,
-  theme: undefined,
-  accent: undefined,
-  stickyUserHeader: true,
-  showTokenUsage: false,
-  compressImages: true,
-  showThinking: false,
-  groupedToolDisplay: true,
-  showTurnFiles: true,
-  swipeToOpenSidebar: true,
-  viewerWidth: 480,
-  artifactViewerWidth: 480,
-  userBubbleColor: null,
-  userBubbleTextColor: null,
-  userBubbleBorderColor: null,
+	version: 1,
+	theme: undefined,
+	accent: undefined,
+	stickyUserHeader: true,
+	showTokenUsage: false,
+	compressImages: true,
+	showThinking: false,
+	groupedToolDisplay: true,
+	showTurnFiles: true,
+	swipeToOpenSidebar: true,
+	viewerWidth: 480,
+	artifactViewerWidth: 480,
+	userBubbleColor: null,
+	userBubbleTextColor: null,
+	userBubbleBorderColor: null,
+	emptyFlapEnabled: true,
+	emptyFlapWords: ["PI-KOT 0.1.36", "PI-SDK 0.83.0"],
+	emptyFlapSize: 30,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
 
 function uiSettingsPath(): string {
-  return join(config.piConfigDir, "ui-settings.json");
+	return join(config.piConfigDir, "ui-settings.json");
 }
 
 // ── Normalization ─────────────────────────────────────────────────────────
 
 function normalize(value: unknown): UiSettings {
-  const settings = structuredClone(DEFAULTS);
-  if (!value || typeof value !== "object" || Array.isArray(value)) return settings;
+	const settings = structuredClone(DEFAULTS);
+	if (!value || typeof value !== "object" || Array.isArray(value))
+		return settings;
 
-  const v = value as Record<string, unknown>;
+	const v = value as Record<string, unknown>;
 
-  if (typeof v.theme === "string") settings.theme = v.theme;
-  if (typeof v.accent === "string") settings.accent = v.accent;
-  if (typeof v.stickyUserHeader === "boolean") settings.stickyUserHeader = v.stickyUserHeader;
-  if (typeof v.showTokenUsage === "boolean") settings.showTokenUsage = v.showTokenUsage;
-  if (typeof v.compressImages === "boolean") settings.compressImages = v.compressImages;
-  if (typeof v.showThinking === "boolean") settings.showThinking = v.showThinking;
-  if (typeof v.groupedToolDisplay === "boolean") settings.groupedToolDisplay = v.groupedToolDisplay;
-  if (typeof v.showTurnFiles === "boolean") settings.showTurnFiles = v.showTurnFiles;
-  if (typeof v.swipeToOpenSidebar === "boolean") settings.swipeToOpenSidebar = v.swipeToOpenSidebar;
-  if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
-  if (typeof v.artifactViewerWidth === "number") settings.artifactViewerWidth = v.artifactViewerWidth;
-  // User bubble: null = use accent default, string = custom hex
-  if (v.userBubbleColor === null || typeof v.userBubbleColor === "string") settings.userBubbleColor = v.userBubbleColor;
-  if (v.userBubbleTextColor === null || typeof v.userBubbleTextColor === "string") settings.userBubbleTextColor = v.userBubbleTextColor;
-  if (v.userBubbleBorderColor === null || typeof v.userBubbleBorderColor === "string") settings.userBubbleBorderColor = v.userBubbleBorderColor;
+	if (typeof v.theme === "string") settings.theme = v.theme;
+	if (typeof v.accent === "string") settings.accent = v.accent;
+	if (typeof v.stickyUserHeader === "boolean")
+		settings.stickyUserHeader = v.stickyUserHeader;
+	if (typeof v.showTokenUsage === "boolean")
+		settings.showTokenUsage = v.showTokenUsage;
+	if (typeof v.compressImages === "boolean")
+		settings.compressImages = v.compressImages;
+	if (typeof v.showThinking === "boolean")
+		settings.showThinking = v.showThinking;
+	if (typeof v.groupedToolDisplay === "boolean")
+		settings.groupedToolDisplay = v.groupedToolDisplay;
+	if (typeof v.showTurnFiles === "boolean")
+		settings.showTurnFiles = v.showTurnFiles;
+	if (typeof v.swipeToOpenSidebar === "boolean")
+		settings.swipeToOpenSidebar = v.swipeToOpenSidebar;
+	if (typeof v.viewerWidth === "number") settings.viewerWidth = v.viewerWidth;
+	if (typeof v.artifactViewerWidth === "number")
+		settings.artifactViewerWidth = v.artifactViewerWidth;
+	// User bubble: null = use accent default, string = custom hex
+	if (v.userBubbleColor === null || typeof v.userBubbleColor === "string")
+		settings.userBubbleColor = v.userBubbleColor;
+	if (
+		v.userBubbleTextColor === null ||
+		typeof v.userBubbleTextColor === "string"
+	)
+		settings.userBubbleTextColor = v.userBubbleTextColor;
+	if (
+		v.userBubbleBorderColor === null ||
+		typeof v.userBubbleBorderColor === "string"
+	)
+		settings.userBubbleBorderColor = v.userBubbleBorderColor;
+	// Split-flap board: sanitize phrases (uppercased at render, capped length/count)
+	if (typeof v.emptyFlapEnabled === "boolean")
+		settings.emptyFlapEnabled = v.emptyFlapEnabled;
+	if (typeof v.emptyFlapSize === "number" && Number.isFinite(v.emptyFlapSize)) {
+		settings.emptyFlapSize = Math.min(
+			64,
+			Math.max(14, Math.round(v.emptyFlapSize)),
+		);
+	}
+	if (Array.isArray(v.emptyFlapWords)) {
+		const words = v.emptyFlapWords
+			.map((w) => (typeof w === "string" ? w.trim() : ""))
+			.filter((w) => w.length > 0)
+			.slice(0, 8)
+			.map((w) => w.slice(0, 32));
+		if (words.length > 0) settings.emptyFlapWords = words;
+	}
 
-  return settings;
+	return settings;
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────
@@ -93,58 +137,58 @@ function normalize(value: unknown): UiSettings {
 let cached: UiSettings | undefined;
 
 export function createUiSettingsStore() {
-  return { read, write, patch, reset };
+	return { read, write, patch, reset };
 }
 
 async function ensureDir(): Promise<void> {
-  await mkdir(dirname(uiSettingsPath()), { recursive: true });
+	await mkdir(dirname(uiSettingsPath()), { recursive: true });
 }
 
 async function read(): Promise<UiSettings> {
-  if (cached) return structuredClone(cached);
-  try {
-    const raw = await readFile(uiSettingsPath(), "utf-8");
-    cached = normalize(JSON.parse(raw));
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      console.warn(`ui-settings: could not read — ${(err as Error).message}`);
-    }
-    cached = structuredClone(DEFAULTS);
-  }
-  return structuredClone(cached);
+	if (cached) return structuredClone(cached);
+	try {
+		const raw = await readFile(uiSettingsPath(), "utf-8");
+		cached = normalize(JSON.parse(raw));
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+			console.warn(`ui-settings: could not read — ${(err as Error).message}`);
+		}
+		cached = structuredClone(DEFAULTS);
+	}
+	return structuredClone(cached);
 }
 
 async function write(settings: UiSettings): Promise<UiSettings> {
-  cached = normalize(settings);
-  await ensureDir();
-  const file = uiSettingsPath();
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(cached, null, 2)}\n`, "utf-8");
-  await rename(tmp, file);
-  return structuredClone(cached);
+	cached = normalize(settings);
+	await ensureDir();
+	const file = uiSettingsPath();
+	const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+	await writeFile(tmp, `${JSON.stringify(cached, null, 2)}\n`, "utf-8");
+	await rename(tmp, file);
+	return structuredClone(cached);
 }
 
 async function patch(patch: Partial<UiSettings>): Promise<UiSettings> {
-  const current = await read();
-  console.log("[ui-settings] patch received:", JSON.stringify(patch));
-  const merged: UiSettings = {
-    ...current,
-    ...Object.fromEntries(
-      Object.entries(patch).filter(([_, v]) => v !== undefined),
-    ),
-  };
-  console.log("[ui-settings] merged:", JSON.stringify(merged));
-  return write(merged);
+	const current = await read();
+	console.log("[ui-settings] patch received:", JSON.stringify(patch));
+	const merged: UiSettings = {
+		...current,
+		...Object.fromEntries(
+			Object.entries(patch).filter(([_, v]) => v !== undefined),
+		),
+	};
+	console.log("[ui-settings] merged:", JSON.stringify(merged));
+	return write(merged);
 }
 
 async function reset(): Promise<UiSettings> {
-  cached = structuredClone(DEFAULTS);
-  await ensureDir();
-  const file = uiSettingsPath();
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, `${JSON.stringify(DEFAULTS, null, 2)}\n`, "utf-8");
-  await rename(tmp, file);
-  return structuredClone(DEFAULTS);
+	cached = structuredClone(DEFAULTS);
+	await ensureDir();
+	const file = uiSettingsPath();
+	const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+	await writeFile(tmp, `${JSON.stringify(DEFAULTS, null, 2)}\n`, "utf-8");
+	await rename(tmp, file);
+	return structuredClone(DEFAULTS);
 }
 
 // ── Singleton ─────────────────────────────────────────────────────────────

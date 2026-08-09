@@ -10,6 +10,7 @@ import {
 } from "../../lib/theme";
 import { getUiSettings, updateUiSettings } from "../../lib/api-client";
 import { usePreferencesStore } from "../../stores/preferences-store";
+import { SplitFlapText } from "../SplitFlapText";
 
 type UiSettings = {
 	theme?: string;
@@ -24,6 +25,9 @@ type UiSettings = {
 	userBubbleColor?: string | null;
 	userBubbleTextColor?: string | null;
 	userBubbleBorderColor?: string | null;
+	emptyFlapEnabled?: boolean;
+	emptyFlapWords?: string[];
+	emptyFlapSize?: number;
 };
 
 // ── Apply user bubble overrides to CSS :root ──
@@ -105,6 +109,12 @@ export function AppearanceTab() {
 	const zSetGrouped = usePreferencesStore((s) => s.setGroupedToolDisplay);
 	const zSetTurnFiles = usePreferencesStore((s) => s.setShowTurnFiles);
 	const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
+	const zFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
+	const zFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
+	const zFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
+	const zSetFlapEnabled = usePreferencesStore((s) => s.setEmptyFlapEnabled);
+	const zSetFlapWords = usePreferencesStore((s) => s.setEmptyFlapWords);
+	const zSetFlapSize = usePreferencesStore((s) => s.setEmptyFlapSize);
 
 	const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
 	const [flyToTop, setFlyToTop] = useState(zFly);
@@ -114,6 +124,10 @@ export function AppearanceTab() {
 	const [groupedToolDisplay, setGroupedToolDisplay] = useState(zGrouped);
 	const [showTurnFiles, setShowTurnFiles] = useState(zTurnFiles);
 	const [swipeToOpenSidebar, setSwipeToOpenSidebar] = useState(zSwipeSidebar);
+	const [flapEnabled, setFlapEnabled] = useState(zFlapEnabled);
+	const [flapWords, setFlapWords] = useState(zFlapWords);
+	const [flapWordsDraft, setFlapWordsDraft] = useState(zFlapWords.join(", "));
+	const [flapSize, setFlapSize] = useState(zFlapSize);
 
 	// ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
 	const [bubbleBg, setBubbleBg] = useState<string | null>(() =>
@@ -199,6 +213,15 @@ export function AppearanceTab() {
 				if (typeof server.swipeToOpenSidebar === "boolean") {
 					setSwipeToOpenSidebar(server.swipeToOpenSidebar);
 					zSetSwipeSidebar(server.swipeToOpenSidebar);
+				}
+				if (typeof server.emptyFlapEnabled === "boolean") {
+					setFlapEnabled(server.emptyFlapEnabled);
+					zSetFlapEnabled(server.emptyFlapEnabled);
+				}
+				if (Array.isArray(server.emptyFlapWords)) {
+					setFlapWords(server.emptyFlapWords);
+					setFlapWordsDraft(server.emptyFlapWords.join(", "));
+					zSetFlapWords(server.emptyFlapWords);
 				}
 
 				// Bubble overrides — use server value, or fallback to localStorage, or null
@@ -298,6 +321,39 @@ export function AppearanceTab() {
 		setSwipeToOpenSidebar(val);
 		zSetSwipeSidebar(val);
 		persist({ swipeToOpenSidebar: val });
+	};
+
+	// ── Split-flap empty state ──
+	const toggleFlapEnabled = (val: boolean) => {
+		setFlapEnabled(val);
+		zSetFlapEnabled(val);
+		persist({ emptyFlapEnabled: val });
+	};
+
+	const saveFlapWords = (raw: string) => {
+		const words = raw
+			.split(",")
+			.map((w) => w.trim())
+			.filter((w) => w.length > 0)
+			.slice(0, 8)
+			.map((w) => w.slice(0, 32));
+		const cleaned =
+			words.length > 0
+				? words
+				: flapWords.length > 0
+					? flapWords
+					: ["PI-KOT 0.1.36", "PI-SDK 0.83.0"];
+		setFlapWords(cleaned);
+		setFlapWordsDraft(cleaned.join(", "));
+		zSetFlapWords(cleaned);
+		persist({ emptyFlapWords: cleaned });
+	};
+
+	const saveFlapSize = (val: number) => {
+		const clamped = Math.min(64, Math.max(14, Math.round(Number(val) || 30)));
+		setFlapSize(clamped);
+		zSetFlapSize(clamped);
+		persist({ emptyFlapSize: clamped });
 	};
 
 	const selectBubblePreset = (idx: number) => {
@@ -711,9 +767,8 @@ export function AppearanceTab() {
 					Fly to top
 				</label>
 				<div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
-					Anchors your newest message near the top while it streams.
-					Reply grows below and auto-scroll takes over once it fills the
-					screen.
+					Anchors your newest message near the top while it streams. Reply grows
+					below and auto-scroll takes over once it fills the screen.
 				</div>
 			</div>
 
@@ -894,6 +949,128 @@ export function AppearanceTab() {
 					Touch screens: horizontal swipes open/collapse the sidebar. Turn off
 					if scrolling triggers it.
 				</p>
+			</div>
+
+			{/* ── Empty state — split-flap departure board ── */}
+			<div className="settings-field">
+				<label className="settings-label">Empty state</label>
+				<label
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 10,
+						cursor: "pointer",
+						userSelect: "none",
+						fontSize: 13,
+						color: "var(--text-secondary)",
+					}}
+				>
+					<input
+						type="checkbox"
+						checked={flapEnabled}
+						onChange={(e) => toggleFlapEnabled(e.target.checked)}
+						style={{
+							width: 16,
+							height: 16,
+							accentColor: "var(--accent)",
+							cursor: "pointer",
+						}}
+					/>
+					Animated split-flap welcome
+				</label>
+				<p className="settings-hint" style={{ marginTop: 4 }}>
+					Airport-style departure board centered in an empty chat. Off → classic
+					“send a message” welcome.
+				</p>
+
+				{flapEnabled && (
+					<>
+						<div style={{ marginTop: 10 }}>
+							<label className="settings-label" style={{ fontSize: 12 }}>
+								Phrases (comma-separated)
+							</label>
+							<input
+								value={flapWordsDraft}
+								onChange={(e) => setFlapWordsDraft(e.target.value)}
+								onBlur={() => saveFlapWords(flapWordsDraft)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter") saveFlapWords(flapWordsDraft);
+								}}
+								className="settings-input"
+								placeholder="PI-KOT 0.1.36, PI-SDK 0.83.0"
+							/>
+							<p className="settings-hint" style={{ marginTop: 4 }}>
+								Board flips between phrases. Enter or click away to apply (shown
+								in caps on the board).
+							</p>
+						</div>
+
+						<div
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								marginTop: 10,
+							}}
+						>
+							<input
+								type="range"
+								min={14}
+								max={64}
+								value={flapSize}
+								onChange={(e) => {
+									const v = Number(e.target.value);
+									setFlapSize(v);
+									zSetFlapSize(v);
+								}}
+								onPointerUp={() => saveFlapSize(flapSize)}
+								onKeyUp={() => saveFlapSize(flapSize)}
+								onBlur={() => saveFlapSize(flapSize)}
+								style={{
+									flex: 1,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							<span
+								style={{
+									fontSize: 12,
+									color: "var(--text-secondary)",
+									minWidth: 34,
+									textAlign: "right",
+								}}
+							>
+								{flapSize}px
+							</span>
+						</div>
+
+						{/* Live preview */}
+						<div
+							style={{
+								marginTop: 12,
+								padding: "18px 12px",
+								borderRadius: "var(--radius-md)",
+								border: "1px solid var(--border)",
+								background: "var(--bg-glass)",
+								display: "flex",
+								justifyContent: "center",
+								overflow: "hidden",
+								maxWidth: "100%",
+							}}
+						>
+							<SplitFlapText
+								words={flapWords}
+								flipDuration={0.12}
+								stagger={0.05}
+								cycleDelay={2600}
+								flipsPerChar={7}
+								gap={4}
+								tileRadius={6}
+								fontSize={Math.min(flapSize, 24)}
+							/>
+						</div>
+					</>
+				)}
 			</div>
 		</div>
 	);

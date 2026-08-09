@@ -29,6 +29,7 @@ import type { ActiveCompaction } from "../stores/session-store";
 import { ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
+import { SplitFlapText } from "./SplitFlapText";
 import {
 	ToolCallEntry,
 	ToolGroupCard,
@@ -1140,6 +1141,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 	const groupedToolDisplay = usePreferencesStore((s) => s.groupedToolDisplay);
 	const showTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
+	const emptyFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
+	const emptyFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
+	const emptyFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -2359,11 +2363,28 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 					{rawMessages.length === 0 && !isStreaming ? (
 						<div className="welcome">
-							<div className="welcome-icon">💬</div>
-							<div className="welcome-text">
-								Send a message to start chatting
-							</div>
-							<div className="welcome-hint">with the pi coding agent</div>
+							{emptyFlapEnabled ? (
+								<SplitFlapText
+									words={emptyFlapWords.map((w) => w.toUpperCase())}
+									flipDuration={0.12}
+									stagger={0.05}
+									cycleDelay={2800}
+									flipsPerChar={7}
+									gap={5}
+									tileRadius={6}
+									charset="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-/"
+									fontSize={`min(${emptyFlapSize}px, 6vw)`}
+									className="welcome-flap"
+								/>
+							) : (
+								<>
+									<div className="welcome-icon">💬</div>
+									<div className="welcome-text">
+										Send a message to start chatting
+									</div>
+								</>
+							)}
+							<div className="welcome-hint">chat with pi coding agent</div>
 						</div>
 					) : (
 						<div
