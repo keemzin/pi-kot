@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, memo } from "react";
+import {
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+	useMemo,
+	useCallback,
+	memo,
+} from "react";
 import {
 	Copy,
 	Check,
@@ -1264,10 +1272,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		undefined,
 	);
 
-	// ── ChatGPT-style "fly to top" (ported from pi-web's prompt-anchor): when
-	// you send, the newest turn anchors near the top of the viewport via a
-	// dynamic bottom spacer that shrinks as the reply streams in, then hands
-	// off to normal bottom auto-scroll once the reply fills the screen. ──
+	// ── ChatGPT-style "fly to top": when you send, the newest turn anchors
+	// near the top of the viewport via a dynamic bottom spacer that shrinks as
+	// the reply streams in, then hands off to normal bottom auto-scroll once
+	// the reply fills the screen. ──
 	const lastUserTurnElRef = useRef<HTMLDivElement | null>(null);
 	const flyAnchorRef = useRef(false);
 	const [flyAnchor, setFlyAnchor] = useState(false);
@@ -1296,8 +1304,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		lastScrollTopRef.current = el.scrollTop;
 	};
 
-	// Smooth-scroll the newest user turn to ~16px below the top of the
-	// viewport — the "fly to top" moment when you hit send.
+	// Smooth-scroll the newest user turn flush to the top of the viewport
+	// — the "fly to top" moment when you hit send. Aligns with the sticky
+	// header behavior (position: sticky; top: 0).
 	const scrollUserMsgToTop = useCallback(() => {
 		const el = scrollRef.current;
 		const userEl = lastUserTurnElRef.current;
@@ -1308,7 +1317,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			el.scrollTop;
 		const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
 		el.scrollTo({
-			top: Math.min(Math.max(0, absTop - 16), maxScrollTop),
+			top: Math.min(Math.max(0, absTop), maxScrollTop),
 			behavior: "smooth",
 		});
 	}, []);
@@ -1410,9 +1419,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		}
 	}, [isStreaming, rawMessages]);
 
-	// The anchor spacer. Mirrors pi-web's prompt-anchor (REF/pi-web/
-	// components/ChatWindow.tsx): while the reply is shorter than the viewport,
-	// a bottom spacer keeps the newest turn near the top; as the reply grows the
+	// The anchor spacer: while the reply is shorter than the viewport, a
+	// bottom spacer keeps the newest turn near the top; as the reply grows the
 	// spacer shrinks; at zero the reply fills the screen and normal
 	// bottom-follow resumes for the rest of the stream.
 	useLayoutEffect(() => {
@@ -1437,17 +1445,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				userEl.getBoundingClientRect().top -
 				container.getBoundingClientRect().top +
 				container.scrollTop;
-			const targetTop = Math.max(0, userTop - 16);
+			const targetTop = Math.max(0, userTop);
 			const maxScrollTopExclSpacer = Math.max(
 				0,
-				container.scrollHeight -
-					flySpacerRef.current -
-					container.clientHeight,
+				container.scrollHeight - flySpacerRef.current - container.clientHeight,
 			);
-			const next = Math.max(
-				0,
-				Math.ceil(targetTop - maxScrollTopExclSpacer),
-			);
+			const next = Math.max(0, Math.ceil(targetTop - maxScrollTopExclSpacer));
 
 			if (next !== flySpacerRef.current) {
 				const needsInitialScroll = flySpacerRef.current === 0 && next > 0;
@@ -1459,10 +1462,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				}
 				setFlySpacer(next);
 				return;
-			}
-			if (flyPendingScrollRef.current) {
-				flyPendingScrollRef.current = false;
-				scrollUserMsgToTop();
 			}
 		};
 
@@ -1478,6 +1477,13 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			ro.disconnect();
 		};
 	}, [chatFlyToTop, flyAnchor, rawMessages.length, scrollUserMsgToTop]);
+
+	useLayoutEffect(() => {
+		if (flyPendingScrollRef.current && flySpacer > 0) {
+			flyPendingScrollRef.current = false;
+			scrollUserMsgToTop();
+		}
+	}, [flySpacer, scrollUserMsgToTop]);
 
 	// Derive active tool name from the streaming message's tool call content blocks
 	// paired with pendingToolCalls from state.
@@ -2065,7 +2071,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		const flushTurn = (): void => {
 			if (currentUser === undefined) return;
 			const turnEndIdx = msgIdx;
-			const isLastTurn = lastUserMsgIdx >= 0 && currentTurnStart === lastUserMsgIdx;
+			const isLastTurn =
+				lastUserMsgIdx >= 0 && currentTurnStart === lastUserMsgIdx;
 			const turnFiles = extractTurnFilePaths(currentAssistants, (id) =>
 				id === undefined ? undefined : getToolResult(id),
 			);
