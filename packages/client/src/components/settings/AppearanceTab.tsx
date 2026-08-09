@@ -97,6 +97,8 @@ export function AppearanceTab() {
 	const zTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
 	const zSwipeSidebar = usePreferencesStore((s) => s.swipeToOpenSidebar);
 	const zSetSticky = usePreferencesStore((s) => s.setStickyUserHeader);
+	const zFly = usePreferencesStore((s) => s.flyToTop);
+	const zSetFly = usePreferencesStore((s) => s.setFlyToTop);
 	const zSetToken = usePreferencesStore((s) => s.setShowTokenUsage);
 	const zSetCompress = usePreferencesStore((s) => s.setCompressImages);
 	const zSetThinking = usePreferencesStore((s) => s.setShowThinking);
@@ -105,6 +107,7 @@ export function AppearanceTab() {
 	const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
 
 	const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
+	const [flyToTop, setFlyToTop] = useState(zFly);
 	const [showTokenUsage, setShowTokenUsage] = useState(zToken);
 	const [compressImages, setCompressImages] = useState(zCompress);
 	const [showThinking, setShowThinking] = useState(zThinking);
@@ -259,6 +262,12 @@ export function AppearanceTab() {
 		setStickyUserHeader(val);
 		zSetSticky(val);
 		persist({ stickyUserHeader: val });
+	};
+	// Local-only preference (not part of the server UiSettings schema) — the
+	// zustand store persists it to localStorage on its own.
+	const toggleFlyToTop = (val: boolean) => {
+		setFlyToTop(val);
+		zSetFly(val);
 	};
 	const toggleToken = (val: boolean) => {
 		setShowTokenUsage(val);
@@ -673,6 +682,39 @@ export function AppearanceTab() {
 					/>
 					Sticky user header
 				</label>
+			</div>
+
+			<div className="settings-field">
+				<label className="settings-label">Chat</label>
+				<label
+					style={{
+						display: "flex",
+						alignItems: "center",
+						gap: 10,
+						cursor: "pointer",
+						userSelect: "none",
+						fontSize: 13,
+						color: "var(--text-secondary)",
+					}}
+				>
+					<input
+						type="checkbox"
+						checked={flyToTop}
+						onChange={(e) => toggleFlyToTop(e.target.checked)}
+						style={{
+							width: 16,
+							height: 16,
+							accentColor: "var(--accent)",
+							cursor: "pointer",
+						}}
+					/>
+					Fly to top
+				</label>
+				<div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
+					Anchors your newest message near the top while it streams.
+					Reply grows below and auto-scroll takes over once it fills the
+					screen.
+				</div>
 			</div>
 
 			<div className="settings-field">
