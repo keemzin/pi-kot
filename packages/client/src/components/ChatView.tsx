@@ -514,11 +514,13 @@ function UserMessageBubble({
 	isSteer,
 	isFollowUp,
 	images,
+	animated,
 }: {
 	text: string;
 	isSteer?: boolean;
 	isFollowUp?: boolean;
 	images?: { mimeType: string; data: string; __blobUrl?: boolean }[];
+	animated?: boolean;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [isLong, setIsLong] = useState(false);
@@ -539,7 +541,7 @@ function UserMessageBubble({
 	}, [text, expanded]);
 
 	return (
-		<div className="message-row user">
+		<div className={`message-row user${animated ? " msg-enter" : ""}`}>
 			<div className="message-bubble user">
 				{isSteer && <span className="steer-tag">steer</span>}
 				{isFollowUp && <span className="steer-tag">follow-up</span>}
@@ -2133,6 +2135,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								isSteer={isSteer}
 								isFollowUp={isFollowUp}
 								images={extractImages(currentUser.content)}
+								animated={isLastTurn && flyAnchor}
 							/>
 							{text.length > 0 && (
 								<div className="assistant-msg-footer user">
@@ -2196,7 +2199,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				out.push(
 					<div
 						key={`user-${turnKey}`}
-						className="message-row user"
+						className={`message-row user${isLastTurn && flyAnchor ? " msg-enter" : ""}`}
 						ref={isLastTurn ? attachLastTurnRef : undefined}
 					>
 						<div className="message-bubble user">
@@ -2338,6 +2341,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		rawMessages,
 		groupedToolDisplay,
 		showTurnFiles,
+		flyAnchor,
 	]);
 
 	return (
