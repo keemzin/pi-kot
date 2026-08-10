@@ -22,6 +22,8 @@ interface Props {
   showToolbar?: boolean;
   /** File size in bytes from the server response. */
   size?: number;
+  /** Fired when the user sends the currently selected lines to the chat, with the 1-based inclusive range. */
+  onSendSelection?: (range: { startLine: number; endLine: number }) => void;
 }
 
 export const FileEditor = memo(function FileEditor({
@@ -37,9 +39,11 @@ export const FileEditor = memo(function FileEditor({
   error,
   showToolbar = true,
   size,
+  onSendSelection,
 }: Props) {
   const [editorMode, setEditorMode] = useState<"raw" | "rendered">("raw");
   const [wordWrap, setWordWrap] = useState(true);
+  const [selection, setSelection] = useState<{ startLine: number; endLine: number } | null>(null);
 
   const isHtml = isHtmlPath(path);
   const isMarkdown = isMarkdownPath(path);
@@ -139,6 +143,38 @@ export const FileEditor = memo(function FileEditor({
               {wordWrap ? "wrap" : "no wrap"}
             </button>
           )}
+
+          {/* Send selected lines to chat — enabled when a range is selected */}
+          {editorMode === "raw" && onSendSelection !== undefined && (
+            <button
+              onClick={() => {
+                if (selection !== null) onSendSelection(selection);
+              }}
+              disabled={selection === null || saving}
+              title={
+                selection === null
+                  ? "Select lines in the editor first"
+                  : `Send lines ${selection.startLine}-${selection.endLine} to chat`
+              }
+              style={{
+                padding: "2px 8px",
+                fontSize: "9px",
+                fontWeight: 600,
+                border: "1px solid var(--accent-text)",
+                borderRadius: "var(--radius-sm)",
+                background: selection !== null ? "var(--accent-bg)" : "transparent",
+                color: "var(--accent-text)",
+                cursor: selection === null ? "not-allowed" : "pointer",
+                opacity: selection === null ? 0.45 : 1,
+                flexShrink: 0,
+              }}
+              type="button"
+            >
+              {selection !== null
+                ? `Send L${selection.startLine}-${selection.endLine} ⇢ chat`
+                : "Send selection ⇢ chat"}
+            </button>
+          )}
         </div>
       )}
 
@@ -160,6 +196,7 @@ export const FileEditor = memo(function FileEditor({
           onSave={onSave}
           fileName={fileName}
           wordWrap={wordWrap}
+          onSelectionChange={setSelection}
         />
       ) : (
         <RenderedView content={content} fileName={fileName} />

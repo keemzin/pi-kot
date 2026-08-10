@@ -1,22 +1,35 @@
 import {
 	useEffect,
+	useLayoutEffect,
 	useRef,
 	useState,
 	useMemo,
+	useCallback,
 	memo,
 } from "react";
-import { Copy, Check, CornerUpLeft, ImageDown } from "lucide-react";
+import {
+	Copy,
+	Check,
+	CornerUpLeft,
+	ImageDown,
+	FileText,
+	XCircle,
+} from "lucide-react";
 import { useExtensions } from "../hooks/use-extensions";
 import { invokeExtensionCommand, cancelExec } from "../lib/api-client";
 import type { CompactionEvent } from "../lib/api-client";
 import { toPng } from "html-to-image";
+import { parseRefChips, type RefChip } from "../lib/ref-chips";
+import { extractTurnFilePaths } from "../lib/turn-file-chips";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { CompactionCard } from "./CompactionCard";
+import { TurnFileChips } from "./TurnFileChips";
 import { CompactionNotice } from "./CompactionNotice";
 import type { ActiveCompaction } from "../stores/session-store";
 import { ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
+import { SplitFlapText } from "./SplitFlapText";
 import {
 	ToolCallEntry,
 	ToolGroupCard,
@@ -52,13 +65,22 @@ const ToolBatchOpenContext = createContext<{
 }>({ open: false, toggle: () => undefined });
 function ToolBatchOpenProvider({ children }: { children: React.ReactNode }) {
 	const [open, setOpen] = useState<boolean>(() => {
-		try { return localStorage.getItem(BATCH_OPEN_KEY) === "true"; } catch { return false; }
+		try {
+			return localStorage.getItem(BATCH_OPEN_KEY) === "true";
+		} catch {
+			return false;
+		}
 	});
-	const toggle = () => setOpen((o) => {
-		const next = !o;
-		try { localStorage.setItem(BATCH_OPEN_KEY, String(next)); } catch { /* ignore */ }
-		return next;
-	});
+	const toggle = () =>
+		setOpen((o) => {
+			const next = !o;
+			try {
+				localStorage.setItem(BATCH_OPEN_KEY, String(next));
+			} catch {
+				/* ignore */
+			}
+			return next;
+		});
 	return (
 		<ToolBatchOpenContext.Provider value={{ open, toggle }}>
 			{children}
@@ -199,7 +221,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 							padding: "8px 10px",
 							fontSize: "12px",
 							lineHeight: "1.5",
-							color: "var(--text-primary)",
+							color: isUser ? "var(--user-bubble-text)" : "var(--text-primary)",
 							background: isUser ? "var(--user-bubble)" : "transparent",
 							border: isUser ? "1px solid var(--user-bubble-border)" : "none",
 							whiteSpace: isUser ? "pre-wrap" : undefined,
@@ -208,7 +230,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 						{isUser ? (
 							<>
 								<UserImages images={imgs} />
-								{text}
+								{renderUserRefs(text)}
 							</>
 						) : (
 							<ChatMarkdown text={text} />
@@ -251,7 +273,11 @@ function ThinkingBlock({ text }: { text: string }) {
  * for EXIT_MS before unmounting.
  */
 const EXIT_MS = 320;
-function RunningToolCard({ running }: { running: { block: Record<string, unknown> } | undefined }) {
+function RunningToolCard({
+	running,
+}: {
+	running: { block: Record<string, unknown> } | undefined;
+}) {
 	const [displayed, setDisplayed] = useState(running);
 	const [exiting, setExiting] = useState(false);
 	const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -271,7 +297,7 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 		return () => {
 			if (exitTimer.current) clearTimeout(exitTimer.current);
 		};
-	// eslint-disable-next-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [running]);
 
 	if (!displayed) return null;
@@ -289,7 +315,8 @@ function RunningToolCard({ running }: { running: { block: Record<string, unknown
 
 /** Render a batch of tool calls as a collapsible timeline group. */
 function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
-	const { open: sharedOpen, toggle: sharedToggle } = useContext(ToolBatchOpenContext);
+	const { open: sharedOpen, toggle: sharedToggle } =
+		useContext(ToolBatchOpenContext);
 	// Each card owns its own open state, seeded from the shared preference once on mount.
 	// This prevents all cards from snapping open/closed when one card's preference changes
 	// (e.g. when a live card finishes and re-joins the group as a batch card).
@@ -304,7 +331,9 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 	const completedCount = toolEntries.filter(
 		(e) => e.result !== undefined && !e.result?.isError,
 	).length;
-	const erroredCount = toolEntries.filter((e) => e.result?.isError === true).length;
+	const erroredCount = toolEntries.filter(
+		(e) => e.result?.isError === true,
+	).length;
 	const errored = erroredCount > 0;
 	const runningCount = toolEntries.filter((e) => e.result === undefined).length;
 	const allDone = runningCount === 0 && toolCount > 0;
@@ -341,8 +370,14 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 					<span className="tool-timeline-batch-count">
 						{allDone ? (
 							<>
-								{completedCount > 0 && <span className="done">✓ {completedCount}</span>}
-								{erroredCount > 0 && <span className="tool-timeline-badge error">✖ {erroredCount}</span>}
+								{completedCount > 0 && (
+									<span className="done">✓ {completedCount}</span>
+								)}
+								{erroredCount > 0 && (
+									<span className="tool-timeline-badge error">
+										✖ {erroredCount}
+									</span>
+								)}
 							</>
 						) : (
 							<>
@@ -350,7 +385,12 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 									<span className="done">✓ {completedCount}</span>
 								)}
 								{erroredCount > 0 && (
-									<span className="tool-timeline-badge error" style={{ marginLeft: "4px" }}>✖ {erroredCount}</span>
+									<span
+										className="tool-timeline-badge error"
+										style={{ marginLeft: "4px" }}
+									>
+										✖ {erroredCount}
+									</span>
 								)}
 								{runningCount > 0 && (
 									<span className="pending"> ⟳ {runningCount}</span>
@@ -386,16 +426,102 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 
 /* ── Sticky user message component ── */
 
+/**
+ * Render `@file` / `@file#L5-12` references and server "not included"
+ * failure markers inside a user message as inline chips, instead of raw
+ * bracketed text like `[@x.ts not included: file not found]`.
+ */
+function renderUserRefs(text: string): React.ReactNode {
+	interface Seg {
+		start: number;
+		end: number;
+		kind: "fail" | "ref";
+		raw: string;
+		ref?: RefChip;
+	}
+	const segs: Seg[] = [];
+
+	// Server failure markers: `[@path#L5-6 not included: reason]`
+	const failRe = /\[@?[^\]]+? not included: [^\]]+\]/g;
+	let fm: RegExpExecArray | null;
+	failRe.lastIndex = 0;
+	while ((fm = failRe.exec(text)) !== null) {
+		segs.push({
+			start: fm.index,
+			end: fm.index + fm[0].length,
+			kind: "fail",
+			raw: fm[0],
+		});
+	}
+
+	// Leftover `@path` markers (large files / deferred refs) still in the text.
+	// parseRefChips intentionally ignores `@` inside `[...]`, so no overlap.
+	for (const c of parseRefChips(text)) {
+		segs.push({ start: c.start, end: c.end, kind: "ref", raw: c.raw, ref: c });
+	}
+
+	segs.sort((a, b) => a.start - b.start);
+	const kept: Seg[] = [];
+	for (const g of segs) {
+		if (kept.length > 0 && g.start < kept[kept.length - 1].end) continue;
+		kept.push(g);
+	}
+
+	const nodes: React.ReactNode[] = [];
+	let cur = 0;
+	kept.forEach((g, i) => {
+		if (g.start > cur) nodes.push(text.slice(cur, g.start));
+		if (g.kind === "fail") {
+			const mm = g.raw.match(
+				/\[@?(.+?)(?:#L\d+(?:-L?\d+)?)? not included: ([^\]]+)\]$/,
+			);
+			const path = mm?.[1] ?? g.raw.replace(/^\[/, "").replace(/\]$/, "");
+			const reason = mm?.[2] ?? "not included";
+			nodes.push(
+				<span
+					key={`f${i}`}
+					className="msg-ref-chip msg-ref-missing"
+					title={reason}
+				>
+					<XCircle size={12} />
+					<span className="msg-ref-name">{path}</span>
+					<span className="msg-ref-reason">not found</span>
+				</span>,
+			);
+		} else {
+			const c = g.ref as RefChip;
+			const range =
+				c.startLine !== undefined
+					? c.endLine !== undefined && c.endLine !== c.startLine
+						? `:L${c.startLine}-${c.endLine}`
+						: `:L${c.startLine}`
+					: "";
+			nodes.push(
+				<span key={`r${i}`} className="msg-ref-chip msg-ref-ok">
+					<FileText size={12} />
+					<span className="msg-ref-name">{c.path}</span>
+					{range !== "" && <span className="msg-ref-range">{range}</span>}
+				</span>,
+			);
+		}
+		cur = g.end;
+	});
+	if (cur < text.length) nodes.push(text.slice(cur));
+	return nodes;
+}
+
 function UserMessageBubble({
 	text,
 	isSteer,
 	isFollowUp,
 	images,
+	animated,
 }: {
 	text: string;
 	isSteer?: boolean;
 	isFollowUp?: boolean;
 	images?: { mimeType: string; data: string; __blobUrl?: boolean }[];
+	animated?: boolean;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const [isLong, setIsLong] = useState(false);
@@ -416,7 +542,7 @@ function UserMessageBubble({
 	}, [text, expanded]);
 
 	return (
-		<div className="message-row user">
+		<div className={`message-row user${animated ? " msg-enter" : ""}`}>
 			<div className="message-bubble user">
 				{isSteer && <span className="steer-tag">steer</span>}
 				{isFollowUp && <span className="steer-tag">follow-up</span>}
@@ -440,7 +566,7 @@ function UserMessageBubble({
 						} as React.CSSProperties
 					}
 				>
-					{text}
+					{renderUserRefs(text)}
 				</div>
 				{isLong && (
 					<div
@@ -1011,8 +1137,13 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const { rewind: rewindAvailable } = useExtensions();
 
 	const stickyUserHeader = usePreferencesStore((s) => s.stickyUserHeader);
+	const chatFlyToTop = usePreferencesStore((s) => s.flyToTop);
 	const showTokenUsage = usePreferencesStore((s) => s.showTokenUsage);
 	const groupedToolDisplay = usePreferencesStore((s) => s.groupedToolDisplay);
+	const showTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
+	const emptyFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
+	const emptyFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
+	const emptyFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -1030,6 +1161,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 	// Push artifacts to the Artifacts Panel
 	const pushArtifact = useLayoutStore((s) => s.pushArtifact);
+	const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 	const seenArtifactIds = useRef(new Set<string>());
 	useEffect(() => {
 		const allMsgs = [
@@ -1071,7 +1203,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						try {
 							JSON.parse(trimmed);
 							artType = "json";
-						} catch {}
+						} catch {
+							// Not JSON — leave artType as-is and render as text.
+						}
 					}
 
 					if (artType) {
@@ -1140,7 +1274,25 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingBottomRef = useRef(true);
 	const lastScrollTopRef = useRef(0);
-	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(undefined);
+	const prevStreamingRef = useRef<Record<string, unknown> | undefined>(
+		undefined,
+	);
+
+	// ── ChatGPT-style "fly to top": when you send, the newest turn anchors
+	// near the top of the viewport via a dynamic bottom spacer that shrinks as
+	// the reply streams in, then hands off to normal bottom auto-scroll once
+	// the reply fills the screen. ──
+	const lastUserTurnElRef = useRef<HTMLDivElement | null>(null);
+	const flyAnchorRef = useRef(false);
+	const [flyAnchor, setFlyAnchor] = useState(false);
+	const flySpacerRef = useRef(0);
+	const [flySpacer, setFlySpacer] = useState(0);
+	const flyPendingScrollRef = useRef(false);
+	const prevMsgLenRef = useRef(0);
+	// Bumped whenever the fly re-arms — lets the scroll-trigger effect re-fire
+	// even when the spacer value stays the same (layout shift above the anchor
+	// changes the target but not the spacer).
+	const [flyRetarget, setFlyRetarget] = useState(0);
 
 	const NEAR_BOTTOM_PX = 24;
 
@@ -1162,6 +1314,24 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		lastScrollTopRef.current = el.scrollTop;
 	};
 
+	// Smooth-scroll the newest user turn flush to the top of the viewport
+	// — the "fly to top" moment when you hit send. Aligns with the sticky
+	// header behavior (position: sticky; top: 0).
+	const scrollUserMsgToTop = useCallback(() => {
+		const el = scrollRef.current;
+		const userEl = lastUserTurnElRef.current;
+		if (el === null || userEl === null) return;
+		const absTop =
+			userEl.getBoundingClientRect().top -
+			el.getBoundingClientRect().top +
+			el.scrollTop;
+		const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+		el.scrollTo({
+			top: Math.min(Math.max(0, absTop), maxScrollTop),
+			behavior: "smooth",
+		});
+	}, []);
+
 	// ResizeObserver: fires after layout and before paint on EVERY content
 	// size change — streaming text growth, tool results expanding, code
 	// highlighting landing, etc. This makes auto-follow truly sticky.
@@ -1169,7 +1339,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	// catches layout changes from any source, even inside memo'd children.
 	useEffect(() => {
 		const el = scrollRef.current;
-		if (!el || typeof ResizeObserver === 'undefined') return;
+		if (!el || typeof ResizeObserver === "undefined") return;
 
 		const streamingJustEnded =
 			prevStreamingRef.current !== undefined && streamingMessage === undefined;
@@ -1185,7 +1355,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				settled = true;
 				return;
 			}
-			if (isFollowingBottomRef.current) {
+			if (
+				isFollowingBottomRef.current &&
+				!(flyAnchorRef.current && flySpacerRef.current > 0)
+			) {
 				el.scrollTop = el.scrollHeight;
 				lastScrollTopRef.current = el.scrollTop;
 			}
@@ -1205,6 +1378,138 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		if (rawMessages.length === 0 && streamingMessage === undefined) return;
 		isFollowingBottomRef.current = true;
 	}, [sessionId]);
+
+	// ── Fly-to-top state machine ──
+
+	// Reset all anchor state when switching sessions.
+	useEffect(() => {
+		prevMsgLenRef.current = 0;
+		flyAnchorRef.current = false;
+		setFlyAnchor(false);
+		flySpacerRef.current = 0;
+		setFlySpacer(0);
+		flyPendingScrollRef.current = false;
+	}, [sessionId]);
+
+	// A new user message (send / steer / follow-up) arms the anchor. Runs as a
+	// layout effect so this commit's ResizeObserver tick already sees the
+	// anchor + disarmed bottom-follow flags — no bottom-pin flash before the
+	// fly-to-top takes over. Initial load / session switch is skipped (prevLen
+	// 0 → treat as history load, keep the normal pin-to-bottom behavior).
+	useLayoutEffect(() => {
+		const prevLen = prevMsgLenRef.current;
+		prevMsgLenRef.current = rawMessages.length;
+		if (!chatFlyToTop || prevLen === 0) return;
+		if (rawMessages.length <= prevLen) return;
+		const last = rawMessages[rawMessages.length - 1] as
+			| Record<string, unknown>
+			| undefined;
+		const role = last?.role;
+		if (role === "user" || role === "user-with-attachments") {
+			flyAnchorRef.current = true;
+			isFollowingBottomRef.current = false; // the anchor owns the scroll now
+			flyPendingScrollRef.current = true;
+			setFlyAnchor(true);
+		}
+	}, [rawMessages, chatFlyToTop]);
+
+	// Release the anchor once the turn completed (stream ended && the last
+	// message is the assistant reply).
+	useEffect(() => {
+		const last = rawMessages[rawMessages.length - 1] as
+			| Record<string, unknown>
+			| undefined;
+		const lastIsUser =
+			last !== undefined &&
+			(last.role === "user" || last.role === "user-with-attachments");
+		if (!isStreaming && !lastIsUser && flyAnchorRef.current) {
+			flyAnchorRef.current = false;
+			flyPendingScrollRef.current = false;
+			setFlyAnchor(false);
+		}
+	}, [isStreaming, rawMessages]);
+
+	// The anchor spacer: while the reply is shorter than the viewport, a
+	// bottom spacer keeps the newest turn near the top; as the reply grows the
+	// spacer shrinks; at zero the reply fills the screen and normal
+	// bottom-follow resumes for the rest of the stream.
+	useLayoutEffect(() => {
+		if (!chatFlyToTop) {
+			if (flySpacerRef.current !== 0) {
+				flySpacerRef.current = 0;
+				setFlySpacer(0);
+			}
+			return;
+		}
+
+		if (!flyAnchor) return;
+
+		const container = scrollRef.current;
+		const userEl = lastUserTurnElRef.current;
+		if (container === null || userEl === null) return;
+
+		let active = true;
+		let lastTargetTop = -1;
+		let lastAnchorScrollTop = -1;
+		const update = () => {
+			if (!active) return;
+			const st = container.scrollTop;
+			const userTop =
+				userEl.getBoundingClientRect().top -
+				container.getBoundingClientRect().top +
+				st;
+			const targetTop = Math.max(0, userTop);
+			const maxScrollTopExclSpacer = Math.max(
+				0,
+				container.scrollHeight - flySpacerRef.current - container.clientHeight,
+			);
+			const next = Math.max(0, Math.ceil(targetTop - maxScrollTopExclSpacer));
+
+			// The anchor's document position moved while the scroll offset did
+			// NOT — that is a layout change above the newest message (content
+			// above resized), not a scroll. Re-arm the one-shot fly so it
+			// re-targets the anchor's new position; without this a mid-fly
+			// layout shift strands the viewport mid-document with no re-fly.
+			const layoutShift = st === lastAnchorScrollTop && targetTop !== lastTargetTop;
+			if (layoutShift && next > 0) {
+				flyPendingScrollRef.current = true;
+				setFlyRetarget((t) => t + 1);
+			}
+			lastTargetTop = targetTop;
+			lastAnchorScrollTop = st;
+
+			if (next !== flySpacerRef.current) {
+				const needsInitialScroll = flySpacerRef.current === 0 && next > 0;
+				flySpacerRef.current = next;
+				if (needsInitialScroll) flyPendingScrollRef.current = true;
+				if (next === 0) {
+					// Reply grew past the viewport — tail-follow takes over.
+					isFollowingBottomRef.current = true;
+				}
+				setFlySpacer(next);
+				return;
+			}
+		};
+
+		update();
+		const ro = new ResizeObserver(update);
+		ro.observe(container);
+		if (container.firstElementChild instanceof Element) {
+			ro.observe(container.firstElementChild);
+		}
+		ro.observe(userEl);
+		return () => {
+			active = false;
+			ro.disconnect();
+		};
+	}, [chatFlyToTop, flyAnchor, rawMessages.length, scrollUserMsgToTop]);
+
+	useLayoutEffect(() => {
+		if (flyPendingScrollRef.current && flySpacer > 0) {
+			flyPendingScrollRef.current = false;
+			scrollUserMsgToTop();
+		}
+	}, [flySpacer, flyRetarget, scrollUserMsgToTop]);
 
 	// Derive active tool name from the streaming message's tool call content blocks
 	// paired with pendingToolCalls from state.
@@ -1305,8 +1610,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// `batch-${key}` caused React to remount the card every time the batch
 				// grew or the contentSerial changed, producing a visible flash.
 				if (completed.length > 0) {
-					const firstToolId = completed.find((e) => e.kind === "tool")?.block?.id as string | undefined;
-					const stableKey = firstToolId ? `batch-id-${firstToolId}` : `batch-${key}`;
+					const firstToolId = completed.find((e) => e.kind === "tool")?.block
+						?.id as string | undefined;
+					const stableKey = firstToolId
+						? `batch-id-${firstToolId}`
+						: `batch-${key}`;
 					elements.push(
 						<div key={stableKey} className="message-row assistant">
 							<div className="message-bubble assistant">
@@ -1615,18 +1923,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				} else if (Array.isArray(customContent)) {
 					renderedContent = (
 						<div>
-							{customContent.map(
-								(block: Record<string, unknown>, i: number) =>
-									block.type === "text" ? (
-										<ChatMarkdown key={i} text={String(block.text ?? "")} />
-									) : block.type === "image" ? (
-										<img
-											key={i}
-											src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
-											alt="Custom message image"
-											style={{ maxWidth: "100%", height: "auto" }}
-										/>
-									) : null,
+							{customContent.map((block: Record<string, unknown>, i: number) =>
+								block.type === "text" ? (
+									<ChatMarkdown key={i} text={String(block.text ?? "")} />
+								) : block.type === "image" ? (
+									<img
+										key={i}
+										src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
+										alt="Custom message image"
+										style={{ maxWidth: "100%", height: "auto" }}
+									/>
+								) : null,
 							)}
 						</div>
 					);
@@ -1658,10 +1965,20 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		const renderGroupedTurn = (
 			turn: GroupedTurn,
 			turnKey: string,
+			isLive: boolean,
 		): React.ReactNode[] => {
 			const elements: React.ReactNode[] = [];
+			// Only the newest (live) turn's trail may show the streaming "full"
+			// view. Older turns must NEVER re-open when a new message starts
+			// streaming — that expansion sits ABOVE the fly-to-top anchor and
+			// shoves the whole layout down after the one-shot fly consumed its
+			// pending scroll, stranding the viewport mid-document on the trails.
+			const trailIsStreaming = isLive && isStreaming;
 
-			const pushSegment = (seg: GroupedTurn["segments"][number], idx: number) => {
+			const pushSegment = (
+				seg: GroupedTurn["segments"][number],
+				idx: number,
+			) => {
 				if (seg.entries.length === 0) return;
 				const stableKey = seg.firstToolId
 					? `trail-${turnKey}-${seg.firstToolId}`
@@ -1671,7 +1988,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						<div className="message-bubble assistant">
 							<ToolGroupCard
 								entries={seg.entries}
-								isStreaming={isStreaming}
+								isStreaming={trailIsStreaming}
 							/>
 						</div>
 					</div>,
@@ -1731,7 +2048,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			}
 
 			for (const m of turn.specials) {
-				const el = renderSpecialMessage(m, `special-${turnKey}-${elements.length}`);
+				const el = renderSpecialMessage(
+					m,
+					`special-${turnKey}-${elements.length}`,
+				);
 				if (el) elements.push(el);
 			}
 
@@ -1753,7 +2073,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					);
 				} else {
 					elements.push(
-						<ThinkingBlock key={`final-${turnKey}-${serial++}`} text={fp.text} />,
+						<ThinkingBlock
+							key={`final-${turnKey}-${serial++}`}
+							text={fp.text}
+						/>,
 					);
 				}
 			}
@@ -1761,17 +2084,36 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			return elements;
 		};
 
-		// ── Turn-grouped rendering ──
+		// Turn-grouped rendering ──
 		let turnIdx = 0;
 		let currentUser: Record<string, unknown> | undefined;
 		let currentAssistants: Record<string, unknown>[] = [];
+		let currentTurnStart = -1;
+
+		// Index of the newest user message — the fly-to-top anchor attaches to
+		// its turn's first element (the sticky wrapper or the user row).
+		let lastUserMsgIdx = -1;
+		for (let i = rawMessages.length - 1; i >= 0; i--) {
+			const r = (rawMessages[i] as Record<string, unknown>).role;
+			if (r === "user" || r === "user-with-attachments") {
+				lastUserMsgIdx = i;
+				break;
+			}
+		}
+		const attachLastTurnRef = (el: HTMLDivElement | null) => {
+			if (el !== null) lastUserTurnElRef.current = el;
+		};
 
 		const flushTurn = (): void => {
 			if (currentUser === undefined) return;
+			const turnEndIdx = msgIdx;
+			const isLastTurn =
+				lastUserMsgIdx >= 0 && currentTurnStart === lastUserMsgIdx;
+			const turnFiles = extractTurnFilePaths(currentAssistants, (id) =>
+				id === undefined ? undefined : getToolResult(id),
+			);
 			const turnKey =
-				typeof currentUser.id === "string"
-					? currentUser.id
-					: `turn-${turnIdx}`;
+				typeof currentUser.id === "string" ? currentUser.id : `turn-${turnIdx}`;
 			turnIdx++;
 			const text = extractContentText(currentUser.content);
 
@@ -1780,12 +2122,16 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			let combinedAssistantText: string;
 			let assistantElements: React.ReactNode[];
 			if (groupedToolDisplay) {
-				const turn = buildGroupedTurn(currentAssistants, getToolResult, isCustomTool);
+				const turn = buildGroupedTurn(
+					currentAssistants,
+					getToolResult,
+					isCustomTool,
+				);
 				combinedAssistantText = turn.finalParts
 					.filter((p) => p.type === "text")
 					.map((p) => p.text)
 					.join("\n\n");
-				assistantElements = renderGroupedTurn(turn, turnKey);
+				assistantElements = renderGroupedTurn(turn, turnKey, isLastTurn);
 			} else {
 				combinedAssistantText = currentAssistants
 					.map((m) => extractContentText(m.content))
@@ -1798,13 +2144,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				(currentUser.metadata as { steer?: boolean } | undefined)?.steer ===
 				true;
 			const isFollowUp =
-				(currentUser.metadata as { followUp?: boolean } | undefined)?.followUp ===
-				true;
+				(currentUser.metadata as { followUp?: boolean } | undefined)
+					?.followUp === true;
 			const lastAssistant = currentAssistants[currentAssistants.length - 1];
 
 			if (stickyUserHeader && text.length > 0) {
 				out.push(
-					<div key={`turn-${turnKey}`} style={{ position: "relative" }}>
+					<div
+						key={`turn-${turnKey}`}
+						style={{ position: "relative" }}
+						ref={isLastTurn ? attachLastTurnRef : undefined}
+					>
 						<div
 							style={{
 								position: "sticky",
@@ -1819,6 +2169,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								isSteer={isSteer}
 								isFollowUp={isFollowUp}
 								images={extractImages(currentUser.content)}
+								animated={isLastTurn && flyAnchor}
 							/>
 							{text.length > 0 && (
 								<div className="assistant-msg-footer user">
@@ -1862,12 +2213,29 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								)}
 							</div>
 						)}
+						{turnFiles.length > 0 && showTurnFiles && (
+							<TurnFileChips
+								files={turnFiles}
+								sessionId={sessionId}
+								startIndex={
+									currentTurnStart >= 0 ? currentTurnStart : undefined
+								}
+								endIndex={turnEndIdx}
+								onOpen={(path) =>
+									openFileViewer(path, path.split(/[\\/]/).pop() ?? path)
+								}
+							/>
+						)}
 					</div>,
 				);
 			} else {
 				// Non-sticky mode
 				out.push(
-					<div key={`user-${turnKey}`} className="message-row user">
+					<div
+						key={`user-${turnKey}`}
+						className={`message-row user${isLastTurn && flyAnchor ? " msg-enter" : ""}`}
+						ref={isLastTurn ? attachLastTurnRef : undefined}
+					>
 						<div className="message-bubble user">
 							{isSteer && <span className="steer-tag">steer</span>}
 							{isFollowUp && <span className="steer-tag">follow-up</span>}
@@ -1915,6 +2283,20 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				}
+				if (turnFiles.length > 0 && showTurnFiles) {
+					out.push(
+						<TurnFileChips
+							key={`${turnKey}-files`}
+							files={turnFiles}
+							sessionId={sessionId}
+							startIndex={currentTurnStart >= 0 ? currentTurnStart : undefined}
+							endIndex={turnEndIdx}
+							onOpen={(path) =>
+								openFileViewer(path, path.split(/[\\/]/).pop() ?? path)
+							}
+						/>,
+					);
+				}
 			}
 
 			currentUser = undefined;
@@ -1947,6 +2329,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			if (role === "user" || role === "user-with-attachments") {
 				flushTurn();
 				currentUser = msg;
+				currentTurnStart = idx;
 			} else if (role === "toolResult") {
 			} else {
 				// Assistant / bashExecution / branchSummary / custom
@@ -1954,7 +2337,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					currentAssistants.push(msg);
 				} else if (groupedToolDisplay) {
 					const turn = buildGroupedTurn([msg], getToolResult, isCustomTool);
-					out.push(...renderGroupedTurn(turn, `orphan-${idx}`));
+					out.push(...renderGroupedTurn(turn, `orphan-${idx}`, false));
 				} else {
 					out.push(...renderAssistantParts([msg]));
 				}
@@ -1991,93 +2374,123 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		rewindAvailable,
 		rawMessages,
 		groupedToolDisplay,
+		showTurnFiles,
+		flyAnchor,
 	]);
 
 	return (
 		<ToolBatchOpenProvider>
-		<ChatDiffViewProvider>
-			<div
-				className="messages-container"
-				style={stickyUserHeader ? { paddingTop: 50 } : undefined}
-			>
-				{error !== undefined && (
-					<div onClick={clearError} className="error-banner">
-						{error} — click to dismiss
-					</div>
-				)}
-
-				{rawMessages.length === 0 && !isStreaming ? (
-					<div className="welcome">
-						<div className="welcome-icon">💬</div>
-						<div className="welcome-text">Send a message to start chatting</div>
-						<div className="welcome-hint">with the pi coding agent</div>
-					</div>
-				) : (
-					<div
-						ref={scrollRef}
-						onScroll={onScroll}
-						style={stickyUserHeader ? { paddingTop: 0 } : undefined}
-						className="chat-scroll"
-					>
-						<div className="chat-message-list">
-							{renderedRows}
-
-							{isStreaming && streamingMessage !== undefined && (() => {
-							// Streaming content is always rendered inside renderedRows via
-							// currentAssistants injection. No standalone row needed.
-							return null;
-							return (
-								<div className="message-row assistant streaming-row">
-									<div className="message-bubble assistant streaming-bubble">
-										{activeToolName && (
-											<div className="tool-badge">
-												<span className="tool-badge-dot" />
-												{activeToolName}
-											</div>
-										)}
-										{renderStreamingContent(
-											streamingMessage as Record<string, unknown>,
-										)}
-									</div>
-								</div>
-							);
-						})()}
-
-
-
-							{activeCompaction !== null && (
-								<CompactionNotice compaction={activeCompaction} />
-							)}
-
-							{queued !== undefined &&
-								(queued.steering.length > 0 || queued.followUp.length > 0) && (
-									<div className="queued-msgs">
-										{[
-											...queued.steering.map((t) => ({
-												kind: "steer" as const,
-												text: t,
-											})),
-											...queued.followUp.map((t) => ({
-												kind: "followUp" as const,
-												text: t,
-											})),
-										].map((q, i) => (
-											<div key={i} className="queued-msg-item">
-												<span className={`queued-badge ${q.kind}`}>
-													{q.kind === "steer" ? "steer" : "follow-up"}
-												</span>
-												<span className="queued-msg-text" title={q.text}>
-													{q.text}
-												</span>
-											</div>
-										))}
-									</div>
-								)}
+			<ChatDiffViewProvider>
+				<div
+					className="messages-container"
+					style={stickyUserHeader ? { paddingTop: 50 } : undefined}
+				>
+					{error !== undefined && (
+						<div onClick={clearError} className="error-banner">
+							{error} — click to dismiss
 						</div>
-					</div>
-				)}
-			</div>
-		</ChatDiffViewProvider>
+					)}
+
+					{rawMessages.length === 0 && !isStreaming ? (
+						<div className="welcome">
+							{emptyFlapEnabled ? (
+								<SplitFlapText
+									words={emptyFlapWords.map((w) => w.toUpperCase())}
+									flipDuration={0.12}
+									stagger={0.05}
+									cycleDelay={2800}
+									flipsPerChar={7}
+									gap={5}
+									tileRadius={6}
+									charset="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-/"
+									fontSize={`min(${emptyFlapSize}px, 6vw)`}
+									className="welcome-flap"
+								/>
+							) : (
+								<>
+									<div className="welcome-icon">💬</div>
+									<div className="welcome-text">
+										Send a message to start chatting
+									</div>
+								</>
+							)}
+							<div className="welcome-hint">chat with pi coding agent</div>
+						</div>
+					) : (
+						<div
+							ref={scrollRef}
+							onScroll={onScroll}
+							style={stickyUserHeader ? { paddingTop: 0 } : undefined}
+							className="chat-scroll"
+						>
+							<div className="chat-message-list">
+								{renderedRows}
+
+								{isStreaming &&
+									streamingMessage !== undefined &&
+									(() => {
+										// Streaming content is always rendered inside renderedRows via
+										// currentAssistants injection. No standalone row needed.
+										return null;
+										return (
+											<div className="message-row assistant streaming-row">
+												<div className="message-bubble assistant streaming-bubble">
+													{activeToolName && (
+														<div className="tool-badge">
+															<span className="tool-badge-dot" />
+															{activeToolName}
+														</div>
+													)}
+													{renderStreamingContent(
+														streamingMessage as Record<string, unknown>,
+													)}
+												</div>
+											</div>
+										);
+									})()}
+
+								{activeCompaction !== null && (
+									<CompactionNotice compaction={activeCompaction} />
+								)}
+
+								{queued !== undefined &&
+									(queued.steering.length > 0 ||
+										queued.followUp.length > 0) && (
+										<div className="queued-msgs">
+											{[
+												...queued.steering.map((t) => ({
+													kind: "steer" as const,
+													text: t,
+												})),
+												...queued.followUp.map((t) => ({
+													kind: "followUp" as const,
+													text: t,
+												})),
+											].map((q, i) => (
+												<div key={i} className="queued-msg-item">
+													<span className={`queued-badge ${q.kind}`}>
+														{q.kind === "steer" ? "steer" : "follow-up"}
+													</span>
+													<span className="queued-msg-text" title={q.text}>
+														{q.text}
+													</span>
+												</div>
+											))}
+										</div>
+									)}
+							</div>
+							{/* ChatGPT-style fly-to-top spacer: holds the newest turn near the
+							    top of the viewport while its reply streams in. */}
+							{flySpacer > 0 && (
+								<div
+									aria-hidden="true"
+									style={{ height: flySpacer, flexShrink: 0 }}
+								/>
+							)}
+						</div>
+					)}
+				</div>
+			</ChatDiffViewProvider>
 		</ToolBatchOpenProvider>
 	);
 }

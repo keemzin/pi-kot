@@ -82,8 +82,9 @@ const renderSplitGutter: RenderGutter = ({ change, side }) => {
 };
 
 /**
- * Reusable unified-diff renderer used by both the inline ChatView
- * edit-tool result and the TurnDiffPanel. Wraps `react-diff-view`'s
+ * Reusable unified-diff renderer used by the inline ChatView
+ * edit-tool result, the turn-diff panel, and the per-turn
+ * TurnFileChips diff. Wraps `react-diff-view`'s
  * `Diff` + `Hunk` primitives with our dark-theme overrides.
  *
  * Render-path resolution (in order):
@@ -113,10 +114,10 @@ export function DiffBlock({
   diff: string;
   /**
    * Caller's chosen rendering mode. Each panel that hosts diffs owns
-   * its own view-type preference (TurnDiffPanel uses
-   * `pi.turnDiff.viewType`, GitPanel uses `pi.gitPanel.viewType`,
+   * its own view-type preference (GitPanel uses `pi.gitPanel.viewType`,
    * ChatView uses `pi.chat.viewType`) — DiffBlock is purely
-   * controlled and never reads the prefs itself.
+   * controlled and never reads the prefs itself; TurnFileChips passes
+   * "unified" fixed.
    */
   viewType?: "unified" | "split";
 } & HunkActionProps) {

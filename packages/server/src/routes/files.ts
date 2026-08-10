@@ -1,4 +1,4 @@
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { stat, createReadStream, watch as fsWatch } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
@@ -247,6 +247,21 @@ async function resolveProject(
   return { id: project.id, path: project.path };
 }
 
+/**
+ * Resolve a client-supplied path against the project root.
+ *
+ * `join(root, p)` mangles absolute paths into `root + p` (path.join
+ * concatenates instead of resetting), but the agent's write/edit tool
+ * calls — and therefore the turn-file chips built from them — can carry
+ * absolute paths like `/home/…/workspace/demo_project/README.md`, and
+ * that is exactly what the viewer passes back here. Treat absolute
+ * inputs as absolute; `assertInsideRoot` in file-manager still rejects
+ * anything that lands outside the project, so no containment regression.
+ */
+function resolveProjectPath(projectPath: string, p: string): string {
+  return isAbsolute(p) ? p : join(projectPath, p);
+}
+
 export const fileRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: { projectId: string; query?: string; limit?: string } }>(
     "/files/complete",
@@ -389,7 +404,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const project = await resolveProject(req.query.projectId, reply);
       if (project === undefined) return reply;
-      const target = req.query.path !== undefined ? join(project.path, req.query.path) : project.path;
+      const target = req.query.path !== undefined ? resolveProjectPath(project.path, req.query.path) : project.path;
       try {
         const result = await downloadStream(target, project.path);
         const asciiName = result.filename.replace(/[^\x20-\x7e]/g, "_");
@@ -442,7 +457,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const project = await resolveProject(req.query.projectId, reply);
       if (project === undefined) return reply;
-      const filePath = join(project.path, req.query.path);
+      const filePath = resolveProjectPath(project.path, req.query.path);
       try {
         // Check if this is a binary file that should be streamed directly
         const streamMime = getStreamMimeType(filePath);
@@ -490,7 +505,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const project = await resolveProject(req.query.projectId, reply);
       if (project === undefined) return reply;
-      const filePath = join(project.path, req.query.path);
+      const filePath = resolveProjectPath(project.path, req.query.path);
 
       // Verify file exists
       try {

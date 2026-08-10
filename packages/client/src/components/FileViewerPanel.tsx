@@ -4,6 +4,7 @@ import { FileViewer } from "./FileViewer";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import { filesRead, filesWrite, getUiSettings, updateUiSettings } from "../lib/api-client";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
+import { useSelectionBridge } from "../stores/selection-bridge";
 import { ConfirmDialog } from "./Modal";
 import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 
@@ -12,6 +13,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const viewerActivePath = useLayoutStore((s) => s.viewerActivePath);
   const viewerWidth = useLayoutStore((s) => s.viewerWidth);
   const setViewerActivePath = useLayoutStore((s) => s.setViewerActivePath);
+  const sendSelection = useSelectionBridge((s) => s.sendSelection);
   const closeFileViewerTab = useLayoutStore((s) => s.closeFileViewerTab);
   const closeAllViewerTabs = useLayoutStore((s) => s.closeAllViewerTabs);
   const setViewerWidth = useLayoutStore((s) => s.setViewerWidth);
@@ -26,7 +28,10 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const [error, setError] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<
-    { kind: "close-tab"; path: string; name: string } | { kind: "close-all" } | undefined
+    | { kind: "close-tab"; path: string; name: string }
+    | { kind: "close-all" }
+    | { kind: "reload" }
+    | undefined
   >(undefined);
   const resizeRef = useRef<{ startX: number; startW: number } | undefined>(undefined);
   const [isResizing, setIsResizing] = useState(false);
@@ -35,14 +40,29 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const isDirty = content !== savedContent;
   const isBinaryFile = activeFile !== undefined && (isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path));
 
-  // Load file content when active file changes
+  // External disk changes (agent writes/edits, git, bash) bump `fileRev[path]`.
+  // We do NOT auto-reload — that would interrupt manual editing and flash on
+  // every agent tool. Instead we flag `externalChange` and let the user reload
+  // via a banner button (with a discard-confirm when unsaved edits exist).
+  const fileRev = useLayoutStore((s) => (activeFile ? s.fileRev[activeFile.path] : undefined));
+  const lastPathRef = useRef<string | undefined>(undefined);
+  const lastRevRef = useRef(0);
+  const [externalChange, setExternalChange] = useState(false);
+
+  // Load file content when the active file changes (open / switch only).
   useEffect(() => {
     if (!activeFile) {
       setContent("");
       setSavedContent("");
       setError(undefined);
+      setExternalChange(false);
+      lastPathRef.current = undefined;
+      lastRevRef.current = 0;
       return;
     }
+    lastPathRef.current = activeFile.path;
+    lastRevRef.current = fileRev ?? 0;
+    setExternalChange(false);
     // Binary files (images, audio, PDF) are streamed directly by FileViewer
     // — no need to fetch JSON content for them.
     if (isBinaryFile) {
@@ -55,6 +75,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
       setLoading(false);
       return;
     }
+
     let cancelled = false;
     setLoading(true);
     setError(undefined);
@@ -85,6 +106,47 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
       });
     return () => { cancelled = true; };
   }, [activeFile?.path, projectId, isBinaryFile]);
+
+  // Manual reload from disk (banner button). Discards in-buffer edits.
+  const handleReload = useCallback(async () => {
+    if (!activeFile) return;
+    setLoading(true);
+    setError(undefined);
+    setExternalChange(false);
+    try {
+      const data = await filesRead(projectId, activeFile.path);
+      const c = data.content ?? "";
+      const normalized = c === "" || c.endsWith("\n") ? c : c + "\n";
+      setContent(normalized);
+      setSavedContent(normalized);
+      setLanguage(data.language);
+      setFileName(activeFile.name);
+      setFileSize(data.size);
+      setSavedAt(undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "read failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [activeFile, projectId]);
+
+  // Detect an external disk change on the ACTIVE file (rev bump).
+  // If the file is NOT dirty (no unsaved manual edits), auto-reload it instantly.
+  // If the file IS dirty, flag it for manual reload via banner.
+  useEffect(() => {
+    if (!activeFile || activeFile.path !== lastPathRef.current) return;
+    const rev = fileRev ?? 0;
+    if (rev > lastRevRef.current) {
+      if (!isDirty) {
+        // Auto-reload since user hasn't made manual edits
+        void handleReload();
+      } else {
+        // User has unsaved edits, show banner to prevent data loss
+        setExternalChange(true);
+      }
+    }
+    lastRevRef.current = rev;
+  }, [fileRev, activeFile?.path, isDirty, handleReload]);
 
   const handleSave = useCallback(async () => {
     if (!activeFile || !isDirty || saving) return;
@@ -354,6 +416,55 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
             </div>
           )}
 
+          {/* ── External-change banner (manual reload) ── */}
+          {externalChange && activeFile && !isBinaryFile && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "4px 12px",
+                fontSize: "11px",
+                color: "var(--text-secondary)",
+                background: "var(--warning-bg, rgba(240,204,21,0.10))",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <span
+                style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isDirty
+                  ? "File changed on disk — reloading will discard unsaved edits"
+                  : "File changed on disk"}
+              </span>
+              <button
+                onClick={() => {
+                  if (isDirty) setPendingConfirm({ kind: "reload" });
+                  else void handleReload();
+                }}
+                title="Reload file from disk"
+                style={{
+                  background: "none",
+                  border: "1px solid var(--border-bright)",
+                  color: "var(--accent-text)",
+                  cursor: "pointer",
+                  padding: "2px 8px",
+                  fontSize: "11px",
+                  borderRadius: "var(--radius-xs)",
+                  flexShrink: 0,
+                }}
+                type="button"
+              >
+                ↻ Reload
+              </button>
+            </div>
+          )}
+
           {/* ── Editor area ── */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
             {loading ? (
@@ -381,6 +492,9 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                     savedAt={savedAt}
                     error={error}
                     size={fileSize}
+                    onSendSelection={(range) =>
+                      sendSelection({ path: activeFile.path, ...range })
+                    }
                   />
                 )}
               </>
@@ -398,16 +512,20 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
             closeFileViewerTab(pendingConfirm.path);
           } else if (pendingConfirm?.kind === "close-all") {
             closeAllViewerTabs();
+          } else if (pendingConfirm?.kind === "reload") {
+            void handleReload();
           }
           setPendingConfirm(undefined);
         }}
-        title="Unsaved changes"
+        title={pendingConfirm?.kind === "reload" ? "Reload file" : "Unsaved changes"}
         message={
           pendingConfirm?.kind === "close-tab"
             ? `Close “${pendingConfirm.name}”? Unsaved changes will be lost.`
-            : `Close all ${viewerTabs.length} tabs? Unsaved changes in the active tab will be lost.`
+            : pendingConfirm?.kind === "close-all"
+              ? `Close all ${viewerTabs.length} tabs? Unsaved changes in the active tab will be lost.`
+              : "Reload this file from disk? Unsaved edits will be lost."
         }
-        primaryLabel="Discard & close"
+        primaryLabel={pendingConfirm?.kind === "reload" ? "Reload" : "Discard & close"}
         tone="danger"
       />
     </div>

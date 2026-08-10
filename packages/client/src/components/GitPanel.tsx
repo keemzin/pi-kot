@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Columns2, Rows2 } from "lucide-react";
 import { getStoredToken } from "../lib/api-client";
+import { useLayoutStore } from "../stores/layout-store";
 import { DiffBlock } from "./DiffBlock";
 
 /** Wrapper around fetch that includes the auth token when available. */
@@ -160,6 +161,15 @@ export function GitPanel({ projectId }: Props) {
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  // Live refresh: when the agent completes a file-modifying tool, the
+  // store bumps `fileChangeTick`, so re-fetch git status.
+  const fileChangeTick = useLayoutStore((s) => s.fileChangeTick);
+  useEffect(() => {
+    if (fileChangeTick === 0) return;
+    const t = setTimeout(() => void fetchStatus(), 400);
+    return () => clearTimeout(t);
+  }, [fileChangeTick, fetchStatus]);
 
   // Lazy-load log
   useEffect(() => {

@@ -3,10 +3,11 @@ import { DiffBlock } from "./DiffBlock";
 
 /**
  * Per-ChatView diff view-type preference. Each diff-rendering surface
- * has its own setting (TurnDiffPanel uses `pi.turnDiff.viewType`,
- * GitPanel uses `pi.gitPanel.viewType`); chat inline edit-tool diffs
- * use `pi.chat.viewType`. Toggling one panel doesn't affect the
- * others — different mental contexts often want different layouts.
+ * has its own setting (GitPanel uses `pi.gitPanel.viewType`); chat
+ * inline edit-tool diffs use `pi.chat.viewType`, and the per-turn
+ * TurnFileChips diff is unified-only. Toggling one panel doesn't
+ * affect the others — different mental contexts often want different
+ * layouts.
  *
  * The hover-revealed toggle on each `<details>` summary updates the
  * chat-wide pref via Context, so one click flips every other chat

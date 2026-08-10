@@ -1,4 +1,5 @@
 import { extname, join } from "node:path";
+import { createReadStream } from "node:fs";
 import { readFile } from "./file-manager.js";
 import { stat, open as fsOpen } from "node:fs/promises";
 
@@ -24,6 +25,10 @@ import { stat, open as fsOpen } from "node:fs/promises";
  * - Two path forms accepted:
  *     `@<path>`               — greedy non-whitespace; common case.
  *     `@"<path with spaces>"` — anything that isn't a `"` or newline.
+ * - Optional range suffix on EITHER form references just a slice of a file
+ *   (always inlined): `@src/foo.ts#L3-L5`, `@src/foo.ts#L1`, or
+ *   `@"my file.ts"#L3-L5`. The inlined block carries original line numbers
+ *   so the model knows the exact positions the user selected.
  * - Resolved against the project's workspace root via file-manager's
  *   path-traversal-safe `checkFileReference`. Four outcomes:
  *     inline    → file ≤ INLINE_THRESHOLD; replace marker with a
@@ -54,13 +59,30 @@ const AGGREGATE_INLINE_BUDGET_BYTES = 512 * 1024;
  * start-or-after-whitespace then either a `"path with spaces"` quoted
  * form or a bare non-whitespace token.
  */
-const REF_RE = /(^|\s)@(?:"([^"\n]+)"|([^\s]+?))(?=[?,;:!)\]]?(?:\s|$))/g;
+const REF_RE = /(^|\s)@(?:"([^"\n]+)"(#L\d+(?:-L?\d+)?)?|([^\s]+?))(?=[?,;:!)\]]?(?:\s|$))/g;
+
+interface RefRange {
+  start: number;
+  end: number;
+}
 
 interface RefMatch {
   start: number;
   end: number;
   path: string;
   lead: string;
+  range?: RefRange;
+}
+
+/** Parse a `#L<start>(-<end>)?` suffix into a 1-based inclusive range. */
+function parseRange(text: string | undefined): RefRange | undefined {
+  if (text === undefined) return undefined;
+  const m = /^#L(\d+)(?:-L?(\d+))?$/.exec(text);
+  if (m === null) return undefined;
+  const start = Number.parseInt(m[1], 10);
+  const end = m[2] !== undefined ? Number.parseInt(m[2], 10) : start;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 1 || end < start) return undefined;
+  return { start, end };
 }
 
 function findRefs(text: string): RefMatch[] {
@@ -68,12 +90,25 @@ function findRefs(text: string): RefMatch[] {
   REF_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = REF_RE.exec(text)) !== null) {
-    matches.push({
-      start: m.index,
-      end: m.index + m[0].length,
-      lead: m[1] ?? "",
-      path: m[2] ?? m[3] ?? "",
-    });
+    let path: string;
+    let range: RefRange | undefined;
+    // Groups: m[1] = leading whitespace, m[2] = quoted path, m[3] = quoted
+    // range suffix, m[4] = bare token (optionally with a #L… range inside).
+    if (m[2] !== undefined) {
+      path = m[2];
+      range = parseRange(m[3]);
+    } else {
+      const bare = m[4] ?? "";
+      const rgx = /^(.*?)(#L(\d+)(?:-L?(\d+))?)$/.exec(bare);
+      if (rgx !== null) {
+        path = rgx[1]!;
+        range = parseRange(rgx[2]);
+      } else {
+        path = bare;
+        range = undefined;
+      }
+    }
+    matches.push({ start: m.index, end: m.index + m[0].length, lead: m[1] ?? "", path, range });
   }
   return matches;
 }
@@ -89,6 +124,7 @@ export async function expandFileReferences(text: string, workspacePath: string):
 
   type Classification =
     | { kind: "inlineCandidate"; size: number; abs: string }
+    | { kind: "range"; abs: string; range: RefRange }
     | { kind: "deferLarge" }
     | { kind: "directory" }
     | { kind: "error"; reason: string };
@@ -112,6 +148,10 @@ export async function expandFileReferences(text: string, workspacePath: string):
         } finally {
           await fh.close();
         }
+
+        // A range reference is always inlined — the slice is bounded by the
+        // user's selection regardless of whole-file size.
+        if (mm.range !== undefined) return { kind: "range", abs, range: mm.range };
 
         if (st.size > INLINE_THRESHOLD_BYTES) return { kind: "deferLarge" };
         return { kind: "inlineCandidate", size: st.size, abs };
@@ -155,6 +195,13 @@ export async function expandFileReferences(text: string, workspacePath: string):
     classifications.map(async (c, i): Promise<Outcome> => {
       if (c.kind === "directory") return { kind: "directory" };
       if (c.kind === "error") return { kind: "error", reason: c.reason };
+      if (c.kind === "range") {
+        const mm = matches[i];
+        if (mm === undefined || mm.range === undefined) return { kind: "defer" };
+        const slice = await readLineRange(c.abs, mm.range.start, mm.range.end);
+        if (slice === undefined) return { kind: "error", reason: "selection outside file lines" };
+        return { kind: "inline", text: formatRangeExpansion(mm.path, slice) };
+      }
       if (c.kind === "deferLarge") return { kind: "defer" };
       if (!inlineSet.has(i)) return { kind: "defer" };
       try {
@@ -181,7 +228,14 @@ export async function expandFileReferences(text: string, workspacePath: string):
     if (outcome === undefined || mm === undefined) continue;
     const before = out.slice(0, mm.start) + mm.lead;
     const after = out.slice(mm.end);
-    const marker = /\s/.test(mm.path) ? `@"${mm.path}"` : `@${mm.path}`;
+    const marker =
+      mm.range !== undefined
+        ? (/\s/.test(mm.path)
+            ? `@"${mm.path}"#L${mm.range.start}-${mm.range.end}`
+            : `@${mm.path}#L${mm.range.start}-${mm.range.end}`)
+        : /\s/.test(mm.path)
+          ? `@"${mm.path}"`
+          : `@${mm.path}`;
     if (outcome.kind === "inline") {
       out = `${before}${marker}\n${outcome.text}\n${after}`;
     } else if (outcome.kind === "defer") {
@@ -215,6 +269,83 @@ function pickFence(content: string): string {
     }
   }
   return "`".repeat(Math.max(3, max + 1));
+}
+
+function formatRangeExpansion(
+  path: string,
+  slice: { lines: string[]; start: number; end: number },
+): string {
+  const lang = languageHintForPath(path);
+  const fence = pickFence(slice.lines.join("\n"));
+  const width = String(slice.end).length;
+  const body = slice.lines
+    .map((line, index) => `${String(slice.start + index).padStart(width)} | ${line}`)
+    .join("\n");
+  return `${fence}${lang} file: ${path} (lines ${slice.start}-${slice.end})\n${body}\n${fence}`;
+}
+
+/**
+ * Stream a file and return only the requested 1-based inclusive lines.
+ * Stops reading once the end line is reached (no whole-file read), so a
+ * small selection from a huge file is cheap. Returns undefined when the
+ * selection lies entirely past the last line of the file.
+ */
+async function readLineRange(
+  abs: string,
+  start: number,
+  end: number,
+): Promise<{ lines: string[]; start: number; end: number } | undefined> {
+  return new Promise((resolve, reject) => {
+    const rs = createReadStream(abs, { encoding: "utf8" });
+    const lines: string[] = [];
+    const actualStart = Math.max(1, start);
+    let lineNo = 0;
+    let buffer = "";
+    let settled = false;
+
+    const settle = (actualEnd: number) => {
+      if (settled) return;
+      settled = true;
+      resolve({ lines, start: actualStart, end: actualEnd });
+    };
+
+    rs.on("data", (chunk: string) => {
+      buffer += chunk;
+      let idx: number;
+      while ((idx = buffer.indexOf("\n")) !== -1) {
+        lineNo += 1;
+        const content = buffer.slice(0, idx).replace(/\r$/, "");
+        if (lineNo >= actualStart && lineNo <= end) lines.push(content);
+        if (lineNo >= end) {
+          rs.destroy();
+          settle(lineNo);
+          return;
+        }
+        buffer = buffer.slice(idx + 1);
+      }
+    });
+
+    rs.on("end", () => {
+      if (settled) return;
+      const last = lineNo + (buffer.length > 0 ? 1 : 0);
+      if (buffer.length > 0 && last >= actualStart && last <= end) {
+        lines.push(buffer.replace(/\r$/, ""));
+      }
+      if (last < actualStart || lines.length === 0) {
+        if (settled) return;
+        settled = true;
+        resolve(undefined);
+        return;
+      }
+      settle(Math.min(last, end));
+    });
+
+    rs.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
+  });
 }
 
 function looksBinary(buf: Buffer): boolean {
