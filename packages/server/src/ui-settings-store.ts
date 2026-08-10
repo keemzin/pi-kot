@@ -23,6 +23,10 @@ export type UiSettings = {
 	/** openkot-style tool trail grouping (one Trail card per turn, interstitial
 	 *  text collapsed into justification previews). */
 	groupedToolDisplay: boolean;
+	/** Trail card resting view for finished turns: "justify" (collapsed
+	 *  per-step previews) or "full" (everything expanded). Streaming turns
+	 *  always show Full regardless. */
+	trailDefaultView: "full" | "justify";
 	/** Turn-written-file chips under each reply. */
 	showTurnFiles: boolean;
 	/** Horizontal swipe on touch screens opens/collapses the sidebar. */
@@ -52,6 +56,7 @@ const DEFAULTS: UiSettings = {
 	compressImages: true,
 	showThinking: false,
 	groupedToolDisplay: true,
+	trailDefaultView: "justify",
 	showTurnFiles: true,
 	swipeToOpenSidebar: true,
 	viewerWidth: 480,
@@ -91,6 +96,8 @@ function normalize(value: unknown): UiSettings {
 		settings.showThinking = v.showThinking;
 	if (typeof v.groupedToolDisplay === "boolean")
 		settings.groupedToolDisplay = v.groupedToolDisplay;
+	if (v.trailDefaultView === "full" || v.trailDefaultView === "justify")
+		settings.trailDefaultView = v.trailDefaultView;
 	if (typeof v.showTurnFiles === "boolean")
 		settings.showTurnFiles = v.showTurnFiles;
 	if (typeof v.swipeToOpenSidebar === "boolean")

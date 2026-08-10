@@ -1289,6 +1289,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const [flySpacer, setFlySpacer] = useState(0);
 	const flyPendingScrollRef = useRef(false);
 	const prevMsgLenRef = useRef(0);
+	// Bumped whenever the fly re-arms — lets the scroll-trigger effect re-fire
+	// even when the spacer value stays the same (layout shift above the anchor
+	// changes the target but not the spacer).
+	const [flyRetarget, setFlyRetarget] = useState(0);
 
 	const NEAR_BOTTOM_PX = 24;
 
@@ -1445,18 +1449,34 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		if (container === null || userEl === null) return;
 
 		let active = true;
+		let lastTargetTop = -1;
+		let lastAnchorScrollTop = -1;
 		const update = () => {
 			if (!active) return;
+			const st = container.scrollTop;
 			const userTop =
 				userEl.getBoundingClientRect().top -
 				container.getBoundingClientRect().top +
-				container.scrollTop;
+				st;
 			const targetTop = Math.max(0, userTop);
 			const maxScrollTopExclSpacer = Math.max(
 				0,
 				container.scrollHeight - flySpacerRef.current - container.clientHeight,
 			);
 			const next = Math.max(0, Math.ceil(targetTop - maxScrollTopExclSpacer));
+
+			// The anchor's document position moved while the scroll offset did
+			// NOT — that is a layout change above the newest message (content
+			// above resized), not a scroll. Re-arm the one-shot fly so it
+			// re-targets the anchor's new position; without this a mid-fly
+			// layout shift strands the viewport mid-document with no re-fly.
+			const layoutShift = st === lastAnchorScrollTop && targetTop !== lastTargetTop;
+			if (layoutShift && next > 0) {
+				flyPendingScrollRef.current = true;
+				setFlyRetarget((t) => t + 1);
+			}
+			lastTargetTop = targetTop;
+			lastAnchorScrollTop = st;
 
 			if (next !== flySpacerRef.current) {
 				const needsInitialScroll = flySpacerRef.current === 0 && next > 0;
@@ -1489,7 +1509,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			flyPendingScrollRef.current = false;
 			scrollUserMsgToTop();
 		}
-	}, [flySpacer, scrollUserMsgToTop]);
+	}, [flySpacer, flyRetarget, scrollUserMsgToTop]);
 
 	// Derive active tool name from the streaming message's tool call content blocks
 	// paired with pendingToolCalls from state.
@@ -1945,8 +1965,15 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		const renderGroupedTurn = (
 			turn: GroupedTurn,
 			turnKey: string,
+			isLive: boolean,
 		): React.ReactNode[] => {
 			const elements: React.ReactNode[] = [];
+			// Only the newest (live) turn's trail may show the streaming "full"
+			// view. Older turns must NEVER re-open when a new message starts
+			// streaming — that expansion sits ABOVE the fly-to-top anchor and
+			// shoves the whole layout down after the one-shot fly consumed its
+			// pending scroll, stranding the viewport mid-document on the trails.
+			const trailIsStreaming = isLive && isStreaming;
 
 			const pushSegment = (
 				seg: GroupedTurn["segments"][number],
@@ -1959,7 +1986,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				elements.push(
 					<div key={stableKey} className="message-row assistant">
 						<div className="message-bubble assistant">
-							<ToolGroupCard entries={seg.entries} isStreaming={isStreaming} />
+							<ToolGroupCard
+								entries={seg.entries}
+								isStreaming={trailIsStreaming}
+							/>
 						</div>
 					</div>,
 				);
@@ -2101,7 +2131,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					.filter((p) => p.type === "text")
 					.map((p) => p.text)
 					.join("\n\n");
-				assistantElements = renderGroupedTurn(turn, turnKey);
+				assistantElements = renderGroupedTurn(turn, turnKey, isLastTurn);
 			} else {
 				combinedAssistantText = currentAssistants
 					.map((m) => extractContentText(m.content))
@@ -2307,7 +2337,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					currentAssistants.push(msg);
 				} else if (groupedToolDisplay) {
 					const turn = buildGroupedTurn([msg], getToolResult, isCustomTool);
-					out.push(...renderGroupedTurn(turn, `orphan-${idx}`));
+					out.push(...renderGroupedTurn(turn, `orphan-${idx}`, false));
 				} else {
 					out.push(...renderAssistantParts([msg]));
 				}

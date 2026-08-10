@@ -20,6 +20,7 @@ type UiSettings = {
 	compressImages?: boolean;
 	showThinking?: boolean;
 	groupedToolDisplay?: boolean;
+	trailDefaultView?: "full" | "justify";
 	showTurnFiles?: boolean;
 	swipeToOpenSidebar?: boolean;
 	userBubbleColor?: string | null;
@@ -98,6 +99,7 @@ export function AppearanceTab() {
 	const zCompress = usePreferencesStore((s) => s.compressImages);
 	const zThinking = usePreferencesStore((s) => s.showThinking);
 	const zGrouped = usePreferencesStore((s) => s.groupedToolDisplay);
+	const zTrailView = usePreferencesStore((s) => s.trailDefaultView);
 	const zTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
 	const zSwipeSidebar = usePreferencesStore((s) => s.swipeToOpenSidebar);
 	const zSetSticky = usePreferencesStore((s) => s.setStickyUserHeader);
@@ -107,6 +109,7 @@ export function AppearanceTab() {
 	const zSetCompress = usePreferencesStore((s) => s.setCompressImages);
 	const zSetThinking = usePreferencesStore((s) => s.setShowThinking);
 	const zSetGrouped = usePreferencesStore((s) => s.setGroupedToolDisplay);
+	const zSetTrailView = usePreferencesStore((s) => s.setTrailDefaultView);
 	const zSetTurnFiles = usePreferencesStore((s) => s.setShowTurnFiles);
 	const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
 	const zFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
@@ -122,6 +125,7 @@ export function AppearanceTab() {
 	const [compressImages, setCompressImages] = useState(zCompress);
 	const [showThinking, setShowThinking] = useState(zThinking);
 	const [groupedToolDisplay, setGroupedToolDisplay] = useState(zGrouped);
+	const [trailView, setTrailView] = useState<"full" | "justify">(zTrailView);
 	const [showTurnFiles, setShowTurnFiles] = useState(zTurnFiles);
 	const [swipeToOpenSidebar, setSwipeToOpenSidebar] = useState(zSwipeSidebar);
 	const [flapEnabled, setFlapEnabled] = useState(zFlapEnabled);
@@ -205,6 +209,13 @@ export function AppearanceTab() {
 				if (typeof server.groupedToolDisplay === "boolean") {
 					setGroupedToolDisplay(server.groupedToolDisplay);
 					zSetGrouped(server.groupedToolDisplay);
+				}
+				if (
+					server.trailDefaultView === "full" ||
+					server.trailDefaultView === "justify"
+				) {
+					setTrailView(server.trailDefaultView);
+					zSetTrailView(server.trailDefaultView);
 				}
 				if (typeof server.showTurnFiles === "boolean") {
 					setShowTurnFiles(server.showTurnFiles);
@@ -311,6 +322,12 @@ export function AppearanceTab() {
 		setGroupedToolDisplay(val);
 		zSetGrouped(val);
 		persist({ groupedToolDisplay: val });
+	};
+
+	const selectTrailView = (view: "full" | "justify") => {
+		setTrailView(view);
+		zSetTrailView(view);
+		persist({ trailDefaultView: view });
 	};
 	const toggleTurnFiles = (val: boolean) => {
 		setShowTurnFiles(val);
@@ -917,6 +934,40 @@ export function AppearanceTab() {
 				<p className="settings-hint" style={{ marginTop: 4 }}>
 					One Trail card per turn; in-between agent text collapses into
 					justification previews.
+				</p>
+				{/* Default resting view for finished trails */}
+				<div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+					{(["justify", "full"] as const).map((v) => (
+						<button
+							key={v}
+							type="button"
+							onClick={() => selectTrailView(v)}
+							style={{
+								padding: "4px 12px",
+								borderRadius: "var(--radius-sm)",
+								border: `1px solid ${trailView === v ? "var(--accent)" : "var(--border)"}`,
+								background:
+									trailView === v
+										? "var(--accent-subtle)"
+										: "var(--bg-glass)",
+								color:
+									trailView === v
+										? "var(--accent-text)"
+										: "var(--text-secondary)",
+								fontSize: "11px",
+								fontWeight: trailView === v ? 600 : 400,
+								cursor: "pointer",
+								fontFamily: "inherit",
+								transition: "all 0.15s",
+							}}
+						>
+							{v === "justify" ? "Justify" : "Full"}
+						</button>
+					))}
+				</div>
+				<p className="settings-hint" style={{ marginTop: 4 }}>
+					Default view for finished trails. Trails always show Full while the
+					agent is working.
 				</p>
 			</div>
 			<div className="settings-field">

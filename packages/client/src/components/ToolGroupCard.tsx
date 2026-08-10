@@ -769,11 +769,14 @@ export function ToolGroupCard({
 	isStreaming?: boolean;
 }) {
 	const hasJustifications = entries.some((e) => e.kind === "justification");
+	// Default resting view for a finished/loaded trail comes from the user
+	// preference; while a turn streams, trails always render Full.
+	const trailDefaultView = usePreferencesStore((s) => s.trailDefaultView);
 	// Two-state view: "justify" (collapsed) ↔ "full" (everything expanded).
 	// Justify works for all turns: tool-only turns show collapsed tool rows;
 	// turns with justifications show per-chunk expandable previews.
 	const [view, setView] = useState<"full" | "justify">(
-		isStreaming ? "full" : "justify",
+		isStreaming ? "full" : trailDefaultView,
 	);
 	// Which chunks are expanded in Justify view (indices into chunks array).
 	const [openChunks, setOpenChunks] = useState<Set<number>>(() => new Set());
@@ -790,15 +793,17 @@ export function ToolGroupCard({
 			setView("full");
 		}
 		if (!isStreaming && prevStreaming.current) {
+			// Streaming stopped — settle on the user's default view: Justify
+			// collapses each step into a preview, Full keeps it expanded.
 			const timer = setTimeout(() => {
-				setView("justify");
+				setView(trailDefaultView);
 				setOpenChunks(new Set());
 			}, 3000);
 			prevStreaming.current = isStreaming;
 			return () => clearTimeout(timer);
 		}
 		prevStreaming.current = isStreaming;
-	}, [isStreaming]);
+	}, [isStreaming, trailDefaultView]);
 
 	const anyRunning =
 		isStreaming &&

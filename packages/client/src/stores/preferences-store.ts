@@ -6,6 +6,7 @@ const LS_SHOW_TOKEN_USAGE = "pi-kot/show-token-usage";
 const LS_COMPRESS_IMAGES = "pi-kot/compress-images";
 const LS_SHOW_THINKING = "pi-kot/show-thinking";
 const LS_GROUPED_TOOL_DISPLAY = "pi-kot/grouped-tool-display";
+const LS_TRAIL_DEFAULT_VIEW = "pi-kot/trail-default-view";
 const LS_SHOW_TURN_FILES = "pi-kot/show-turn-files";
 const LS_SWIPE_TO_OPEN_SIDEBAR = "pi-kot/swipe-to-open-sidebar";
 const LS_EMPTY_FLAP_ENABLED = "pi-kot/empty-flap-enabled";
@@ -21,6 +22,21 @@ function loadGroupedToolDisplay(): boolean {
 		return v === null ? true : v === "true";
 	} catch {
 		return true;
+	}
+}
+
+/** Trail card resting view: "justify" (collapsed per-step previews) or
+ *  "full" (everything expanded). While a turn streams, trails always show
+ *  Full regardless; this decides what they settle on afterwards. */
+export type TrailViewMode = "full" | "justify";
+
+function loadTrailDefaultView(): TrailViewMode {
+	if (typeof window === "undefined") return "justify";
+	try {
+		const v = localStorage.getItem(LS_TRAIL_DEFAULT_VIEW);
+		return v === "full" || v === "justify" ? v : "justify";
+	} catch {
+		return "justify";
 	}
 }
 
@@ -151,6 +167,10 @@ export interface PreferencesState {
 	 *  text collapsed into justification previews). */
 	groupedToolDisplay: boolean;
 	setGroupedToolDisplay: (enabled: boolean) => void;
+	/** Trail card resting view (Justify = collapsed per-step previews, Full =
+	 *  everything expanded). Streaming turns always show Full regardless. */
+	trailDefaultView: TrailViewMode;
+	setTrailDefaultView: (view: TrailViewMode) => void;
 	/** Turn-written-file chips under each reply. */
 	showTurnFiles: boolean;
 	setShowTurnFiles: (enabled: boolean) => void;
@@ -228,6 +248,18 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
 			// private mode
 		}
 		set({ groupedToolDisplay: enabled });
+	},
+
+	trailDefaultView: loadTrailDefaultView(),
+
+	setTrailDefaultView: (view) => {
+		const v: TrailViewMode = view === "full" ? "full" : "justify";
+		try {
+			localStorage.setItem(LS_TRAIL_DEFAULT_VIEW, v);
+		} catch {
+			// private mode
+		}
+		set({ trailDefaultView: v });
 	},
 
 	showTurnFiles: loadShowTurnFiles(),
