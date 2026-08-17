@@ -145,18 +145,41 @@ const components: Components = {
     </a>
   ),
 
-  img: ({ src, alt }) => (
-    <img
-      src={src}
-      alt={alt ?? ""}
-      style={{
-        maxWidth: "100%",
-        height: "auto",
-        borderRadius: 4,
-        boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-      }}
-    />
-  ),
+  img: ({ src, alt }) => {
+    if (src && (src.toLowerCase().endsWith(".html") || src.toLowerCase().endsWith(".htm"))) {
+      return (
+        <div style={{ 
+          padding: "12px", 
+          border: "1px dashed var(--border)", 
+          borderRadius: "6px", 
+          margin: "12px 0",
+          background: "var(--bg-subtle)" 
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+            <span style={{ fontSize: "16px" }}>⚠️</span>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+              HTML Preview Blocked
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+            The agent attempted to embed <strong>{src.split('/').pop() || src}</strong> as an image. HTML files cannot be displayed this way. To view the live preview, open the <strong>Artifacts</strong> tab and click on the file.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <img
+        src={src}
+        alt={alt ?? ""}
+        style={{
+          maxWidth: "100%",
+          height: "auto",
+          borderRadius: 4,
+          boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+        }}
+      />
+    );
+  },
 
   table: ({ children }) => (
     <div className="table-wrapper">
