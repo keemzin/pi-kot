@@ -5632,9 +5632,6 @@ strong {
 		visibility 0s 0s; /* flutter-free: visible as soon as opening */
 }
 .trail-chunk-content {
-	padding-left: 10px;
-	border-left: 2px solid var(--border);
-	margin-left: 5px;
 	padding-bottom: 4px;
 	min-height: 0;
 	overflow: hidden;

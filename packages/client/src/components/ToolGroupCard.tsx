@@ -649,20 +649,13 @@ export function ToolCallEntry({
 
 function TrailThinkingRow({ text }: { text: string }) {
 	const showThinking = usePreferencesStore((s) => s.showThinking);
-	const [open, setOpen] = useState(false);
 	if (!showThinking) return null;
 	return (
 		<div className="trail-thinking">
-			<div
-				role="button"
-				onClick={() => setOpen((o) => !o)}
-				className="trail-thinking-header"
-			>
-				<span className="trail-justification-dot" />
+			<div className="trail-thinking-header">
 				<span className="trail-thinking-label">Thinking</span>
-				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
 			</div>
-			{open && <div className="trail-thinking-body">{text}</div>}
+			<div className="trail-thinking-body">{text}</div>
 		</div>
 	);
 }
@@ -680,11 +673,17 @@ function JustificationRow({
 	open: boolean;
 	onToggle: () => void;
 }) {
-	const trimmed = text.trim().replace(/\s+/g, " ");
-	const truncated = trimmed.length > JUSTIFICATION_PREVIEW_LEN;
+	const stripped = text
+		.replace(/#+\s+/g, "") // remove headers like "## "
+		.replace(/[*_~`]/g, "") // remove bold, italic, strikethrough, code ticks
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // markdown links -> just text
+		.replace(/<[^>]+>/g, "") // HTML tags
+		.trim()
+		.replace(/\s+/g, " ");
+	const truncated = stripped.length > JUSTIFICATION_PREVIEW_LEN;
 	const preview = truncated
-		? trimmed.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
-		: trimmed;
+		? stripped.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
+		: stripped;
 	return (
 		<div className={`trail-justification${open ? " expanded" : " collapsed"}`}>
 			<div
@@ -701,14 +700,13 @@ function JustificationRow({
 				title={open ? "Collapse this step" : "Expand this step"}
 				aria-expanded={open}
 			>
-				<span className="trail-justification-dot" />
+				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
 				<span className="trail-justification-label">Justification</span>
 				{!open && (
 					<span className="trail-justification-preview" title={preview}>
 						{preview}
 					</span>
 				)}
-				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
 			</div>
 		</div>
 	);
