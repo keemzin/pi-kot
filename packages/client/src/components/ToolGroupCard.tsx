@@ -535,8 +535,8 @@ export function ToolCallEntry({
 		outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
 
 	const preview =
-		previewOverride ?? toolPreviewFromArgs(name, args) ?? undefined;
-	const iconNode = icon ?? getToolIcon(name);
+		previewOverride ?? getToolDescription(name, args as Record<string, unknown>) ?? undefined;
+	const iconNode = icon ?? <TrailIcon toolName={name} />;
 
 	// For `edit`, prefer the unified diff string the SDK puts on
 	// result.details (details.diff). When absent (e.g. some providers),
@@ -567,10 +567,19 @@ export function ToolCallEntry({
 			</span>
 			<div className="tool-timeline-content">
 				<div className="tool-timeline-row">
-					<span className="tool-timeline-name">{displayName ?? name}</span>
+					<span className="tool-timeline-name">{displayName ?? getToolDisplayName(name)}</span>
 					{preview && (
 						<span className="tool-timeline-arg" title={preview}>
 							{preview}
+						</span>
+					)}
+					{!isRunning && !detailsOpen && outputPreview.length > 0 && (
+						<span 
+							className="tool-timeline-arg" 
+							title={outputPreview}
+							style={{ color: "var(--text-ghost)", fontStyle: "italic" }}
+						>
+							— {isError ? "✖ " : "✓ "} {outputPreview}
 						</span>
 					)}
 					{isRunning && (
@@ -590,13 +599,6 @@ export function ToolCallEntry({
 						</button>
 					)}
 				</div>
-				{/* Smart-disclosure output preview (always shown when not expanded) */}
-				{!isRunning && !detailsOpen && outputPreview.length > 0 && (
-					<div className="tool-timeline-output-preview" title={outputPreview}>
-						{isError ? "✖ " : "✓ "}
-						{outputPreview}
-					</div>
-				)}
 				{/* Expanded details pane */}
 				{detailsOpen && (
 					<div className="tool-timeline-details">
