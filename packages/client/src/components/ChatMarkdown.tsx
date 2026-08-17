@@ -9,6 +9,7 @@ import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
+import { normalizeDisplayMath, normalizeInlineLatexMath } from "../lib/markdown";
 
 type Props = { text: string; chatStyleBreaks?: boolean };
 
@@ -253,14 +254,17 @@ function renderSegments(text: string): (string | ReactNode)[] {
 export function ChatMarkdown({ text, chatStyleBreaks }: Props) {
   const plugins = chatStyleBreaks ? [remarkGfm, remarkMath, remarkBreaks] : [remarkGfm, remarkMath];
 
-  const segments = useMemo(() => renderSegments(text), [text]);
+  const segments = useMemo(() => {
+    const normalizedText = normalizeInlineLatexMath(normalizeDisplayMath(text));
+    return renderSegments(normalizedText);
+  }, [text]);
 
   // Fast path: no proposed_plan blocks — just render as plain markdown
   if (segments.length === 1 && typeof segments[0] === "string") {
     return (
       <div className="md-root text-sm break-words" style={{ overflowWrap: "anywhere" }}>
         <ReactMarkdown remarkPlugins={plugins} rehypePlugins={htmlRehypePlugins} components={components}>
-          {text}
+          {segments[0] as string}
         </ReactMarkdown>
       </div>
     );
