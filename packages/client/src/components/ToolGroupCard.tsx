@@ -651,14 +651,23 @@ export function ToolCallEntry({
 
 function TrailThinkingRow({ text }: { text: string }) {
 	const showThinking = usePreferencesStore((s) => s.showThinking);
+	const [open, setOpen] = useState(false);
+	
 	if (!showThinking) return null;
+	
 	return (
-		<div className="trail-thinking">
-			<div className="trail-thinking-header">
-				<span className="trail-thinking-label">Thinking</span>
-			</div>
-			<div className="trail-thinking-body">{text}</div>
-		</div>
+		<details open={open} className="thinking-block">
+			<summary
+				onClick={(e) => {
+					e.preventDefault();
+					setOpen((o) => !o);
+				}}
+			>
+				<span className="thinking-block-chevron">▶</span>
+				<span className="thinking-block-label">Thinking</span>
+			</summary>
+			<div className="thinking-block-content">{text}</div>
+		</details>
 	);
 }
 
