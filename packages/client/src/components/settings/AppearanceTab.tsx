@@ -966,8 +966,7 @@ export function AppearanceTab() {
 					))}
 				</div>
 				<p className="settings-hint" style={{ marginTop: 4 }}>
-					Default view for finished trails. Trails always show Full while the
-					agent is working.
+					Default view for tool trails. Applies to both active and finished runs.
 				</p>
 			</div>
 			<div className="settings-field">

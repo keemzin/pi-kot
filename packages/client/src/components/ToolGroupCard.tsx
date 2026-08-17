@@ -769,28 +769,25 @@ export function ToolGroupCard({
 	isStreaming?: boolean;
 }) {
 	const hasJustifications = entries.some((e) => e.kind === "justification");
-	// Default resting view for a finished/loaded trail comes from the user
-	// preference; while a turn streams, trails always render Full.
+	// Default resting view for a trail comes from the user preference.
 	const trailDefaultView = usePreferencesStore((s) => s.trailDefaultView);
 	// Two-state view: "justify" (collapsed) ↔ "full" (everything expanded).
 	// Justify works for all turns: tool-only turns show collapsed tool rows;
 	// turns with justifications show per-chunk expandable previews.
-	const [view, setView] = useState<"full" | "justify">(
-		isStreaming ? "full" : trailDefaultView,
-	);
+	const [view, setView] = useState<"full" | "justify">(trailDefaultView);
 	// Which chunks are expanded in Justify view (indices into chunks array).
 	const [openChunks, setOpenChunks] = useState<Set<number>>(() => new Set());
 	const [showAllChunks, setShowAllChunks] = useState(false);
 
-	// Track streaming state transitions: force full while streaming,
-	// auto-collapse to justify shortly after streaming stops.
+	// Track streaming state transitions
 	const prevStreaming = useRef(isStreaming);
+	const prevDefaultView = useRef(trailDefaultView);
 	const hasJustificationsRef = useRef(hasJustifications);
 	hasJustificationsRef.current = hasJustifications;
 
 	useEffect(() => {
 		if (isStreaming && !prevStreaming.current) {
-			setView("full");
+			setView(trailDefaultView);
 		}
 		if (!isStreaming && prevStreaming.current) {
 			// Streaming stopped — settle on the user's default view: Justify
@@ -802,7 +799,15 @@ export function ToolGroupCard({
 			prevStreaming.current = isStreaming;
 			return () => clearTimeout(timer);
 		}
+		
+		// Sync all non-streaming cards if user changes global settings
+		if (!isStreaming && trailDefaultView !== prevDefaultView.current) {
+			setView(trailDefaultView);
+			if (trailDefaultView === "justify") setOpenChunks(new Set());
+		}
+
 		prevStreaming.current = isStreaming;
+		prevDefaultView.current = trailDefaultView;
 	}, [isStreaming, trailDefaultView]);
 
 	const anyRunning =
