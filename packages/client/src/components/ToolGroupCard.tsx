@@ -697,28 +697,49 @@ function JustificationRow({
 		: stripped;
 	return (
 		<div className={`trail-justification${open ? " expanded" : " collapsed"}`}>
-			<div
-				role="button"
-				tabIndex={0}
+			<button
+				type="button"
 				onClick={onToggle}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						onToggle();
-					}
-				}}
 				className="trail-justification-header"
 				title={open ? "Collapse this step" : "Expand this step"}
 				aria-expanded={open}
 			>
-				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
-				<span className="trail-justification-label">Justification</span>
-				{!open && (
-					<span className="trail-justification-preview" title={preview}>
-						{preview}
+				<div className="trail-justification-title-wrapper">
+					<span className="trail-justification-icon-box">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<circle cx="12" cy="12" r="10" />
+						</svg>
 					</span>
-				)}
-			</div>
+					{open ? (
+						<span className="trail-justification-label">Justification</span>
+					) : (
+						<span className="trail-justification-preview" title={preview}>
+							{preview || "Justification"}
+						</span>
+					)}
+				</div>
+				<span className="trail-justification-chevron">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<path d="m6 9 6 6 6-6" />
+					</svg>
+				</span>
+			</button>
 		</div>
 	);
 }
@@ -896,6 +917,7 @@ export function ToolGroupCard({
 		keyPrefix: string,
 	) => {
 		const isOpen = openChunks.has(chunkIdx);
+		const isLast = chunkIdx === chunks.length - 1;
 		return (
 			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}`}>
 				<JustificationRow

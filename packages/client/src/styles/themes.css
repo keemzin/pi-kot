@@ -5520,6 +5520,11 @@ strong {
 	flex-direction: column;
 	gap: 1px;
 }
+.trail-body-justify .trail-list {
+	padding-left: 0;
+	border-left: none;
+	gap: 0;
+}
 
 /* Justification row — collapsed preview of in-between agent text */
 .trail-justification {
@@ -5529,50 +5534,78 @@ strong {
 .trail-justification-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 4px 0;
+	gap: 8px;
+	padding: 6px 0;
 	cursor: pointer;
 	user-select: none;
 	min-width: 0;
+	width: 100%;
+	background: transparent;
+	border: none;
+	outline: none;
+	color: var(--text-secondary);
+	transition: color 0.15s var(--ease);
 }
-.trail-justification-dot {
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	flex-shrink: 0;
-	background: var(--text-dim);
-	opacity: 0.7;
+.trail-justification-header:hover {
+	color: var(--text-primary);
 }
-.trail-justification-icon {
-	color: var(--text-dim);
-	display: inline-flex;
+.trail-justification-title-wrapper {
+	display: flex;
+	flex: 1;
 	align-items: center;
+	gap: 8px;
+	overflow: hidden;
+}
+.trail-justification-icon-box {
+	position: relative;
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
+	z-index: 1; /* Sit above the continuous line */
+}
+.trail-justification-icon-box svg {
+	width: 10px;
+	height: 10px;
+	fill: var(--bg-solid); /* Opaques the line behind it */
+	stroke: currentColor;
 }
 .trail-justification-label {
-	font-family: var(--font-mono);
-	font-size: 10px;
-	font-weight: 600;
-	color: var(--text-dim);
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
 	flex-shrink: 0;
+	color: var(--text-primary);
 }
 .trail-justification-preview {
-	font-size: 11px;
+	font-size: 13px;
+	font-weight: 500;
 	color: var(--text-dim);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	flex: 1;
 	min-width: 0;
+	text-align: left;
 }
 .trail-justification-chevron {
-	font-size: 9px;
-	color: var(--text-dim);
+	width: 16px;
+	height: 16px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
-	transition: transform 0.15s var(--ease);
+	color: var(--text-dim);
+	transition: transform 0.2s var(--ease);
+}
+.trail-justification-chevron svg {
+	width: 16px;
+	height: 16px;
 }
 .trail-justification.expanded .trail-justification-chevron {
-	transform: rotate(90deg);
+	transform: rotate(180deg);
 }
 .trail-justification-body {
 	padding-left: 23px;
@@ -5638,6 +5671,37 @@ strong {
 	padding-bottom: 4px;
 	min-height: 0;
 	overflow: hidden;
+	padding-left: 23px; /* Full indent (7px margin + 16px padding previously) */
+}
+.trail-chunk-content .trail-full-prose {
+	padding-left: 0;
+}
+/* Base continuous line covers the entire chunk height */
+.trail-chunk {
+	position: relative;
+}
+.trail-chunk::before {
+	content: "";
+	position: absolute;
+	left: 7px;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--border);
+	z-index: 0;
+}
+/* First chunk: line starts at the center of its circle */
+.trail-chunk:first-child::before {
+	top: 14px;
+}
+/* Last chunk (closed): line stops at the center of its circle */
+.trail-chunk:last-child:not(.open)::before {
+	bottom: auto;
+	height: 14px;
+}
+/* Single chunk (closed): no line needed */
+.trail-chunk:first-child:last-child:not(.open)::before {
+	display: none;
 }
 /* Content glides in when a chunk opens — also covers tool rows appended
    while the agent keeps working inside the currently-open step. */
