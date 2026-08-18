@@ -554,6 +554,7 @@ export function ToolCallEntry({
 			: undefined;
 	const editStats =
 		editDiff !== undefined ? countDiffLines(editDiff) : undefined;
+	const hasDetails = argsText.length > 2 || outputText.length > 0;
 
 	return (
 		<div
@@ -566,7 +567,12 @@ export function ToolCallEntry({
 				{iconNode}
 			</span>
 			<div className="tool-timeline-content">
-				<div className="tool-timeline-row">
+				<div 
+					className={`tool-timeline-row ${hasDetails ? "clickable" : ""}`}
+					onClick={hasDetails ? () => setDetailsOpen(o => !o) : undefined}
+					role={hasDetails ? "button" : undefined}
+					tabIndex={hasDetails ? 0 : undefined}
+				>
 					<span className="tool-timeline-name">{displayName ?? getToolDisplayName(name)}</span>
 					{preview && (
 						<span className="tool-timeline-arg" title={preview}>
@@ -587,16 +593,10 @@ export function ToolCallEntry({
 							running…
 						</span>
 					)}
-					{(argsText.length > 2 || outputText.length > 0) && (
-						<button
-							type="button"
-							className="tool-timeline-details-btn"
-							onClick={() => setDetailsOpen((o) => !o)}
-							aria-expanded={detailsOpen}
-							aria-label={detailsOpen ? "Hide details" : "Show details"}
-						>
-							{detailsOpen ? "hide" : "details"}
-						</button>
+					{hasDetails && (
+						<span className={`tool-timeline-chevron-toggle ${detailsOpen ? "open" : ""}`}>
+							›
+						</span>
 					)}
 				</div>
 				{/* Expanded details pane */}

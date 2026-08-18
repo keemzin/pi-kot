@@ -5354,6 +5354,16 @@ strong {
 	gap: 6px;
 	flex-wrap: wrap;
 }
+.tool-timeline-row.clickable {
+	cursor: pointer;
+	border-radius: 4px;
+	margin-left: -6px;
+	padding: 2px 6px;
+	transition: background 0.15s;
+}
+.tool-timeline-row.clickable:hover {
+	background: var(--bg-glass-hover);
+}
 
 /* Tool name */
 .tool-timeline-name {
@@ -5390,23 +5400,16 @@ strong {
 }
 /* tool colors are on the circle icon only */
 
-/* "show details" / "hide" toggle link */
-.tool-timeline-details-btn {
-	appearance: none;
-	background: transparent;
-	border: none;
-	outline: none;
-	cursor: pointer;
-	padding: 0;
-	font-size: 10px;
-	font-family: inherit;
+/* Chevron toggle for tool rows */
+.tool-timeline-chevron-toggle {
+	font-size: 14px;
+	line-height: 1;
 	color: var(--text-dim);
-	text-decoration: underline;
-	text-underline-offset: 2px;
-	transition: color 0.12s;
+	margin-left: auto;
+	transition: transform 0.15s;
 }
-.tool-timeline-details-btn:hover {
-	color: var(--text-secondary);
+.tool-timeline-chevron-toggle.open {
+	transform: rotate(90deg);
 }
 
 /* Expanded details pane: args + full output */
