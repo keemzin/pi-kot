@@ -961,7 +961,7 @@ export function AppearanceTab() {
 								transition: "all 0.15s",
 							}}
 						>
-							{v === "justify" ? "Justify" : "Full"}
+							{v === "justify" ? "Auto" : "Expand All"}
 						</button>
 					))}
 				</div>

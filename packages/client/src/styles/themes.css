@@ -5570,7 +5570,7 @@ strong {
 	width: 10px;
 	height: 10px;
 	fill: var(--bg-solid); /* Opaques the line behind it */
-	stroke: currentColor;
+	stroke: var(--accent);
 }
 .trail-justification-label {
 	font-family: inherit;

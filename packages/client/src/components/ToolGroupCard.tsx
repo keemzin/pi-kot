@@ -844,7 +844,7 @@ export function ToolGroupCard({
 		isStreaming &&
 		entries.some((e) => e.kind === "tool" && e.result === undefined);
 
-	const { chunks } = groupChunks(entries);
+	const { chunks, leading } = groupChunks(entries);
 
 	// Live-turn "only the step being worked on" focus: while the turn is
 	// streaming in Justify view, the newest chunk expands automatically
@@ -874,7 +874,7 @@ export function ToolGroupCard({
 		}
 	};
 
-	const viewLabel = view === "full" ? "Full" : "Justify";
+	const viewLabel = view === "full" ? "Collapse All" : "Expand All";
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -916,7 +916,7 @@ export function ToolGroupCard({
 		chunkIdx: number,
 		keyPrefix: string,
 	) => {
-		const isOpen = openChunks.has(chunkIdx);
+		const isOpen = view === "full" || openChunks.has(chunkIdx);
 		const isLast = chunkIdx === chunks.length - 1;
 		return (
 			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}`}>
@@ -944,13 +944,11 @@ export function ToolGroupCard({
 	};
 
 	const shouldCollapseChunks = chunks.length > JUSTIFY_COLLAPSE_THRESHOLD;
-	const visibleChunks =
-		shouldCollapseChunks && !showAllChunks
+	const collapseActive = view !== "full" && shouldCollapseChunks && !showAllChunks;
+	const visibleChunks = collapseActive
 			? chunks.slice(-JUSTIFY_COLLAPSE_THRESHOLD)
 			: chunks;
-	// Visible chunk indices are offset when collapsed (we show the last N).
-	const chunkIdxOffset =
-		shouldCollapseChunks && !showAllChunks
+	const chunkIdxOffset = collapseActive
 			? chunks.length - JUSTIFY_COLLAPSE_THRESHOLD
 			: 0;
 
@@ -960,7 +958,7 @@ export function ToolGroupCard({
 				<button
 					type="button"
 					className="trail-toggle"
-					title={`Trail view: ${view}. Click to toggle Full ↔ Justify`}
+					title={`Trail view: ${view}. Click to toggle Expand All ↔ Auto`}
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
@@ -968,15 +966,13 @@ export function ToolGroupCard({
 							width="14"
 							height="14"
 							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							strokeLinecap="round"
+							fill="currentColor"
+							style={{
+								animation: anyRunning ? "pulse 2s infinite ease-in-out" : "none",
+								color: anyRunning ? "var(--accent)" : "currentColor",
+							}}
 						>
-							<circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
-							<circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-							<circle cx="19" cy="12" r="2" fill="currentColor" stroke="none" />
-							<path d="M7 12h3M14 12h3" />
+							<circle cx="12" cy="12" r="6" />
 						</svg>
 					</span>
 					<span className="trail-toggle-label">Trail</span>
@@ -985,38 +981,33 @@ export function ToolGroupCard({
 				</button>
 			</div>
 
-			{view === "full" && (
-				<div
-					ref={scrollRef}
-					className={`trail-body trail-body-full${isStreaming ? " streaming" : ""}`}
-				>
-					<div className="trail-list">{entries.map(renderEntry)}</div>
+			<div className="trail-body trail-body-justify" ref={scrollRef}>
+				<div className="trail-list">
+					{view === "full" && leading.length > 0 && (
+						<div className="trail-chunk">
+							<div className="trail-chunk-content">
+								{leading.map((e, i) => renderEntry(e, i))}
+							</div>
+						</div>
+					)}
+					{collapseActive && (
+						<button
+							type="button"
+							className="trail-earlier"
+							onClick={() => setShowAllChunks(true)}
+						>
+							▼ {chunks.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
+						</button>
+					)}
+					{visibleChunks.map((chunk, i) =>
+						renderChunk(
+							chunk,
+							chunkIdxOffset + i,
+							`chunk-${chunkIdxOffset + i}`,
+						),
+					)}
 				</div>
-			)}
-
-			{view === "justify" && (
-				<div className="trail-body trail-body-justify">
-					<div className="trail-list">
-						{shouldCollapseChunks && !showAllChunks && (
-							<button
-								type="button"
-								className="trail-earlier"
-								onClick={() => setShowAllChunks(true)}
-							>
-								▼ {chunks.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
-							</button>
-						)}
-						{visibleChunks.map((chunk, i) =>
-							renderChunk(
-								chunk,
-								chunkIdxOffset + i,
-								`chunk-${chunkIdxOffset + i}`,
-							),
-						)}
-						{/* Leading tools (before first justification) are visible in Full view only. */}
-					</div>
-				</div>
-			)}
+			</div>
 		</div>
 	);
 }
