@@ -774,21 +774,33 @@ function groupChunks(entries: ToolGroupEntry[]): {
 	leading: ToolGroupEntry[];
 	chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[];
 } {
-	const leading: ToolGroupEntry[] = [];
 	const chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[] = [];
 	let current: { just: ToolGroupEntry; tools: ToolGroupEntry[] } | null = null;
 	for (const e of entries) {
 		if (e.kind === "justification") {
-			if (current) chunks.push(current);
-			current = { just: e, tools: [] };
-		} else if (current) {
-			current.tools.push(e);
+			if (
+				current &&
+				current.just.kind === "justification" &&
+				current.just.text === "Working..." &&
+				!current.tools.some((t) => t.kind === "tool")
+			) {
+				current.just = e;
+			} else {
+				if (current) chunks.push(current);
+				current = { just: e, tools: [] };
+			}
 		} else {
-			leading.push(e);
+			if (!current) {
+				current = {
+					just: { kind: "justification", text: "Working..." },
+					tools: [],
+				};
+			}
+			current.tools.push(e);
 		}
 	}
 	if (current) chunks.push(current);
-	return { leading, chunks };
+	return { leading: [], chunks };
 }
 
 export function ToolGroupCard({
@@ -983,13 +995,6 @@ export function ToolGroupCard({
 
 			<div className="trail-body trail-body-justify" ref={scrollRef}>
 				<div className="trail-list">
-					{view === "full" && leading.length > 0 && (
-						<div className="trail-chunk">
-							<div className="trail-chunk-content">
-								{leading.map((e, i) => renderEntry(e, i))}
-							</div>
-						</div>
-					)}
 					{collapseActive && (
 						<button
 							type="button"
