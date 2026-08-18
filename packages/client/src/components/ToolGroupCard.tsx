@@ -803,6 +803,130 @@ function groupChunks(entries: ToolGroupEntry[]): {
 	return { leading: [], chunks };
 }
 
+function groupConsecutiveTools(
+	tools: ToolGroupEntry[],
+): (ToolGroupEntry | ToolGroupEntry[])[] {
+	const result: (ToolGroupEntry | ToolGroupEntry[])[] = [];
+	let currentGroup: ToolGroupEntry[] = [];
+	let currentToolName = "";
+
+	for (const entry of tools) {
+		if (entry.kind === "tool") {
+			const toolName = String(entry.block.name ?? "tool");
+			if (toolName === currentToolName) {
+				currentGroup.push(entry);
+			} else {
+				if (currentGroup.length > 0) {
+					result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+				}
+				currentGroup = [entry];
+				currentToolName = toolName;
+			}
+		} else {
+			if (currentGroup.length > 0) {
+				result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+				currentGroup = [];
+				currentToolName = "";
+			}
+			result.push(entry);
+		}
+	}
+	if (currentGroup.length > 0) {
+		result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+	}
+	return result;
+}
+
+function ConsecutiveToolGroup({
+	entries,
+	view,
+	isStreaming,
+	startIndex,
+	renderEntry,
+}: {
+	entries: ToolGroupEntry[];
+	view: "full" | "justify";
+	isStreaming: boolean;
+	startIndex: number;
+	renderEntry: (entry: ToolGroupEntry, idx: number) => React.ReactNode;
+}) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	const anyRunning =
+		isStreaming &&
+		entries.some((e) => e.kind === "tool" && e.result === undefined);
+	const anyError = entries.some(
+		(e) => e.kind === "tool" && e.result?.isError === true,
+	);
+
+	const expanded = view === "full" || isOpen || anyRunning || anyError;
+
+	const firstTool = entries[0];
+	if (firstTool.kind !== "tool") return null;
+
+	const name = String(firstTool.block.name ?? "tool");
+	const count = entries.length;
+	const displayName = getToolDisplayName(name);
+
+	const isRunning = anyRunning;
+	const isError = anyError;
+
+	return (
+		<div className="consecutive-tools-group" style={{ marginBottom: "2px" }}>
+			<div
+				className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
+			>
+				<span
+					className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
+					aria-hidden="true"
+				>
+					<TrailIcon toolName={name} />
+				</span>
+				<div className="tool-timeline-content">
+					<div
+						className="tool-timeline-row clickable"
+						onClick={() => setIsOpen(!isOpen)}
+						role="button"
+						tabIndex={0}
+					>
+						<span className="tool-timeline-name" style={{ fontWeight: 600 }}>
+							{count} × {displayName}
+						</span>
+						{!expanded && (
+							<span className="tool-timeline-arg">Grouped tools</span>
+						)}
+						{isRunning && (
+							<span className="tool-timeline-running" aria-label="running">
+								running…
+							</span>
+						)}
+						<span className={`tool-timeline-chevron-toggle ${expanded ? "open" : ""}`}>
+							›
+						</span>
+					</div>
+				</div>
+			</div>
+			{expanded && (
+				<div
+					className="consecutive-tools-list"
+					style={{
+						paddingLeft: "10px",
+						borderLeft: "2px solid var(--border)",
+						marginLeft: "5px",
+						marginTop: "4px",
+						marginBottom: "8px",
+						display: "flex",
+						flexDirection: "column",
+						gap: "1px",
+					}}
+				>
+					{entries.map((e, i) => renderEntry(e, startIndex + i))}
+				</div>
+			)}
+		</div>
+	);
+}
+
 export function ToolGroupCard({
 	entries,
 	isStreaming = false,
@@ -948,7 +1072,28 @@ export function ToolGroupCard({
 								text={(chunk.just as { text: string }).text.trim()}
 							/>
 						</div>
-						{chunk.tools.map((e, i) => renderEntry(e, i))}
+						{(() => {
+							let globalIndex = 0;
+							return groupConsecutiveTools(chunk.tools).map((g, i) => {
+								if (Array.isArray(g)) {
+									const startIdx = globalIndex;
+									globalIndex += g.length;
+									return (
+										<ConsecutiveToolGroup
+											key={`group-${i}`}
+											entries={g}
+											view={view}
+											isStreaming={isStreaming}
+											startIndex={startIdx}
+											renderEntry={renderEntry}
+										/>
+									);
+								} else {
+									const idx = globalIndex++;
+									return renderEntry(g, idx);
+								}
+							});
+						})()}
 					</div>
 				</div>
 			</div>
