@@ -693,7 +693,7 @@ strong {
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 500;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	background: var(--sidebar-bg);
 	-webkit-backdrop-filter: blur(10px);
 	backdrop-filter: blur(10px);
