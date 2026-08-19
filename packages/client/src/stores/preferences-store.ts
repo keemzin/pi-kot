@@ -13,7 +13,7 @@ const LS_EMPTY_FLAP_ENABLED = "pi-kot/empty-flap-enabled";
 const LS_EMPTY_FLAP_WORDS = "pi-kot/empty-flap-words";
 const LS_EMPTY_FLAP_SIZE = "pi-kot/empty-flap-size";
 
-const DEFAULT_EMPTY_FLAP_WORDS = ["PI-KOT 0.1.36", "PI-SDK 0.83.0"];
+const DEFAULT_EMPTY_FLAP_WORDS = ["PI-KOT 0.1.38", "PI-SDK 0.84.2"];
 
 function loadGroupedToolDisplay(): boolean {
 	if (typeof window === "undefined") return true;
