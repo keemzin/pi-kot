@@ -30,6 +30,7 @@ import { ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
 import { SplitFlapText } from "./SplitFlapText";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 import {
 	ToolCallEntry,
 	ToolGroupCard,
@@ -1087,17 +1088,34 @@ function ModelBadge({
 	);
 }
 
+/** The "thinking…" placeholder shown while a part streams in. */
+function StreamingHint({ label }: { label: string }) {
+	return (
+		<span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)' }}>
+			<ThinkingIndicator style={{ width: '16px', height: '16px', color: 'var(--text-primary)' }} />
+			<span className="chat-shimmer" style={{ fontSize: '14px' }}>{label}</span>
+		</span>
+	);
+}
+
 /** Render content blocks from a raw SDK streaming message (no tool-call parts — those go in ToolCallBatchCard). */
 function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 	const content = msg.content;
 	if (!Array.isArray(content)) {
 		const text = typeof content === "string" ? content : "";
-		return text ? <ChatMarkdown text={text} /> : null;
+		return text ? <ChatMarkdown text={text} /> : <StreamingHint label="waiting for model…" />;
 	}
+	
+	const hasVisibleText = content.some(chunk => chunk.type === "text" && typeof chunk.text === "string" && chunk.text.trim().length > 0);
+	
 	return (
 		<>
+			{content.length === 0 && <StreamingHint label="waiting for model…" />}
 			{content.map((chunk: Record<string, unknown>, i: number) => {
 				if (chunk.type === "text" && typeof chunk.text === "string") {
+					if (chunk.text.length === 0) {
+						return <StreamingHint key={i} label="waiting for model…" />;
+					}
 					return <ChatMarkdown key={i} text={chunk.text} />;
 				}
 				if (
@@ -1108,6 +1126,9 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 				}
 				return null;
 			})}
+			{!hasVisibleText && content.length > 0 && !content.some(c => c.type === "thinking" || c.type === "reasoning" || (c.type === "text" && (c.text as string).length === 0)) && (
+				<StreamingHint label="waiting for model…" />
+			)}
 		</>
 	);
 }
@@ -2137,6 +2158,19 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					.filter((t) => t.length > 0)
 					.join("\n\n");
 				assistantElements = renderAssistantParts(currentAssistants);
+			}
+
+			if (assistantElements.length === 0 && isLastTurn && isStreaming) {
+				assistantElements.push(
+					<div
+						key={`streaming-${turnKey}`}
+						className="message-row assistant streaming-row"
+					>
+						<div className="message-bubble assistant streaming-bubble">
+							<StreamingHint label="waiting for model…" />
+						</div>
+					</div>
+				);
 			}
 
 			const isSteer =

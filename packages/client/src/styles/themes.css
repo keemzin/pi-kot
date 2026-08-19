@@ -7089,3 +7089,42 @@ strong {
 	word-break: break-word;
 	overflow-x: auto;
 }
+
+/* ---------------------------------------------------------------------------
+ * Chat: shimmer "thinking" text + shiki code blocks (ported from the Nuxt UI
+ * chat template's Comark rendering).
+ * ------------------------------------------------------------------------- */
+
+/* Flowing gradient text used for the streaming indicator label. */
+@keyframes chat-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.chat-shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--text-dim) 40%,
+    var(--text-primary) 50%,
+    var(--text-dim) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: chat-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-shimmer {
+    color: var(--text-dim);
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+    animation: none;
+  }
+}

@@ -3,6 +3,7 @@ import { ChatMarkdown } from "./ChatMarkdown";
 import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 import { usePreferencesStore } from "../stores/preferences-store";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -1120,19 +1121,20 @@ export function ToolGroupCard({
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="var(--bg-solid)"
-							strokeWidth="2"
-							style={{
-								animation: anyRunning ? "pulse 2s infinite ease-in-out" : "none",
-								stroke: anyRunning ? "var(--accent)" : "currentColor",
-							}}
-						>
-							<circle cx="12" cy="12" r="10" />
-						</svg>
+						{anyRunning ? (
+							<ThinkingIndicator style={{ width: "12px", height: "12px", color: "var(--accent)", margin: "1px" }} />
+						) : (
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="var(--bg-solid)"
+								strokeWidth="2"
+								style={{ stroke: "currentColor" }}
+							>
+								<circle cx="12" cy="12" r="10" />
+							</svg>
+						)}
 					</span>
 					<span className="trail-toggle-label">Trail</span>
 					<span className="trail-toggle-view">{viewLabel}</span>
