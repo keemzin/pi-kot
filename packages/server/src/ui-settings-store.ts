@@ -41,8 +41,6 @@ export type UiSettings = {
 	emptyFlapEnabled: boolean;
 	/** Phrases shown/cycled by the board when the chat is empty. */
 	emptyFlapWords: string[];
-	/** Board font size in px. */
-	emptyFlapSize: number;
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -66,7 +64,6 @@ const DEFAULTS: UiSettings = {
 	userBubbleBorderColor: null,
 	emptyFlapEnabled: true,
 	emptyFlapWords: ["PI-KOT 0.1.38", "PI-SDK 0.84.2"],
-	emptyFlapSize: 30,
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -121,12 +118,6 @@ function normalize(value: unknown): UiSettings {
 	// Split-flap board: sanitize phrases (uppercased at render, capped length/count)
 	if (typeof v.emptyFlapEnabled === "boolean")
 		settings.emptyFlapEnabled = v.emptyFlapEnabled;
-	if (typeof v.emptyFlapSize === "number" && Number.isFinite(v.emptyFlapSize)) {
-		settings.emptyFlapSize = Math.min(
-			64,
-			Math.max(14, Math.round(v.emptyFlapSize)),
-		);
-	}
 	if (Array.isArray(v.emptyFlapWords)) {
 		const words = v.emptyFlapWords
 			.map((w) => (typeof w === "string" ? w.trim() : ""))

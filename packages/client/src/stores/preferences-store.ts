@@ -141,17 +141,6 @@ function loadEmptyFlapWords(): string[] {
 	}
 }
 
-function loadEmptyFlapSize(): number {
-	if (typeof window === "undefined") return 30;
-	try {
-		const v = Number(localStorage.getItem(LS_EMPTY_FLAP_SIZE));
-		if (!Number.isFinite(v)) return 30;
-		return Math.min(64, Math.max(14, Math.round(v)));
-	} catch {
-		return 30;
-	}
-}
-
 export interface PreferencesState {
 	stickyUserHeader: boolean;
 	setStickyUserHeader: (enabled: boolean) => void;
@@ -182,8 +171,6 @@ export interface PreferencesState {
 	setEmptyFlapEnabled: (enabled: boolean) => void;
 	emptyFlapWords: string[];
 	setEmptyFlapWords: (words: string[]) => void;
-	emptyFlapSize: number;
-	setEmptyFlapSize: (size: number) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>((set) => ({
@@ -276,7 +263,6 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
 	swipeToOpenSidebar: loadSwipeToOpenSidebar(),
 	emptyFlapEnabled: loadEmptyFlapEnabled(),
 	emptyFlapWords: loadEmptyFlapWords(),
-	emptyFlapSize: loadEmptyFlapSize(),
 
 	setSwipeToOpenSidebar: (enabled) => {
 		try {
@@ -312,15 +298,5 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
 		set({
 			emptyFlapWords: cleaned.length > 0 ? cleaned : DEFAULT_EMPTY_FLAP_WORDS,
 		});
-	},
-
-	setEmptyFlapSize: (size) => {
-		const clamped = Math.min(64, Math.max(14, Math.round(Number(size) || 30)));
-		try {
-			localStorage.setItem(LS_EMPTY_FLAP_SIZE, String(clamped));
-		} catch {
-			// private mode
-		}
-		set({ emptyFlapSize: clamped });
 	},
 }));

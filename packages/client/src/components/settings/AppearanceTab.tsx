@@ -28,7 +28,6 @@ type UiSettings = {
 	userBubbleBorderColor?: string | null;
 	emptyFlapEnabled?: boolean;
 	emptyFlapWords?: string[];
-	emptyFlapSize?: number;
 };
 
 // ── Apply user bubble overrides to CSS :root ──
@@ -114,10 +113,8 @@ export function AppearanceTab() {
 	const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
 	const zFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
 	const zFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
-	const zFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 	const zSetFlapEnabled = usePreferencesStore((s) => s.setEmptyFlapEnabled);
 	const zSetFlapWords = usePreferencesStore((s) => s.setEmptyFlapWords);
-	const zSetFlapSize = usePreferencesStore((s) => s.setEmptyFlapSize);
 
 	const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
 	const [flyToTop, setFlyToTop] = useState(zFly);
@@ -131,7 +128,6 @@ export function AppearanceTab() {
 	const [flapEnabled, setFlapEnabled] = useState(zFlapEnabled);
 	const [flapWords, setFlapWords] = useState(zFlapWords);
 	const [flapWordsDraft, setFlapWordsDraft] = useState(zFlapWords.join(", "));
-	const [flapSize, setFlapSize] = useState(zFlapSize);
 
 	// ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
 	const [bubbleBg, setBubbleBg] = useState<string | null>(() =>
@@ -364,13 +360,6 @@ export function AppearanceTab() {
 		setFlapWordsDraft(cleaned.join(", "));
 		zSetFlapWords(cleaned);
 		persist({ emptyFlapWords: cleaned });
-	};
-
-	const saveFlapSize = (val: number) => {
-		const clamped = Math.min(64, Math.max(14, Math.round(Number(val) || 30)));
-		setFlapSize(clamped);
-		zSetFlapSize(clamped);
-		persist({ emptyFlapSize: clamped });
 	};
 
 	const selectBubblePreset = (idx: number) => {
@@ -1055,45 +1044,6 @@ export function AppearanceTab() {
 							</p>
 						</div>
 
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 10,
-								marginTop: 10,
-							}}
-						>
-							<input
-								type="range"
-								min={14}
-								max={64}
-								value={flapSize}
-								onChange={(e) => {
-									const v = Number(e.target.value);
-									setFlapSize(v);
-									zSetFlapSize(v);
-								}}
-								onPointerUp={() => saveFlapSize(flapSize)}
-								onKeyUp={() => saveFlapSize(flapSize)}
-								onBlur={() => saveFlapSize(flapSize)}
-								style={{
-									flex: 1,
-									accentColor: "var(--accent)",
-									cursor: "pointer",
-								}}
-							/>
-							<span
-								style={{
-									fontSize: 12,
-									color: "var(--text-secondary)",
-									minWidth: 34,
-									textAlign: "right",
-								}}
-							>
-								{flapSize}px
-							</span>
-						</div>
-
 						{/* Live preview */}
 						<div
 							style={{
@@ -1116,7 +1066,7 @@ export function AppearanceTab() {
 								flipsPerChar={7}
 								gap={4}
 								tileRadius={6}
-								fontSize={Math.min(flapSize, 24)}
+								fontSize={14}
 							/>
 						</div>
 					</>

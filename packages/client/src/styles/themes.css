@@ -3580,6 +3580,7 @@ strong {
 	color: var(--text-dim);
 	padding: 40px 20px;
 	animation: fadeIn 0.5s var(--ease);
+	container-type: inline-size;
 }
 
 .welcome-icon {

@@ -1143,7 +1143,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const showTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
 	const emptyFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
 	const emptyFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
-	const emptyFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -2403,7 +2402,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									gap={5}
 									tileRadius={6}
 									charset="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-/"
-									fontSize={`min(${emptyFlapSize}px, 6vw)`}
+									fontSize={`min(64px, calc((100cqi - ${(Math.max(12, ...emptyFlapWords.map(w => w.length)) - 1) * 5}px) / ${Math.max(12, ...emptyFlapWords.map(w => w.length)) * 0.78}))`}
 									className="welcome-flap"
 								/>
 							) : (
