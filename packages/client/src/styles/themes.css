@@ -5469,6 +5469,10 @@ strong {
 	color: var(--text-dim);
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	width: 15px;
+	position: relative;
+	z-index: 1;
 }
 .trail-toggle-label {
 	font-family: var(--font-mono);
@@ -5693,6 +5697,9 @@ strong {
 /* First chunk: line starts at the center of its circle */
 .trail-chunk:first-child::before {
 	top: 14px;
+}
+.trail-chunk.connects-to-header::before {
+	top: -11px; /* Extends upward to hit the center of the larger trail-toggle icon */
 }
 /* Last chunk (closed): line stops at the center of its circle */
 .trail-chunk:last-child:not(.open)::before {

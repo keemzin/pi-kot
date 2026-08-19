@@ -1051,11 +1051,12 @@ export function ToolGroupCard({
 		chunk: { just: ToolGroupEntry; tools: ToolGroupEntry[] },
 		chunkIdx: number,
 		keyPrefix: string,
+		visibleIdx: number
 	) => {
 		const isOpen = view === "full" || openChunks.has(chunkIdx);
 		const isLast = chunkIdx === chunks.length - 1;
 		return (
-			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}`}>
+			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}${visibleIdx === 0 && !collapseActive ? " connects-to-header" : ""}`}>
 				<JustificationRow
 					text={(chunk.just as { text: string }).text}
 					open={isOpen}
@@ -1123,13 +1124,14 @@ export function ToolGroupCard({
 							width="14"
 							height="14"
 							viewBox="0 0 24 24"
-							fill="currentColor"
+							fill="var(--bg-solid)"
+							strokeWidth="2"
 							style={{
 								animation: anyRunning ? "pulse 2s infinite ease-in-out" : "none",
-								color: anyRunning ? "var(--accent)" : "currentColor",
+								stroke: anyRunning ? "var(--accent)" : "currentColor",
 							}}
 						>
-							<circle cx="12" cy="12" r="6" />
+							<circle cx="12" cy="12" r="10" />
 						</svg>
 					</span>
 					<span className="trail-toggle-label">Trail</span>
@@ -1154,6 +1156,7 @@ export function ToolGroupCard({
 							chunk,
 							chunkIdxOffset + i,
 							`chunk-${chunkIdxOffset + i}`,
+							i
 						),
 					)}
 				</div>
