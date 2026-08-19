@@ -2,7 +2,6 @@
 
 <img width="2560" height="1440" alt="New Project" src="https://github.com/user-attachments/assets/fa6a4dd8-c61e-43e4-ba36-4b5bf2640745" />
 
-
 > A browser-based UI wrapper for the [pi coding agent](https://pi.dev)
 
 pi-kot wraps the `@earendil-works/pi-coding-agent` SDK in an HTTP bridge with a React-based web UI. It exposes the agent's capabilities through REST, SSE, and WebSocket, giving you a fully interactive chat-and-terminal environment in your browser — no desktop app required.
@@ -24,7 +23,7 @@ This project was built out of **love and curiosity**.
 ## Features
 
 | Feature | Description |
-|---|---|
+| --- | --- |
 | **💬 Chat** | Full agent conversation with streaming, markdown rendering, code blocks with syntax highlighting, and diff views — no intermediate adapter, SDK types consumed directly |
 | **🖥️ Terminal** | Multi-tab xterm.js terminal with persistent PTY sessions, **touch gestures** (long-press+drag arrows, double-tap Tab, 3-finger paste), and a mobile quick-keys bar |
 | **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
@@ -50,6 +49,7 @@ npx pi-kot --password pikot
 ```
 
 help
+
 ```bash
 npx pi-kot --help
 ```
@@ -57,7 +57,7 @@ npx pi-kot --help
 Available options:
 
 | Flag | Description | Default |
-|---|---|---|
+| --- | --- | --- |
 | `--port <n>` | Port to listen on | `3333` |
 | `--host <h>` | Host/interface to bind to | `0.0.0.0` |
 | `--password <pw>` | Enable UI password auth | — |
@@ -105,7 +105,7 @@ All flags also work as environment variables (`PORT`, `HOST`, `UI_PASSWORD`, `AP
 pi-kot's terminal supports mobile touch gestures inspired by Termius:
 
 | Gesture | Action | Details |
-|---|---|---|
+| --- | --- | --- |
 | **Long-press 150ms + drag** | Arrow keys (↑↓←→) | Continuous with 3 speed gears — drag further for faster |
 | **Double-tap** | Tab key | Two quick taps within 300ms |
 | **3-finger tap** | Paste | Reads from system clipboard |
@@ -118,7 +118,7 @@ pi-kot's terminal supports mobile touch gestures inspired by Termius:
 Some features only appear **after** installing the corresponding extension. Head to the **Extensions tab** (⚙ → Extensions) and install the 💎 **Recommended for pi-kot** extensions:
 
 | Extension | Package | Unlocks |
-|---|---|---|
+| --- | --- | --- |
 | **pi-web-access** 🌐 | `npm:pi-web-access` | Web search, content extraction, API interaction tools for the agent |
 | **pi-playwright** 🎭 | `npm:pi-playwright` | Browser automation — the agent can interact with real web UI |
 | **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model; full vision settings exposed in Extensions tab |
@@ -127,6 +127,7 @@ Some features only appear **after** installing the corresponding extension. Head
 | **context-mode** 🧠 | `npm:context-mode` | **Context window savings** — sandboxed code execution, FTS5 knowledge base, BM25 search, and session continuity across compaction |
 
 > 💡 **Tip**: Some UI elements only appear **after** the extension is installed. For example:
+>
 > - **Vision model selector** in Extensions tab → appears only after `pi-vision-tool` is installed
 > - **Rewind button** on chat messages → appears only after `pi-rewind` is installed
 > - **Plan mode tool safety** → appears only after `pi-plan-mode` is installed
@@ -157,7 +158,7 @@ pi-kot includes a built-in tunnel helper for exposing your local instance to the
 The server exposes tunnel controls under `/api/v1/tunnel`:
 
 | Method | Path | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `GET` | `/api/v1/tunnel/check` | Check whether ngrok is installed and return version/platform info |
 | `GET` | `/api/v1/tunnel/doctor` | Run diagnostics for binary, auth token, and network checks |
 | `GET` | `/api/v1/tunnel/status` | Return whether a tunnel is active, its public URL, mode, provider, and local port |
@@ -173,7 +174,7 @@ All options can be set as environment variables **or** CLI flags (with `npx pi-k
 ### Network
 
 | Variable | Flag | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `PORT` | `--port` | `3333` | HTTP listen port |
 | `HOST` | `--host` | `0.0.0.0` | Bind address (`127.0.0.1` for loopback-only) |
 | `TRUST_PROXY` | — | `false` | Trust `X-Forwarded-*` headers when behind a reverse proxy |
@@ -182,7 +183,7 @@ All options can be set as environment variables **or** CLI flags (with `npx pi-k
 ### Authentication
 
 | Variable | Flag | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `UI_PASSWORD` | `--password` | — | Enable password auth; browser shows a login form |
 | `API_KEY` | `--api-key` | — | Static API key for scripts/CI; also accepted as password in the login form |
 
@@ -191,7 +192,7 @@ If both are unset, auth is **disabled** and the UI opens freely.
 ### Storage paths
 
 | Variable | Flag | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `WORKSPACE_PATH` | `--workspace` | `~/.pi-kot/workspace/default` | Default project workspace directory |
 | `SESSION_DIR` | — | `~/.pi-kot/sessions` | Session data directory |
 | `FORGE_DATA_DIR` | — | `~/.pi-kot` | Base config/data directory (MCP config, tool/skill overrides) |
@@ -200,7 +201,7 @@ If both are unset, auth is **disabled** and the UI opens freely.
 ### Data files (under `FORGE_DATA_DIR` by default)
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `MCP_CONFIG_FILE` | `$FORGE_DATA_DIR/mcp.json` | MCP server configurations |
 | `MCP_STDIO_TRUST_FILE` | `$FORGE_DATA_DIR/mcp-stdio-trust.json` | Trusted stdio MCP servers |
 | `TOOL_OVERRIDES_FILE` | `$FORGE_DATA_DIR/tool-overrides.json` | Per-project tool enable/disable overrides |
@@ -209,7 +210,7 @@ If both are unset, auth is **disabled** and the UI opens freely.
 ### Logging & Environment
 
 | Variable | Flag | Default | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `LOG_LEVEL` | `--log-level` | `info` | Server log level: `info`, `debug`, `warn`, `error` |
 | `PIKOT_MODE` | — | — | Set to `dev` to use `-dev`-suffixed data dirs (`~/.pi-kot-dev/`) so dev data doesn't mix with production |
 | `NODE_ENV` | — | `production` | Set automatically by the server; `test` disables request logging |
@@ -218,14 +219,14 @@ If both are unset, auth is **disabled** and the UI opens freely.
 ### Static client serving
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `SERVE_CLIENT` | `true` | Serve the built Vite client from `CLIENT_DIST_PATH`; set `false` to run API-only (e.g. behind a separate reverse proxy serving the client) |
 | `CLIENT_DIST_PATH` | `packages/client/dist` (in-repo) or `dist/client` (npm install) | Path to the built client dist directory; auto-detected |
 
 ### Orchestration & UI
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ORCHESTRATION_ENABLED` | `true` | Enable supervisor/worker orchestration |
 | `MINIMAL_UI` | `false` | Hide optional UI panels (terminal, git, changes). Useful for locked-down deployments |
 
@@ -307,7 +308,7 @@ pi-kot can render agent-created content inline in chat — HTML pages, SVG image
 ### Supported formats
 
 | Format | Detection | Preview |
-|---|---|---|
+| --- | --- | --- |
 | **HTML** | `<!DOCTYPE html>`, `<html>`, or ` ```html` | Sandboxed iframe |
 | **SVG** | `<svg>` or ` ```svg` | Sandboxed iframe |
 | **Mermaid** | ` ```mermaid` | Rendered diagram |
@@ -332,6 +333,7 @@ Ask the agent:
 > "Create a futuristic button with hover effects"
 
 The agent will:
+
 1. Write the HTML to `.pi/artifacts/button.html`
 2. Output: `[Live Preview](/api/v1/artifacts/button.html)`
 3. You see the rendered button inline in chat
@@ -349,7 +351,7 @@ The agent will:
 Access settings via the **⚙** icon in the header.
 
 | Tab | What you can configure |
-|---|---|
+| --- | --- |
 | **Appearance** | Theme picker, sticky user header, show token usage, image compression — all **persisted server-side** |
 | **Providers** | View configured providers, add/remove API keys, add custom providers, raw models.json editor |
 | **Agent** | Default provider, default model, thinking level, model scope (hide unused models), orchestrator model |
@@ -424,10 +426,10 @@ pi-kot/
 ## Tech Stack
 
 | Layer | Technology |
-|---|---|
+| --- | --- |
 | **UI** | React, TypeScript, Vite, xterm.js, CodeMirror, Zustand |
 | **Server** | Fastify, ws (WebSocket), node-pty |
-| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.83.0) |
+| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.84.2) |
 | **Auth** | JWT, scrypt password hashing |
 | **State** | Zustand (client), JSONL session files (server) |
 

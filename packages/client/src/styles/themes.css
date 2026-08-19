@@ -43,10 +43,10 @@
 	--header-bg: rgba(30, 30, 30, 0.85);
 	--sidebar-bg: rgba(18, 18, 18, 0.95);
 	--bg-frosted: rgba(12, 12, 12, 0.9);
-	--text-primary: rgba(255, 255, 255, 0.88);
-	--text-secondary: rgba(255, 255, 255, 0.55);
-	--text-dim: rgba(255, 255, 255, 0.35);
-	--text-ghost: rgba(255, 255, 255, 0.1);
+	--text-primary: #fafafa;
+	--text-secondary: #a1a1aa;
+	--text-dim: #71717a;
+	--text-ghost: #52525b;
 	--border: rgba(255, 255, 255, 0.06);
 	--border-hover: rgba(255, 255, 255, 0.1);
 	--border-bright: rgba(255, 255, 255, 0.14);
@@ -69,10 +69,10 @@
 	--header-bg: rgba(30, 30, 30, 0.85);
 	--sidebar-bg: rgba(18, 18, 18, 0.95);
 	--bg-frosted: rgba(12, 12, 12, 0.9);
-	--text-primary: rgba(255, 255, 255, 0.88);
-	--text-secondary: rgba(255, 255, 255, 0.55);
-	--text-dim: rgba(255, 255, 255, 0.35);
-	--text-ghost: rgba(255, 255, 255, 0.1);
+	--text-primary: #fafafa;
+	--text-secondary: #a1a1aa;
+	--text-dim: #71717a;
+	--text-ghost: #52525b;
 	--border: rgba(255, 255, 255, 0.06);
 	--border-hover: rgba(255, 255, 255, 0.1);
 	--border-bright: rgba(255, 255, 255, 0.14);
@@ -95,10 +95,10 @@
 	--header-bg: rgba(55, 55, 60, 0.75);
 	--sidebar-bg: rgba(40, 40, 38, 0.95);
 	--bg-frosted: rgba(33, 33, 33, 0.85);
-	--text-primary: rgba(255, 255, 255, 0.88);
-	--text-secondary: rgba(255, 255, 255, 0.6);
-	--text-dim: rgba(255, 255, 255, 0.4);
-	--text-ghost: rgba(255, 255, 255, 0.1);
+	--text-primary: #f4f4f5;
+	--text-secondary: #a1a1aa;
+	--text-dim: #71717a;
+	--text-ghost: #52525b;
 	--border: rgba(255, 255, 255, 0.06);
 	--border-hover: rgba(255, 255, 255, 0.1);
 	--border-bright: rgba(255, 255, 255, 0.14);
@@ -121,10 +121,10 @@
 	--header-bg: rgba(42, 40, 38, 0.78);
 	--sidebar-bg: rgba(28, 27, 26, 0.95);
 	--bg-frosted: rgba(23, 21, 21, 0.82);
-	--text-primary: rgba(206, 205, 195, 0.92);
-	--text-secondary: rgba(128, 126, 121, 0.85);
-	--text-dim: rgba(128, 126, 121, 0.5);
-	--text-ghost: rgba(128, 126, 121, 0.2);
+	--text-primary: #f5f5f4;
+	--text-secondary: #a8a29e;
+	--text-dim: #78716c;
+	--text-ghost: #57534e;
 	--border: rgba(52, 51, 49, 0.8);
 	--border-hover: rgba(64, 62, 60, 0.9);
 	--border-bright: rgba(206, 205, 195, 0.12);
@@ -148,10 +148,10 @@
 	--header-bg: rgba(245, 245, 245, 0.85);
 	--sidebar-bg: rgba(248, 248, 248, 0.95);
 	--bg-frosted: rgba(252, 252, 252, 0.9);
-	--text-primary: rgba(0, 0, 0, 0.88);
-	--text-secondary: rgba(0, 0, 0, 0.6);
-	--text-dim: rgba(0, 0, 0, 0.38);
-	--text-ghost: rgba(0, 0, 0, 0.08);
+	--text-primary: #09090b;
+	--text-secondary: #71717a;
+	--text-dim: #a1a1aa;
+	--text-ghost: #e4e4e7;
 	--border: rgba(0, 0, 0, 0.08);
 	--border-hover: rgba(0, 0, 0, 0.14);
 	--border-bright: rgba(0, 0, 0, 0.2);
@@ -177,10 +177,10 @@
 	--header-bg: rgba(242, 240, 232, 0.72);
 	--sidebar-bg: rgba(246, 245, 238, 0.95);
 	--bg-frosted: rgba(255, 253, 244, 0.82);
-	--text-primary: rgba(0, 0, 0, 0.9);
-	--text-secondary: rgba(0, 0, 0, 0.7);
-	--text-dim: rgba(0, 0, 0, 0.42);
-	--text-ghost: rgba(0, 0, 0, 0.1);
+	--text-primary: #0c0a09;
+	--text-secondary: #78716c;
+	--text-dim: #a8a29e;
+	--text-ghost: #e7e5e4;
 	--border: rgba(218, 216, 206, 0.8);
 	--border-hover: rgba(206, 205, 195, 0.9);
 	--border-bright: rgba(16, 15, 15, 0.12);
@@ -693,7 +693,7 @@ strong {
 	cursor: pointer;
 	font-size: 13px;
 	font-weight: 500;
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	background: var(--sidebar-bg);
 	-webkit-backdrop-filter: blur(10px);
 	backdrop-filter: blur(10px);
@@ -5354,6 +5354,16 @@ strong {
 	gap: 6px;
 	flex-wrap: wrap;
 }
+.tool-timeline-row.clickable {
+	cursor: pointer;
+	border-radius: 4px;
+	margin-left: -6px;
+	padding: 2px 6px;
+	transition: background 0.15s;
+}
+.tool-timeline-row.clickable:hover {
+	background: var(--bg-glass-hover);
+}
 
 /* Tool name */
 .tool-timeline-name {
@@ -5390,23 +5400,16 @@ strong {
 }
 /* tool colors are on the circle icon only */
 
-/* "show details" / "hide" toggle link */
-.tool-timeline-details-btn {
-	appearance: none;
-	background: transparent;
-	border: none;
-	outline: none;
-	cursor: pointer;
-	padding: 0;
-	font-size: 10px;
-	font-family: inherit;
+/* Chevron toggle for tool rows */
+.tool-timeline-chevron-toggle {
+	font-size: 14px;
+	line-height: 1;
 	color: var(--text-dim);
-	text-decoration: underline;
-	text-underline-offset: 2px;
-	transition: color 0.12s;
+	margin-left: auto;
+	transition: transform 0.15s;
 }
-.tool-timeline-details-btn:hover {
-	color: var(--text-secondary);
+.tool-timeline-chevron-toggle.open {
+	transform: rotate(90deg);
 }
 
 /* Expanded details pane: args + full output */
@@ -5466,6 +5469,10 @@ strong {
 	color: var(--text-dim);
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
+	width: 15px;
+	position: relative;
+	z-index: 1;
 }
 .trail-toggle-label {
 	font-family: var(--font-mono);
@@ -5517,6 +5524,11 @@ strong {
 	flex-direction: column;
 	gap: 1px;
 }
+.trail-body-justify .trail-list {
+	padding-left: 0;
+	border-left: none;
+	gap: 0;
+}
 
 /* Justification row — collapsed preview of in-between agent text */
 .trail-justification {
@@ -5526,50 +5538,78 @@ strong {
 .trail-justification-header {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 4px 0;
+	gap: 8px;
+	padding: 6px 0;
 	cursor: pointer;
 	user-select: none;
 	min-width: 0;
+	width: 100%;
+	background: transparent;
+	border: none;
+	outline: none;
+	color: var(--text-secondary);
+	transition: color 0.15s var(--ease);
 }
-.trail-justification-dot {
-	width: 5px;
-	height: 5px;
-	border-radius: 50%;
-	flex-shrink: 0;
-	background: var(--text-dim);
-	opacity: 0.7;
+.trail-justification-header:hover {
+	color: var(--text-primary);
 }
-.trail-justification-icon {
-	color: var(--text-dim);
-	display: inline-flex;
+.trail-justification-title-wrapper {
+	display: flex;
+	flex: 1;
 	align-items: center;
+	gap: 8px;
+	overflow: hidden;
+}
+.trail-justification-icon-box {
+	position: relative;
+	display: inline-flex;
+	width: 16px;
+	height: 16px;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
+	z-index: 1; /* Sit above the continuous line */
+}
+.trail-justification-icon-box svg {
+	width: 10px;
+	height: 10px;
+	fill: var(--bg-solid); /* Opaques the line behind it */
+	stroke: var(--accent);
 }
 .trail-justification-label {
-	font-family: var(--font-mono);
-	font-size: 10px;
-	font-weight: 600;
-	color: var(--text-dim);
+	font-family: inherit;
+	font-size: 13px;
+	font-weight: 500;
 	flex-shrink: 0;
+	color: var(--text-primary);
 }
 .trail-justification-preview {
-	font-size: 11px;
+	font-size: 13px;
+	font-weight: 500;
 	color: var(--text-dim);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	flex: 1;
 	min-width: 0;
+	text-align: left;
 }
 .trail-justification-chevron {
-	font-size: 9px;
-	color: var(--text-dim);
+	width: 16px;
+	height: 16px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	flex-shrink: 0;
-	transition: transform 0.15s var(--ease);
+	color: var(--text-dim);
+	transition: transform 0.2s var(--ease);
+}
+.trail-justification-chevron svg {
+	width: 16px;
+	height: 16px;
 }
 .trail-justification.expanded .trail-justification-chevron {
-	transform: rotate(90deg);
+	transform: rotate(180deg);
 }
 .trail-justification-body {
 	padding-left: 23px;
@@ -5632,12 +5672,43 @@ strong {
 		visibility 0s 0s; /* flutter-free: visible as soon as opening */
 }
 .trail-chunk-content {
-	padding-left: 10px;
-	border-left: 2px solid var(--border);
-	margin-left: 5px;
 	padding-bottom: 4px;
 	min-height: 0;
 	overflow: hidden;
+	padding-left: 23px; /* Full indent (7px margin + 16px padding previously) */
+}
+.trail-chunk-content .trail-full-prose {
+	padding-left: 0;
+}
+/* Base continuous line covers the entire chunk height */
+.trail-chunk {
+	position: relative;
+}
+.trail-chunk::before {
+	content: "";
+	position: absolute;
+	left: 7px;
+	top: 0;
+	bottom: 0;
+	width: 1px;
+	background: var(--border);
+	z-index: 0;
+}
+/* First chunk: line starts at the center of its circle */
+.trail-chunk:first-child::before {
+	top: 14px;
+}
+.trail-chunk.connects-to-header::before {
+	top: -11px; /* Extends upward to hit the center of the larger trail-toggle icon */
+}
+/* Last chunk (closed): line stops at the center of its circle */
+.trail-chunk:last-child:not(.open)::before {
+	bottom: auto;
+	height: 14px;
+}
+/* Single chunk (closed): no line needed */
+.trail-chunk:first-child:last-child:not(.open)::before {
+	display: none;
 }
 /* Content glides in when a chunk opens — also covers tool rows appended
    while the agent keeps working inside the currently-open step. */

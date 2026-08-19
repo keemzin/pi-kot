@@ -302,6 +302,20 @@ export function AgentTab({ onError }: Props) {
             style={{ marginBottom: 8, width: "100%" }}
             autoFocus
           />
+          <div style={{ display: "flex", gap: 12, marginBottom: 8, padding: "0 4px" }}>
+            <button
+              onClick={() => setScopedDraft(null)}
+              style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
+            >
+              Select All
+            </button>
+            <button
+              onClick={() => setScopedDraft([])}
+              style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
+            >
+              Untick All
+            </button>
+          </div>
           <div className="scope-model-list">
             {filteredEntries.map((entry) => {
               const draft = scopedDraft ?? allModelEntries.map((e) => e.fullId);

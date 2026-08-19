@@ -65,7 +65,7 @@ const DEFAULTS: UiSettings = {
 	userBubbleTextColor: null,
 	userBubbleBorderColor: null,
 	emptyFlapEnabled: true,
-	emptyFlapWords: ["PI-KOT 0.1.36", "PI-SDK 0.83.0"],
+	emptyFlapWords: ["PI-KOT 0.1.38", "PI-SDK 0.84.2"],
 	emptyFlapSize: 30,
 };
 

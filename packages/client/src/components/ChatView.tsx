@@ -259,7 +259,7 @@ function ThinkingBlock({ text }: { text: string }) {
 					setOpen((o) => !o);
 				}}
 			>
-				<span className="thinking-block-chevron">{open ? "▶" : "▶"}</span>
+				<span className="thinking-block-chevron">▶</span>
 				<span className="thinking-block-label">Thinking</span>
 			</summary>
 			<div className="thinking-block-content">{text}</div>

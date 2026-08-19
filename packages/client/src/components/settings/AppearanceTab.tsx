@@ -359,7 +359,7 @@ export function AppearanceTab() {
 				? words
 				: flapWords.length > 0
 					? flapWords
-					: ["PI-KOT 0.1.36", "PI-SDK 0.83.0"];
+					: ["PI-KOT 0.1.38", "PI-SDK 0.84.2"];
 		setFlapWords(cleaned);
 		setFlapWordsDraft(cleaned.join(", "));
 		zSetFlapWords(cleaned);
@@ -961,13 +961,12 @@ export function AppearanceTab() {
 								transition: "all 0.15s",
 							}}
 						>
-							{v === "justify" ? "Justify" : "Full"}
+							{v === "justify" ? "Auto" : "Expand All"}
 						</button>
 					))}
 				</div>
 				<p className="settings-hint" style={{ marginTop: 4 }}>
-					Default view for finished trails. Trails always show Full while the
-					agent is working.
+					Default view for tool trails. Applies to both active and finished runs.
 				</p>
 			</div>
 			<div className="settings-field">
@@ -1048,7 +1047,7 @@ export function AppearanceTab() {
 									if (e.key === "Enter") saveFlapWords(flapWordsDraft);
 								}}
 								className="settings-input"
-								placeholder="PI-KOT 0.1.36, PI-SDK 0.83.0"
+								placeholder="PI-KOT 0.1.38, PI-SDK 0.84.2"
 							/>
 							<p className="settings-hint" style={{ marginTop: 4 }}>
 								Board flips between phrases. Enter or click away to apply (shown

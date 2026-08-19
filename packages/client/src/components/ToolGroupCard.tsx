@@ -535,8 +535,8 @@ export function ToolCallEntry({
 		outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
 
 	const preview =
-		previewOverride ?? toolPreviewFromArgs(name, args) ?? undefined;
-	const iconNode = icon ?? getToolIcon(name);
+		previewOverride ?? getToolDescription(name, args as Record<string, unknown>) ?? undefined;
+	const iconNode = icon ?? <TrailIcon toolName={name} />;
 
 	// For `edit`, prefer the unified diff string the SDK puts on
 	// result.details (details.diff). When absent (e.g. some providers),
@@ -554,6 +554,7 @@ export function ToolCallEntry({
 			: undefined;
 	const editStats =
 		editDiff !== undefined ? countDiffLines(editDiff) : undefined;
+	const hasDetails = argsText.length > 2 || outputText.length > 0;
 
 	return (
 		<div
@@ -566,11 +567,25 @@ export function ToolCallEntry({
 				{iconNode}
 			</span>
 			<div className="tool-timeline-content">
-				<div className="tool-timeline-row">
-					<span className="tool-timeline-name">{displayName ?? name}</span>
+				<div 
+					className={`tool-timeline-row ${hasDetails ? "clickable" : ""}`}
+					onClick={hasDetails ? () => setDetailsOpen(o => !o) : undefined}
+					role={hasDetails ? "button" : undefined}
+					tabIndex={hasDetails ? 0 : undefined}
+				>
+					<span className="tool-timeline-name">{displayName ?? getToolDisplayName(name)}</span>
 					{preview && (
 						<span className="tool-timeline-arg" title={preview}>
 							{preview}
+						</span>
+					)}
+					{!isRunning && !detailsOpen && outputPreview.length > 0 && (
+						<span 
+							className="tool-timeline-arg" 
+							title={outputPreview}
+							style={{ color: "var(--text-ghost)", fontStyle: "italic" }}
+						>
+							— {isError ? "✖ " : "✓ "} {outputPreview}
 						</span>
 					)}
 					{isRunning && (
@@ -578,25 +593,12 @@ export function ToolCallEntry({
 							running…
 						</span>
 					)}
-					{(argsText.length > 2 || outputText.length > 0) && (
-						<button
-							type="button"
-							className="tool-timeline-details-btn"
-							onClick={() => setDetailsOpen((o) => !o)}
-							aria-expanded={detailsOpen}
-							aria-label={detailsOpen ? "Hide details" : "Show details"}
-						>
-							{detailsOpen ? "hide" : "details"}
-						</button>
+					{hasDetails && (
+						<span className={`tool-timeline-chevron-toggle ${detailsOpen ? "open" : ""}`}>
+							›
+						</span>
 					)}
 				</div>
-				{/* Smart-disclosure output preview (always shown when not expanded) */}
-				{!isRunning && !detailsOpen && outputPreview.length > 0 && (
-					<div className="tool-timeline-output-preview" title={outputPreview}>
-						{isError ? "✖ " : "✓ "}
-						{outputPreview}
-					</div>
-				)}
 				{/* Expanded details pane */}
 				{detailsOpen && (
 					<div className="tool-timeline-details">
@@ -650,20 +652,22 @@ export function ToolCallEntry({
 function TrailThinkingRow({ text }: { text: string }) {
 	const showThinking = usePreferencesStore((s) => s.showThinking);
 	const [open, setOpen] = useState(false);
+	
 	if (!showThinking) return null;
+	
 	return (
-		<div className="trail-thinking">
-			<div
-				role="button"
-				onClick={() => setOpen((o) => !o)}
-				className="trail-thinking-header"
+		<details open={open} className="thinking-block">
+			<summary
+				onClick={(e) => {
+					e.preventDefault();
+					setOpen((o) => !o);
+				}}
 			>
-				<span className="trail-justification-dot" />
-				<span className="trail-thinking-label">Thinking</span>
-				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
-			</div>
-			{open && <div className="trail-thinking-body">{text}</div>}
-		</div>
+				<span className="thinking-block-chevron">▶</span>
+				<span className="thinking-block-label">Thinking</span>
+			</summary>
+			<div className="thinking-block-content">{text}</div>
+		</details>
 	);
 }
 
@@ -680,36 +684,62 @@ function JustificationRow({
 	open: boolean;
 	onToggle: () => void;
 }) {
-	const trimmed = text.trim().replace(/\s+/g, " ");
-	const truncated = trimmed.length > JUSTIFICATION_PREVIEW_LEN;
+	const stripped = text
+		.replace(/#+\s+/g, "") // remove headers like "## "
+		.replace(/[*_~`]/g, "") // remove bold, italic, strikethrough, code ticks
+		.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // markdown links -> just text
+		.replace(/<[^>]+>/g, "") // HTML tags
+		.trim()
+		.replace(/\s+/g, " ");
+	const truncated = stripped.length > JUSTIFICATION_PREVIEW_LEN;
 	const preview = truncated
-		? trimmed.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
-		: trimmed;
+		? stripped.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
+		: stripped;
 	return (
 		<div className={`trail-justification${open ? " expanded" : " collapsed"}`}>
-			<div
-				role="button"
-				tabIndex={0}
+			<button
+				type="button"
 				onClick={onToggle}
-				onKeyDown={(e) => {
-					if (e.key === "Enter" || e.key === " ") {
-						e.preventDefault();
-						onToggle();
-					}
-				}}
 				className="trail-justification-header"
 				title={open ? "Collapse this step" : "Expand this step"}
 				aria-expanded={open}
 			>
-				<span className="trail-justification-dot" />
-				<span className="trail-justification-label">Justification</span>
-				{!open && (
-					<span className="trail-justification-preview" title={preview}>
-						{preview}
+				<div className="trail-justification-title-wrapper">
+					<span className="trail-justification-icon-box">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<circle cx="12" cy="12" r="10" />
+						</svg>
 					</span>
-				)}
-				<span className="trail-justification-chevron">{open ? "▾" : "▸"}</span>
-			</div>
+					{open ? (
+						<span className="trail-justification-label">Justification</span>
+					) : (
+						<span className="trail-justification-preview" title={preview}>
+							{preview || "Justification"}
+						</span>
+					)}
+				</div>
+				<span className="trail-justification-chevron">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						strokeWidth="2"
+						strokeLinecap="round"
+						strokeLinejoin="round"
+					>
+						<path d="m6 9 6 6 6-6" />
+					</svg>
+				</span>
+			</button>
 		</div>
 	);
 }
@@ -744,21 +774,157 @@ function groupChunks(entries: ToolGroupEntry[]): {
 	leading: ToolGroupEntry[];
 	chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[];
 } {
-	const leading: ToolGroupEntry[] = [];
 	const chunks: { just: ToolGroupEntry; tools: ToolGroupEntry[] }[] = [];
 	let current: { just: ToolGroupEntry; tools: ToolGroupEntry[] } | null = null;
 	for (const e of entries) {
 		if (e.kind === "justification") {
-			if (current) chunks.push(current);
-			current = { just: e, tools: [] };
-		} else if (current) {
-			current.tools.push(e);
+			if (
+				current &&
+				current.just.kind === "justification" &&
+				current.just.text === "Working..." &&
+				!current.tools.some((t) => t.kind === "tool")
+			) {
+				current.just = e;
+			} else {
+				if (current) chunks.push(current);
+				current = { just: e, tools: [] };
+			}
 		} else {
-			leading.push(e);
+			if (!current) {
+				current = {
+					just: { kind: "justification", text: "Working..." },
+					tools: [],
+				};
+			}
+			current.tools.push(e);
 		}
 	}
 	if (current) chunks.push(current);
-	return { leading, chunks };
+	return { leading: [], chunks };
+}
+
+function groupConsecutiveTools(
+	tools: ToolGroupEntry[],
+): (ToolGroupEntry | ToolGroupEntry[])[] {
+	const result: (ToolGroupEntry | ToolGroupEntry[])[] = [];
+	let currentGroup: ToolGroupEntry[] = [];
+	let currentToolName = "";
+
+	for (const entry of tools) {
+		if (entry.kind === "tool") {
+			const toolName = String(entry.block.name ?? "tool");
+			if (toolName === currentToolName) {
+				currentGroup.push(entry);
+			} else {
+				if (currentGroup.length > 0) {
+					result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+				}
+				currentGroup = [entry];
+				currentToolName = toolName;
+			}
+		} else {
+			if (currentGroup.length > 0) {
+				result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+				currentGroup = [];
+				currentToolName = "";
+			}
+			result.push(entry);
+		}
+	}
+	if (currentGroup.length > 0) {
+		result.push(currentGroup.length === 1 ? currentGroup[0] : currentGroup);
+	}
+	return result;
+}
+
+function ConsecutiveToolGroup({
+	entries,
+	view,
+	isStreaming,
+	startIndex,
+	renderEntry,
+}: {
+	entries: ToolGroupEntry[];
+	view: "full" | "justify";
+	isStreaming: boolean;
+	startIndex: number;
+	renderEntry: (entry: ToolGroupEntry, idx: number) => React.ReactNode;
+}) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	const anyRunning =
+		isStreaming &&
+		entries.some((e) => e.kind === "tool" && e.result === undefined);
+	const anyError = entries.some(
+		(e) => e.kind === "tool" && e.result?.isError === true,
+	);
+
+	const expanded = view === "full" || isOpen || anyRunning || anyError;
+
+	const firstTool = entries[0];
+	if (firstTool.kind !== "tool") return null;
+
+	const name = String(firstTool.block.name ?? "tool");
+	const count = entries.length;
+	const displayName = getToolDisplayName(name);
+
+	const isRunning = anyRunning;
+	const isError = anyError;
+
+	return (
+		<div className="consecutive-tools-group" style={{ marginBottom: "2px" }}>
+			<div
+				className={`tool-timeline-node ${isRunning ? " running" : isError ? " error" : " success"}`}
+			>
+				<span
+					className={`tool-timeline-icon${isRunning ? " running" : isError ? " error" : " success"}`}
+					aria-hidden="true"
+				>
+					<TrailIcon toolName={name} />
+				</span>
+				<div className="tool-timeline-content">
+					<div
+						className="tool-timeline-row clickable"
+						onClick={() => setIsOpen(!isOpen)}
+						role="button"
+						tabIndex={0}
+					>
+						<span className="tool-timeline-name" style={{ fontWeight: 600 }}>
+							{count} × {displayName}
+						</span>
+						{!expanded && (
+							<span className="tool-timeline-arg">Grouped tools</span>
+						)}
+						{isRunning && (
+							<span className="tool-timeline-running" aria-label="running">
+								running…
+							</span>
+						)}
+						<span className={`tool-timeline-chevron-toggle ${expanded ? "open" : ""}`}>
+							›
+						</span>
+					</div>
+				</div>
+			</div>
+			{expanded && (
+				<div
+					className="consecutive-tools-list"
+					style={{
+						paddingLeft: "10px",
+						borderLeft: "2px solid var(--border)",
+						marginLeft: "5px",
+						marginTop: "4px",
+						marginBottom: "8px",
+						display: "flex",
+						flexDirection: "column",
+						gap: "1px",
+					}}
+				>
+					{entries.map((e, i) => renderEntry(e, startIndex + i))}
+				</div>
+			)}
+		</div>
+	);
 }
 
 export function ToolGroupCard({
@@ -769,28 +935,25 @@ export function ToolGroupCard({
 	isStreaming?: boolean;
 }) {
 	const hasJustifications = entries.some((e) => e.kind === "justification");
-	// Default resting view for a finished/loaded trail comes from the user
-	// preference; while a turn streams, trails always render Full.
+	// Default resting view for a trail comes from the user preference.
 	const trailDefaultView = usePreferencesStore((s) => s.trailDefaultView);
 	// Two-state view: "justify" (collapsed) ↔ "full" (everything expanded).
 	// Justify works for all turns: tool-only turns show collapsed tool rows;
 	// turns with justifications show per-chunk expandable previews.
-	const [view, setView] = useState<"full" | "justify">(
-		isStreaming ? "full" : trailDefaultView,
-	);
+	const [view, setView] = useState<"full" | "justify">(trailDefaultView);
 	// Which chunks are expanded in Justify view (indices into chunks array).
 	const [openChunks, setOpenChunks] = useState<Set<number>>(() => new Set());
 	const [showAllChunks, setShowAllChunks] = useState(false);
 
-	// Track streaming state transitions: force full while streaming,
-	// auto-collapse to justify shortly after streaming stops.
+	// Track streaming state transitions
 	const prevStreaming = useRef(isStreaming);
+	const prevDefaultView = useRef(trailDefaultView);
 	const hasJustificationsRef = useRef(hasJustifications);
 	hasJustificationsRef.current = hasJustifications;
 
 	useEffect(() => {
 		if (isStreaming && !prevStreaming.current) {
-			setView("full");
+			setView(trailDefaultView);
 		}
 		if (!isStreaming && prevStreaming.current) {
 			// Streaming stopped — settle on the user's default view: Justify
@@ -802,14 +965,22 @@ export function ToolGroupCard({
 			prevStreaming.current = isStreaming;
 			return () => clearTimeout(timer);
 		}
+		
+		// Sync all non-streaming cards if user changes global settings
+		if (!isStreaming && trailDefaultView !== prevDefaultView.current) {
+			setView(trailDefaultView);
+			if (trailDefaultView === "justify") setOpenChunks(new Set());
+		}
+
 		prevStreaming.current = isStreaming;
+		prevDefaultView.current = trailDefaultView;
 	}, [isStreaming, trailDefaultView]);
 
 	const anyRunning =
 		isStreaming &&
 		entries.some((e) => e.kind === "tool" && e.result === undefined);
 
-	const { chunks } = groupChunks(entries);
+	const { chunks, leading } = groupChunks(entries);
 
 	// Live-turn "only the step being worked on" focus: while the turn is
 	// streaming in Justify view, the newest chunk expands automatically
@@ -839,7 +1010,7 @@ export function ToolGroupCard({
 		}
 	};
 
-	const viewLabel = view === "full" ? "Full" : "Justify";
+	const viewLabel = view === "full" ? "Collapse All" : "Expand All";
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -880,10 +1051,12 @@ export function ToolGroupCard({
 		chunk: { just: ToolGroupEntry; tools: ToolGroupEntry[] },
 		chunkIdx: number,
 		keyPrefix: string,
+		visibleIdx: number
 	) => {
-		const isOpen = openChunks.has(chunkIdx);
+		const isOpen = view === "full" || openChunks.has(chunkIdx);
+		const isLast = chunkIdx === chunks.length - 1;
 		return (
-			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}`}>
+			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}${visibleIdx === 0 && !collapseActive ? " connects-to-header" : ""}`}>
 				<JustificationRow
 					text={(chunk.just as { text: string }).text}
 					open={isOpen}
@@ -900,7 +1073,28 @@ export function ToolGroupCard({
 								text={(chunk.just as { text: string }).text.trim()}
 							/>
 						</div>
-						{chunk.tools.map((e, i) => renderEntry(e, i))}
+						{(() => {
+							let globalIndex = 0;
+							return groupConsecutiveTools(chunk.tools).map((g, i) => {
+								if (Array.isArray(g)) {
+									const startIdx = globalIndex;
+									globalIndex += g.length;
+									return (
+										<ConsecutiveToolGroup
+											key={`group-${i}`}
+											entries={g}
+											view={view}
+											isStreaming={isStreaming}
+											startIndex={startIdx}
+											renderEntry={renderEntry}
+										/>
+									);
+								} else {
+									const idx = globalIndex++;
+									return renderEntry(g, idx);
+								}
+							});
+						})()}
 					</div>
 				</div>
 			</div>
@@ -908,13 +1102,11 @@ export function ToolGroupCard({
 	};
 
 	const shouldCollapseChunks = chunks.length > JUSTIFY_COLLAPSE_THRESHOLD;
-	const visibleChunks =
-		shouldCollapseChunks && !showAllChunks
+	const collapseActive = view !== "full" && shouldCollapseChunks && !showAllChunks;
+	const visibleChunks = collapseActive
 			? chunks.slice(-JUSTIFY_COLLAPSE_THRESHOLD)
 			: chunks;
-	// Visible chunk indices are offset when collapsed (we show the last N).
-	const chunkIdxOffset =
-		shouldCollapseChunks && !showAllChunks
+	const chunkIdxOffset = collapseActive
 			? chunks.length - JUSTIFY_COLLAPSE_THRESHOLD
 			: 0;
 
@@ -924,7 +1116,7 @@ export function ToolGroupCard({
 				<button
 					type="button"
 					className="trail-toggle"
-					title={`Trail view: ${view}. Click to toggle Full ↔ Justify`}
+					title={`Trail view: ${view}. Click to toggle Expand All ↔ Auto`}
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
@@ -932,15 +1124,14 @@ export function ToolGroupCard({
 							width="14"
 							height="14"
 							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
+							fill="var(--bg-solid)"
 							strokeWidth="2"
-							strokeLinecap="round"
+							style={{
+								animation: anyRunning ? "pulse 2s infinite ease-in-out" : "none",
+								stroke: anyRunning ? "var(--accent)" : "currentColor",
+							}}
 						>
-							<circle cx="5" cy="12" r="2" fill="currentColor" stroke="none" />
-							<circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-							<circle cx="19" cy="12" r="2" fill="currentColor" stroke="none" />
-							<path d="M7 12h3M14 12h3" />
+							<circle cx="12" cy="12" r="10" />
 						</svg>
 					</span>
 					<span className="trail-toggle-label">Trail</span>
@@ -949,38 +1140,27 @@ export function ToolGroupCard({
 				</button>
 			</div>
 
-			{view === "full" && (
-				<div
-					ref={scrollRef}
-					className={`trail-body trail-body-full${isStreaming ? " streaming" : ""}`}
-				>
-					<div className="trail-list">{entries.map(renderEntry)}</div>
+			<div className="trail-body trail-body-justify" ref={scrollRef}>
+				<div className="trail-list">
+					{collapseActive && (
+						<button
+							type="button"
+							className="trail-earlier"
+							onClick={() => setShowAllChunks(true)}
+						>
+							▼ {chunks.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
+						</button>
+					)}
+					{visibleChunks.map((chunk, i) =>
+						renderChunk(
+							chunk,
+							chunkIdxOffset + i,
+							`chunk-${chunkIdxOffset + i}`,
+							i
+						),
+					)}
 				</div>
-			)}
-
-			{view === "justify" && (
-				<div className="trail-body trail-body-justify">
-					<div className="trail-list">
-						{shouldCollapseChunks && !showAllChunks && (
-							<button
-								type="button"
-								className="trail-earlier"
-								onClick={() => setShowAllChunks(true)}
-							>
-								▼ {chunks.length - JUSTIFY_COLLAPSE_THRESHOLD} earlier steps
-							</button>
-						)}
-						{visibleChunks.map((chunk, i) =>
-							renderChunk(
-								chunk,
-								chunkIdxOffset + i,
-								`chunk-${chunkIdxOffset + i}`,
-							),
-						)}
-						{/* Leading tools (before first justification) are visible in Full view only. */}
-					</div>
-				</div>
-			)}
+			</div>
 		</div>
 	);
 }
