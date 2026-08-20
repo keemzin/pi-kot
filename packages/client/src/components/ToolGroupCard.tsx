@@ -612,15 +612,12 @@ export function ToolCallEntry({
 				{detailsOpen && (
 					<div className="tool-timeline-details">
 						{argsText.length > 2 && (
-							<details>
-							<summary>
+							<div>
 								<div className="tool-timeline-section-label">{t("chat.toolInput")}</div>
-								<div className="tool-timeline-section-line" />
-							</summary>
 								<pre className="tool-timeline-code" ref={argsPreRef}>
 									{argsText}
 								</pre>
-							</details>
+							</div>
 						)}
 						{editDiff !== undefined && editStats !== undefined ? (
 							<div className="overflow-hidden px-3 pb-2">
@@ -733,14 +730,12 @@ function JustificationRow({
 						</svg>
 					</span>
 					{open ? (
-						<span className="trail-justification-label">Justification</span>
-					) : (
-						<div className="trail-justification-summary">
 						<span className="trail-justification-label">{t("chat.toolJustification")}</span>
-						<span className="trail-justification-preview">
+					) : (
+						<span className="trail-justification-preview" title={preview}>
 							{preview || t("chat.toolJustification")}
 						</span>
-					</div>)}
+					)}
 				</div>
 				<span className="trail-justification-chevron">
 					<svg
