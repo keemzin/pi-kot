@@ -38,6 +38,7 @@ import {
 	type GroupedTurn,
 	type PairableMessage,
 } from "./ToolGroupCard";
+import { useI18n } from "../hooks/useI18n";
 
 // Register custom tool renderers
 toolRegistry.register("javascript_repl", ({ part }) => (
@@ -247,6 +248,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
+	const { t } = useI18n();
 	const showThinking = usePreferencesStore((s) => s.showThinking);
 	const [open, setOpen] = useState(false);
 
@@ -261,7 +263,7 @@ function ThinkingBlock({ text }: { text: string }) {
 				}}
 			>
 				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">Thinking</span>
+				<span className="thinking-block-label">{t("chat.thinking")}</span>
 			</summary>
 			<div className="thinking-block-content">{text}</div>
 		</details>
@@ -309,6 +311,8 @@ function RunningToolCard({
 				block={displayed.block}
 				result={undefined}
 				initialExpanded={false}
+				isActive={true}
+				isLastInTurn={true}
 			/>
 		</div>
 	);
@@ -415,7 +419,7 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 							text={(entry.block.thinking as string) ?? ""}
 						/>
 					) : (
-						<ToolCallEntry key={j} block={entry.block} result={entry.result} />
+						<ToolCallEntry key={j} block={entry.block} result={entry.result} isActive={false} isLastInTurn={j === entries.length - 1} />
 					),
 				)}
 			</div>
@@ -524,6 +528,7 @@ function UserMessageBubble({
 	images?: { mimeType: string; data: string; __blobUrl?: boolean }[];
 	animated?: boolean;
 }) {
+	const { t } = useI18n();
 	const [expanded, setExpanded] = useState(false);
 	const [isLong, setIsLong] = useState(false);
 	const textRef = useRef<HTMLDivElement>(null);
@@ -545,8 +550,8 @@ function UserMessageBubble({
 	return (
 		<div className={`message-row user${animated ? " msg-enter" : ""}`}>
 			<div className="message-bubble user">
-				{isSteer && <span className="steer-tag">steer</span>}
-				{isFollowUp && <span className="steer-tag">follow-up</span>}
+				{isSteer && <span className="steer-tag">{t("chat.steer")}</span>}
+				{isFollowUp && <span className="steer-tag">{t("chat.followUp")}</span>}
 				{images !== undefined && images.length > 0 && (
 					<UserImages images={images} />
 				)}
@@ -1089,11 +1094,12 @@ function ModelBadge({
 }
 
 /** The "thinking…" placeholder shown while a part streams in. */
-function StreamingHint({ label }: { label: string }) {
+function StreamingHint({ label }: { label?: string }) {
+	const { t } = useI18n();
 	return (
 		<span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)' }}>
 			<ThinkingIndicator style={{ width: '16px', height: '16px', color: 'var(--text-primary)' }} />
-			<span className="chat-shimmer" style={{ fontSize: '14px' }}>{label}</span>
+			<span className="chat-shimmer" style={{ fontSize: '14px' }}>{label ?? t("chat.waitingForModel")}</span>
 		</span>
 	);
 }
@@ -1103,14 +1109,14 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 	const content = msg.content;
 	if (!Array.isArray(content)) {
 		const text = typeof content === "string" ? content : "";
-		return text ? <ChatMarkdown text={text} /> : <StreamingHint label="waiting for model…" />;
+		return text ? <ChatMarkdown text={text} /> : <StreamingHint />;
 	}
 	
 	const hasVisibleText = content.some(chunk => chunk.type === "text" && typeof chunk.text === "string" && chunk.text.trim().length > 0);
 	
 	return (
 		<>
-			{content.length === 0 && <StreamingHint label="waiting for model…" />}
+			{content.length === 0 && <StreamingHint />}
 			{content.map((chunk: Record<string, unknown>, i: number) => {
 				if (chunk.type === "text" && typeof chunk.text === "string") {
 					if (chunk.text.length === 0) {
@@ -1127,7 +1133,7 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 				return null;
 			})}
 			{!hasVisibleText && content.length > 0 && !content.some(c => c.type === "thinking" || c.type === "reasoning" || (c.type === "text" && (c.text as string).length === 0)) && (
-				<StreamingHint label="waiting for model…" />
+				<StreamingHint />
 			)}
 		</>
 	);
@@ -1138,6 +1144,7 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
+	const { t } = useI18n();
 	const messages = useSessionStore((s) => s.messages);
 	const streamingMessage = useSessionStore((s) => s.streamingMessage);
 	const isStreaming = useSessionStore((s) => s.isStreaming);
@@ -1726,7 +1733,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						>
 							<div className="message-bubble assistant">
 								<div className="branch-summary-block">
-									<div className="branch-summary-label">Branch Summary</div>
+									<div className="branch-summary-label">{t("chat.branchSummary")}</div>
 									<ChatMarkdown text={summary} />
 									{fromId && (
 										<div className="branch-summary-from" title={fromId}>
@@ -1780,7 +1787,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									{renderedContent}
 									{details != null && (
 										<details className="custom-message-details">
-											<summary>Details</summary>
+											<summary>{t("chat.details")}</summary>
 											<pre>{JSON.stringify(details, null, 2)}</pre>
 										</details>
 									)}
@@ -1921,7 +1928,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					<div key={key} className="message-row assistant">
 						<div className="message-bubble assistant">
 							<div className="branch-summary-block">
-								<div className="branch-summary-label">Branch Summary</div>
+								<div className="branch-summary-label">{t("chat.branchSummary")}</div>
 								<ChatMarkdown text={summary} />
 								{fromId && (
 									<div className="branch-summary-from" title={fromId}>
@@ -1970,7 +1977,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								{renderedContent}
 								{details != null && (
 									<details className="custom-message-details">
-										<summary>Details</summary>
+										<summary>{t("chat.details")}</summary>
 										<pre>{JSON.stringify(details, null, 2)}</pre>
 									</details>
 								)}
@@ -2167,7 +2174,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						className="message-row assistant streaming-row"
 					>
 						<div className="message-bubble assistant streaming-bubble">
-							<StreamingHint label="waiting for model…" />
+							<StreamingHint />
 						</div>
 					</div>
 				);
@@ -2270,8 +2277,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						ref={isLastTurn ? attachLastTurnRef : undefined}
 					>
 						<div className="message-bubble user">
-							{isSteer && <span className="steer-tag">steer</span>}
-							{isFollowUp && <span className="steer-tag">follow-up</span>}
+							{isSteer && <span className="steer-tag">{t("chat.steer")}</span>}
+							{isFollowUp && <span className="steer-tag">{t("chat.followUp")}</span>}
 							<UserImages images={extractImages(currentUser.content)} />
 							{text}
 						</div>
@@ -2443,11 +2450,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								<>
 									<div className="welcome-icon">💬</div>
 									<div className="welcome-text">
-										Send a message to start chatting
+										{t("chat.startChatting")}
 									</div>
 								</>
 							)}
-							<div className="welcome-hint">chat with pi coding agent</div>
+							<div className="welcome-hint">{t("chat.emptyState")}</div>
 						</div>
 					) : (
 						<div
@@ -2465,21 +2472,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 										// Streaming content is always rendered inside renderedRows via
 										// currentAssistants injection. No standalone row needed.
 										return null;
-										return (
-											<div className="message-row assistant streaming-row">
-												<div className="message-bubble assistant streaming-bubble">
-													{activeToolName && (
-														<div className="tool-badge">
-															<span className="tool-badge-dot" />
-															{activeToolName}
-														</div>
-													)}
-													{renderStreamingContent(
-														streamingMessage as Record<string, unknown>,
-													)}
-												</div>
-											</div>
-										);
 									})()}
 
 								{activeCompaction !== null && (
@@ -2501,8 +2493,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 												})),
 											].map((q, i) => (
 												<div key={i} className="queued-msg-item">
-													<span className={`queued-badge ${q.kind}`}>
-														{q.kind === "steer" ? "steer" : "follow-up"}
+													<span className="steer-tag" style={{ marginLeft: 6 }}>
+														{q.kind === "steer" ? t("chat.steer") : t("chat.followUp")}
 													</span>
 													<span className="queued-msg-text" title={q.text}>
 														{q.text}

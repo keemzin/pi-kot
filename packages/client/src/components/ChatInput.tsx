@@ -8,6 +8,7 @@ import { ModelDropdown } from "./ModelDropdown";
 import { getSessionModel, setSessionThinking } from "../lib/api-client";
 import { useSelectionBridge } from "../stores/selection-bridge";
 import { parseRefChips, type RefChip } from "../lib/ref-chips";
+import { useI18n } from "../hooks/useI18n";
 
 interface Props {
   sessionId: string;
@@ -30,6 +31,7 @@ interface SlashCommand {
 }
 
 export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onModelSelect, onModelError }: Props) {
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSend = useSelectionBridge((s) => s.pendingSend);
   const consumeSend = useSelectionBridge((s) => s.consumeSend);
@@ -879,7 +881,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               ? "Compacting…"
               : isStreaming
                 ? "Steer the agent…"
-                : "Send a message... (/compact, /abort, !cmd, @file)"
+                : t("chat.placeholder")
           }
           disabled={compacting}
           rows={1}

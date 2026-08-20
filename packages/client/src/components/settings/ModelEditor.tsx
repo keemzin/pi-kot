@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { useI18n } from "../../hooks/useI18n";
 
 /* ── Types matching models.json format ── */
 
@@ -28,6 +29,7 @@ function ThinkingLevelMapEditor({
   value: Record<string, string | null> | undefined;
   onChange: (v: Record<string, string | null> | undefined) => void;
 }) {
+  const { t } = useI18n();
   const map = value ?? {};
 
   const setLevel = (level: ThinkingLevel, entry: string | null | "omit") => {
@@ -80,17 +82,17 @@ function ThinkingLevelMapEditor({
             <div style={{ display: "flex", borderRadius: 5, border: "1px solid var(--border)", overflow: "hidden" }}>
               <button onClick={() => setLevel(level, "omit")}
                 style={{ ...baseBtn, borderRight: "1px solid var(--border)", ...(state === "omit" ? activeBtn : {}) }}>
-                Default
+                {t("settings.providers.model.default")}
               </button>
               <button onClick={() => setLevel(level, null)}
                 style={{ ...baseBtn, ...(state === "null" ? disabledBtn : {}) }}>
-                Disabled
+                {t("settings.providers.model.disabled")}
               </button>
             </div>
             <div style={{ display: "flex", borderRadius: 5, border: `1px solid ${state === "string" ? "var(--accent)" : "var(--border)"}`, overflow: "hidden" }}>
               <button onClick={() => setLevel(level, strVal || level)}
                 style={{ ...baseBtn, borderRight: "1px solid var(--border)", ...(state === "string" ? activeBtn : {}) }}>
-                Custom
+                {t("settings.providers.model.custom")}
               </button>
               <input value={strVal}
                 onChange={(e) => setLevel(level, e.target.value)}
@@ -146,6 +148,7 @@ interface Props {
 }
 
 export function ModelEditor({ model, onChange, onDelete }: Props) {
+  const { t } = useI18n();
   const set = <K extends keyof ModelEntry>(k: K, v: ModelEntry[K]) => onChange({ ...model, [k]: v });
 
   const costVal = (k: keyof NonNullable<ModelEntry["cost"]>) =>
@@ -160,25 +163,25 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
       {/* ID / Name */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>ID *</label>
-          <input value={model.id} onChange={(e) => set("id", e.target.value)} placeholder="model-id" style={inputStyle} />
+          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("settings.providers.model.id")}</label>
+          <input value={model.id} onChange={(e) => set("id", e.target.value)} placeholder={t("settings.providers.model.idPlaceholder")} style={inputStyle} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>Name</label>
-          <input value={model.name ?? ""} onChange={(e) => set("name", e.target.value || undefined)} placeholder="Display name" style={inputStyle} />
+          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("settings.providers.model.name")}</label>
+          <input value={model.name ?? ""} onChange={(e) => set("name", e.target.value || undefined)} placeholder={t("settings.providers.model.namePlaceholder")} style={inputStyle} />
         </div>
       </div>
 
       {/* API override */}
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>API override</label>
+        <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("settings.providers.model.apiOverride")}</label>
         <select value={model.api ?? ""} onChange={(e) => set("api", e.target.value || undefined)}
           style={{ ...inputStyle, cursor: "pointer" }}>
-          <option value="">Default</option>
-          <option value="openai-completions">OpenAI Compatible</option>
-          <option value="openai-responses">OpenAI Responses API</option>
-          <option value="anthropic-messages">Anthropic Messages API</option>
-          <option value="google-generative-ai">Google Generative AI</option>
+          <option value="">{t("settings.providers.model.apiDefault")}</option>
+          <option value="openai-completions">{t("settings.providers.model.apiOpenAiCompat")}</option>
+          <option value="openai-responses">{t("settings.providers.model.apiOpenAiResponses")}</option>
+          <option value="anthropic-messages">{t("settings.providers.model.apiAnthropic")}</option>
+          <option value="google-generative-ai">{t("settings.providers.model.apiGoogle")}</option>
         </select>
       </div>
 
@@ -188,13 +191,13 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
           <input type="checkbox" checked={model.reasoning ?? false}
             onChange={(e) => set("reasoning", e.target.checked || undefined)}
             style={{ accentColor: "var(--accent-text)" }} />
-          Reasoning / thinking
+          {t("settings.providers.model.reasoning")}
         </label>
         <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-primary)", cursor: "pointer", userSelect: "none" }}>
           <input type="checkbox" checked={model.input?.includes("image") ?? false}
             onChange={(e) => set("input", e.target.checked ? ["text", "image"] : undefined)}
             style={{ accentColor: "var(--accent-text)" }} />
-          Image input
+          {t("settings.providers.model.imageInput")}
         </label>
       </div>
 
@@ -205,15 +208,15 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
             <input type="checkbox" checked={hasDeepseekCompat(model)}
               onChange={(e) => onChange(setDeepseekCompat(model, e.target.checked))}
               style={{ accentColor: "var(--accent-text)" }} />
-            DeepSeek thinking compatibility
+            {t("settings.providers.model.deepSeekCompat")}
           </label>
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>Thinking level map</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)" }}>{t("settings.providers.model.thinkingLevelMap")}</span>
               {model.thinkingLevelMap && (
                 <button onClick={() => set("thinkingLevelMap", undefined)}
                   style={{ fontSize: 10, padding: "2px 7px", background: "none", border: "1px solid var(--border)", borderRadius: 4, color: "var(--text-dim)", cursor: "pointer" }}>
-                  clear all
+                  {t("settings.providers.model.clearAll")}
                 </button>
               )}
             </div>
@@ -225,13 +228,13 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
       {/* Context / Max tokens */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>Context window (tokens)</label>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("settings.providers.model.contextWindow")}</label>
           <input value={model.contextWindow !== undefined ? String(model.contextWindow) : ""}
             onChange={(e) => set("contextWindow", e.target.value ? parseInt(e.target.value) : undefined)}
             placeholder="128000" style={inputStyle} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>Max output tokens</label>
+          <label style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("settings.providers.model.maxTokens")}</label>
           <input value={model.maxTokens !== undefined ? String(model.maxTokens) : ""}
             onChange={(e) => set("maxTokens", e.target.value ? parseInt(e.target.value) : undefined)}
             placeholder="16384" style={inputStyle} />
@@ -240,7 +243,7 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
 
       {/* Cost */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>Cost (per million tokens)</div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>{t("settings.providers.model.cost")}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
           {(["input", "output", "cacheRead", "cacheWrite"] as const).map((k) => (
             <div key={k} style={{ display: "flex", flexDirection: "column", gap: 3 }}>
@@ -255,7 +258,7 @@ export function ModelEditor({ model, onChange, onDelete }: Props) {
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
         <button onClick={onDelete}
           style={{ padding: "6px 12px", background: "none", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 5, color: "#ef4444", cursor: "pointer", fontSize: 12 }}>
-          Remove model
+          {t("settings.providers.model.removeModel")}
         </button>
       </div>
     </div>

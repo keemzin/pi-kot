@@ -12,6 +12,7 @@ function loadLocalBubble(key: string): string | null {
   try { const v = localStorage.getItem(key); return v !== null ? v : null; } catch { return null; }
 }
 import { usePreferencesStore } from "./stores/preferences-store";
+import { I18nProvider } from "./hooks/useI18n";
 import "./styles/themes.css";
 
 // Apply saved theme + accent before first render (no flash)
@@ -77,6 +78,8 @@ if (root === null) throw new Error("root element not found");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <I18nProvider>
+      <App />
+    </I18nProvider>
   </StrictMode>,
 );

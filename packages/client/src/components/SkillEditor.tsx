@@ -12,8 +12,10 @@ interface Props {
   onSaved: () => void;
   onError: (msg: string) => void;
 }
+import { useI18n } from "../hooks/useI18n";
 
 export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Props) {
+  const { t } = useI18n();
   const onErrorRef = useRef(onErrorProp);
   onErrorRef.current = onErrorProp;
   const onSavedRef = useRef(onSaved);
@@ -89,7 +91,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
   if (loading) {
     return (
       <div style={{ padding: 24, textAlign: "center", color: "var(--text-dim)" }}>
-        Loading…
+        {t("settings.skills.editor.loading")}
       </div>
     );
   }
@@ -101,7 +103,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
       <div style={{ padding: 24 }}>
         <p style={{ color: "var(--danger, #e74c3c)", marginBottom: 12 }}>{error}</p>
         <button onClick={onBack} className="settings-btn" style={{ fontSize: 12 }}>
-          ← Back to skills
+          {t("settings.skills.editor.backToSkills")}
         </button>
       </div>
     );
@@ -143,7 +145,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
             flexShrink: 0,
           }}
         >
-          ← Back
+          {t("settings.skills.editor.back")}
         </button>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -166,12 +168,12 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
             color: "var(--text-primary)",
           }}
         >
-          Description <span style={{ color: "var(--danger, #e74c3c)" }}>*</span>
+          {t("settings.skills.editor.description")} <span style={{ color: "var(--danger, #e74c3c)" }}>*</span>
         </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="What does this skill do?"
+          placeholder={t("settings.skills.editor.descriptionPlaceholder")}
           rows={2}
           style={{
             width: "100%",
@@ -201,7 +203,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
           }}
         >
           <label style={{ fontSize: 11, fontWeight: 600, color: "var(--text-primary)" }}>
-            Instructions
+            {t("settings.skills.editor.instructions")}
           </label>
           <button
             onClick={() => setShowPreview((p) => !p)}
@@ -216,7 +218,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
               fontWeight: 600,
             }}
           >
-            {showPreview ? "Edit" : "Preview"}
+            {showPreview ? t("settings.skills.editor.edit") : t("settings.skills.editor.preview")}
           </button>
         </div>
 
@@ -247,7 +249,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
             <textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Skill instructions (Markdown)…"
+              placeholder={t("settings.skills.editor.instructionsPlaceholder")}
               style={{
                 width: "100%",
                 height: "100%",
@@ -291,7 +293,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
             cursor: "pointer",
           }}
         >
-          Cancel
+          {t("settings.agent.cancel")}
         </button>
         <button
           onClick={handleSave}
@@ -308,7 +310,7 @@ export function SkillEditor({ skill, onBack, onSaved, onError: onErrorProp }: Pr
             opacity: saving || !description.trim() ? 0.6 : 1,
           }}
         >
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("settings.agent.saving") : t("settings.skills.editor.save")}
         </button>
       </div>
     </div>

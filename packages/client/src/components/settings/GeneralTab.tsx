@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { getVersions, checkSdkUpdate } from "../../lib/api-client";
 import { errorMsg } from "./shared";
+import { useI18n } from "../../hooks/useI18n";
+import type { Locale } from "../../lib/i18n/types";
 
 export function GeneralTab() {
+  const { t, locale, setLocale, supportedLocales } = useI18n();
   const [versions, setVersions] = useState<{ serverVersion: string; sdkVersion: string } | undefined>(undefined);
   const [checkResult, setCheckResult] = useState<{
     latestSdkVersion: string;
@@ -36,35 +39,53 @@ export function GeneralTab() {
   return (
     <div className="settings-fields">
       <div className="settings-field">
-        <label className="settings-label">About</label>
+        <label className="settings-label">{t("settings.general.about")}</label>
         <p className="settings-hint">
-          pi-kot — a web UI for the pi coding agent.
+          {t("settings.general.aboutDesc")}
         </p>
       </div>
 
       <hr className="settings-divider" />
 
       <div className="settings-field">
-        <label className="settings-label">Versions</label>
+        <label className="settings-label">{t("settings.language")}</label>
+        <select
+          className="settings-select"
+          value={locale}
+          onChange={(e) => setLocale(e.target.value as Locale)}
+          style={{ width: "fit-content" }}
+        >
+          {supportedLocales.map((loc) => (
+            <option key={loc.id} value={loc.id}>
+              {loc.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <hr className="settings-divider" />
+
+      <div className="settings-field">
+        <label className="settings-label">{t("settings.general.versions")}</label>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
           <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>pi-kot server</span>
+            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.server")}</span>
             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
               {versions?.serverVersion ?? "…"}
             </span>
           </div>
           <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>pi SDK</span>
+            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.sdk")}</span>
             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
               {versions?.sdkVersion ?? "…"}
             </span>
           </div>
           {checkResult !== undefined && (
             <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-              <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>Latest SDK</span>
+              <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.latestSdk")}</span>
               <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
                 {checkResult.error !== undefined ? (
-                  <span style={{ color: "var(--danger, #e74c3c)" }}>Check failed</span>
+                  <span style={{ color: "var(--danger, #e74c3c)" }}>{t("settings.general.checkFailed")}</span>
                 ) : (
                   checkResult.latestSdkVersion
                 )}
@@ -78,11 +99,11 @@ export function GeneralTab() {
                   borderRadius: 4,
                   fontWeight: 600,
                 }}>
-                  Update available
+                  {t("settings.general.updateAvailable")}
                 </span>
               )}
               {checkResult.error === undefined && !checkResult.updateAvailable && (
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Up to date</span>
+                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("settings.general.upToDate")}</span>
               )}
             </div>
           )}
@@ -98,7 +119,7 @@ export function GeneralTab() {
             disabled={checking}
             className="settings-btn"
           >
-            {checking ? "Checking…" : checkResult !== undefined ? "Check again" : "Check for updates"}
+            {checking ? t("settings.general.checking") : checkResult !== undefined ? t("settings.general.checkAgain") : t("settings.general.checkForUpdates")}
           </button>
         </div>
       </div>
@@ -110,7 +131,7 @@ export function GeneralTab() {
           onClick={() => window.location.reload()}
           className="settings-btn"
         >
-          Reload page
+          {t("settings.general.reloadPage")}
         </button>
       </div>
     </div>

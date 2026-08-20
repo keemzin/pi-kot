@@ -24,6 +24,7 @@ import { SystemPromptTab } from "./components/SystemPromptTab";
 import { useTouchSwipe } from "./hooks/useTouchSwipe";
 import { useLayoutStore } from "./stores/layout-store";
 import { usePreferencesStore } from "./stores/preferences-store";
+import { useI18n } from "./hooks/useI18n";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -68,6 +69,7 @@ function projectColor(id: string): string {
 }
 
 export function App() {
+  const { t } = useI18n();
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
   const activeProjectId = useSessionStore((s) => s.activeProjectId);
   const sessions = useSessionStore((s) => s.sessions);
@@ -788,26 +790,31 @@ export function App() {
             {showArchived === activeProjectId && (() => {
               const archived = useSessionStore.getState().archivedSessions[activeProjectId];
               if (archived === undefined) return <div className="archived-status"><LoadingSkeleton variant="list" count={2} /></div>;
-              if (archived.length === 0) return <div className="archived-status">No archived sessions — they appear here once archived</div>;
               return (
-                <div className="session-list project-sublist archived-list">
-                  {archived.map((s: SessionSummary) => (
-                    <div key={s.sessionId} className="session-item archived">
-                      <span className="session-name">
-                        {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
-                      </span>
-                      <button
-                        className="session-restore-btn"
-                        title="Restore session"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          useSessionStore.getState().unarchiveSession(s.sessionId, activeProjectId);
-                        }}
-                      >
-                        ↻
-                      </button>
+                <div className="sidebar-section-content" style={{ marginTop: 4 }}>
+                  {archived.length === 0 ? (
+                    <div className="archived-status">{t("app.noArchived")}</div>
+                  ) : (
+                    <div className="session-list project-sublist archived-list">
+                      {archived.map((s: SessionSummary) => (
+                        <div key={s.sessionId} className="session-item archived">
+                          <span className="session-name">
+                            {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
+                          </span>
+                          <button
+                            className="session-restore-btn"
+                            title="Restore session"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              useSessionStore.getState().unarchiveSession(s.sessionId, activeProjectId);
+                            }}
+                          >
+                            ↻
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               );
             })()}
@@ -827,7 +834,7 @@ export function App() {
                 <path d="M2 17l10 5 10-5" />
                 <path d="M2 12l10 5 10-5" />
               </svg>
-              <span>MCP</span>
+              <span>{t("sidebar.nav.mcp")}</span>
             </button>
             <button
               type="button"
@@ -838,7 +845,7 @@ export function App() {
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              <span>Settings</span>
+              <span>{t("sidebar.nav.settings")}</span>
             </button>
             <button
               type="button"
@@ -850,7 +857,7 @@ export function App() {
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              <span>Sign out</span>
+              <span>{t("sidebar.nav.signOut")}</span>
             </button>
           </div>
         </div>
@@ -968,7 +975,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setShowMCP(true)}
-                title="MCP Settings"
+                title={t("sidebar.nav.mcp")}
                 style={{
                   background: "none",
                   border: "none",
@@ -989,7 +996,7 @@ export function App() {
               <button
                 type="button"
                 onClick={() => setShowSettings(true)}
-                title="Settings"
+                title={t("sidebar.nav.settings")}
                 style={{
                   background: "none",
                   border: "none",
@@ -1006,7 +1013,7 @@ export function App() {
               <button
                 type="button"
                 onClick={handleClearToken}
-                title="Sign out (clear stored token)"
+                title={t("sidebar.nav.signOut")}
                 style={{
                   background: "none",
                   border: "none",
@@ -1018,7 +1025,7 @@ export function App() {
                   lineHeight: 1,
                 }}
               >
-                Sign out
+                {t("sidebar.nav.signOut")}
               </button>
             </div>
           </div>
@@ -1088,10 +1095,10 @@ export function App() {
               </>
             ) : (
               <div className="centered" style={{ height: "100%" }}>
-                <div className="welcome">
+                <div className="welcome-message" style={{ margin: "auto" }}>
                   <div className="welcome-icon">⌨️</div>
-                  <div className="welcome-text">Select or create a session</div>
-                  <div className="welcome-hint">to start chatting with the coding agent</div>
+                  <div className="welcome-text">{t("app.selectSession")}</div>
+                  <div className="welcome-hint">{t("app.startChatting")}</div>
                 </div>
               </div>
             )}
@@ -1184,7 +1191,7 @@ export function App() {
             style={{ width: 420, maxWidth: "90vw", height: "auto", minHeight: 0 }}
           >
             <header className="settings-header">
-              <span style={{ fontSize: 14, fontWeight: 600 }}>Remove project?</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{t("app.removeProject")}</span>
               <button
                 onClick={() => setProjectToDelete(undefined)}
                 className="settings-close"

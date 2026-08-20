@@ -1,6 +1,7 @@
 import { memo, useEffect, useState } from "react";
 import { Layers } from "lucide-react";
 import type { ActiveCompaction } from "../stores/session-store";
+import { useI18n } from "../hooks/useI18n";
 
 const REASON_CONFIG: Record<
   ActiveCompaction["reason"],
@@ -8,18 +9,18 @@ const REASON_CONFIG: Record<
 > = {
   overflow: {
     icon: "🧠",
-    label: "Auto-compacting",
-    description: "Context overflow detected. Compressing older messages to make room...",
+    label: "chat.autoCompacting",
+    description: "chat.descOverflow",
   },
   threshold: {
     icon: "⚙️",
-    label: "Auto-compacting",
-    description: "Context usage threshold reached. Compressing older messages...",
+    label: "chat.autoCompacting",
+    description: "chat.descThreshold",
   },
   manual: {
     icon: "🗜️",
-    label: "Compacting",
-    description: "Compressing session context...",
+    label: "chat.compacting",
+    description: "chat.descManual",
   },
 };
 
@@ -33,6 +34,7 @@ export const CompactionNotice = memo(function CompactionNotice({
 }: {
   compaction: ActiveCompaction;
 }) {
+  const { t } = useI18n();
   const isComplete = compaction.completedAt !== undefined;
   const cfg = REASON_CONFIG[compaction.reason];
   const [elapsed, setElapsed] = useState(() =>
@@ -50,10 +52,10 @@ export const CompactionNotice = memo(function CompactionNotice({
   // Completed state — show result summary
   if (isComplete) {
     const title = compaction.aborted
-      ? "Compaction cancelled"
+      ? t("chat.compaction_cancelled")
       : compaction.errorMessage
-        ? "Compaction failed"
-        : "Compacted";
+        ? t("chat.compaction_failed")
+        : t("chat.compacted");
 
     return (
       <div className="message-row system">
@@ -103,8 +105,8 @@ export const CompactionNotice = memo(function CompactionNotice({
       <div className="compaction-notice">
         <span className="compaction-notice-icon">{cfg.icon}</span>
         <div className="compaction-notice-body">
-          <div className="compaction-notice-title">{cfg.label}</div>
-          <div className="compaction-notice-desc">{cfg.description}</div>
+          <div className="compaction-notice-title">{t(cfg.label as any)}</div>
+          <div className="compaction-notice-desc">{t(cfg.description as any)}</div>
           <div className="compaction-notice-timer">
             {elapsed < 60
               ? `${elapsed}s`
@@ -117,6 +119,9 @@ export const CompactionNotice = memo(function CompactionNotice({
           <span>.</span>
           <span>.</span>
         </span>
+        {compaction.phase === "summarizing"
+          ? t("chat.summarizing")
+          : t("chat.compacting")}
       </div>
     </div>
   );

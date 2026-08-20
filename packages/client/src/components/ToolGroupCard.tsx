@@ -4,6 +4,7 @@ import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { useI18n } from "../hooks/useI18n";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -481,6 +482,8 @@ export function ToolCallEntry({
 	previewOverride,
 	icon,
 	suppressRunning = false,
+	isActive,
+	isLastInTurn,
 }: {
 	block: Record<string, unknown>;
 	result: PairableMessage | undefined;
@@ -494,7 +497,12 @@ export function ToolCallEntry({
 	/** When true, a missing result is treated as cancelled/aborted rather than
 	 *  running (used after the turn stopped streaming). */
 	suppressRunning?: boolean;
+	isActive: boolean;
+	isLastInTurn: boolean;
 }) {
+	const { t } = useI18n();
+	// Local override for expanded state. If undefined, we follow the global preference.
+	const [localExpanded, setLocalExpanded] = useState<boolean | undefined>();
 	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
 	const [justCompleted, setJustCompleted] = useState(false);
 	const wasRunning = useRef(result === undefined);
@@ -591,7 +599,7 @@ export function ToolCallEntry({
 					)}
 					{isRunning && (
 						<span className="tool-timeline-running" aria-label="running">
-							running…
+							{t("chat.running")}
 						</span>
 					)}
 					{hasDetails && (
@@ -604,12 +612,15 @@ export function ToolCallEntry({
 				{detailsOpen && (
 					<div className="tool-timeline-details">
 						{argsText.length > 2 && (
-							<div>
-								<div className="tool-timeline-section-label">input</div>
+							<details>
+							<summary>
+								<div className="tool-timeline-section-label">{t("chat.toolInput")}</div>
+								<div className="tool-timeline-section-line" />
+							</summary>
 								<pre className="tool-timeline-code" ref={argsPreRef}>
 									{argsText}
 								</pre>
-							</div>
+							</details>
 						)}
 						{editDiff !== undefined && editStats !== undefined ? (
 							<div className="overflow-hidden px-3 pb-2">
@@ -651,6 +662,7 @@ export function ToolCallEntry({
 /* ── Thinking row (only rendered when showThinking is on) ───────────────── */
 
 function TrailThinkingRow({ text }: { text: string }) {
+	const { t } = useI18n();
 	const showThinking = usePreferencesStore((s) => s.showThinking);
 	const [open, setOpen] = useState(false);
 	
@@ -665,7 +677,7 @@ function TrailThinkingRow({ text }: { text: string }) {
 				}}
 			>
 				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">Thinking</span>
+				<span className="thinking-block-label">{t("chat.thinking")}</span>
 			</summary>
 			<div className="thinking-block-content">{text}</div>
 		</details>
@@ -685,6 +697,7 @@ function JustificationRow({
 	open: boolean;
 	onToggle: () => void;
 }) {
+	const { t } = useI18n();
 	const stripped = text
 		.replace(/#+\s+/g, "") // remove headers like "## "
 		.replace(/[*_~`]/g, "") // remove bold, italic, strikethrough, code ticks
@@ -722,10 +735,12 @@ function JustificationRow({
 					{open ? (
 						<span className="trail-justification-label">Justification</span>
 					) : (
-						<span className="trail-justification-preview" title={preview}>
-							{preview || "Justification"}
+						<div className="trail-justification-summary">
+						<span className="trail-justification-label">{t("chat.toolJustification")}</span>
+						<span className="trail-justification-preview">
+							{preview || t("chat.toolJustification")}
 						</span>
-					)}
+					</div>)}
 				</div>
 				<span className="trail-justification-chevron">
 					<svg
@@ -851,6 +866,7 @@ function ConsecutiveToolGroup({
 	startIndex: number;
 	renderEntry: (entry: ToolGroupEntry, idx: number) => React.ReactNode;
 }) {
+	const { t } = useI18n();
 	const [isOpen, setIsOpen] = useState(false);
 
 	const anyRunning =
@@ -894,11 +910,12 @@ function ConsecutiveToolGroup({
 							{count} × {displayName}
 						</span>
 						{!expanded && (
-							<span className="tool-timeline-arg">Grouped tools</span>
-						)}
+						<div className="tool-timeline-summary">
+							<span className="tool-timeline-arg">{t("chat.groupedTools")}</span>
+						</div>)}
 						{isRunning && (
 							<span className="tool-timeline-running" aria-label="running">
-								running…
+								{t("chat.running")}
 							</span>
 						)}
 						<span className={`tool-timeline-chevron-toggle ${expanded ? "open" : ""}`}>
@@ -935,6 +952,7 @@ export function ToolGroupCard({
 	entries: ToolGroupEntry[];
 	isStreaming?: boolean;
 }) {
+	const { t } = useI18n();
 	const hasJustifications = entries.some((e) => e.kind === "justification");
 	// Default resting view for a trail comes from the user preference.
 	const trailDefaultView = usePreferencesStore((s) => s.trailDefaultView);
@@ -1034,6 +1052,8 @@ export function ToolGroupCard({
 					previewOverride={getToolDescription(name, args) || undefined}
 					icon={<TrailIcon toolName={name} />}
 					suppressRunning={!isStreaming}
+					isActive={isStreaming && entry.result === undefined}
+					isLastInTurn={idx === entries.length - 1}
 				/>
 			);
 		}
@@ -1136,9 +1156,9 @@ export function ToolGroupCard({
 							</svg>
 						)}
 					</span>
-					<span className="trail-toggle-label">Trail</span>
+					<span className="trail-toggle-label">{t("chat.trail")}</span>
 					<span className="trail-toggle-view">{viewLabel}</span>
-					{anyRunning && <span className="trail-running-label">running</span>}
+					{anyRunning && <span className="trail-running-label">{t("chat.runningShort")}</span>}
 				</button>
 			</div>
 

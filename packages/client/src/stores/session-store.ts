@@ -80,6 +80,7 @@ export interface ActiveCompaction {
 	completedAt?: number;
 	aborted?: boolean;
 	errorMessage?: string;
+	phase?: string;
 	tokensBefore?: number;
 	estimatedTokensAfter?: number;
 }

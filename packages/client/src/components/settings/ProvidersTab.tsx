@@ -14,12 +14,14 @@ import { AddProviderDialog } from "../AddProviderDialog";
 import { ConfirmDialog } from "../Modal";
 import { errorMsg } from "./shared";
 import { ModelEditor, type ModelEntry } from "./ModelEditor";
+import { useI18n } from "../../hooks/useI18n";
 
 interface Props {
   onError: (msg: string | undefined) => void;
 }
 
 export function ProvidersTab({ onError }: Props) {
+  const { t } = useI18n();
   const [providers, setProviders] = useState<ProvidersResponse | undefined>(undefined);
   const [auth, setAuth] = useState<AuthSummaryResponse | undefined>(undefined);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -110,17 +112,16 @@ export function ProvidersTab({ onError }: Props) {
   };
 
   if (providers === undefined) {
-    return <p className="settings-hint">Loading providers…</p>;
+    return <p className="settings-hint">{t("settings.providers.loading")}</p>;
   }
 
   return (
     <div className="space-y-3">
       <p className="settings-hint">
-        Built-in providers and anything in <code className="font-mono">models.json</code>. Stored
-        API keys are presence-only — actual values are never sent to the browser.
+        {t("settings.providers.description")}
       </p>
       {providers.providers.length === 0 && (
-        <p className="settings-hint italic">No providers configured.</p>
+        <p className="settings-hint italic">{t("settings.providers.noProviders")}</p>
       )}
       {providers.providers.map((p) => {
         const presence = auth?.providers[p.provider];
@@ -132,13 +133,13 @@ export function ProvidersTab({ onError }: Props) {
               <div className="settings-card-left">
                 <span className="font-mono text-sm">{p.provider}</span>
                 <span className={`settings-badge ${configured ? "settings-badge-on" : "settings-badge-off"}`}>
-                  {configured ? "key set" : "no key"}
+                  {configured ? t("settings.providers.keySet") : t("settings.providers.noKey")}
                 </span>
                 {customProviders.has(p.provider) && (
                   <span className="settings-badge-custom">models.json</span>
                 )}
                 {presence?.source !== undefined && (
-                  <span className="text-xs text-dim">via {presence.source}</span>
+                  <span className="text-xs text-dim">{t("settings.providers.via")} {presence.source}</span>
                 )}
               </div>
               <div className="settings-card-actions">
@@ -150,7 +151,7 @@ export function ProvidersTab({ onError }: Props) {
                     }}
                     className="settings-btn"
                   >
-                    {configured ? "Replace key" : "Add key"}
+                    {configured ? t("settings.providers.replaceKey") : t("settings.providers.addKey")}
                   </button>
                 )}
                 {configured && !editing && (
@@ -159,7 +160,7 @@ export function ProvidersTab({ onError }: Props) {
                     disabled={busy}
                     className="settings-btn settings-btn-danger"
                   >
-                    Remove
+                    {t("settings.providers.remove")}
                   </button>
                 )}
                 {customProviders.has(p.provider) && !editing && (
@@ -167,9 +168,9 @@ export function ProvidersTab({ onError }: Props) {
                     onClick={() => setRemovingProvider(p.provider)}
                     disabled={busy}
                     className="settings-btn-delete"
-                    title="Remove from models.json"
+                    title={t("settings.providers.removeFromModels")}
                   >
-                    Delete provider
+                    {t("settings.providers.deleteProvider")}
                   </button>
                 )}
               </div>
@@ -180,7 +181,7 @@ export function ProvidersTab({ onError }: Props) {
                   type="password"
                   value={keyDraft}
                   onChange={(e) => setKeyDraft(e.target.value)}
-                  placeholder="Paste API key"
+                  placeholder={t("settings.providers.pasteKey")}
                   autoFocus
                   className="settings-input"
                 />
@@ -189,7 +190,7 @@ export function ProvidersTab({ onError }: Props) {
                   disabled={busy || keyDraft.trim().length === 0}
                   className="settings-btn settings-btn-primary"
                 >
-                  {busy ? "Saving…" : "Save"}
+                  {busy ? t("settings.providers.saving") : t("settings.providers.save")}
                 </button>
                 <button
                   onClick={() => {
@@ -198,13 +199,13 @@ export function ProvidersTab({ onError }: Props) {
                   }}
                   className="settings-btn"
                 >
-                  Cancel
+                  {t("settings.providers.cancel")}
                 </button>
               </div>
             )}
             <details className="settings-details">
               <summary className="settings-summary">
-                {p.models.length} model{p.models.length === 1 ? "" : "s"}
+                {p.models.length} {t("settings.providers.modelsCount")}
               </summary>
               <ul className="settings-model-list">
                 {p.models.map((m, mi) => (
@@ -236,7 +237,7 @@ export function ProvidersTab({ onError }: Props) {
                           }}
                         />
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                          <button onClick={() => setEditingModel(undefined)} className="settings-btn">Cancel</button>
+                          <button onClick={() => setEditingModel(undefined)} className="settings-btn">{t("settings.providers.cancel")}</button>
                           <button onClick={async () => {
                             if (!modelsData) return;
                             setBusy(true);
@@ -251,7 +252,7 @@ export function ProvidersTab({ onError }: Props) {
                               setBusy(false);
                             }
                           }} className="settings-btn settings-btn-primary" disabled={busy}>
-                            {busy ? "Saving…" : "Save"}
+                            {busy ? t("settings.providers.saving") : t("settings.providers.save")}
                           </button>
                         </div>
                       </div>
@@ -272,12 +273,12 @@ export function ProvidersTab({ onError }: Props) {
         );
       })}
 
-      <div className="add-provider-actions" style={{ marginTop: 16, marginBottom: 8 }}>
+      <div style={{ marginTop: 24, textAlign: "center" }}>
         <button
           onClick={() => setShowAddDialog(true)}
-          className="settings-btn settings-btn-primary"
+          className="settings-btn"
         >
-          + Add Custom Provider
+          {t("settings.providers.addCustom")}
         </button>
       </div>
 
@@ -310,9 +311,9 @@ export function ProvidersTab({ onError }: Props) {
             setBusy(false);
           }
         }}
-        title="Delete provider"
-        message={`Remove "${removingProvider ?? ""}" from models.json? This can be undone by adding it again.`}
-        primaryLabel="Delete"
+        title={t("settings.providers.deleteProvider")}
+        message={t("settings.providers.deleteProviderConfirm")}
+        primaryLabel={t("settings.providers.delete")}
         tone="danger"
       />
 
@@ -328,7 +329,7 @@ export function ProvidersTab({ onError }: Props) {
           }}
           className="settings-btn"
         >
-          {showModelsJson ? "Hide" : "Show"} models.json raw editor
+          {showModelsJson ? t("settings.providers.hideRaw") : t("settings.providers.showRaw")}
         </button>
         {showModelsJson && rawJson !== undefined && (
           <div className="settings-json-area">
@@ -341,21 +342,21 @@ export function ProvidersTab({ onError }: Props) {
             />
             <div className="settings-json-actions">
               {jsonSavedAt !== undefined && (
-                <span className="settings-json-flash">Saved</span>
+                <span className="settings-json-flash">{t("settings.agent.saved")}</span>
               )}
               <button
                 onClick={() => void loadModelsJson()}
                 disabled={busy}
                 className="settings-btn"
               >
-                Reload
+                {t("settings.providers.reload")}
               </button>
               <button
                 onClick={() => void saveRawJson()}
                 disabled={busy}
                 className="settings-btn settings-btn-primary"
               >
-                {busy ? "Saving…" : "Save"}
+                {busy ? t("settings.providers.saving") : t("settings.providers.save")}
               </button>
             </div>
           </div>

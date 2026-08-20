@@ -12,6 +12,7 @@ import {
   type TunnelDoctorResponse,
   type TunnelStatusResponse,
 } from "../lib/api-client";
+import { useI18n } from "../hooks/useI18n";
 
 type TunnelState = "idle" | "starting" | "stopping" | "error";
 
@@ -82,6 +83,7 @@ function fallbackCopy(text: string): Promise<void> {
 }
 
 function CopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
@@ -109,12 +111,13 @@ function CopyButton({ text }: { text: string }) {
       }}
       title="Copy URL"
     >
-      {failed ? "Failed" : copied ? "Copied!" : "Copy"}
+      {failed ? t("settings.tunnel.failed") : copied ? t("settings.tunnel.copied") : t("settings.tunnel.copy")}
     </button>
   );
 }
 
 export function TunnelTab() {
+  const { t } = useI18n();
   const [check, setCheck] = useState<TunnelCheckResponse | null>(null);
   const [doctor, setDoctor] = useState<TunnelDoctorResponse | null>(null);
   const [status, setStatus] = useState<TunnelStatusResponse | null>(null);
@@ -182,7 +185,7 @@ export function TunnelTab() {
   return (
     <div className="settings-section" style={{ padding: "20px 24px" }}>
       <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 600 }}>
-        Ngrok Tunnel
+        {t("settings.tunnel.title")}
       </h3>
 
       {/* Installation status */}
@@ -193,10 +196,10 @@ export function TunnelTab() {
         marginBottom: 16,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>Status</span>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.tunnel.status")}</span>
           <StatusBadge
             status={ngrokInstalled ? "pass" : "fail"}
-            label={ngrokInstalled ? "ngrok installed" : "ngrok not installed"}
+            label={ngrokInstalled ? t("settings.tunnel.ngrokInstalled") : t("settings.tunnel.ngrokNotInstalled")}
           />
         </div>
         {check && (
@@ -204,7 +207,7 @@ export function TunnelTab() {
             {check.version && <div>Version: {check.version}</div>}
             {!ngrokInstalled && check.installCommand && (
               <div style={{ marginTop: 8 }}>
-                <span>Install: </span>
+                <span>{t("settings.tunnel.install")}</span>
                 <code style={{
                   background: "var(--bg-glass)",
                   padding: "2px 8px",
@@ -221,7 +224,7 @@ export function TunnelTab() {
                       rel="noopener noreferrer"
                       style={{ color: "var(--accent)" }}
                     >
-                      Download
+                      {t("settings.tunnel.download")}
                     </a>
                   </span>
                 )}
@@ -240,7 +243,7 @@ export function TunnelTab() {
           marginBottom: 16,
         }}>
           <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>
-            Diagnostics
+            {t("settings.tunnel.diagnostics")}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {doctor.providerChecks.map((c) => (
@@ -260,11 +263,11 @@ export function TunnelTab() {
                 marginBottom: 6,
                 textTransform: "capitalize",
               }}>
-                {mode.mode} mode
+                {mode.mode} {t("settings.tunnel.mode")}
               </div>
               {mode.blockers.length > 0 && (
                 <div style={{ fontSize: 11, color: "var(--accent-red, #e06c75)" }}>
-                  Blockers: {mode.blockers.join(", ")}
+                  {t("settings.tunnel.blockers")}: {mode.blockers.join(", ")}
                 </div>
               )}
             </div>
@@ -288,7 +291,7 @@ export function TunnelTab() {
               borderRadius: "50%",
               background: "var(--accent-green, #98c379)",
             }} />
-            <span style={{ fontSize: 13, fontWeight: 500 }}>Tunnel Active</span>
+            <span style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.tunnel.serverListening")}</span>
           </div>
           <div style={{
             display: "flex",
@@ -302,7 +305,7 @@ export function TunnelTab() {
             <CopyButton text={status.url} />
           </div>
           <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>
-            Provider: {status.provider} · Mode: {status.mode}
+            {t("settings.tunnel.provider")}: {status.provider} · {t("settings.tunnel.mode")}: {status.mode}
           </div>
         </div>
       )}
@@ -345,10 +348,10 @@ export function TunnelTab() {
           }}
         >
           {tunnelState === "starting"
-            ? "Starting..."
+            ? t("settings.tunnel.starting")
             : running
-              ? "Tunnel Active"
-              : "Start Tunnel"}
+              ? t("settings.tunnel.active")
+              : t("settings.tunnel.start")}
         </button>
         <button
           onClick={handleStop}
@@ -366,7 +369,7 @@ export function TunnelTab() {
             color: "var(--accent-red, #e06c75)",
           }}
         >
-          {tunnelState === "stopping" ? "Stopping..." : "Stop Tunnel"}
+          {tunnelState === "stopping" ? t("settings.tunnel.stopping") : t("settings.tunnel.stop")}
         </button>
         <button
           onClick={refresh}

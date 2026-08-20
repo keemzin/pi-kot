@@ -3,8 +3,10 @@ import { useMcpStore } from "../stores/mcp-store";
 import { listTools, setToolEnabled, listToolOverrides, clearToolProjectOverride, fetchProjects } from "../lib/api-client";
 import type { McpServerConfig, McpServerStatus, ToolOverridesResponse } from "../lib/api-client/types";
 import { SlidePanel } from "./SlidePanel";
+import { useI18n } from "../hooks/useI18n";
 
 export function MCPPanel({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   const settings = useMcpStore((s) => s.settings);
   const globalServers = useMcpStore((s) => s.globalServers);
   const globalStatus = useMcpStore((s) => s.globalStatus);
@@ -56,7 +58,7 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
   const serverEntries = Object.entries(globalServers);
 
   return (
-    <SlidePanel open onClose={onClose} title="MCP Settings" style={{ maxWidth: "520px" }}>
+    <SlidePanel open onClose={onClose} title={t("settings.mcp.title")} style={{ maxWidth: "520px" }}>
       <div style={{ padding: "12px 16px 16px" }}>
           {error !== null && (
             <div className="mcp-error">{error}</div>
@@ -64,13 +66,13 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
 
           {loading && settings === undefined ? (
             <div style={{ padding: "20px 0", textAlign: "center", color: "var(--text-dim)", fontSize: "12px" }}>
-              Loading MCP configuration...
+              {t("settings.mcp.loading")}
             </div>
           ) : (
             <>
               <div className="settings-card" style={{ marginBottom: "10px" }}>
                 <div className="settings-card-header">
-                  <span className="settings-section-title" style={{ margin: 0 }}>Status</span>
+                  <span className="settings-section-title" style={{ margin: 0 }}>{t("settings.mcp.status")}</span>
                   <label className="mcp-toggle" style={{ cursor: "pointer" }}>
                     <span
                       className="mcp-toggle-track"
@@ -80,20 +82,20 @@ export function MCPPanel({ onClose }: { onClose: () => void }) {
                       <span className="mcp-toggle-thumb" />
                     </span>
                     <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                      {settings?.enabled ? "Enabled" : "Disabled"}
+                      {settings?.enabled ? t("settings.mcp.enabled") : t("settings.mcp.disabled")}
                     </span>
                   </label>
                 </div>
                 {settings !== undefined && (
                   <div style={{ padding: "0 12px 8px", fontSize: "12px", color: "var(--text-dim)" }}>
-                    {settings.connected} / {settings.total} servers connected
+                    {settings.connected} / {settings.total} {t("settings.mcp.serversConnected")}
                   </div>
                 )}
               </div>
 
               <div className="settings-card" style={{ marginBottom: "10px" }}>
                 <div className="settings-card-header">
-                  <span className="settings-section-title" style={{ margin: 0 }}>Servers</span>
+                  <span className="settings-section-title" style={{ margin: 0 }}>{t("settings.mcp.servers")}</span>
                   <button
                     type="button"
                     className="mcp-add-btn"
@@ -195,6 +197,7 @@ function McpServerRow({
   onDelete: () => void;
   isEditing?: boolean;
 }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [tools, setTools] = useState<Array<{ name: string; shortName: string; description: string; enabled: boolean; globalEnabled: boolean; projectOverride?: "enabled" | "disabled" }> | null>(null);
   const [toolsLoading, setToolsLoading] = useState(false);
@@ -217,7 +220,7 @@ function McpServerRow({
     effectiveState === "connected" ? "Connected" :
     effectiveState === "connecting" ? "Connecting..." :
     effectiveState === "error" ? `Error${status?.lastError ? `: ${status.lastError}` : ""}` :
-    effectiveState === "disabled" ? (serverEnabled ? "Disabled" : "Disabled") :
+    effectiveState === "disabled" ? (serverEnabled ? t("settings.mcp.disabled") : t("settings.mcp.disabled")) :
     effectiveState === "trust_required" ? "Trust Required" :
     effectiveState === "idle" ? "Idle" :
     status !== undefined ? status.state : "—";
@@ -307,12 +310,12 @@ function McpServerRow({
         <span className="mcp-server-name">{name}</span>
         {config !== undefined && (
           <span className="mcp-server-badge" style={{ fontSize: "10px", color: serverEnabled ? "var(--text-secondary)" : "var(--text-dim)" }}>
-            {serverEnabled ? "Enabled" : "Disabled"}
+            {serverEnabled ? t("settings.mcp.enabled") : t("settings.mcp.disabled")}
           </span>
         )}
         <span className="mcp-server-badge" data-kind={kindLabel}>{kindLabel}</span>
         {status !== undefined && (
-          <span className="mcp-server-tools">{status.toolCount} tools</span>
+          <span className="mcp-server-tools">{status.toolCount} {t("settings.mcp.tools")}</span>
         )}
       </div>
 
@@ -358,7 +361,7 @@ function McpServerRow({
                 className={`mcp-action-btn ${serverEnabled ? "" : "mcp-action-btn-danger"}`}
                 onClick={() => onToggle(!serverEnabled)}
               >
-                {serverEnabled ? "Disable" : "Enable"}
+                {serverEnabled ? t("settings.mcp.disable") : t("settings.mcp.enable")}
               </button>
             )}
             <button
@@ -402,11 +405,12 @@ function McpServerForm({
   onCancel,
 }: {
   initialName?: string;
-  initialConfig?: McpServerConfig;
+  initialConfig?: Partial<McpServerConfig>;
   isEditing?: boolean;
   onSave: (name: string, config: McpServerConfig) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { t } = useI18n();
   const isStdio = initialConfig !== undefined
     ? typeof initialConfig.command === "string" && initialConfig.command.length > 0
     : false;
@@ -480,7 +484,7 @@ function McpServerForm({
   return (
     <div className="mcp-form" onClick={(e) => e.stopPropagation()}>
       <div className="mcp-form-row">
-        <label className="mcp-form-label">Name</label>
+        <label className="mcp-form-label">{t("settings.mcp.name")}</label>
         <input
           className="mcp-form-input"
           type="text"
@@ -492,7 +496,7 @@ function McpServerForm({
         />
       </div>
       <div className="mcp-form-row">
-        <label className="mcp-form-label">Type</label>
+        <label className="mcp-form-label">{t("settings.mcp.type")}</label>
         <select
           className="mcp-form-select"
           value={kind}
@@ -500,8 +504,8 @@ function McpServerForm({
           disabled={isEditing}
           style={isEditing ? { opacity: 0.6 } : undefined}
         >
-          <option value="stdio">stdio</option>
-          <option value="remote">Remote URL</option>
+          <option value="stdio">Stdio</option>
+          <option value="remote">{t("settings.mcp.remoteUrl")}</option>
         </select>
         {isEditing && (
           <span style={{ fontSize: "10px", color: "var(--text-dim)", marginLeft: "6px" }}>
@@ -510,7 +514,7 @@ function McpServerForm({
         )}
       </div>
       <div className="mcp-form-row">
-        <label className="mcp-form-label">Enabled</label>
+        <label className="mcp-form-label">{t("settings.mcp.enabled")}</label>
         <label className="mcp-form-checkbox-label" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <input
             type="checkbox"
@@ -518,14 +522,14 @@ function McpServerForm({
             onChange={(e) => setEnabled(e.target.checked)}
           />
           <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-            Disabled servers don't connect or contribute tools
+            {t("settings.mcp.disabledDesc")}
           </span>
         </label>
       </div>
       {kind === "remote" ? (
         <>
           <div className="mcp-form-row">
-            <label className="mcp-form-label">URL</label>
+            <label className="mcp-form-label">{t("settings.mcp.url")}</label>
             <input
               className="mcp-form-input"
               type="text"
@@ -535,18 +539,18 @@ function McpServerForm({
             />
           </div>
           <div className="mcp-form-row">
-            <label className="mcp-form-label">Transport</label>
+            <label className="mcp-form-label">{t("settings.mcp.transport")}</label>
             <select
               className="mcp-form-select"
               value={transport}
               onChange={(e) => setTransport(e.target.value as "auto" | "streamable-http" | "sse")}
             >
-              <option value="auto">Auto</option>
+              <option value="auto">{t("settings.mcp.auto")}</option>
               <option value="streamable-http">Streamable HTTP</option>
               <option value="sse">SSE</option>
             </select>
           </div>
-          <div className="mcp-form-section-label">Headers</div>
+          <div className="mcp-form-section-label">{t("settings.mcp.headers")}</div>
           {headersEntries.map((entry, i) => (
             <div key={i} className="mcp-form-row mcp-form-row-inline">
               <input
@@ -586,13 +590,13 @@ function McpServerForm({
             style={{ alignSelf: "flex-start" }}
             onClick={() => setHeadersEntries([...headersEntries, { key: "", value: "" }])}
           >
-            + Header
+            {t("settings.mcp.addHeader")}
           </button>
         </>
       ) : (
         <>
           <div className="mcp-form-row">
-            <label className="mcp-form-label">Command</label>
+            <label className="mcp-form-label">{t("settings.mcp.command")}</label>
             <input
               className="mcp-form-input"
               type="text"
@@ -602,7 +606,7 @@ function McpServerForm({
             />
           </div>
           <div className="mcp-form-row">
-            <label className="mcp-form-label">Args</label>
+            <label className="mcp-form-label">{t("settings.mcp.args")}</label>
             <input
               className="mcp-form-input"
               type="text"
@@ -612,7 +616,7 @@ function McpServerForm({
             />
           </div>
           <div className="mcp-form-row">
-            <label className="mcp-form-label">Working Directory</label>
+            <label className="mcp-form-label">{t("settings.mcp.workingDirectory")}</label>
             <input
               className="mcp-form-input"
               type="text"
@@ -621,7 +625,7 @@ function McpServerForm({
               placeholder="/absolute/path (optional)"
             />
           </div>
-          <div className="mcp-form-section-label">Environment Variables</div>
+          <div className="mcp-form-section-label">{t("settings.mcp.environmentVariables")}</div>
           {envEntries.map((entry, i) => (
             <div key={i} className="mcp-form-row mcp-form-row-inline">
               <input
@@ -661,15 +665,15 @@ function McpServerForm({
             style={{ alignSelf: "flex-start" }}
             onClick={() => setEnvEntries([...envEntries, { key: "", value: "" }])}
           >
-            + Env Var
+            {t("settings.mcp.addEnv")} Var
           </button>
         </>
       )}
       {formError !== null && <div className="mcp-form-error">{formError}</div>}
       <div className="mcp-form-actions">
-        <button type="button" className="mcp-action-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="mcp-action-btn" onClick={onCancel}>{t("settings.mcp.cancel")}</button>
         <button type="button" className="mcp-action-btn mcp-action-btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : isEditing ? "Save changes" : "Save"}
+          {saving ? t("settings.mcp.saving") : isEditing ? t("settings.mcp.saveChanges") : t("settings.mcp.save")}
         </button>
       </div>
     </div>
@@ -707,6 +711,7 @@ function ToolCascadeRow({
   onToggleGlobal,
   onSetProjectOverride,
 }: ToolCascadeRowProps) {
+  const { t } = useI18n();
   const [showOverrides, setShowOverrides] = useState(false);
 
   const existingOverrideProjects = overridesData !== null
@@ -746,7 +751,7 @@ function ToolCascadeRow({
           disabled={busy}
           onClick={() => onToggleGlobal(!globalEnabled)}
         >
-          {busy ? "..." : globalEnabled ? "Global: enabled" : "Global: disabled"}
+          {busy ? "..." : globalEnabled ? t("settings.mcp.globalEnabled") : t("settings.mcp.globalDisabled")}
         </button>
         {projectsList.length > 0 && (
           <button
@@ -807,10 +812,11 @@ interface TriStatePickerProps {
 }
 
 function TriStatePicker({ value, disabled, onChange }: TriStatePickerProps) {
+  const { t } = useI18n();
   const states = [
     { label: "Inherit", state: undefined as "enabled" | "disabled" | undefined },
-    { label: "Enabled", state: "enabled" as "enabled" | "disabled" | undefined },
-    { label: "Disabled", state: "disabled" as "enabled" | "disabled" | undefined },
+    { label: t("settings.mcp.enabled"), state: "enabled" as "enabled" | "disabled" | undefined },
+    { label: t("settings.mcp.disabled"), state: "disabled" as "enabled" | "disabled" | undefined },
   ];
 
   return (
@@ -856,6 +862,7 @@ interface AddOverrideDropdownProps {
 }
 
 function AddOverrideDropdown({ projects, busy, onSet }: AddOverrideDropdownProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(projects[0]?.id ?? "");
 
@@ -908,7 +915,7 @@ function AddOverrideDropdown({ projects, busy, onSet }: AddOverrideDropdownProps
             style={{ fontSize: "10px", padding: "2px 6px" }}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            {t("settings.mcp.cancel")}
           </button>
         </div>
       )}

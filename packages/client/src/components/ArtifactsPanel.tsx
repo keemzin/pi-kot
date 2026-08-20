@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore } from "../stores/session-store";
 import { listArtifacts, type ArtifactFileInfo } from "../lib/api-client";
+import { useI18n } from "../hooks/useI18n";
 
 const ARTIFACT_ICONS: Record<string, string> = {
   html: "◈", svg: "◇", markdown: "📝", json: "{}", text: "¶", image: "🖼",
@@ -19,19 +20,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, t: (key: string) => string): string {
   const d = new Date(iso);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1) return t("artifacts.justNow");
+  if (diffMin < 60) return `${diffMin}${t("artifacts.mAgo")}`;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}h ago`;
-  return `${Math.floor(diffHr / 24)}d ago`;
+  if (diffHr < 24) return `${diffHr}${t("artifacts.hAgo")}`;
+  return `${Math.floor(diffHr / 24)}${t("artifacts.dAgo")}`;
 }
 
 export function ArtifactsPanel() {
+  const { t } = useI18n();
   // ── Stream artifacts (from chat) ──
   const artifactItems       = useLayoutStore((s) => s.artifactItems);
   const artifactActiveId    = useLayoutStore((s) => s.artifactActiveId);
@@ -100,7 +102,7 @@ export function ArtifactsPanel() {
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
-          📡 Stream
+          📡 {t("artifacts.stream")}
         </span>
         <span
           style={{ fontSize: 11, color: "var(--text-tertiary)", background: "var(--bg-glass)", padding: "1px 6px", borderRadius: 10 }}
@@ -120,7 +122,7 @@ export function ArtifactsPanel() {
               fontSize: 12,
             }}
           >
-            No stream artifacts for this session.
+            {t("artifacts.noStream")}
           </div>
         ) : (
           sessionStreamArtifacts.map((item) => {
@@ -194,7 +196,7 @@ export function ArtifactsPanel() {
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>
-          💾 Saved
+          💾 {t("artifacts.saved")}
         </span>
         <button
           onClick={fetchSaved}
@@ -209,7 +211,7 @@ export function ArtifactsPanel() {
             cursor: savedLoading ? "wait" : "pointer",
             opacity: savedLoading ? 0.5 : 1,
           }}
-          title="Refresh saved artifacts"
+          title={t("artifacts.refreshSaved")}
         >
           {savedLoading ? "⏳" : "🔄"}
         </button>
@@ -242,12 +244,12 @@ export function ArtifactsPanel() {
               fontSize: 12,
             }}
           >
-            No saved artifacts.
+            {t("artifacts.noSaved")}
             <br />
             <span style={{ fontSize: 11 }}>
               {projectPath
-                ? `Agent-created files in .pi/artifacts/`
-                : "Select a project to see saved artifacts"}
+                ? t("artifacts.agentCreated")
+                : t("artifacts.selectProject")}
             </span>
           </div>
         ) : (
@@ -287,7 +289,7 @@ export function ArtifactsPanel() {
                   }}
                 >
                   <span>{formatSize(file.size)}</span>
-                  <span>{formatTime(file.modified)}</span>
+                  <span>{formatTime(file.modified, t)}</span>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -302,7 +304,7 @@ export function ArtifactsPanel() {
                     borderRadius: 4,
                     cursor: "pointer",
                   }}
-                  title="Open in new tab (full browser experience)"
+                  title={t("artifacts.openNewTab")}
                 >
                   ↗
                 </button>

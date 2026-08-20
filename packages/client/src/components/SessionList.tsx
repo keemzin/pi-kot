@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import type { SessionSummary } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useFavoriteStore } from "../stores/favorite-store";
+import { useI18n } from "../hooks/useI18n";
 
 const PAGE_SIZE = 8; // sessions shown before "Show more"
 const SEARCH_THRESHOLD = 0; // show search input once a project has this many sessions
@@ -42,6 +43,7 @@ export function SessionList({
   onToggleWorkerGroup,
   onNewSession,
 }: Props) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -202,19 +204,19 @@ export function SessionList({
       {/* ── Empty states ── */}
       {supervisors.length === 0 && workers.length === 0 && (
         <div style={{ padding: "6px 12px 2px", fontSize: "11px", color: "var(--text-dim)", fontStyle: "italic" }}>
-          No sessions yet — click + to start one
+          {t("sidebar.noSessions")}
         </div>
       )}
       {q && filteredSupervisors.length === 0 && (
         <div style={{ padding: "6px 12px 2px", fontSize: "11px", color: "var(--text-dim)", fontStyle: "italic" }}>
-          No matches for "{query}"
+          {t("sidebar.noMatches", { query })}
         </div>
       )}
 
       {/* ── Favorites section ── */}
       {favSessions.length > 0 && !q && (
         <>
-          <div className="favorites-section-header">★ Favorites</div>
+          <div className="favorites-section-header">{t("sidebar.favorites")}</div>
           {favSessions.map(renderRow)}
           {normalSessions.length > 0 && <div className="favorites-section-divider" />}
         </>
@@ -229,7 +231,7 @@ export function SessionList({
           onClick={() => setShowAll(true)}
           type="button"
         >
-          ↓ {hiddenCount} more session{hiddenCount !== 1 ? "s" : ""}
+          {hiddenCount !== 1 ? t("sidebar.showMorePlural", { count: hiddenCount }) : t("sidebar.showMore", { count: hiddenCount })}
         </button>
       )}
       {showAll && filteredSupervisors.length > PAGE_SIZE && (
@@ -238,7 +240,7 @@ export function SessionList({
           onClick={() => setShowAll(false)}
           type="button"
         >
-          ↑ Show less
+          {t("sidebar.showLess")}
         </button>
       )}
 
@@ -260,7 +262,7 @@ export function SessionList({
         type="button"
       >
         <span style={{ fontSize: "14px", lineHeight: 1 }}>＋</span>
-        New session
+        {t("sidebar.newSession")}
       </button>
     </div>
   );
