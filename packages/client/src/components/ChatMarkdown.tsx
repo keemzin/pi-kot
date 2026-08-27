@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, ImageOff } from "lucide-react";
 import { Highlight, themes as prismThemes } from "prism-react-renderer";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeKatex from "rehype-katex";
@@ -126,6 +126,78 @@ function CodeCopyButton({ code }: { code: string }) {
   );
 }
 
+function MarkdownImage({ src, alt }: { src?: string; alt?: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (src && (src.toLowerCase().endsWith(".html") || src.toLowerCase().endsWith(".htm"))) {
+    return (
+      <div
+        style={{
+          padding: "12px",
+          border: "1px dashed var(--border)",
+          borderRadius: "6px",
+          margin: "12px 0",
+          background: "var(--bg-subtle)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+          <span style={{ fontSize: "16px" }}>⚠️</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+            HTML Preview Blocked
+          </span>
+        </div>
+        <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+          The agent attempted to embed <strong>{src.split("/").pop() || src}</strong> as an image. HTML files cannot be displayed this way. To view the live preview, open the <strong>Artifacts</strong> tab and click on the file.
+        </p>
+      </div>
+    );
+  }
+
+  if (hasError || !src) {
+    const label = alt || (src ? src.split("/").pop() : "Image unavailable");
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "4px 10px",
+          margin: "4px 0",
+          fontSize: "12px",
+          color: "var(--text-muted, #888)",
+          background: "var(--bg-subtle, rgba(255,255,255,0.04))",
+          border: "1px solid var(--border, rgba(255,255,255,0.1))",
+          borderRadius: "6px",
+          maxWidth: "100%",
+          userSelect: "none",
+        }}
+        title={src ? `Unable to load: ${src}` : "Image unavailable"}
+      >
+        <ImageOff size={13} style={{ flexShrink: 0, opacity: 0.7 }} />
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {label}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt ?? ""}
+      loading="lazy"
+      onError={() => setHasError(true)}
+      style={{
+        maxWidth: "100%",
+        height: "auto",
+        borderRadius: 4,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+        display: "inline-block",
+      }}
+    />
+  );
+}
+
 const components: Components = {
   h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
   h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
@@ -145,41 +217,7 @@ const components: Components = {
     </a>
   ),
 
-  img: ({ src, alt }) => {
-    if (src && (src.toLowerCase().endsWith(".html") || src.toLowerCase().endsWith(".htm"))) {
-      return (
-        <div style={{ 
-          padding: "12px", 
-          border: "1px dashed var(--border)", 
-          borderRadius: "6px", 
-          margin: "12px 0",
-          background: "var(--bg-subtle)" 
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-            <span style={{ fontSize: "16px" }}>⚠️</span>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-              HTML Preview Blocked
-            </span>
-          </div>
-          <p style={{ margin: 0, fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-            The agent attempted to embed <strong>{src.split('/').pop() || src}</strong> as an image. HTML files cannot be displayed this way. To view the live preview, open the <strong>Artifacts</strong> tab and click on the file.
-          </p>
-        </div>
-      );
-    }
-    return (
-      <img
-        src={src}
-        alt={alt ?? ""}
-        style={{
-          maxWidth: "100%",
-          height: "auto",
-          borderRadius: 4,
-          boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-        }}
-      />
-    );
-  },
+  img: ({ src, alt }) => <MarkdownImage src={src} alt={alt} />,
 
   table: ({ children }) => (
     <div className="table-wrapper">

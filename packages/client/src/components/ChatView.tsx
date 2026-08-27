@@ -650,6 +650,20 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 
 /* ── Save as PNG button for assistant messages ── */
 
+const FALLBACK_IMG_PLACEHOLDER =
+	"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60' viewBox='0 0 120 60'%3E%3Crect width='120' height='60' fill='%23262626' rx='4'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23888888' font-size='12' font-family='sans-serif'%3EImage%3C/text%3E%3C/svg%3E";
+
+function dataUrlToBlob(dataUrl: string): Blob {
+	const parts = dataUrl.split(",");
+	const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+	const binary = atob(parts[1]);
+	const array = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) {
+		array[i] = binary.charCodeAt(i);
+	}
+	return new Blob([array], { type: mime });
+}
+
 function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 	const [saving, setSaving] = useState(false);
 
@@ -695,6 +709,7 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 		if (sourceBubbles.length === 0) return;
 
 		setSaving(true);
+		let wrapper: HTMLElement | null = null;
 		try {
 			const rootStyle = window.getComputedStyle(document.documentElement);
 			const bgColor =
@@ -704,7 +719,7 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 				"#1a1a1a";
 			const paddingSize = 40;
 
-			const wrapper = document.createElement("div");
+			wrapper = document.createElement("div");
 			wrapper.style.cssText = `
         padding: ${paddingSize}px;
         background-color: ${bgColor};
@@ -728,6 +743,10 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 				// Strip scrollbars from all child elements too (Firefox + legacy Edge)
 				clone.querySelectorAll<HTMLElement>("*").forEach((el) => {
 					el.style.scrollbarWidth = "none";
+					const bg = el.style.backgroundImage;
+					if (bg && (bg.includes("http://") || bg.includes("https://"))) {
+						el.style.backgroundImage = "none";
+					}
 				});
 
 				// Inject a tiny style to suppress WebKit scrollbars (Chrome, Safari)
@@ -749,6 +768,33 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 					el.style.overflow = "visible";
 				});
 
+				// Pre-convert / sanitize all images in the clone to avoid html-to-image fetch errors (CORS, offline, tailscale, broken URLs)
+				const originalImages = originalBubble.querySelectorAll<HTMLImageElement>("img");
+				const clonedImages = clone.querySelectorAll<HTMLImageElement>("img");
+				clonedImages.forEach((img, idx) => {
+					const origImg = originalImages[idx];
+					img.removeAttribute("srcset");
+					try {
+						if (origImg && origImg.complete && origImg.naturalWidth > 0 && origImg.naturalHeight > 0) {
+							const canvas = document.createElement("canvas");
+							canvas.width = origImg.naturalWidth;
+							canvas.height = origImg.naturalHeight;
+							const ctx = canvas.getContext("2d");
+							if (ctx) {
+								ctx.drawImage(origImg, 0, 0);
+								img.src = canvas.toDataURL("image/png");
+								return;
+							}
+						}
+					} catch {
+						// Tainted canvas or draw failure
+					}
+					// If already data URL, keep it
+					if (img.src.startsWith("data:")) return;
+					// Fallback for failed / cross-origin / dead external images (e.g. via.placeholder.com)
+					img.src = FALLBACK_IMG_PLACEHOLDER;
+				});
+
 				// Hide interactive elements by data-attr or class
 				clone
 					.querySelectorAll<HTMLElement>(
@@ -763,34 +809,36 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 
 			document.body.appendChild(wrapper);
 
+			// Adaptive pixelRatio to prevent exceeding browser canvas dimension/memory limits on very long messages
+			const wrapperHeight = wrapper.offsetHeight || 800;
+			const pixelRatio = wrapperHeight > 3000 ? 1.5 : 2;
+
 			const dataUrl = await toPng(wrapper, {
-				quality: 1,
-				pixelRatio: 3,
+				quality: 0.95,
+				pixelRatio,
 				backgroundColor: bgColor,
 				// Skip web font embedding — html-to-image can't read CSS rules
 				// from cross-origin stylesheets (Google Fonts via fonts.googleapis.com).
 				// The PNG will use system fallback fonts, which is fine for screenshots.
 				skipFonts: true,
+				imagePlaceholder: FALLBACK_IMG_PLACEHOLDER,
 			});
 
-			document.body.removeChild(wrapper);
-
-			// Convert data URL to blob to avoid Chromium's
-			// "loaded over an insecure connection" warning for HTTP origins.
-			const res = await fetch(dataUrl);
-			const blob = await res.blob();
+			const blob = dataUrlToBlob(dataUrl);
 			const blobUrl = URL.createObjectURL(blob);
-
 			const link = document.createElement("a");
 			link.download = `message-${Date.now()}.png`;
 			link.href = blobUrl;
 			document.body.appendChild(link);
 			link.click();
 			document.body.removeChild(link);
-			URL.revokeObjectURL(blobUrl);
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 		} catch (err) {
 			console.error("Failed to save message as PNG:", err);
 		} finally {
+			if (wrapper && wrapper.parentNode) {
+				wrapper.parentNode.removeChild(wrapper);
+			}
 			setSaving(false);
 		}
 	};
