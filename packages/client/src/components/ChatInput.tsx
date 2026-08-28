@@ -25,7 +25,8 @@ interface Props {
 interface SlashCommand {
   name: string;
   description: string;
-  handler: (sessionId: string) => Promise<void>;
+  /** args = everything the user typed after the command name (may be empty string). */
+  handler: (sessionId: string, args: string) => Promise<void>;
   /** Whether this is an extension command that needs the invokeExtensionCommand API */
   isExtension?: boolean;
 }
@@ -141,9 +142,10 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         const cmds: SlashCommand[] = info.commands.map((cmd) => ({
           name: "/" + cmd.invocationName,
           description: cmd.description || "Extension command",
-          handler: async (sid: string) => {
+          handler: async (sid: string, args: string) => {
             const { invokeExtensionCommand } = await import("../lib/api-client");
-            await invokeExtensionCommand(sid, cmd.invocationName);
+            // Forward the typed args (e.g. "/vision config provider openai" → args = "config provider openai")
+            await invokeExtensionCommand(sid, cmd.invocationName, args || undefined);
           },
           isExtension: true,
         }));
@@ -162,7 +164,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/compact",
       description: "Manually compact the session context",
-      handler: async (sid: string) => {
+      handler: async (sid: string, _args: string) => {
         try {
           await useSessionStore.getState().compactAndReload(sid);
         } catch (err: unknown) {
@@ -179,7 +181,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/compact with summary",
       description: "Compact and keep focus on specific areas",
-      handler: async (sid: string) => {
+      handler: async (sid: string, _args: string) => {
         try {
           await useSessionStore.getState().compactAndReload(sid);
         } catch (err: unknown) {
@@ -196,7 +198,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/reload",
       description: "Reload agent config and rebuild session tools",
-      handler: async () => {
+      handler: async (_sid: string, _args: string) => {
         const { reloadAgent } = await import("../lib/api-client");
         await reloadAgent();
       },
@@ -204,7 +206,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/abort",
       description: "Abort the current streaming response",
-      handler: async () => {
+      handler: async (_sid: string, _args: string) => {
         useSessionStore.getState().abort();
       },
     },
@@ -501,16 +503,24 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
     // Check if the input is a slash command
     if (text.startsWith("/") && !isStreaming) {
-      const trimmed = text.trim().toLowerCase();
-      const matched = allSlashCommands.find((cmd) => cmd.name.startsWith(trimmed));
+      // Split typed text into command-name token + trailing args.
+      // e.g. "/vision config provider openai" → name="/vision", args="config provider openai"
+      // Also support multi-word builtin names like "/compact with summary".
+      const trimmedLower = text.trim().toLowerCase();
+      // Find the longest registered command name that is a prefix of the typed text
+      // (prefer longer matches so "/compact with summary" wins over "/compact").
+      const matched = allSlashCommands
+        .filter((cmd) => trimmedLower === cmd.name.toLowerCase() || trimmedLower.startsWith(cmd.name.toLowerCase() + " "))
+        .sort((a, b) => b.name.length - a.name.length)[0];
       if (matched) {
+        const args = text.trim().slice(matched.name.length).trim();
         el.value = "";
         el.style.height = "auto";
         setSlashSuggestions([]);
         setImages([]);
         acClose();
         syncChips();
-        await matched.handler(sessionId);
+        await matched.handler(sessionId, args);
         return;
       }
     }
@@ -685,8 +695,13 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
     // ── Detect slash commands ──
     if (text.startsWith("/")) {
-      const trimmed = text.trim().toLowerCase();
-      const matched = allSlashCommands.filter((cmd) => cmd.name.startsWith(trimmed));
+      // Show suggestions for any registered command whose name starts with the
+      // first token the user has typed (i.e. cmd.name starts with the first word).
+      // This keeps the dropdown visible even after the user types args.
+      const firstToken = text.trim().toLowerCase().split(/\s+/)[0] ?? "";
+      const matched = allSlashCommands.filter((cmd) =>
+        cmd.name.toLowerCase().startsWith(firstToken),
+      );
       setSlashSuggestions(matched);
     } else {
       setSlashSuggestions([]);
@@ -706,6 +721,12 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const handleSlashCommand = async (cmd: SlashCommand) => {
     const el = textareaRef.current;
     if (el === null) return;
+    // Read args BEFORE clearing the input — the user may have typed
+    // "/vision config" and clicked the suggestion, so args = "config".
+    const typedText = el.value.trim();
+    const args = typedText.toLowerCase().startsWith(cmd.name.toLowerCase())
+      ? typedText.slice(cmd.name.length).trim()
+      : "";
     el.value = "";
     el.style.height = "auto";
     setSlashSuggestions([]);
@@ -713,7 +734,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     syncChips();
     setCompacting(true);
     try {
-      await cmd.handler(sessionId);
+      await cmd.handler(sessionId, args);
     } catch (err) {
       console.error("Slash command failed:", err);
     } finally {
