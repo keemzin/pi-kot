@@ -1616,12 +1616,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	}, [messages]);
 
 	// Per-turn cache for buildGroupedTurn results.
-	// Key = stable join of assistant message IDs in the turn + toolResults size.
+	// Key = stable join of assistant message IDs in the turn + turn-local result count.
 	// When the streaming turn finishes (all results arrive) it becomes a past
 	// turn and is served from cache on subsequent SSE events.
 	// The cache is intentionally unbounded per session (turns don't grow without
 	// bound in a single conversation, and we want the full history to stay fast).
 	const groupedTurnCache = useRef(new Map<string, GroupedTurn>());
+	// Clear cache on session switch — guards against ChatView being reused
+	// across sessions without unmounting (different sessionId, same instance).
+	useEffect(() => {
+		groupedTurnCache.current.clear();
+	}, [sessionId]);
 
 	const renderedRows = useMemo(() => {
 		const out: React.ReactNode[] = [];
