@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
@@ -523,12 +523,14 @@ export function ToolCallEntry({
 	const isError = result?.isError === true;
 	const isRunning = result === undefined && !suppressRunning;
 
-	// Auto-scroll the args pane to bottom while the tool is streaming
+	// Auto-scroll the args pane to bottom while the tool is streaming.
+	// Dep array is intentional: run only when running/open state changes, not
+	// every render — missing it caused a layout reflow per SSE tick per entry.
 	useEffect(() => {
 		if (isRunning && detailsOpen && argsPreRef.current) {
 			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
 		}
-	});
+	}, [isRunning, detailsOpen]);
 
 	const resultContent = Array.isArray(result?.content) ? result?.content : [];
 	const outputText = resultContent
@@ -994,7 +996,10 @@ export function ToolGroupCard({
 		isStreaming &&
 		entries.some((e) => e.kind === "tool" && e.result === undefined);
 
-	const { chunks, leading } = groupChunks(entries);
+	// Memoize chunk grouping so it doesn't recompute on every SSE delta.
+	// entries is only a new reference when the outer useMemo in ChatView
+	// rebuilds — which is already gated on message/toolResult changes.
+	const { chunks, leading } = useMemo(() => groupChunks(entries), [entries]);
 
 	// Live-turn "only the step being worked on" focus: while the turn is
 	// streaming in Justify view, the newest chunk expands automatically
@@ -1027,10 +1032,18 @@ export function ToolGroupCard({
 	const viewLabel = view === "full" ? "Collapse All" : "Expand All";
 
 	const scrollRef = useRef<HTMLDivElement>(null);
+	// Scroll to bottom when in full view during streaming.
+	// Use rAF to avoid forcing a synchronous layout reflow on every SSE event
+	// (scrollTop = scrollHeight forces layout; batching it to the paint frame
+	// prevents blocking input events during heavy tool calling).
 	useEffect(() => {
-		if (isStreaming && view === "full" && scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-		}
+		if (!isStreaming || view !== "full") return;
+		const raf = requestAnimationFrame(() => {
+			if (scrollRef.current) {
+				scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+			}
+		});
+		return () => cancelAnimationFrame(raf);
 	}, [entries.length, isStreaming, view]);
 
 	/** Render a single entry in Full view (tools, thinking, or full prose). */

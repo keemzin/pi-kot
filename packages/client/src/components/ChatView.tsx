@@ -1243,6 +1243,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			...messages,
 			...(streamingMessage ? [streamingMessage] : []),
 		];
+		// Build the result map ONCE for this effect run, not once per tool call
+		// block — previously called N times for N tool calls, rebuilding the full
+		// map each time.
+		const resultMap = buildToolResultMap(messages);
 		for (const msg of allMsgs) {
 			const m = msg as Record<string, unknown>;
 			const contents = m.content;
@@ -1257,7 +1261,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					seenArtifactIds.current.add(toolCallId);
 
 					// Find the paired result for output
-					const resultMap = buildToolResultMap(messages);
 					const result = resultMap.get(toolCallId);
 					const outputText = extractContentText(result?.content);
 					const trimmed = outputText.trim();
@@ -1611,6 +1614,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		}
 		return map;
 	}, [messages]);
+
+	// Per-turn cache for buildGroupedTurn results.
+	// Key = stable join of assistant message IDs in the turn + toolResults size.
+	// When the streaming turn finishes (all results arrive) it becomes a past
+	// turn and is served from cache on subsequent SSE events.
+	// The cache is intentionally unbounded per session (turns don't grow without
+	// bound in a single conversation, and we want the full history to stay fast).
+	const groupedTurnCache = useRef(new Map<string, GroupedTurn>());
 
 	const renderedRows = useMemo(() => {
 		const out: React.ReactNode[] = [];
@@ -2197,11 +2208,45 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			let combinedAssistantText: string;
 			let assistantElements: React.ReactNode[];
 			if (groupedToolDisplay) {
-				const turn = buildGroupedTurn(
-					currentAssistants,
-					getToolResult,
-					isCustomTool,
-				);
+				// Build a stable cache key from the assistant message IDs in this
+				// turn. For the live streaming turn the last message is the
+				// streamingMessage (no stable id) so its key changes every SSE delta
+				// and always misses — which is correct, we always want to recompute.
+				// Past turns have stable ids and hit the cache, skipping the full
+				// N×M content scan on every SSE event.
+				// We count only the tool results belonging to THIS turn's tool calls
+				// (not global toolResults.size) so a result arriving for turn B
+				// doesn't invalidate the cache for unrelated turn A.
+				const turnToolCallIds = new Set<string>();
+				for (const m of currentAssistants) {
+					const content = m.content;
+					if (!Array.isArray(content)) continue;
+					for (const chunk of content as Record<string, unknown>[]) {
+						if (chunk.type === "toolCall" && typeof chunk.id === "string") {
+							turnToolCallIds.add(chunk.id);
+						}
+					}
+				}
+				const turnResultCount = [...turnToolCallIds].filter(
+					(id) => toolResults.has(id),
+				).length;
+				const cacheKey =
+					currentAssistants.map((m) => String(m.id ?? "")).join(",") +
+					`:tr${turnResultCount}`;
+				let turn = groupedTurnCache.current.get(cacheKey);
+				if (turn === undefined) {
+					turn = buildGroupedTurn(
+						currentAssistants,
+						getToolResult,
+						isCustomTool,
+					);
+					// Only cache completed turns (those whose last message has a
+					// stable id). Streaming messages have no id yet.
+					const lastId = String(
+						currentAssistants[currentAssistants.length - 1]?.id ?? "",
+					);
+					if (lastId) groupedTurnCache.current.set(cacheKey, turn);
+				}
 				combinedAssistantText = turn.finalParts
 					.filter((p) => p.type === "text")
 					.map((p) => p.text)
