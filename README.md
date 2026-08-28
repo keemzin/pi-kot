@@ -24,11 +24,13 @@ This project was built out of **love and curiosity**.
 
 | Feature | Description |
 | --- | --- |
-| **💬 Chat** | Full agent conversation with streaming, markdown rendering, code blocks with syntax highlighting, and diff views — no intermediate adapter, SDK types consumed directly |
+| **💬 Chat** | Full agent conversation with streaming, markdown rendering, code blocks with syntax highlighting, diff views, and KaTeX math — no intermediate adapter, SDK types consumed directly |
+| **🗂️ Trail / Tool Grouping** | Consecutive tool calls collapse into a single **Trail** card. In-between agent reasoning appears as collapsible **Justification** steps with a chain-of-thought view that follows the agent live |
+| **🌐 Internationalization** | Full multi-language support (**English** & **简体中文 / Simplified Chinese**), auto-detected from browser locale or configurable in Settings |
 | **🖥️ Terminal** | Multi-tab xterm.js terminal with persistent PTY sessions, **touch gestures** (long-press+drag arrows, double-tap Tab, 3-finger paste), and a mobile quick-keys bar |
-| **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
+| **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with auto-refresh on agent edits, folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
 | **🔧 MCP Support** | Add, configure, and toggle MCP servers with a full settings UI |
-| **💾 Persistent UI Prefs** | Theme, sticky header, token usage toggle, and image compression — saved **server-side** in `~/.pi/agent/ui-settings.json`. Survives browser cache clears and device switches |
+| **💾 Persistent UI Prefs** | Theme, language, sticky header, token usage toggle, image compression, trail view — saved **server-side** in `~/.pi/agent/ui-settings.json`. Survives browser cache clears and device switches |
 | **🧩 Orchestration** | Multi-agent workflows — supervise sub-agents, delegate tasks, inspect results |
 | **🔐 Auth** | Password-based login, API key support, JWT sessions |
 | **📱 Mobile-friendly** | PWA-ready, adaptive layout, touch gestures, virtual keyboard support |
@@ -37,6 +39,8 @@ This project was built out of **love and curiosity**.
 | **🔌 Tunnel** | Built-in tunnel helper UI for exposing local pi-kot traffic via supported providers, with install checks, diagnostics, and one-click start/stop |
 | **📦 Extensions** | Discover and install pi extensions from the UI — some features only appear after installing the right extension |
 | **🎨 Artifacts** | Agent-created HTML, SVG, Mermaid diagrams, and other files render inline in chat via sandboxed previews |
+| **📎 Turn File Chips** | Files modified/created during each turn are summarized in clickable chips below the assistant message with diff previews |
+| **✈️ Fly-to-Top Anchor** | Smooth prompt anchoring that flies your message to the top upon submit, keeping streaming responses comfortably in focus |
 
 ---
 
@@ -100,6 +104,45 @@ All flags also work as environment variables (`PORT`, `HOST`, `UI_PASSWORD`, `AP
 
 ---
 
+## Trail — Grouped Tool Display & Chain-of-Thought
+
+When the agent executes consecutive tool calls or intersperses text between actions, pi-kot structures them into a clean **Trail**:
+
+- **Auto (Justify)**: Collapses reasoning steps into preview rows. The newest step automatically stays expanded while the agent is live so you can follow its train of thought in real-time.
+- **Expand All**: Expands all tools, justifications, and thinking blocks.
+- **Consecutive Tool Grouping**: Identical consecutive actions (like reading multiple files) are automatically bundled (e.g. `8 × Read`) to avoid visual noise while remaining interactive.
+
+---
+
+## Slash Commands
+
+Type `/` in the chat input to access built-in and extension commands. Slash commands support arguments:
+
+```
+/vision config provider openai
+/vision show
+/vision on
+/compact
+/compact with summary
+/reload
+/abort
+```
+
+The dropdown stays visible while typing arguments, and arguments are forwarded directly to the target extension or command handler.
+
+---
+
+## 🌐 Internationalization (i18n)
+
+pi-kot supports multiple languages out of the box:
+
+- **English** (`en`)
+- **简体中文** (`zh-CN` / Simplified Chinese)
+
+Language is automatically detected from your browser settings and can be changed in **Settings → Appearance → Language**.
+
+---
+
 ## Terminal Touch Gestures
 
 pi-kot's terminal supports mobile touch gestures inspired by Termius:
@@ -121,14 +164,14 @@ Some features only appear **after** installing the corresponding extension. Head
 | --- | --- | --- |
 | **pi-web-access** 🌐 | `npm:pi-web-access` | Web search, content extraction, API interaction tools for the agent |
 | **pi-playwright** 🎭 | `npm:pi-playwright` | Browser automation — the agent can interact with real web UI |
-| **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model; full vision settings exposed in Extensions tab |
+| **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model; full vision settings exposed in Extensions tab and slash commands (`/vision config`, `/vision show`, etc.) |
 | **pi-rewind** ⏪ | `npm:@ayulab/pi-rewind` | **Session revert** — checkpoint, rewind, and branch from any prior state |
 | **pi-plan-mode** 📋 | `npm:@narumitw/pi-plan-mode` | **Plan mode** — codex-like structured planning. Blocks mutating tools, adds `plan_mode_question` for structured user questions |
 | **context-mode** 🧠 | `npm:context-mode` | **Context window savings** — sandboxed code execution, FTS5 knowledge base, BM25 search, and session continuity across compaction |
 
 > 💡 **Tip**: Some UI elements only appear **after** the extension is installed. For example:
 >
-> - **Vision model selector** in Extensions tab → appears only after `pi-vision-tool` is installed
+> - **Vision model selector & slash commands** → appears only after `pi-vision-tool` is installed
 > - **Rewind button** on chat messages → appears only after `pi-rewind` is installed
 > - **Plan mode tool safety** → appears only after `pi-plan-mode` is installed
 > - **Context stats/doctor commands** → appears only after `context-mode` is installed
@@ -242,7 +285,7 @@ If both are unset, auth is **disabled** and the UI opens freely.
 
 Browse and manage files in your project workspace.
 
-- **Open**: Click a file to read it
+- **Open**: Click a file to read it; auto-refreshes when modified by the agent
 - **Edit**: Modify content directly in the editor (CodeMirror)
 - **New file/folder**: Right-click in the tree
 - **Delete**: Right-click a file
@@ -250,8 +293,6 @@ Browse and manage files in your project workspace.
 - **Upload files/folders**: Drag from your OS, use the folder picker, or click the upload buttons
 - **Download folder as ZIP**: Right-click a folder in the explorer and choose the download action
 - **Clone project**: Use the clone dialog to pull a repo into the workspace, with optional custom destination path
-
-The file explorer also shows files the agent has created or modified during the session.
 
 ---
 
@@ -316,34 +357,6 @@ pi-kot can render agent-created content inline in chat — HTML pages, SVG image
 | **JSON** | ` ```json` or valid JSON tool output | Syntax highlighted |
 | **Image** | `data:image/...` or ` ```image` | `<img>` tag |
 
-### Agent context injection
-
-pi-kot automatically injects a **web UI context** into every session, telling the agent:
-
-- It's running in a browser (not a terminal)
-- To write user-visible files to `.pi/artifacts/` in the current directory
-- To use `/api/v1/artifacts/<filename>` links for previews
-- To use Mermaid instead of ASCII art for diagrams
-
-This means the agent will automatically produce web-compatible output when creating diagrams, reports, or interactive content.
-
-### Example
-
-Ask the agent:
-> "Create a futuristic button with hover effects"
-
-The agent will:
-
-1. Write the HTML to `.pi/artifacts/button.html`
-2. Output: `[Live Preview](/api/v1/artifacts/button.html)`
-3. You see the rendered button inline in chat
-
-### API route
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/api/v1/artifacts/:filename` | Serve an artifact file (no auth required) |
-
 ---
 
 ## Settings
@@ -352,74 +365,13 @@ Access settings via the **⚙** icon in the header.
 
 | Tab | What you can configure |
 | --- | --- |
-| **Appearance** | Theme picker, sticky user header, show token usage, image compression — all **persisted server-side** |
+| **Appearance** | Theme picker, language (English / 简体中文), sticky user header, show token usage, image compression, trail default view — all **persisted server-side** |
 | **Providers** | View configured providers, add/remove API keys, add custom providers, raw models.json editor |
-| **Agent** | Default provider, default model, thinking level, model scope (hide unused models), orchestrator model |
+| **Agent** | Default provider, default model, thinking level, model scope (hide unused models with **bulk select toggles**), orchestrator model |
 | **General** | Server & SDK versions, update check, reload page |
 | **Extensions ⚗️** | Install/manage pi extensions — **install the recommended ones to unlock features** |
 | **Skills** | Enable/disable agent skills |
 | **Tunnel 🚇** | Tunnel provider install check, diagnostics, start/stop tunnel, copy public URL |
-
-### Image compression
-
-You can toggle automatic client-side image compression before sending images to the model. When enabled, images are downscaled to a max dimension and compressed to JPEG to reduce token usage.
-
----
-
-## Troubleshooting
-
-### "Connection lost" in terminal
-
-The terminal reconnects automatically with exponential backoff. If it doesn't reconnect:
-
-1. Check that the server is still running
-2. Refresh the page — tabs are restored from sessionStorage
-3. If the server restarted, PTY sessions are lost — close and reopen tabs
-
-### Login form keeps showing
-
-Your token expired or the server password changed. Sign out and log in again (or use **Clear stored token** on the login form).
-
-### Terminal feels laggy on mobile
-
-- Tap responsiveness uses native touch events with minimal delay
-- Arrow keys and input travel over WebSocket to the server — if the server is far away, you'll feel it. Try a local server for snappier response
-- Try the **CTRL toggle** (quick-keys bar) instead of long-press for Ctrl+letter combinations
-
-### Touch gestures not working
-
-- Make sure you're touching the terminal area, not the tab bar or quick-keys bar
-- For long-press + drag: **hold still for 150ms first**, then drag — don't swipe immediately
-- If text gets selected, the browser's default behavior is interfering — tap once to focus the terminal first
-
-### Keyboard not appearing on mobile
-
-Tap anywhere on the terminal area to focus it. The quick-keys bar should appear, and the system keyboard should open.
-
----
-
-## Project Structure
-
-```
-pi-kot/
-├── packages/
-│   ├── client/          # React SPA (Vite, xterm.js, Zustand)
-│   │   └── src/
-│   │       ├── components/   # UI components (ChatView, TerminalPanel, SlidePanel, ...)
-│   │       ├── stores/       # Zustand stores (session, layout, terminal, MCP, preferences)
-│   │       ├── hooks/        # Custom hooks (touch swipe, extensions, ...)
-│   │       └── lib/          # Utilities (API client, SSE, theme, tool-registry, ...)
-│   │                          # Note: no normalize.ts — SDK types consumed directly
-│   └── server/          # Fastify server (REST, SSE, WebSocket, PTY)
-│       └── src/
-│           ├── routes/       # API routes (sessions, terminal, git, files, projects, extensions, tunnel, ...)
-│           ├── mcp/          # MCP server registry & manager
-│           ├── orchestration/ # Multi-agent orchestration
-│           ├── ask-user-question/ # Web-compatible tool wrappers (e.g. plan_mode_question)
-│           ├── tunnel/       # Tunnel providers, registry, service, install/doctor helpers
-│           └── ...           # Config, auth, PTY manager, extension manager, etc.
-├── CHANGELOG.md         # Release notes & SDK upgrade history
-```
 
 ---
 
@@ -432,6 +384,7 @@ pi-kot/
 | **SDK** | `@earendil-works/pi-coding-agent` (currently 0.84.2) |
 | **Auth** | JWT, scrypt password hashing |
 | **State** | Zustand (client), JSONL session files (server) |
+| **i18n** | Lightweight custom registry supporting English & 简体中文 |
 
 ---
 
