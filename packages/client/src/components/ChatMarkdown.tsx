@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
 import { Check, Copy, ImageOff } from "lucide-react";
 import { Highlight, themes as prismThemes } from "prism-react-renderer";
 import ReactMarkdown, { type Components } from "react-markdown";
@@ -312,7 +312,7 @@ function renderSegments(text: string): (string | ReactNode)[] {
   return segments.length > 0 ? segments : [text];
 }
 
-export function ChatMarkdown({ text, chatStyleBreaks }: Props) {
+export const ChatMarkdown = memo(function ChatMarkdown({ text, chatStyleBreaks }: Props) {
   const plugins = chatStyleBreaks ? [remarkGfm, remarkMath, remarkBreaks] : [remarkGfm, remarkMath];
 
   const segments = useMemo(() => {
@@ -350,4 +350,4 @@ export function ChatMarkdown({ text, chatStyleBreaks }: Props) {
       )}
     </div>
   );
-}
+});

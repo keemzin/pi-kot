@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
@@ -474,7 +474,7 @@ export function countDiffLines(diff: string): { adds: number; dels: number } {
 
 /* ── ToolCallEntry — single tool call + result as a timeline node ──────── */
 
-export function ToolCallEntry({
+export const ToolCallEntry = memo(function ToolCallEntry({
 	block,
 	result,
 	initialExpanded = false,
@@ -656,7 +656,7 @@ export function ToolCallEntry({
 			</div>
 		</div>
 	);
-}
+});
 
 /* ── Thinking row (only rendered when showThinking is on) ───────────────── */
 
@@ -942,7 +942,7 @@ function ConsecutiveToolGroup({
 	);
 }
 
-export function ToolGroupCard({
+export const ToolGroupCard = memo(function ToolGroupCard({
 	entries,
 	isStreaming = false,
 }: {
@@ -1193,7 +1193,7 @@ export function ToolGroupCard({
 			</div>
 		</div>
 	);
-}
+});
 
 function TrailIcon({ toolName }: { toolName: string }) {
 	return (

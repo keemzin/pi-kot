@@ -319,17 +319,18 @@ function RunningToolCard({
 }
 
 /** Render a batch of tool calls as a collapsible timeline group. */
-function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
+const ToolCallBatchCard = memo(function ToolCallBatchCard({
+	entries,
+}: {
+	entries: ToolBatchEntry[];
+}) {
 	const { open: sharedOpen, toggle: sharedToggle } =
 		useContext(ToolBatchOpenContext);
-	// Each card owns its own open state, seeded from the shared preference once on mount.
-	// This prevents all cards from snapping open/closed when one card's preference changes
-	// (e.g. when a live card finishes and re-joins the group as a batch card).
 	const [open, setOpen] = useState(() => sharedOpen);
 	const toggle = () => {
 		const next = !open;
 		setOpen(next);
-		sharedToggle(); // keep shared preference in sync for future cards
+		sharedToggle();
 	};
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
@@ -425,7 +426,7 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 			</div>
 		</details>
 	);
-}
+});
 
 /** Render an assistant prose/thinking block. */
 
@@ -515,7 +516,7 @@ function renderUserRefs(text: string): React.ReactNode {
 	return nodes;
 }
 
-function UserMessageBubble({
+const UserMessageBubble = memo(function UserMessageBubble({
 	text,
 	isSteer,
 	isFollowUp,
@@ -591,7 +592,7 @@ function UserMessageBubble({
 			</div>
 		</div>
 	);
-}
+});
 
 /* ── Copy button for assistant messages ── */
 
