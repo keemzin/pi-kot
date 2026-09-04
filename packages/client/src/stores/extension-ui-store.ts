@@ -110,6 +110,21 @@ export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
       case "input":
         set({ activeInteraction: event as ExtensionUIEvent, commandRunning: true });
         break;
+      case "status": {
+        const s = event as unknown as { key?: string; status?: string };
+        if (s.key === "plannotator") {
+          const isPlan = Boolean(
+            s.status &&
+            (s.status.includes("plan") ||
+             s.status.includes("📋") ||
+             s.status.includes("⏸"))
+          );
+          import("./plan-review-store").then(({ usePlanReviewStore }) => {
+            usePlanReviewStore.getState().setPlanModeActive(isPlan);
+          });
+        }
+        break;
+      }
       case "notify": {
         const n = event as { type: string; notificationType: string; message: string };
         const id = `ext-notif-${++_notifCounter}`;
@@ -122,6 +137,21 @@ export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
         set((state) => ({
           notifications: [...state.notifications, notif],
         }));
+
+        if (n.message.includes("planning mode enabled")) {
+          import("./plan-review-store").then(({ usePlanReviewStore }) => {
+            usePlanReviewStore.getState().setPlanModeActive(true);
+          });
+        } else if (
+          n.message.includes("returned to idle") ||
+          n.message.includes("plan mode has ended") ||
+          n.message.includes("plan mode off")
+        ) {
+          import("./plan-review-store").then(({ usePlanReviewStore }) => {
+            usePlanReviewStore.getState().setPlanModeActive(false);
+          });
+        }
+
         // Auto-dismiss after 8 seconds
         setTimeout(() => {
           set((state) => ({

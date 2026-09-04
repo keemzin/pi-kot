@@ -40,6 +40,8 @@ import {
 } from "./ToolGroupCard";
 import { useI18n } from "../hooks/useI18n";
 
+import { PlanSubmittedCard } from "./PlanSubmittedCard";
+
 // Register custom tool renderers
 toolRegistry.register("javascript_repl", ({ part }) => (
 	<ReplSandbox
@@ -54,6 +56,7 @@ toolRegistry.register("javascript_repl", ({ part }) => (
 		isError={part.state === "error"}
 	/>
 ));
+toolRegistry.register("plannotator_submit_plan", PlanSubmittedCard);
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -1812,6 +1815,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					continue;
 				}
 				if (role === "custom") {
+					if (m.display === false) {
+						continue;
+					}
 					const customType = (m.customType as string) ?? "custom";
 					const customContent = m.content;
 					const details = m.details;
@@ -2006,6 +2012,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 			}
 			if (role === "custom") {
+				if (m.display === false) {
+					return null;
+				}
 				const customType = (m.customType as string) ?? "custom";
 				const customContent = m.content;
 				const details = m.details;
@@ -2470,6 +2479,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				currentUser = msg;
 				currentTurnStart = idx;
 			} else if (role === "toolResult") {
+			} else if (role === "custom" && msg.display === false) {
+				// Internal system or extension message flagged as hidden — do not render
+				continue;
 			} else {
 				// Assistant / bashExecution / branchSummary / custom
 				if (currentUser !== undefined) {

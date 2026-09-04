@@ -11,6 +11,7 @@ import { config } from "./config.js";
 import { authEnabled, extractBearer, verifyHmac } from "./routes/auth.js";
 import { healthRoutes, authRoutes, versionRoutes } from "./routes/auth.js";
 import { askUserQuestionRoutes } from "./routes/ask-user-question.js";
+import { planReviewRoutes } from "./routes/plan-review.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { promptRoutes } from "./routes/prompt.js";
 import { streamRoutes } from "./routes/stream.js";
@@ -20,6 +21,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { fileRoutes } from "./routes/files.js";
 import { disposeAllSessions, getSession } from "./session-store.js";
 import { subscribe as subscribeAskUserQuestion } from "./ask-user-question/registry.js";
+import { subscribePlanReview } from "./ask-user-question/plannotator-registry.js";
 import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
 import { extensionRoutes } from "./routes/extensions.js";
@@ -140,6 +142,7 @@ export async function buildServer() {
       await api.register(authRoutes);
       await api.register(sessionRoutes);
       await api.register(askUserQuestionRoutes);
+      await api.register(planReviewRoutes);
       await api.register(promptRoutes);
       await api.register(streamRoutes);
       await api.register(configRoutes);
@@ -165,6 +168,19 @@ export async function buildServer() {
 
   // Wire ask_user_question registry events into SSE fanout
   subscribeAskUserQuestion((event) => {
+    const live = getSession(event.sessionId);
+    if (live === undefined) return;
+    for (const client of live.clients) {
+      try {
+        client.send(event as unknown as { type: string; [k: string]: unknown });
+      } catch {
+        live.clients.delete(client);
+      }
+    }
+  });
+
+  // Wire plan_review registry events into SSE fanout
+  subscribePlanReview((event) => {
     const live = getSession(event.sessionId);
     if (live === undefined) return;
     for (const client of live.clients) {

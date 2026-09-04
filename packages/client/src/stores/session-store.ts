@@ -21,6 +21,7 @@ import {
 import type { CompactionEvent } from "../lib/api-client";
 import { streamSessionSSE, type SSEClient } from "../lib/sse-client";
 import { useAskUserQuestionStore } from "./ask-user-question-store";
+import { usePlanReviewStore } from "./plan-review-store";
 import { useExtensionUIStore } from "./extension-ui-store";
 import { useLayoutStore } from "./layout-store";
 
@@ -320,6 +321,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
 		// Connect SSE
 		get().connectSSE(id);
+
+		// Synchronize plan mode status & pending reviews
+		void usePlanReviewStore.getState().fetchPlanModeStatus(id);
 	},
 
 	connectSSE: (sessionId: string) => {
@@ -558,6 +562,26 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 							.clearPending(sessionId, cancelledId);
 						break;
 					}
+					case "plannotator_plan_review_requested": {
+						const { requestId, planFilePath, planContent } = event as unknown as {
+							requestId: string;
+							planFilePath: string;
+							planContent: string;
+						};
+						usePlanReviewStore
+							.getState()
+							.openReview({ requestId, sessionId, planFilePath, planContent });
+						break;
+					}
+					case "plannotator_plan_review_resolved": {
+						const { requestId: resolvedId } = event as unknown as {
+							requestId: string;
+						};
+						usePlanReviewStore
+							.getState()
+							.resolveReview(resolvedId);
+						break;
+					}
 					case "compaction_start": {
 						const compactionEvent = event as {
 							reason?: "manual" | "threshold" | "overflow";
@@ -734,6 +758,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						break;
 					}
 					// ── Extension UI bridge events ──
+					case "extension_ui_status":
 					case "extension_ui_select":
 					case "extension_ui_confirm":
 					case "extension_ui_input":

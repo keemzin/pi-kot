@@ -1,12 +1,15 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
-import { FileText, X } from "lucide-react";
+import { FileText, X, ClipboardList } from "lucide-react";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
+import { usePlanReviewStore } from "../stores/plan-review-store";
+import { useExtensionUIStore } from "../stores/extension-ui-store";
 import type { ImageContent } from "../lib/api-client";
 import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 import { getSessionModel, setSessionThinking } from "../lib/api-client";
 import { useSelectionBridge } from "../stores/selection-bridge";
+import { useLayoutStore } from "../stores/layout-store";
 import { parseRefChips, type RefChip } from "../lib/ref-chips";
 import { useI18n } from "../hooks/useI18n";
 
@@ -38,6 +41,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const consumeSend = useSelectionBridge((s) => s.consumeSend);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
+  const planModeActive = usePlanReviewStore((s) => s.planModeActive);
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const sendFollowUp = useSessionStore((s) => s.sendFollowUp);
@@ -49,6 +53,12 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [thinkingLevel, setThinkingLevel] = useState<string | undefined>(undefined);
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
+  const isMobile = useLayoutStore((s) => s.isMobile);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (planModeActive) setBannerDismissed(false);
+  }, [planModeActive]);
 
   // ── Hold-to-followUp state (streaming only) ──
   const HOLD_DURATION = 600; // ms to hold before followUp triggers
@@ -154,13 +164,59 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       .catch(() => {
         // session may not be live yet — that's fine
       });
+    usePlanReviewStore.getState().fetchPlanModeStatus(sessionId);
     return () => {
       cancelled = true;
     };
   }, [sessionId]);
 
   // Build the full slash command list from builtins + extension commands
+  const handleTogglePlanMode = useCallback(async () => {
+    if (!sessionId) return;
+    const hasPlannotator = extensionCommands.some(
+      (c) => c.name === "/plannotator-plan-mode",
+    );
+    if (hasPlannotator) {
+      const nextActive = !planModeActive;
+      usePlanReviewStore.getState().setPlanModeActive(nextActive);
+      const { invokeExtensionCommand } = await import("../lib/api-client");
+      try {
+        await invokeExtensionCommand(sessionId, "plannotator-plan-mode");
+      } catch {
+        // Revert on failure
+        usePlanReviewStore.getState().setPlanModeActive(planModeActive);
+      }
+    } else {
+      useExtensionUIStore.getState().pushEvent({
+        type: "notify",
+        notificationType: "warning",
+        message:
+          "Plannotator is not installed. Go to Settings > Packages and install @plannotator/pi-extension, or run 'pi install npm:@plannotator/pi-extension'.",
+      });
+    }
+  }, [sessionId, extensionCommands, planModeActive]);
+
   const builtinCommands: SlashCommand[] = [
+    {
+      name: "/plan",
+      description: "Toggle Plannotator plan mode",
+      handler: async (sid: string, args: string) => {
+        const hasPlannotator = extensionCommands.some(
+          (c) => c.name === "/plannotator-plan-mode",
+        );
+        if (hasPlannotator) {
+          const { invokeExtensionCommand } = await import("../lib/api-client");
+          await invokeExtensionCommand(sid, "plannotator-plan-mode", args || undefined);
+        } else {
+          useExtensionUIStore.getState().pushEvent({
+            type: "notify",
+            notificationType: "warning",
+            message:
+              "Plannotator is not installed. Go to Settings > Packages and install @plannotator/pi-extension, or run 'pi install npm:@plannotator/pi-extension'.",
+          });
+        }
+      },
+    },
     {
       name: "/compact",
       description: "Manually compact the session context",
@@ -891,6 +947,108 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
           </div>
         )}
 
+        {planModeActive && !bannerDismissed && (
+          <div
+            className="chat-input-plan-banner"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: isMobile ? "2px 8px" : "3px 12px",
+              minHeight: isMobile ? "22px" : "26px",
+              height: isMobile ? "22px" : "26px",
+              background: "var(--accent-glow)",
+              borderBottom: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
+              fontSize: isMobile ? "10px" : "11px",
+              color: "var(--accent)",
+              fontWeight: 500,
+              boxSizing: "border-box",
+              gap: "6px",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, overflow: "hidden", flex: 1 }}>
+              <ClipboardList size={isMobile ? 11 : 12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+              <span style={{ fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {isMobile ? "Plan Mode" : "Plan Mode Active"}
+              </span>
+              {!isMobile && (
+                <span
+                  className="plan-banner-desc"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontSize: "10.5px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  — drafts plan before modifying code
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <button
+                type="button"
+                className="plan-banner-review-btn"
+                onClick={() => usePlanReviewStore.getState().openFileReview("PLAN.md", sessionId)}
+                title="Review plan"
+                style={{
+                  background: "var(--bg-solid)",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent)",
+                  fontSize: isMobile ? "9.5px" : "10.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  borderRadius: "3px",
+                  padding: isMobile ? "1px 6px" : "2px 8px",
+                  lineHeight: "13px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {isMobile ? "Review" : "Review Plan"}
+              </button>
+              <button
+                type="button"
+                onClick={handleTogglePlanMode}
+                title="Exit Plan Mode"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  fontSize: isMobile ? "9.5px" : "10px",
+                  cursor: "pointer",
+                  padding: "1px 4px",
+                  lineHeight: "13px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Exit
+              </button>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                title="Dismiss banner (Plan Mode stays active)"
+                aria-label="Dismiss banner"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  padding: "1px 2px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  borderRadius: "2px",
+                }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           className="ti-input"
@@ -966,6 +1124,44 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" style={{ fill: showOrch ? "currentColor" : "none" }} />
               </svg>
+            </button>
+
+            <button
+              type="button"
+              className={`ti-toolbar-btn${planModeActive ? " active" : ""}`}
+              onClick={() => {
+                if (planModeActive && bannerDismissed) {
+                  setBannerDismissed(false);
+                } else {
+                  handleTogglePlanMode();
+                }
+              }}
+              title={
+                planModeActive
+                  ? bannerDismissed
+                    ? "Plan Mode Active (click to show banner)"
+                    : "Plan Mode Active (click to exit)"
+                  : "Toggle Plan Mode (/plan)"
+              }
+              tabIndex={-1}
+              style={{
+                color: planModeActive ? "var(--accent)" : undefined,
+                background: planModeActive ? "var(--accent-glow)" : undefined,
+                borderColor: planModeActive ? "var(--accent)" : "transparent",
+                boxShadow: planModeActive
+                  ? "0 0 12px var(--accent-glow), 0 0 3px var(--accent)"
+                  : undefined,
+                transition: "all 0.2s ease-in-out",
+              }}
+            >
+              <ClipboardList
+                size={14}
+                style={{
+                  color: planModeActive ? "var(--accent)" : "currentColor",
+                  filter: planModeActive ? "drop-shadow(0 0 3px var(--accent))" : undefined,
+                  transition: "all 0.2s ease-in-out",
+                }}
+              />
             </button>
           </div>
 

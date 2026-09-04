@@ -3,6 +3,8 @@ import type { FastifyReply } from "fastify";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { LiveSession, SSEClient } from "./session-store.js";
 import { getPendingForSession } from "./ask-user-question/registry.js";
+import { getPendingPlanReviewsForSession } from "./ask-user-question/plannotator-registry.js";
+import { getSessionStatuses, setSessionStatus } from "./extension-ui-bridge.js";
 
 /**
  * One-shot padding flush sent right after `compaction_start` so L7
@@ -56,6 +58,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "snapshot",
   "ask_user_question",
   "ask_user_question_cancelled",
+  "plannotator_plan_review_requested",
+  "plannotator_plan_review_resolved",
   // Streaming exec events (!cmd / !!cmd live terminal feed)
   "exec_start",
   "exec_update",
@@ -65,6 +69,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   "extension_ui_confirm",
   "extension_ui_input",
   "extension_ui_notify",
+  "extension_ui_status",
   "extension_ui_done",
 ]);
 
@@ -167,6 +172,46 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
       );
     }
 
+    // Re-emit any pending plannotator plan review events for this session
+    for (const pending of getPendingPlanReviewsForSession(live.sessionId)) {
+      raw.write(
+        serializeSSE({
+          type: "plannotator_plan_review_requested",
+          sessionId: live.sessionId,
+          requestId: pending.requestId,
+          planFilePath: pending.planFilePath,
+          planContent: pending.planContent,
+        } as unknown as { type: string; [k: string]: unknown }),
+      );
+    }
+
+    // Re-emit any active extension UI statuses for this session
+    const statuses = getSessionStatuses(live.sessionId);
+    for (const { key, status } of statuses) {
+      raw.write(
+        serializeSSE({
+          type: "extension_ui_status",
+          sessionId: live.sessionId,
+          key,
+          status,
+        } as unknown as { type: string; [k: string]: unknown }),
+      );
+    }
+
+    // If plannotator status is not in memory yet, check session entries
+    const hasPlannotator = statuses.some((s) => s.key === "plannotator");
+    if (!hasPlannotator && isSessionInPlanMode(live)) {
+      setSessionStatus(live.sessionId, "plannotator", "📋 Plan Mode");
+      raw.write(
+        serializeSSE({
+          type: "extension_ui_status",
+          sessionId: live.sessionId,
+          key: "plannotator",
+          status: "📋 Plan Mode",
+        } as unknown as { type: string; [k: string]: unknown }),
+      );
+    }
+
     live.clients.add(client);
 
     raw.on("close", close);
@@ -183,4 +228,51 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
     }
     throw err;
   }
+}
+
+/**
+ * Check whether a session is currently in plan mode based on:
+ * 1. Active pending plan reviews
+ * 2. In-memory extension statuses
+ * 3. Durable sessionManager entries on disk
+ */
+export function isSessionInPlanMode(live: LiveSession): boolean {
+  // 1. Check if there is an active pending plan review
+  if (getPendingPlanReviewsForSession(live.sessionId).length > 0) {
+    return true;
+  }
+
+  // 2. Check in-memory session status
+  const statuses = getSessionStatuses(live.sessionId);
+  const planStatus = statuses.find((s) => s.key === "plannotator" || s.key === "plan-mode");
+  if (planStatus && planStatus.status) {
+    const s = planStatus.status.toLowerCase();
+    if (s.includes("plan") || s.includes("📋") || s.includes("⏸")) {
+      return true;
+    }
+  }
+
+  // 3. Inspect sessionManager entries on disk
+  try {
+    const entries = live.sessionManager.getEntries();
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i] as {
+        type?: string;
+        customType?: string;
+        data?: { phase?: string; active?: boolean };
+      };
+      if (e && e.type === "custom" && (e.customType === "plannotator" || e.customType === "plan-mode")) {
+        if (e.data?.phase === "planning" || e.data?.active === true) {
+          return true;
+        }
+        if (e.data?.phase === "idle" || e.data?.phase === "executing" || e.data?.active === false) {
+          return false;
+        }
+      }
+    }
+  } catch {
+    // best-effort
+  }
+
+  return false;
 }

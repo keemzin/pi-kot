@@ -95,6 +95,40 @@ export function cancelAllPendingRequests(): void {
   }
 }
 
+// ── Session status tracking ─────────────────────────────────────────
+
+const sessionStatuses = new Map<string, Map<string, string>>();
+
+export function setSessionStatus(
+  sessionId: string,
+  key: string,
+  status: string | undefined,
+): void {
+  let map = sessionStatuses.get(sessionId);
+  if (!map) {
+    map = new Map<string, string>();
+    sessionStatuses.set(sessionId, map);
+  }
+  if (status === undefined || status === "") {
+    map.delete(key);
+    if (map.size === 0) sessionStatuses.delete(sessionId);
+  } else {
+    map.set(key, status);
+  }
+}
+
+export function getSessionStatuses(
+  sessionId: string,
+): Array<{ key: string; status: string }> {
+  const map = sessionStatuses.get(sessionId);
+  if (!map) return [];
+  return Array.from(map.entries()).map(([key, status]) => ({ key, status }));
+}
+
+export function clearSessionStatuses(sessionId: string): void {
+  sessionStatuses.delete(sessionId);
+}
+
 // ── Bridge factory ──────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,8 +217,9 @@ export function createBridgeUIContext(
       return () => {};
     },
 
-    setStatus: (_key: string, _text: string | undefined) => {
-      // Status bar is managed by the GUI.
+    setStatus: (key: string, text: string | undefined) => {
+      setSessionStatus(sessionId, key, text);
+      send("extension_ui_status", { key, status: text });
     },
 
     setWorkingMessage: (_message?: string) => {
@@ -267,8 +302,42 @@ export function createBridgeUIContext(
     },
 
     get theme() {
-      // Return a minimal theme stub — the server doesn't have a TUI theme.
-      return {} as any;
+      // Return a robust theme stub supporting formatting methods and color functions.
+      // Extensions (e.g. Plannotator) format status/messages using ctx.ui.theme.fg(...) or ctx.ui.theme.strikethrough(...).
+      const format = (_first: unknown, second?: unknown) => {
+        if (second !== undefined) return String(second);
+        if (_first !== undefined) return String(_first);
+        return "";
+      };
+
+      const baseTheme: Record<string, unknown> = {
+        fg: format,
+        bg: format,
+        bold: (text: unknown) => (text !== undefined ? String(text) : ""),
+        italic: (text: unknown) => (text !== undefined ? String(text) : ""),
+        underline: (text: unknown) => (text !== undefined ? String(text) : ""),
+        strikethrough: (text: unknown) => (text !== undefined ? String(text) : ""),
+        dim: (text: unknown) => (text !== undefined ? String(text) : ""),
+        muted: (text: unknown) => (text !== undefined ? String(text) : ""),
+        accent: (text: unknown) => (text !== undefined ? String(text) : ""),
+        warning: (text: unknown) => (text !== undefined ? String(text) : ""),
+        error: (text: unknown) => (text !== undefined ? String(text) : ""),
+        success: (text: unknown) => (text !== undefined ? String(text) : ""),
+        info: (text: unknown) => (text !== undefined ? String(text) : ""),
+      };
+
+      return new Proxy(baseTheme, {
+        get(target, prop: string | symbol) {
+          if (typeof prop === "string" && prop in target) {
+            return target[prop];
+          }
+          if (typeof prop === "string") {
+            // Any other style or color accessed as method or property
+            return format;
+          }
+          return undefined;
+        },
+      }) as any;
     },
 
     getAllThemes: () => {

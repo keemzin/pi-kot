@@ -159,14 +159,19 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     icon: "🧠",
   },
   {
-    id: "pi-plan-mode",
-    name: "pi-plan-mode",
+    id: "plannotator",
+    name: "plannotator",
     description:
-      "Codex-like structured planning. Blocks mutating tools, adds plan_mode_question for structured user questions, and guides the agent through explore → intent → final plan flow.",
-    package: "npm:@narumitw/pi-plan-mode",
+      "Visual plan review and structured planning for Pi. Allows reviewing, editing, and approving agent plans in a native side panel before execution begins.",
+    package: "npm:@plannotator/pi-extension",
     category: "productivity",
     verified: true,
-    enablesFeatures: ["Plan mode with /plan command", "Structured plan_mode_question tool", "Tool safety in planning phase"],
+    enablesFeatures: [
+      "Visual plan review in side panel",
+      "Native plan approval & editing",
+      "File-based planning mode with /plan",
+      "Execution checklist progress tracking",
+    ],
     icon: "📋",
   },
 ];

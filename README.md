@@ -166,14 +166,14 @@ Some features only appear **after** installing the corresponding extension. Head
 | **pi-playwright** 🎭 | `npm:pi-playwright` | Browser automation — the agent can interact with real web UI |
 | **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model; full vision settings exposed in Extensions tab and slash commands (`/vision config`, `/vision show`, etc.) |
 | **pi-rewind** ⏪ | `npm:@ayulab/pi-rewind` | **Session revert** — checkpoint, rewind, and branch from any prior state |
-| **pi-plan-mode** 📋 | `npm:@narumitw/pi-plan-mode` | **Plan mode** — codex-like structured planning. Blocks mutating tools, adds `plan_mode_question` for structured user questions |
+| **plannotator** 📋 | `npm:@plannotator/pi-extension` | **Native plan review** — visual plan review, in-place markdown editing, and structured planning in a dedicated side panel |
 | **context-mode** 🧠 | `npm:context-mode` | **Context window savings** — sandboxed code execution, FTS5 knowledge base, BM25 search, and session continuity across compaction |
 
 > 💡 **Tip**: Some UI elements only appear **after** the extension is installed. For example:
 >
 > - **Vision model selector & slash commands** → appears only after `pi-vision-tool` is installed
 > - **Rewind button** on chat messages → appears only after `pi-rewind` is installed
-> - **Plan mode tool safety** → appears only after `pi-plan-mode` is installed
+> - **Plan mode & review side panel** → appears only after `plannotator` is installed
 > - **Context stats/doctor commands** → appears only after `context-mode` is installed
 > If something mentioned in this README doesn't show up, check the Extensions tab first.
 

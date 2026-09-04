@@ -1137,6 +1137,34 @@ export async function answerAskQuestion(
   );
 }
 
+export interface PendingPlanReviewItem {
+  requestId: string;
+  planFilePath: string;
+  planContent: string;
+}
+
+export async function getPendingPlanReviews(
+  sessionId: string,
+): Promise<PendingPlanReviewItem[]> {
+  const res = await request<{ pending: PendingPlanReviewItem[] }>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-review/pending`,
+  );
+  return res.pending;
+}
+
+export async function submitPlanReviewDecision(
+  sessionId: string,
+  requestId: string,
+  decision: { approved: boolean; feedback?: string; updatedContent?: string },
+): Promise<void> {
+  await request(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-review/${encodeURIComponent(requestId)}/decision`,
+    decision,
+  );
+}
+
 // ── Orchestration ──
 
 export interface OrchestrationConfig {

@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { FileExplorer } from "./components/FileExplorer";
 import { FileViewerPanel } from "./components/FileViewerPanel";
 import { ArtifactViewer } from "./components/ArtifactViewer";
+import { PlanReviewPanel } from "./components/PlanReviewPanel";
 import { TerminalPanel } from "./components/TerminalPanel";
 import { ArtifactsPanel } from "./components/ArtifactsPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
@@ -1113,6 +1114,9 @@ export function App() {
           {activeProjectId !== undefined && (
             <ArtifactViewer />
           )}
+
+          {/* Plan Review panel — slides in when a plan is submitted for review */}
+          <PlanReviewPanel />
 
           {/* File tree / git panel — slides in */}
           {activeProjectId !== undefined && !isMobile && (
