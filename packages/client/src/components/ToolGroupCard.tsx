@@ -35,17 +35,26 @@ export type TrailSegment = {
 	firstToolId?: string;
 };
 
+export type CustomToolCall = {
+	name: string;
+	id: string;
+	args: Record<string, unknown>;
+	result?: PairableMessage | undefined;
+	msgId?: string;
+};
+
+export type GroupedTurnItem =
+	| { kind: "segment"; segment: TrailSegment }
+	| { kind: "customTool"; customTool: CustomToolCall }
+	| { kind: "special"; message: Record<string, unknown> };
+
 export type GroupedTurn = {
+	/** Chronologically ordered items (segments, custom tools, specials). */
+	items: GroupedTurnItem[];
 	/** Trail runs, each rendered as one ToolGroupCard. */
 	segments: TrailSegment[];
 	/** Tool calls handled by a registered custom renderer (break out of the trail). */
-	customTools: {
-		name: string;
-		id: string;
-		args: Record<string, unknown>;
-		result?: PairableMessage | undefined;
-		msgId?: string;
-	}[];
+	customTools: CustomToolCall[];
 	/** Non-assistant role messages (bashExecution, branchSummary, custom…). */
 	specials: Record<string, unknown>[];
 	/** Text/thinking after the last tool call — the actual answer. */
@@ -77,6 +86,7 @@ export function buildGroupedTurn(
 	getResult: (id: string) => PairableMessage | undefined,
 	isCustomTool: (name: string) => boolean,
 ): GroupedTurn {
+	const items: GroupedTurnItem[] = [];
 	const segments: TrailSegment[] = [];
 	const customTools: GroupedTurn["customTools"] = [];
 	const specials: Record<string, unknown>[] = [];
@@ -86,7 +96,9 @@ export function buildGroupedTurn(
 
 	const pushSegment = (): void => {
 		if (current !== undefined && current.length > 0) {
-			segments.push({ entries: current, firstToolId: currentFirstToolId });
+			const seg: TrailSegment = { entries: current, firstToolId: currentFirstToolId };
+			segments.push(seg);
+			items.push({ kind: "segment", segment: seg });
 		}
 		current = undefined;
 		currentFirstToolId = undefined;
@@ -111,6 +123,7 @@ export function buildGroupedTurn(
 			// bashExecution / branchSummary / custom / unknown roles
 			pushSegment();
 			specials.push(m);
+			items.push({ kind: "special", message: m });
 			continue;
 		}
 
@@ -138,13 +151,15 @@ export function buildGroupedTurn(
 
 				if (isCustomTool(toolName)) {
 					pushSegment();
-					customTools.push({
+					const ct: CustomToolCall = {
 						name: toolName,
 						id,
 						args,
 						result: id ? getResult(id) : undefined,
 						msgId: String(m.id ?? ""),
-					});
+					};
+					customTools.push(ct);
+					items.push({ kind: "customTool", customTool: ct });
 				} else {
 					if (current === undefined) current = [];
 					if (!currentFirstToolId && id) currentFirstToolId = id;
@@ -174,7 +189,7 @@ export function buildGroupedTurn(
 	const finalParts = prose;
 	pushSegment();
 
-	return { segments, customTools, specials, finalParts };
+	return { items, segments, customTools, specials, finalParts };
 }
 
 /* ── Tool presentation helpers (openkot-style friendly names/icons) ────── */

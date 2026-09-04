@@ -2096,10 +2096,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 			};
 
-			turn.segments.forEach((seg, i) => pushSegment(seg, i));
-
-			// Custom-rendered tools break out of the trail into their own bubble
-			for (const ct of turn.customTools) {
+			const renderCustomTool = (
+				ct: GroupedTurn["customTools"][number],
+			) => {
 				const CustomRenderer = toolRegistry.get(ct.name);
 				const part: ToolCallPart = {
 					type: "tool-call",
@@ -2130,8 +2129,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				} else {
-					// Defensive fallback — registry lookups stay in sync, but keep
-					// the call visible if one is ever missing.
 					pushSegment(
 						{
 							entries: [
@@ -2143,17 +2140,38 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							],
 							firstToolId: ct.id,
 						},
-						0,
+						elements.length,
 					);
 				}
-			}
+			};
 
-			for (const m of turn.specials) {
-				const el = renderSpecialMessage(
-					m,
-					`special-${turnKey}-${elements.length}`,
-				);
-				if (el) elements.push(el);
+			if (turn.items && turn.items.length > 0) {
+				let segIdx = 0;
+				for (const item of turn.items) {
+					if (item.kind === "segment") {
+						pushSegment(item.segment, segIdx++);
+					} else if (item.kind === "customTool") {
+						renderCustomTool(item.customTool);
+					} else if (item.kind === "special") {
+						const el = renderSpecialMessage(
+							item.message,
+							`special-${turnKey}-${elements.length}`,
+						);
+						if (el) elements.push(el);
+					}
+				}
+			} else {
+				turn.segments.forEach((seg, i) => pushSegment(seg, i));
+				for (const ct of turn.customTools) {
+					renderCustomTool(ct);
+				}
+				for (const m of turn.specials) {
+					const el = renderSpecialMessage(
+						m,
+						`special-${turnKey}-${elements.length}`,
+					);
+					if (el) elements.push(el);
+				}
 			}
 
 			// Final answer text after the last tool call
