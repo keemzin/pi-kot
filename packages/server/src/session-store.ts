@@ -52,11 +52,18 @@ export async function buildResourceLoader(
       appendSystemPrompt.push(webUiContext);
     }
   }
+
+  const skillOverrides = await readSkillOverrides();
+
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: config.piConfigDir,
     extensionFactories: [compactionContinuationExtension, planModeExtension],
     appendSystemPrompt,
+    skillsOverride: (base) => ({
+      skills: base.skills.filter((s) => isSkillEffective(skillOverrides, projectId, s.name)),
+      diagnostics: base.diagnostics,
+    }),
   });
   await loader.reload();
   return loader;
@@ -73,6 +80,7 @@ import {
   isGloballyEnabled as mcpIsGloballyEnabled,
 } from "./mcp/manager.js";
 import { filterEnabledTools, readToolOverrides, isToolEffective } from "./tool-policy.js";
+import { readSkillOverrides, isSkillEffective } from "./skill-policy.js";
 
 /**
  * Build the ExtensionBindings for a session with real command context
@@ -270,12 +278,18 @@ export async function createSession(
   registerArtifactCwd(workspacePath);
 
   const resourceLoader = await buildResourceLoader(workspacePath, projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    projectId,
+    workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Trigger session_start event and wire real command context actions
@@ -788,12 +802,18 @@ export async function resumeSessionById(
   ];
 
   const resourceLoader = await buildResourceLoader(loc.workspacePath, loc.projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    loc.projectId,
+    loc.workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: loc.workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Wire real command context actions (navigateTree, etc.) so
@@ -903,12 +923,18 @@ export async function forkSession(
   ];
 
   const resourceLoader = await buildResourceLoader(sourceLive.workspacePath, sourceLive.projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    sourceLive.projectId,
+    sourceLive.workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: sourceLive.workspacePath,
     sessionManager: forkedSM,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Wire real command context actions (navigateTree, etc.) so

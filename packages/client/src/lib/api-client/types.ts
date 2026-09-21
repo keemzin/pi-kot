@@ -401,6 +401,7 @@ export interface SkillDiagnostic {
 }
 
 export interface SkillsListResponse {
+  disableAll?: boolean;
   skills: SkillSummary[];
   diagnostics: SkillDiagnostic[];
 }

@@ -184,6 +184,8 @@ export const enLocale: LocalePlugin = {
     "settings.skills.diagnosticLoser": "Loser: {path}",
     "settings.skills.noSkillsMatch": "No skills match “{search}”",
     "settings.skills.noSkillsFound": "No skills found.",
+    "settings.skills.disableAll": "Disable All",
+    "settings.skills.enableAll": "Enable All",
     "settings.skills.editor.loading": "Loading…",
     "settings.skills.editor.backToSkills": "← Back to skills",
     "settings.skills.editor.back": "← Back",

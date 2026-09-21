@@ -1756,6 +1756,16 @@ export async function clearSkillProjectOverride(
   );
 }
 
+export async function setAllSkillsEnabled(
+  enabled: boolean,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    "PUT",
+    "/api/v1/config/skills/all/enabled",
+    { enabled },
+  );
+}
+
 // ── Skill Detail ────────────────────────────────────────────────────
 
 export async function getSkillDetail(

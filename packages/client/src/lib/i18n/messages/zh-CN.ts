@@ -247,6 +247,8 @@ export const zhCNLocale: LocalePlugin = {
     "settings.skills.diagnosticLoser": "落败方: {path}",
     "settings.skills.noSkillsMatch": "没有技能匹配 “{search}”",
     "settings.skills.noSkillsFound": "未找到技能。",
+    "settings.skills.disableAll": "全部禁用",
+    "settings.skills.enableAll": "全部启用",
     "settings.skills.editor.loading": "加载中...",
     "settings.skills.editor.backToSkills": "← 返回技能列表",
     "settings.skills.editor.back": "← 返回",

@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import {
   listSkills,
   setSkillEnabled,
+  setAllSkillsEnabled,
 } from "../lib/api-client";
 import type { SkillSummary, SkillDiagnostic, SkillsListResponse } from "../lib/api-client/types";
 import { SkillEditor } from "./SkillEditor";
@@ -45,6 +46,20 @@ export function SkillsTab({ onError }: Props) {
       await refresh();
     } catch (err) {
       onError(`Toggle failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleAll = async () => {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const nextEnabled = Boolean(data.disableAll);
+      await setAllSkillsEnabled(nextEnabled);
+      await refresh();
+    } catch (err) {
+      onError(`Toggle all failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -130,7 +145,7 @@ export function SkillsTab({ onError }: Props) {
           className="settings-input"
           style={{ flex: 1, minWidth: 140 }}
         />
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           {(["all", "global", "project", "extension"] as const).map((f) => {
             const count =
               f === "all" ? data.skills.length : (sourceCounts[f] ?? 0);
@@ -153,6 +168,22 @@ export function SkillsTab({ onError }: Props) {
               </button>
             );
           })}
+          <button
+            onClick={() => void handleToggleAll()}
+            disabled={busy}
+            className="settings-tab"
+            style={{
+              fontSize: 11,
+              padding: "2px 8px",
+              borderRadius: 4,
+              border: "1px solid var(--border, rgba(255,255,255,0.15))",
+              cursor: busy ? "not-allowed" : "pointer",
+              color: data.disableAll ? "var(--accent, #6366f1)" : "var(--danger, #e74c3c)",
+              fontWeight: 500,
+            }}
+          >
+            {data.disableAll ? t("settings.skills.enableAll") : t("settings.skills.disableAll")}
+          </button>
         </div>
       </div>
       )}

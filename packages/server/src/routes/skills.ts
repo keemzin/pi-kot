@@ -20,13 +20,16 @@ import {
 import { config } from "../config.js";
 import {
   readSkillOverrides,
+  writeSkillOverrides,
   setSkillEnabled,
+  setAllSkillsEnabled,
   setProjectSkillOverride,
   listSkillOverrides,
   isSkillEffective,
   getProjectOverride,
   type SkillOverrideState,
 } from "../skill-policy.js";
+import { listSessions, rebuildSessionTools } from "../session-store.js";
 import { errorSchema } from "./_schemas.js";
 import { readFile, writeFile } from "node:fs/promises";
 
@@ -47,7 +50,7 @@ function toSkillSummary(
       skill.sourceInfo.source === "extension"
         ? skill.sourceInfo.path
         : undefined,
-    enabled: !overrides.global.includes(skill.name),
+    enabled: !overrides.disableAll && !overrides.global.includes(skill.name),
     projectOverride: getProjectOverride(overrides, projectId, skill.name),
     effective: isSkillEffective(overrides, projectId, skill.name),
     disableModelInvocation: skill.disableModelInvocation,
@@ -106,6 +109,7 @@ export const skillRoutes: FastifyPluginAsync = async (fastify) => {
             type: "object",
             required: ["skills", "diagnostics"],
             properties: {
+              disableAll: { type: "boolean" },
               skills: {
                 type: "array",
                 items: {
@@ -186,7 +190,7 @@ export const skillRoutes: FastifyPluginAsync = async (fastify) => {
 
         const diagnostics = result.diagnostics.map(toSkillDiagnostic);
 
-        return { skills, diagnostics };
+        return { disableAll: Boolean(overrides.disableAll), skills, diagnostics };
       } catch (err) {
         fastify.log.error(err, "GET /config/skills failed");
         return reply.code(500).send({ error: "internal_error" });
@@ -513,6 +517,9 @@ export const skillRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
+      const allSessions = listSessions();
+      await Promise.allSettled(allSessions.map((s) => rebuildSessionTools(s.sessionId)));
+
       return { ok: true };
     },
   );
@@ -557,6 +564,57 @@ export const skillRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       await setProjectSkillOverride(projectId, req.params.name, undefined);
+      const allSessions = listSessions();
+      await Promise.allSettled(allSessions.map((s) => rebuildSessionTools(s.sessionId)));
+      return { ok: true };
+    },
+  );
+
+  // ── PUT /config/skills/all/enabled — toggle all skills ─────────────
+
+  fastify.put<{
+    Body: { enabled: boolean };
+  }>(
+    "/config/skills/all/enabled",
+    {
+      schema: {
+        description: "Enable or disable all skills globally.",
+        tags: ["config"],
+        body: {
+          type: "object",
+          required: ["enabled"],
+          properties: { enabled: { type: "boolean" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: { ok: { type: "boolean" } },
+          },
+        },
+      },
+    },
+    async (req) => {
+      if (!req.body.enabled) {
+        try {
+          const result = loadSkills({
+            cwd: config.workspacePath,
+            agentDir: config.piConfigDir,
+            skillPaths: [],
+            includeDefaults: true,
+          });
+          const allNames = result.skills.map((s) => s.name);
+          const data = await readSkillOverrides();
+          data.disableAll = true;
+          data.global = Array.from(new Set([...data.global, ...allNames]));
+          await writeSkillOverrides(data);
+        } catch {
+          await setAllSkillsEnabled(false);
+        }
+      } else {
+        await setAllSkillsEnabled(true);
+      }
+      const allSessions = listSessions();
+      await Promise.allSettled(allSessions.map((s) => rebuildSessionTools(s.sessionId)));
       return { ok: true };
     },
   );
