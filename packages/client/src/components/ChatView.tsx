@@ -56,7 +56,7 @@ toolRegistry.register("javascript_repl", ({ part }) => (
 		isError={part.state === "error"}
 	/>
 ));
-toolRegistry.register("plannotator_submit_plan", PlanSubmittedCard);
+toolRegistry.register("submit_plan", PlanSubmittedCard);
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";

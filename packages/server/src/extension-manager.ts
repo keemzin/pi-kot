@@ -158,22 +158,6 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     enablesFeatures: ["⚠️ ~8,181 tokens on first prompt — then saves ~98%", "Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search", "Commands: /ctx-stats, /ctx-doctor"],
     icon: "🧠",
   },
-  {
-    id: "plannotator",
-    name: "plannotator",
-    description:
-      "Visual plan review and structured planning for Pi. Allows reviewing, editing, and approving agent plans in a native side panel before execution begins.",
-    package: "npm:@plannotator/pi-extension",
-    category: "productivity",
-    verified: true,
-    enablesFeatures: [
-      "Visual plan review in side panel",
-      "Native plan approval & editing",
-      "File-based planning mode with /plan",
-      "Execution checklist progress tracking",
-    ],
-    icon: "📋",
-  },
 ];
 
 // ── Discovery ───────────────────────────────────────────────────────

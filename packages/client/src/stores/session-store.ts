@@ -562,7 +562,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 							.clearPending(sessionId, cancelledId);
 						break;
 					}
-					case "plannotator_plan_review_requested": {
+					case "plan_review_requested": {
 						const { requestId, planFilePath, planContent } = event as unknown as {
 							requestId: string;
 							planFilePath: string;
@@ -573,7 +573,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 							.openReview({ requestId, sessionId, planFilePath, planContent });
 						break;
 					}
-					case "plannotator_plan_review_resolved": {
+					case "plan_review_resolved": {
 						const { requestId: resolvedId } = event as unknown as {
 							requestId: string;
 						};
@@ -733,6 +733,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						}
 
 						refetchMessages();
+						// Synchronize plan mode status & pending reviews upon turn completion
+						void usePlanReviewStore.getState().fetchPlanModeStatus(sessionId);
 						// Safety net after a turn ends (also covers sub-agent /
 						// orchestration edits that don't emit `tool_result` on this
 						// stream). We only bump the git tick here — the specific file

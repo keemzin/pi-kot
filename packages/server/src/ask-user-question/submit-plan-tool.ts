@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
-import { registerPendingPlanReview } from "./plannotator-registry.js";
+import { registerPendingPlanReview } from "./plan-review-registry.js";
 
-export const PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME = "plannotator_submit_plan";
+export const SUBMIT_PLAN_TOOL_NAME = "submit_plan";
 
 function isPlanWritePathAllowed(filePath: string, cwd: string): boolean {
   if (!/\.(?:md|mdx)$/i.test(filePath)) return false;
@@ -12,12 +12,12 @@ function isPlanWritePathAllowed(filePath: string, cwd: string): boolean {
   return !rel.startsWith("..") && !isAbsolute(rel);
 }
 
-export function createPlannotatorSubmitPlanTool(sessionId: string): ToolDefinition {
+export function createSubmitPlanTool(sessionId: string, toolName = SUBMIT_PLAN_TOOL_NAME): ToolDefinition {
   return {
-    name: PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME,
+    name: toolName,
     label: "Submit Plan",
     description:
-      "Submit your Plannotator plan for user review. " +
+      "Submit your implementation plan for user review. " +
       "Call this after drafting your plan as a markdown file anywhere inside the working directory. " +
       "Pass the path to the plan file (e.g. PLAN.md or plans/auth.md). " +
       "The user will review the plan in a native side panel and can edit, approve, or request revisions. " +
@@ -41,7 +41,7 @@ export function createPlannotatorSubmitPlanTool(sessionId: string): ToolDefiniti
           content: [
             {
               type: "text",
-              text: `Error: ${PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME} requires a filePath argument pointing to your markdown plan file (e.g. "PLAN.md" or "plans/auth.md").`,
+              text: `Error: ${toolName} requires a filePath argument pointing to your markdown plan file (e.g. "PLAN.md" or "plans/auth.md").`,
             },
           ],
           details: { approved: false },
@@ -69,7 +69,7 @@ export function createPlannotatorSubmitPlanTool(sessionId: string): ToolDefiniti
             content: [
               {
                 type: "text",
-                text: `Error: ${inputPath} does not exist or is not a regular file. Write your plan using the write tool first, then call ${PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME} with its path.`,
+                text: `Error: ${inputPath} does not exist or is not a regular file. Write your plan using the write tool first, then call ${toolName} with its path.`,
               },
             ],
             details: { approved: false },
@@ -107,7 +107,7 @@ export function createPlannotatorSubmitPlanTool(sessionId: string): ToolDefiniti
           content: [
             {
               type: "text",
-              text: `Error: ${inputPath} is empty. Write your plan first, then call ${PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME} again.`,
+              text: `Error: ${inputPath} is empty. Write your plan first, then call ${toolName} again.`,
             },
           ],
           details: { approved: false },
@@ -127,3 +127,4 @@ export function createPlannotatorSubmitPlanTool(sessionId: string): ToolDefiniti
     },
   };
 }
+

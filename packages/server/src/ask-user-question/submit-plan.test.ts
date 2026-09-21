@@ -4,17 +4,17 @@ import {
   resolvePendingPlanReview,
   getPendingPlanReviewsForSession,
   subscribePlanReview,
-} from "./plannotator-registry.js";
+} from "./plan-review-registry.js";
 import {
-  createPlannotatorSubmitPlanTool,
-  PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME,
-} from "./plannotator-submit-plan-tool.js";
+  createSubmitPlanTool,
+  SUBMIT_PLAN_TOOL_NAME,
+} from "./submit-plan-tool.js";
 
-describe("Plannotator Plan Review Registry & Tool", () => {
+describe("Plan Review Registry & Tool", () => {
   it("should have correct tool name and schema", () => {
-    const tool = createPlannotatorSubmitPlanTool("test-session");
-    expect(tool.name).toBe("plannotator_submit_plan");
-    expect(tool.name).toBe(PLANNOTATOR_SUBMIT_PLAN_TOOL_NAME);
+    const tool = createSubmitPlanTool("test-session");
+    expect(tool.name).toBe("submit_plan");
+    expect(tool.name).toBe(SUBMIT_PLAN_TOOL_NAME);
     expect(tool.parameters).toHaveProperty("required", ["filePath"]);
   });
 
@@ -23,7 +23,7 @@ describe("Plannotator Plan Review Registry & Tool", () => {
     let eventFired = false;
 
     const unsubscribe = subscribePlanReview((ev) => {
-      if (ev.type === "plannotator_plan_review_requested" && ev.sessionId === sessionId) {
+      if (ev.type === "plan_review_requested" && ev.sessionId === sessionId) {
         eventFired = true;
       }
     });

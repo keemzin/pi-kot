@@ -114,6 +114,18 @@ When the agent executes consecutive tool calls or intersperses text between acti
 
 ---
 
+## 📋 Native Plan Mode & Review Panel
+
+pi-kot includes a 100% native, lightweight Plan Mode built directly into the agent lifecycle — no third-party extensions required:
+
+- **Zero Token Overhead When Inactive**: Inactive turns consume **0 extra tokens**.
+- **Dynamic In-Process Guardrails**: When toggled on, an in-process interceptor restricts the agent to exploring the codebase and drafting markdown plans (e.g. `PLAN.md`). Modifying code files is safely blocked until user approval.
+- **Side Panel Review**: The agent pauses and submits its plan via `submit_plan`. Review the proposal in a side panel with rendered markdown, edit directly, approve with implementation notes, or request revisions.
+- **Seamless Approval Flow**: Approving automatically transitions out of plan mode, allowing the agent to proceed with code modifications without any extra manual steps.
+- **Toggle Anywhere**: Enable or exit Plan Mode anytime via the clipboard icon in the chat input, the banner above the prompt box, or the `/plan` slash command.
+
+---
+
 ## Slash Commands
 
 Type `/` in the chat input to access built-in and extension commands. Slash commands support arguments:
@@ -166,15 +178,14 @@ Some features only appear **after** installing the corresponding extension. Head
 | **pi-playwright** 🎭 | `npm:pi-playwright` | Browser automation — the agent can interact with real web UI |
 | **pi-vision-tool** 👁️ | `npm:pi-vision-tool` | **Vision agent selection** — non-vision models can delegate `describe_image` to a vision-capable model; full vision settings exposed in Extensions tab and slash commands (`/vision config`, `/vision show`, etc.) |
 | **pi-rewind** ⏪ | `npm:@ayulab/pi-rewind` | **Session revert** — checkpoint, rewind, and branch from any prior state |
-| **plannotator** 📋 | `npm:@plannotator/pi-extension` | **Native plan review** — visual plan review, in-place markdown editing, and structured planning in a dedicated side panel |
 | **context-mode** 🧠 | `npm:context-mode` | **Context window savings** — sandboxed code execution, FTS5 knowledge base, BM25 search, and session continuity across compaction |
 
 > 💡 **Tip**: Some UI elements only appear **after** the extension is installed. For example:
 >
 > - **Vision model selector & slash commands** → appears only after `pi-vision-tool` is installed
 > - **Rewind button** on chat messages → appears only after `pi-rewind` is installed
-> - **Plan mode & review side panel** → appears only after `plannotator` is installed
 > - **Context stats/doctor commands** → appears only after `context-mode` is installed
+> *(Note: **Plan mode & review side panel** is built-in natively out-of-the-box — no extension install required!)*
 > If something mentioned in this README doesn't show up, check the Extensions tab first.
 
 ---

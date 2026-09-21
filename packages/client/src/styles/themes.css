@@ -3035,6 +3035,7 @@ strong {
 /* ═══ Messages ═══ */
 .messages-container {
 	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
 	padding: 60px 24px 24px;
 	display: flex;
@@ -3045,6 +3046,8 @@ strong {
 	margin: 0 auto;
 	width: 100%;
 	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE/Edge */
+	scrollbar-gutter: stable;
 }
 .messages-container::-webkit-scrollbar {
 	display: none;
@@ -4865,10 +4868,17 @@ strong {
 /* ══ Forge-like chat helpers (structural match) ══ */
 .chat-scroll {
 	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
 	overflow-anchor: auto;
 	scroll-behavior: auto;
 	padding: 4px 16px 2px;
+	scrollbar-width: none; /* Firefox */
+	-ms-overflow-style: none; /* IE/Edge */
+	scrollbar-gutter: stable;
+}
+.chat-scroll::-webkit-scrollbar {
+	display: none; /* Chrome/Safari/Edge */
 }
 .chat-message-list {
 	max-width: 760px;
@@ -6927,9 +6937,6 @@ strong {
 
 .repl-sandbox-title {
 	flex: 1;
-}
-
-.repl-sandbox-code {
 }
 
 .repl-sandbox-toggle {

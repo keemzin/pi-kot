@@ -6,11 +6,12 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { compactionContinuationExtension } from "./compaction-continuation.js";
+import { planModeExtension } from "./plan-mode-extension.js";
 import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { createPlanModeQuestionTool } from "./ask-user-question/plan-mode-question-tool.js";
-import { createPlannotatorSubmitPlanTool } from "./ask-user-question/plannotator-submit-plan-tool.js";
+import { createSubmitPlanTool } from "./ask-user-question/submit-plan-tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
@@ -54,7 +55,7 @@ export async function buildResourceLoader(
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: config.piConfigDir,
-    extensionFactories: [compactionContinuationExtension],
+    extensionFactories: [compactionContinuationExtension, planModeExtension],
     appendSystemPrompt,
   });
   await loader.reload();
@@ -134,6 +135,8 @@ export interface LiveSession {
   unsubscribe: () => void;
   /** The session name set via appendSessionInfo, if any. */
   name: string | undefined;
+  /** In-memory plan mode toggle state. */
+  planModeActive?: boolean;
   /** Abort handle for the currently executing !cmd / !!cmd stream. */
   currentExecAbort: (() => void) | undefined;
 }
@@ -259,7 +262,7 @@ export async function createSession(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
-    createPlannotatorSubmitPlanTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
@@ -558,7 +561,7 @@ async function buildToolsAllowlist(
   const builtinCustomToolNames = new Set<string>([
     "ask_user_question",
     "plan_mode_question",
-    "plannotator_submit_plan",
+    "submit_plan",
     ...BUILTIN_TOOL_NAMES,
   ]);
 
@@ -600,7 +603,7 @@ export async function rebuildSessionTools(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
-    createPlannotatorSubmitPlanTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
@@ -780,7 +783,7 @@ export async function resumeSessionById(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
-    createPlannotatorSubmitPlanTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
@@ -895,7 +898,7 @@ export async function forkSession(
     ...mcpTools,
     createAskUserQuestionTool(forkedId),
     createPlanModeQuestionTool(forkedId),
-    createPlannotatorSubmitPlanTool(forkedId),
+    createSubmitPlanTool(forkedId),
     ...orchestrationTools,
   ];
 

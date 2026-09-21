@@ -42,6 +42,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
   const planModeActive = usePlanReviewStore((s) => s.planModeActive);
+  const hasPendingReview = usePlanReviewStore((s) => Boolean(s.activeReview?.requestId));
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const sendFollowUp = useSessionStore((s) => s.sendFollowUp);
@@ -173,47 +174,30 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   // Build the full slash command list from builtins + extension commands
   const handleTogglePlanMode = useCallback(async () => {
     if (!sessionId) return;
-    const hasPlannotator = extensionCommands.some(
-      (c) => c.name === "/plannotator-plan-mode",
-    );
-    if (hasPlannotator) {
-      const nextActive = !planModeActive;
-      usePlanReviewStore.getState().setPlanModeActive(nextActive);
-      const { invokeExtensionCommand } = await import("../lib/api-client");
-      try {
-        await invokeExtensionCommand(sessionId, "plannotator-plan-mode");
-      } catch {
-        // Revert on failure
-        usePlanReviewStore.getState().setPlanModeActive(planModeActive);
-      }
-    } else {
-      useExtensionUIStore.getState().pushEvent({
-        type: "notify",
-        notificationType: "warning",
-        message:
-          "Plannotator is not installed. Go to Settings > Packages and install @plannotator/pi-extension, or run 'pi install npm:@plannotator/pi-extension'.",
-      });
+    const nextActive = !planModeActive;
+    usePlanReviewStore.getState().setPlanModeActive(nextActive);
+    try {
+      const { setPlanMode } = await import("../lib/api-client");
+      await setPlanMode(sessionId, nextActive);
+    } catch {
+      // Revert on failure
+      usePlanReviewStore.getState().setPlanModeActive(planModeActive);
     }
-  }, [sessionId, extensionCommands, planModeActive]);
+  }, [sessionId, planModeActive]);
 
   const builtinCommands: SlashCommand[] = [
     {
       name: "/plan",
-      description: "Toggle Plannotator plan mode",
-      handler: async (sid: string, args: string) => {
-        const hasPlannotator = extensionCommands.some(
-          (c) => c.name === "/plannotator-plan-mode",
-        );
-        if (hasPlannotator) {
-          const { invokeExtensionCommand } = await import("../lib/api-client");
-          await invokeExtensionCommand(sid, "plannotator-plan-mode", args || undefined);
-        } else {
-          useExtensionUIStore.getState().pushEvent({
-            type: "notify",
-            notificationType: "warning",
-            message:
-              "Plannotator is not installed. Go to Settings > Packages and install @plannotator/pi-extension, or run 'pi install npm:@plannotator/pi-extension'.",
-          });
+      description: "Toggle Plan Mode on or off",
+      handler: async (sid: string, _args: string) => {
+        const currentActive = usePlanReviewStore.getState().planModeActive;
+        const nextActive = !currentActive;
+        usePlanReviewStore.getState().setPlanModeActive(nextActive);
+        try {
+          const { setPlanMode } = await import("../lib/api-client");
+          await setPlanMode(sid, nextActive);
+        } catch {
+          usePlanReviewStore.getState().setPlanModeActive(currentActive);
         }
       },
     },
@@ -970,7 +954,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
             <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, overflow: "hidden", flex: 1 }}>
               <ClipboardList size={isMobile ? 11 : 12} style={{ color: "var(--accent)", flexShrink: 0 }} />
               <span style={{ fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
-                {isMobile ? "Plan Mode" : "Plan Mode Active"}
+                {hasPendingReview
+                  ? (isMobile ? "Review Ready" : "Plan Ready for Review")
+                  : (isMobile ? "Plan Mode" : "Plan Mode Active")}
               </span>
               {!isMobile && (
                 <span
@@ -983,7 +969,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                     whiteSpace: "nowrap",
                   }}
                 >
-                  — drafts plan before modifying code
+                  {hasPendingReview
+                    ? "— click Approve & Execute to begin"
+                    : "— drafts plan before modifying code"}
                 </span>
               )}
             </div>
@@ -992,7 +980,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                 type="button"
                 className="plan-banner-review-btn"
                 onClick={() => usePlanReviewStore.getState().openFileReview("PLAN.md", sessionId)}
-                title="Review plan"
+                title={hasPendingReview ? "Review plan" : "View plan"}
                 style={{
                   background: "var(--bg-solid)",
                   border: "1px solid var(--accent)",
@@ -1006,7 +994,9 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
                   whiteSpace: "nowrap",
                 }}
               >
-                {isMobile ? "Review" : "Review Plan"}
+                {hasPendingReview
+                  ? (isMobile ? "Review" : "Review Plan")
+                  : (isMobile ? "Plan" : "View Plan")}
               </button>
               <button
                 type="button"

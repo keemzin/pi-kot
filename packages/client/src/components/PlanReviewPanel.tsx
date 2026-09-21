@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { usePlanReviewStore } from "../stores/plan-review-store";
+import { useSessionStore } from "../stores/session-store";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { Check, Edit3, Eye, LogOut, MessageSquare, RotateCcw, Save, X } from "lucide-react";
@@ -87,11 +88,36 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
     };
   }, [isResizing, panelWidth]);
 
+  const codeHasBeenWritten = useMemo(() => {
+    const msgs = useSessionStore.getState().messages;
+    for (const m of msgs) {
+      const msg = m as Record<string, unknown>;
+      if (msg?.role === "assistant" && Array.isArray(msg?.content)) {
+        for (const block of msg.content) {
+          const b = block as Record<string, unknown>;
+          if (b?.type === "toolCall" && (b.name === "write" || b.name === "edit")) {
+            const args = b.arguments as { path?: string; filePath?: string } | undefined;
+            const p = args?.path ?? args?.filePath;
+            if (typeof p === "string" && !/\.(?:md|mdx)$/i.test(p)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }, [activeReview]);
+
   if (!isOpen || !activeReview) {
     return null;
   }
 
   const isPendingReview = Boolean(activeReview.requestId);
+
+  const isCompleted = !isPendingReview && codeHasBeenWritten;
+  const isDrafting = planModeActive && !isPendingReview && !isCompleted;
+  const isApproved = (!planModeActive && !isPendingReview) || isCompleted;
+  const isReviewable = isPendingReview || isDrafting;
   const hasEditedChanges = editedContent.trim() !== activeReview.planContent.trim();
 
   const handleApprove = async () => {
@@ -226,14 +252,24 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
             <div
               style={{
                 fontSize: "11px",
-                color: isPendingReview ? "var(--accent, #3b82f6)" : "#22c55e",
+                color: isPendingReview
+                  ? "var(--accent, #3b82f6)"
+                  : isDrafting
+                    ? "#eab308"
+                    : "#22c55e",
                 fontWeight: 500,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
             >
-              {isPendingReview ? "Awaiting Your Review" : "✓ Plan Approved & Saved"}
+              {isPendingReview
+                ? "Awaiting Your Review"
+                : isDrafting
+                  ? "📝 Plan Draft (In Progress)"
+                  : isCompleted
+                    ? "✓ Plan Completed"
+                    : "✓ Plan Approved & Saved"}
             </div>
           </div>
         </div>
@@ -559,8 +595,8 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
           flexShrink: 0,
         }}
       >
-        {isPendingReview ? (
-          /* Active Pending Review State */
+        {isReviewable ? (
+          /* Active Review / Plan Draft State */
           <>
             <div
               className="plan-review-footer-group"
@@ -626,37 +662,131 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
                 <MessageSquare size={13} />
                 Approve with Notes...
               </button>
+              {planModeActive && (
+                <button
+                  type="button"
+                  className="plan-review-footer-btn"
+                  onClick={handleExitPlanMode}
+                  title="Unlock code file editing for the agent"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "4px",
+                    padding: "7px 12px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    background: "rgba(234, 179, 8, 0.15)",
+                    color: "#eab308",
+                    border: "1px solid rgba(234, 179, 8, 0.35)",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    flex: isMobile ? "1 1 auto" : undefined,
+                  }}
+                >
+                  <LogOut size={13} />
+                  Exit Plan Mode
+                </button>
+              )}
             </div>
 
-            <button
-              type="button"
-              className="plan-review-footer-btn"
-              onClick={handleApprove}
-              disabled={submitting}
+            <div
+              className="plan-review-footer-group"
               style={{
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: "6px",
-                padding: "8px 18px",
-                fontSize: "13px",
-                fontWeight: 600,
-                background: "#16a34a",
-                color: "#fff",
-                border: "none",
-                borderRadius: "6px",
-                cursor: "pointer",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.15)",
-                flex: isMobile ? "1 1 100%" : undefined,
-                width: isMobile ? "100%" : undefined,
+                gap: "8px",
+                flexWrap: "wrap",
+                flex: isMobile ? "1 1 100%" : "0 1 auto",
+                justifyContent: isMobile ? "stretch" : "flex-end",
               }}
             >
-              <Check size={15} strokeWidth={2.5} />
-              {submitting ? "Approving..." : "Approve & Execute"}
-            </button>
+              {saveSuccess && (
+                <span style={{ fontSize: "11px", color: "#22c55e", fontWeight: 600, width: isMobile ? "100%" : undefined, textAlign: isMobile ? "center" : undefined }}>
+                  ✓ Saved to disk
+                </span>
+              )}
+              {hasEditedChanges && (
+                <button
+                  type="button"
+                  className="plan-review-footer-btn"
+                  onClick={handleSaveEdits}
+                  disabled={submitting}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "5px",
+                    padding: "7px 16px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    background: "var(--accent, #3b82f6)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    flex: isMobile ? "1 1 auto" : undefined,
+                  }}
+                >
+                  <Save size={13} />
+                  Save Edits
+                </button>
+              )}
+              <button
+                type="button"
+                className="plan-review-footer-btn"
+                onClick={handleApprove}
+                disabled={submitting}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  padding: "8px 18px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  background: "#16a34a",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  boxShadow: "0 1px 3px rgba(0, 0, 0, 0.15)",
+                  flex: isMobile ? "1 1 100%" : undefined,
+                  width: isMobile ? "100%" : undefined,
+                }}
+              >
+                <Check size={15} strokeWidth={2.5} />
+                {submitting
+                  ? "Approving..."
+                  : isPendingReview
+                    ? "Approve & Execute"
+                    : "Execute Plan"}
+              </button>
+              <button
+                type="button"
+                className="plan-review-footer-btn"
+                onClick={handleClose}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "7px 14px",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  background: "var(--bg-glass)",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  flex: isMobile ? "1 1 auto" : undefined,
+                }}
+              >
+                Close
+              </button>
+            </div>
           </>
         ) : (
-          /* Already Approved / On-Demand View Mode */
+          /* Already Approved / Completed View Mode */
           <>
             <div
               className="plan-review-footer-group"
@@ -700,7 +830,7 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
                   type="button"
                   className="plan-review-footer-btn"
                   onClick={handleExitPlanMode}
-                  title="Unlock code file editing for the agent"
+                  title="Exit Plan Mode"
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -782,7 +912,7 @@ export const PlanReviewPanel: React.FC<Props> = ({ onClose }) => {
                   }}
                 >
                   <Check size={14} strokeWidth={2.5} />
-                  Plan Approved
+                  {isCompleted ? "Plan Completed" : "Plan Approved"}
                 </span>
               )}
               <button

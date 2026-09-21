@@ -303,7 +303,7 @@ export function createBridgeUIContext(
 
     get theme() {
       // Return a robust theme stub supporting formatting methods and color functions.
-      // Extensions (e.g. Plannotator) format status/messages using ctx.ui.theme.fg(...) or ctx.ui.theme.strikethrough(...).
+      // Extensions format status/messages using ctx.ui.theme.fg(...) or ctx.ui.theme.strikethrough(...).
       const format = (_first: unknown, second?: unknown) => {
         if (second !== undefined) return String(second);
         if (_first !== undefined) return String(_first);

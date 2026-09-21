@@ -112,7 +112,7 @@ export const useExtensionUIStore = create<ExtensionUIStore>((set) => ({
         break;
       case "status": {
         const s = event as unknown as { key?: string; status?: string };
-        if (s.key === "plannotator") {
+        if (s.key === "plan-mode") {
           const isPlan = Boolean(
             s.status &&
             (s.status.includes("plan") ||

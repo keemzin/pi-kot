@@ -21,7 +21,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { fileRoutes } from "./routes/files.js";
 import { disposeAllSessions, getSession } from "./session-store.js";
 import { subscribe as subscribeAskUserQuestion } from "./ask-user-question/registry.js";
-import { subscribePlanReview } from "./ask-user-question/plannotator-registry.js";
+import { subscribePlanReview } from "./ask-user-question/plan-review-registry.js";
 import { initOrchestrationAskUserQuestionBridge } from "./orchestration/init.js";
 import { orchestrationRoutes } from "./routes/orchestration.js";
 import { extensionRoutes } from "./routes/extensions.js";

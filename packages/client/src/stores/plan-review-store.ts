@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { submitPlanReviewDecision, filesRead, filesWrite } from "../lib/api-client";
+import { submitPlanReviewDecision, filesRead, filesWrite, getPendingPlanReviews, getPlanModeStatus } from "../lib/api-client";
 import { useSessionStore } from "./session-store";
 
 export interface ActivePlanReview {
@@ -48,26 +48,16 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
     const sid = sessionId ?? useSessionStore.getState().activeSessionId;
     if (!sid) return;
     try {
-      const [res, pendingRes] = await Promise.all([
-        fetch(`/api/v1/sessions/${encodeURIComponent(sid)}/plan-mode`),
-        fetch(`/api/v1/sessions/${encodeURIComponent(sid)}/plan-review/pending`),
+      const [modeRes, pendingRes] = await Promise.all([
+        getPlanModeStatus(sid).catch(() => null),
+        getPendingPlanReviews(sid).catch(() => null),
       ]);
-      if (res.ok) {
-        const data = (await res.json()) as { planModeActive?: boolean };
-        if (typeof data.planModeActive === "boolean") {
-          set({ planModeActive: data.planModeActive });
-        }
+      if (modeRes && typeof modeRes.planModeActive === "boolean") {
+        set({ planModeActive: modeRes.planModeActive });
       }
-      if (pendingRes.ok) {
-        const pData = (await pendingRes.json()) as {
-          pending?: Array<{
-            requestId: string;
-            planFilePath: string;
-            planContent: string;
-          }>;
-        };
-        if (Array.isArray(pData.pending) && pData.pending.length > 0) {
-          const first = pData.pending[0];
+      if (Array.isArray(pendingRes)) {
+        if (pendingRes.length > 0) {
+          const first = pendingRes[0];
           set({
             activeReview: {
               requestId: first.requestId,
@@ -81,8 +71,18 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
           });
         } else {
           const current = get().activeReview;
-          if (current && current.sessionId !== sid) {
-            set({ activeReview: null, isOpen: false, editedContent: "" });
+          if (current) {
+            if (current.sessionId !== sid) {
+              set({ activeReview: null, isOpen: false, editedContent: "" });
+            } else if (current.requestId) {
+              // The pending review request was resolved/completed. Clear requestId so it's not treated as pending.
+              set({
+                activeReview: {
+                  ...current,
+                  requestId: undefined,
+                },
+              });
+            }
           }
         }
       }
@@ -102,25 +102,60 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
   },
 
   openFileReview: async (filePath = "PLAN.md", sessionId?: string) => {
-    const { activeReview } = get();
-    // If an active review already exists for this file, just ensure panel is open
-    if (activeReview && activeReview.planFilePath === filePath) {
-      set({ isOpen: true, viewMode: "preview" });
-      return;
-    }
-
     const sid = sessionId ?? useSessionStore.getState().activeSessionId;
     const projectId = useSessionStore.getState().activeProjectId ?? "default";
+    const current = get().activeReview;
+
+    let pendingRequestId: string | undefined = undefined;
+    let pendingContent: string | undefined;
+
+    if (sid) {
+      try {
+        const [pendingRes, modeRes] = await Promise.all([
+          getPendingPlanReviews(sid).catch(() => []),
+          getPlanModeStatus(sid).catch(() => null),
+        ]);
+
+        if (modeRes && typeof modeRes.planModeActive === "boolean") {
+          set({ planModeActive: modeRes.planModeActive });
+        }
+
+        if (Array.isArray(pendingRes) && pendingRes.length > 0) {
+          const match = pendingRes.find((p) => {
+            if (p.planFilePath === filePath) return true;
+            const pNorm = p.planFilePath.replace(/\\/g, "/");
+            const fNorm = filePath.replace(/\\/g, "/");
+            return pNorm.endsWith(`/${fNorm}`) || fNorm.endsWith(`/${pNorm}`) || pNorm === fNorm;
+          }) ?? (pendingRes.length === 1 ? pendingRes[0] : undefined);
+
+          if (match) {
+            pendingRequestId = match.requestId;
+            pendingContent = match.planContent;
+          }
+        }
+      } catch {
+        // Best effort
+      }
+    }
 
     try {
-      const res = await filesRead(projectId, filePath);
+      let content = pendingContent;
+      if (!content) {
+        const res = await filesRead(projectId, filePath);
+        content = res.content;
+      }
+
+      const hasUserEdited = current && current.planContent.trim() !== get().editedContent.trim();
+      const updatedEditedContent = hasUserEdited ? get().editedContent : content;
+
       set({
         activeReview: {
+          requestId: pendingRequestId,
           sessionId: sid ?? "",
           planFilePath: filePath,
-          planContent: res.content,
+          planContent: content,
         },
-        editedContent: res.content,
+        editedContent: updatedEditedContent,
         isOpen: true,
         viewMode: "preview",
         error: null,
@@ -166,8 +201,8 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
   exitPlanMode: async () => {
     const sid = useSessionStore.getState().activeSessionId;
     if (sid) {
-      const { invokeExtensionCommand } = await import("../lib/api-client");
-      await invokeExtensionCommand(sid, "plannotator-plan-mode").catch(() => {});
+      const { setPlanMode } = await import("../lib/api-client");
+      await setPlanMode(sid, false).catch(() => {});
     }
     set({ planModeActive: false });
   },
@@ -200,10 +235,10 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
           },
         );
 
-        // Transition Plannotator out of plan mode on approval
+        // Transition out of plan mode on approval
         if (approved && sid) {
-          const { invokeExtensionCommand } = await import("../lib/api-client");
-          await invokeExtensionCommand(sid, "plannotator-plan-mode").catch(() => {});
+          const { setPlanMode } = await import("../lib/api-client");
+          await setPlanMode(sid, false).catch(() => {});
           set({ planModeActive: false });
         }
       } else if (sid) {
@@ -214,8 +249,8 @@ export const usePlanReviewStore = create<PlanReviewState>((set, get) => ({
             `Plan approved!${notes}\nPlease proceed with executing the implementation steps in ${activeReview.planFilePath}.`,
           );
           if (get().planModeActive) {
-            const { invokeExtensionCommand } = await import("../lib/api-client");
-            await invokeExtensionCommand(sid, "plannotator-plan-mode").catch(() => {});
+            const { setPlanMode } = await import("../lib/api-client");
+            await setPlanMode(sid, false).catch(() => {});
             set({ planModeActive: false });
           }
         } else {

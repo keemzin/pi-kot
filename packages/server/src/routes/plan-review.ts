@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { getSession } from "../session-store.js";
-import { getPendingPlanReviewsForSession, resolvePendingPlanReview, type PlanReviewDecision } from "../ask-user-question/plannotator-registry.js";
+import { getPendingPlanReviewsForSession, resolvePendingPlanReview, type PlanReviewDecision } from "../ask-user-question/plan-review-registry.js";
 import { isSessionInPlanMode } from "../event-stream.js";
 import { setSessionStatus } from "../extension-ui-bridge.js";
 
@@ -107,21 +107,15 @@ export const planReviewRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.code(404).send({ error: "plan_review_not_found" });
       }
 
-      // If approved, clear the in-memory plan status and notify Plannotator
+      // If approved, clear the plan status and update session state
       if (req.body.approved) {
-        setSessionStatus(req.params.id, "plannotator", undefined);
+        live.planModeActive = false;
         try {
-          const session = live.session as unknown as { events?: { emit?: (event: string, data: unknown) => void } };
-          if (session.events && typeof session.events.emit === "function") {
-            session.events.emit("plannotator:request", {
-              action: "plan-mode",
-              payload: { mode: "exit" },
-              respond: () => {},
-            });
-          }
-        } catch (err) {
-          req.log.warn({ err }, "Could not notify plannotator of exit on approval");
+          live.sessionManager.appendCustomEntry?.("plan-mode", { active: false, phase: "idle" });
+        } catch {
+          // best-effort
         }
+        setSessionStatus(req.params.id, "plan-mode", undefined);
       }
 
       return reply.code(204).send();
@@ -140,6 +134,51 @@ export const planReviewRoutes: FastifyPluginAsync = async (fastify) => {
       const phase = planModeActive ? "planning" : "idle";
 
       return { phase, planModeActive };
+    },
+  );
+
+  fastify.post<{
+    Params: { id: string };
+    Body: { active?: boolean };
+  }>(
+    "/sessions/:id/plan-mode",
+    {
+      schema: {
+        description: "Toggle or explicitly set Plan Mode on or off for this session",
+        tags: ["plan-review"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        body: {
+          type: "object",
+          properties: {
+            active: { type: "boolean" },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const live = getSession(req.params.id);
+      if (live === undefined) {
+        return reply.code(404).send({ error: "session_not_found" });
+      }
+
+      const currentActive = isSessionInPlanMode(live);
+      const nextActive = typeof req.body?.active === "boolean" ? req.body.active : !currentActive;
+      const phase = nextActive ? "planning" : "idle";
+
+      live.planModeActive = nextActive;
+      try {
+        live.sessionManager.appendCustomEntry?.("plan-mode", { active: nextActive, phase });
+      } catch {
+        // best-effort
+      }
+
+      setSessionStatus(req.params.id, "plan-mode", nextActive ? "📋 Plan Mode" : undefined);
+
+      return { ok: true, planModeActive: nextActive, phase };
     },
   );
 };

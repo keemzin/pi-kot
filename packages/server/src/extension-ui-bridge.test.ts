@@ -34,16 +34,16 @@ describe("extension-ui-bridge", () => {
     const clients = new Set<any>();
     const ui = createBridgeUIContext(clients, sessionId);
 
-    ui.setStatus("plannotator", "⏸ plan");
-    expect(getSessionStatuses(sessionId)).toEqual([{ key: "plannotator", status: "⏸ plan" }]);
+    ui.setStatus("plan-mode", "📋 Plan Mode");
+    expect(getSessionStatuses(sessionId)).toEqual([{ key: "plan-mode", status: "📋 Plan Mode" }]);
 
     ui.setStatus("custom", "info");
     expect(getSessionStatuses(sessionId)).toEqual([
-      { key: "plannotator", status: "⏸ plan" },
+      { key: "plan-mode", status: "📋 Plan Mode" },
       { key: "custom", status: "info" },
     ]);
 
-    ui.setStatus("plannotator", undefined);
+    ui.setStatus("plan-mode", undefined);
     expect(getSessionStatuses(sessionId)).toEqual([{ key: "custom", status: "info" }]);
 
     clearSessionStatuses(sessionId);

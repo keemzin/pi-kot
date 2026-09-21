@@ -24,14 +24,14 @@ export interface PlanReviewToolResult {
 
 export type PlanReviewEvent =
   | {
-      type: "plannotator_plan_review_requested";
+      type: "plan_review_requested";
       sessionId: string;
       requestId: string;
       planFilePath: string;
       planContent: string;
     }
   | {
-      type: "plannotator_plan_review_resolved";
+      type: "plan_review_resolved";
       sessionId: string;
       requestId: string;
       approved: boolean;
@@ -84,7 +84,7 @@ export function registerPendingPlanReview(args: {
         details: { approved: false, cancelled: true, error: "superseded" },
       });
       notify({
-        type: "plannotator_plan_review_resolved",
+        type: "plan_review_resolved",
         sessionId: args.sessionId,
         requestId: existingId,
         approved: false,
@@ -116,7 +116,7 @@ export function registerPendingPlanReview(args: {
       if (byRequestId.has(requestId)) {
         removeEntry(requestId);
         notify({
-          type: "plannotator_plan_review_resolved",
+          type: "plan_review_resolved",
           sessionId: args.sessionId,
           requestId,
           approved: false,
@@ -133,7 +133,7 @@ export function registerPendingPlanReview(args: {
   }
 
   notify({
-    type: "plannotator_plan_review_requested",
+    type: "plan_review_requested",
     sessionId: args.sessionId,
     requestId,
     planFilePath: args.planFilePath,
@@ -172,7 +172,7 @@ export async function resolvePendingPlanReview(
   }
 
   notify({
-    type: "plannotator_plan_review_resolved",
+    type: "plan_review_resolved",
     sessionId: e.sessionId,
     requestId,
     approved: decision.approved,
@@ -212,7 +212,7 @@ export async function resolvePendingPlanReview(
       content: [
         {
           type: "text",
-          text: `YOUR PLAN WAS NOT APPROVED.\n\nYou MUST revise the plan to address ALL of the feedback below before calling plannotator_submit_plan again.\n\nRules:\n- Your plan is saved at: ${e.planFilePath}\n  You can edit this file to make targeted changes, then pass its path to plannotator_submit_plan.\n- Do not resubmit the same plan unchanged.\n- Do NOT change the plan title (first # heading) unless the user explicitly asks you to.\n\n${feedbackText}`,
+          text: `YOUR PLAN WAS NOT APPROVED.\n\nYou MUST revise the plan to address ALL of the feedback below before calling submit_plan again.\n\nRules:\n- Your plan is saved at: ${e.planFilePath}\n  You can edit this file to make targeted changes, then pass its path to submit_plan.\n- Do not resubmit the same plan unchanged.\n- Do NOT change the plan title (first # heading) unless the user explicitly asks you to.\n\n${feedbackText}`,
         },
       ],
       details: { approved: false, feedback: feedbackText },

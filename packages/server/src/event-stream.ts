@@ -3,7 +3,7 @@ import type { FastifyReply } from "fastify";
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import type { LiveSession, SSEClient } from "./session-store.js";
 import { getPendingForSession } from "./ask-user-question/registry.js";
-import { getPendingPlanReviewsForSession } from "./ask-user-question/plannotator-registry.js";
+import { getPendingPlanReviewsForSession } from "./ask-user-question/plan-review-registry.js";
 import { getSessionStatuses, setSessionStatus } from "./extension-ui-bridge.js";
 
 /**
@@ -58,8 +58,8 @@ const ALLOWED_EVENT_TYPES = new Set([
   "snapshot",
   "ask_user_question",
   "ask_user_question_cancelled",
-  "plannotator_plan_review_requested",
-  "plannotator_plan_review_resolved",
+  "plan_review_requested",
+  "plan_review_resolved",
   // Streaming exec events (!cmd / !!cmd live terminal feed)
   "exec_start",
   "exec_update",
@@ -172,11 +172,11 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
       );
     }
 
-    // Re-emit any pending plannotator plan review events for this session
+    // Re-emit any pending plan review events for this session
     for (const pending of getPendingPlanReviewsForSession(live.sessionId)) {
       raw.write(
         serializeSSE({
-          type: "plannotator_plan_review_requested",
+          type: "plan_review_requested",
           sessionId: live.sessionId,
           requestId: pending.requestId,
           planFilePath: pending.planFilePath,
@@ -198,15 +198,15 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
       );
     }
 
-    // If plannotator status is not in memory yet, check session entries
-    const hasPlannotator = statuses.some((s) => s.key === "plannotator");
-    if (!hasPlannotator && isSessionInPlanMode(live)) {
-      setSessionStatus(live.sessionId, "plannotator", "📋 Plan Mode");
+    // If plan mode status is not in memory yet, check session entries
+    const hasPlanStatus = statuses.some((s) => s.key === "plan-mode");
+    if (!hasPlanStatus && isSessionInPlanMode(live)) {
+      setSessionStatus(live.sessionId, "plan-mode", "📋 Plan Mode");
       raw.write(
         serializeSSE({
           type: "extension_ui_status",
           sessionId: live.sessionId,
-          key: "plannotator",
+          key: "plan-mode",
           status: "📋 Plan Mode",
         } as unknown as { type: string; [k: string]: unknown }),
       );
@@ -232,11 +232,17 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
 
 /**
  * Check whether a session is currently in plan mode based on:
+ * 0. In-memory session planModeActive state
  * 1. Active pending plan reviews
  * 2. In-memory extension statuses
  * 3. Durable sessionManager entries on disk
  */
 export function isSessionInPlanMode(live: LiveSession): boolean {
+  // 0. Check in-memory session override
+  if (typeof live.planModeActive === "boolean") {
+    return live.planModeActive;
+  }
+
   // 1. Check if there is an active pending plan review
   if (getPendingPlanReviewsForSession(live.sessionId).length > 0) {
     return true;
@@ -244,7 +250,7 @@ export function isSessionInPlanMode(live: LiveSession): boolean {
 
   // 2. Check in-memory session status
   const statuses = getSessionStatuses(live.sessionId);
-  const planStatus = statuses.find((s) => s.key === "plannotator" || s.key === "plan-mode");
+  const planStatus = statuses.find((s) => s.key === "plan-mode");
   if (planStatus && planStatus.status) {
     const s = planStatus.status.toLowerCase();
     if (s.includes("plan") || s.includes("📋") || s.includes("⏸")) {
@@ -261,7 +267,7 @@ export function isSessionInPlanMode(live: LiveSession): boolean {
         customType?: string;
         data?: { phase?: string; active?: boolean };
       };
-      if (e && e.type === "custom" && (e.customType === "plannotator" || e.customType === "plan-mode")) {
+      if (e && e.type === "custom" && e.customType === "plan-mode") {
         if (e.data?.phase === "planning" || e.data?.active === true) {
           return true;
         }

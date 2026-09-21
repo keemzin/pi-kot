@@ -1165,6 +1165,29 @@ export async function submitPlanReviewDecision(
   );
 }
 
+export interface PlanModeStatus {
+  phase: "planning" | "idle";
+  planModeActive: boolean;
+}
+
+export async function getPlanModeStatus(sessionId: string): Promise<PlanModeStatus> {
+  return request<PlanModeStatus>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-mode`,
+  );
+}
+
+export async function setPlanMode(
+  sessionId: string,
+  active?: boolean,
+): Promise<{ ok: boolean; planModeActive: boolean; phase: string }> {
+  return request<{ ok: boolean; planModeActive: boolean; phase: string }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-mode`,
+    typeof active === "boolean" ? { active } : {},
+  );
+}
+
 // ── Orchestration ──
 
 export interface OrchestrationConfig {
