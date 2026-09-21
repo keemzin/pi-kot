@@ -3222,8 +3222,13 @@ strong {
 
 .assistant-msg-model-header {
 	margin-bottom: 4px;
+	max-width: 100%;
+	min-width: 0;
+	overflow: hidden;
 }
 .assistant-msg-model {
+	display: inline-block;
+	max-width: 100%;
 	font-size: 13px;
 	font-weight: 600;
 	color: var(--text-secondary);
@@ -3232,6 +3237,13 @@ strong {
 	text-overflow: ellipsis;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
+	vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+	.assistant-msg-model {
+		font-size: 11px;
+	}
 }
 
 .copy-msg-btn {

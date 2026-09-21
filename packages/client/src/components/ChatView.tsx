@@ -39,6 +39,7 @@ import {
 	type PairableMessage,
 } from "./ToolGroupCard";
 import { useI18n } from "../hooks/useI18n";
+import { formatModelDisplayName } from "../lib/model-name";
 
 import { PlanSubmittedCard } from "./PlanSubmittedCard";
 
@@ -1131,16 +1132,22 @@ function ModelBadge({
 	fallbackModel?: string;
 	fallbackProvider?: string;
 }) {
-	const modelName =
+	const rawModel =
 		(typeof msg?.model === "string" ? msg.model : undefined) ?? fallbackModel;
 	const providerName =
 		(typeof msg?.provider === "string" ? msg.provider : undefined) ??
 		fallbackProvider;
-	if (!modelName) return null;
+	if (!rawModel) return null;
+
+	const displayModel = formatModelDisplayName(rawModel);
+	const fullTitle = providerName
+		? `${providerName} / ${rawModel}`
+		: rawModel;
+
 	return (
-		<span className="assistant-msg-model">
+		<span className="assistant-msg-model" title={fullTitle}>
 			{providerName ? `${providerName} / ` : ""}
-			{modelName}
+			{displayModel}
 		</span>
 	);
 }
