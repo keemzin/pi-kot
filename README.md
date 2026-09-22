@@ -353,8 +353,8 @@ pi-kot can render agent-created content inline in chat — HTML pages, SVG image
 
 ### How it works
 
-1. The agent writes files to `.pi/artifacts/` in your project directory
-2. Files are served via `/api/v1/artifacts/<filename>`
+1. The agent writes files to `.pi/artifacts/` in your project directory (subfolders supported)
+2. Files are served via `/api/v1/artifacts/<path>`
 3. The chat renderer detects HTML/SVG/JSON/Markdown content and shows a live preview
 
 ### Supported formats

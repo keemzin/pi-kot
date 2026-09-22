@@ -9,16 +9,17 @@ When creating files the user should view from the web UI, such as screenshots, d
 - **First**: Create the `.pi/artifacts/` directory if it doesn't exist: `mkdir -p .pi/artifacts`
 - Write files under `.pi/artifacts/` in the current working directory.
 - Reference images in your response with Markdown image syntax:
-  `![description](/api/v1/artifacts/<filename>)`
+  `![description](/api/v1/artifacts/<path>)`
 - Reference non-image files in your response with Markdown link syntax:
-  `[filename](/api/v1/artifacts/<filename>)`
+  `[filename](/api/v1/artifacts/<path>)`
+- Subdirectories inside `.pi/artifacts/` (e.g. `.pi/artifacts/folder/html.html`) are fully supported and served via `/api/v1/artifacts/<folder>/<filename>`.
 - If working outside the workspace (e.g., ~/WORK/project), artifacts go to that directory's `.pi/artifacts/` and will be served automatically.
 - Markdown (`.md`, `.markdown`), HTML (`.html`, `.htm`), and video (`.mp4`, `.webm`, `.mov`, `.ogv`) artifact links are previewed inline in chat.
 - HTML artifact previews allow scripts but run in a sandboxed opaque origin; guard any `localStorage`/`sessionStorage` access with `try`/`catch`.
 - Prefer short, stable, URL-safe filenames.
 - Do not ask users to open arbitrary local filesystem paths like `/tmp/...` for user-visible artifacts unless they explicitly ask for the local path.
 
-The `/api/v1/artifacts/<filename>` route serves files from `.pi/artifacts/` in the workspace or any project subdirectory.
+The `/api/v1/artifacts/<path>` route serves files from `.pi/artifacts/` (including subfolders) in the workspace or any project subdirectory.
 
 ## Diagrams
 

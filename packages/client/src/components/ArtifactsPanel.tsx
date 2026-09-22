@@ -75,7 +75,11 @@ export function ArtifactsPanel() {
 
   const openFullView = (filename: string) => {
     const qs = projectPath ? `?cwd=${encodeURIComponent(projectPath)}` : "";
-    window.open(`/api/v1/artifacts/${encodeURIComponent(filename)}${qs}`, "_blank");
+    const encoded = filename
+      .split("/")
+      .map((part) => encodeURIComponent(part))
+      .join("/");
+    window.open(`/api/v1/artifacts/${encoded}${qs}`, "_blank");
   };
 
   return (
@@ -253,64 +257,83 @@ export function ArtifactsPanel() {
             </span>
           </div>
         ) : (
-          savedFiles.map((file) => (
-            <div
-              key={file.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "6px 12px",
-                borderBottom: "1px solid var(--border-subtle, transparent)",
-              }}
-            >
-              <span style={{ flexShrink: 0, fontSize: 14, lineHeight: 1 }}>
-                {ARTIFACT_ICONS[file.type] ?? "📄"}
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-primary)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={file.name}
-                >
-                  {file.name}
+          savedFiles.map((file) => {
+            const lastSlash = file.name.lastIndexOf("/");
+            const dirPart = lastSlash !== -1 ? file.name.slice(0, lastSlash + 1) : "";
+            const basePart = lastSlash !== -1 ? file.name.slice(lastSlash + 1) : file.name;
+
+            return (
+              <div
+                key={file.name}
+                onClick={() => openFullView(file.name)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 12px",
+                  borderBottom: "1px solid var(--border-subtle, transparent)",
+                  cursor: "pointer",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-glass-strong, rgba(255,255,255,0.05))")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <span style={{ flexShrink: 0, fontSize: 14, lineHeight: 1 }}>
+                  {ARTIFACT_ICONS[file.type] ?? "📄"}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "var(--text-primary)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={file.name}
+                  >
+                    {dirPart && (
+                      <span style={{ color: "var(--text-tertiary)", opacity: 0.8 }}>
+                        {dirPart}
+                      </span>
+                    )}
+                    <span>{basePart}</span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "var(--text-tertiary)",
+                      display: "flex",
+                      gap: 8,
+                    }}
+                  >
+                    <span>{formatSize(file.size)}</span>
+                    <span>{formatTime(file.modified, t)}</span>
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "var(--text-tertiary)",
-                    display: "flex",
-                    gap: 8,
-                  }}
-                >
-                  <span>{formatSize(file.size)}</span>
-                  <span>{formatTime(file.modified, t)}</span>
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openFullView(file.name);
+                    }}
+                    style={{
+                      fontSize: 11,
+                      color: "var(--accent-text)",
+                      background: "var(--accent-subtle)",
+                      border: "none",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                    }}
+                    title={t("artifacts.openNewTab")}
+                  >
+                    ↗
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                <button
-                  onClick={() => openFullView(file.name)}
-                  style={{
-                    fontSize: 11,
-                    color: "var(--accent-text)",
-                    background: "var(--accent-subtle)",
-                    border: "none",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                  }}
-                  title={t("artifacts.openNewTab")}
-                >
-                  ↗
-                </button>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
