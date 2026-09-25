@@ -1249,16 +1249,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const pushArtifact = useLayoutStore((s) => s.pushArtifact);
 	const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 	const seenArtifactIds = useRef(new Set<string>());
+
+	// Clear seen artifacts on session switch
 	useEffect(() => {
-		const allMsgs = [
-			...messages,
-			...(streamingMessage ? [streamingMessage] : []),
-		];
-		// Build the result map ONCE for this effect run, not once per tool call
-		// block — previously called N times for N tool calls, rebuilding the full
-		// map each time.
+		seenArtifactIds.current.clear();
+	}, [sessionId]);
+
+	useEffect(() => {
+		// Scan finalized messages only — decoupled from streamingMessage to maintain
+		// 60fps streaming and eliminate redundant multi-turn regex scans on every token.
 		const resultMap = buildToolResultMap(messages);
-		for (const msg of allMsgs) {
+		for (const msg of messages) {
 			const m = msg as Record<string, unknown>;
 			const contents = m.content;
 			if (!Array.isArray(contents)) continue;
@@ -1268,12 +1269,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// ── Tool outputs ──
 				if (c.type === "toolCall") {
 					const toolCallId = typeof c.id === "string" ? c.id : "";
-					if (seenArtifactIds.current.has(toolCallId)) continue;
-					seenArtifactIds.current.add(toolCallId);
+					if (!toolCallId || seenArtifactIds.current.has(toolCallId)) continue;
 
 					// Find the paired result for output
 					const result = resultMap.get(toolCallId);
-					const outputText = extractContentText(result?.content);
+					if (!result) continue; // Wait until tool result is finalized
+
+					seenArtifactIds.current.add(toolCallId);
+					const outputText = extractContentText(result.content);
 					const trimmed = outputText.trim();
 
 					let artType: string | undefined;
@@ -1358,7 +1361,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				}
 			}
 		}
-	}, [messages, streamingMessage, pushArtifact, sessionId]);
+	}, [messages, pushArtifact, sessionId]);
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingBottomRef = useRef(true);
