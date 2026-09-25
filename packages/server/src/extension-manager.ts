@@ -158,17 +158,6 @@ const knownExtensions: Omit<RecommendedExtension, "installed">[] = [
     enablesFeatures: ["⚠️ ~8,181 tokens on first prompt — then saves ~98%", "Context window savings", "Sandboxed code execution (ctx_execute)", "Session continuity after compaction", "FTS5 knowledge base with BM25 search", "Commands: /ctx-stats, /ctx-doctor"],
     icon: "🧠",
   },
-  {
-    id: "pi-plan-mode",
-    name: "pi-plan-mode",
-    description:
-      "Codex-like structured planning. Blocks mutating tools, adds plan_mode_question for structured user questions, and guides the agent through explore → intent → final plan flow.",
-    package: "npm:@narumitw/pi-plan-mode",
-    category: "productivity",
-    verified: true,
-    enablesFeatures: ["Plan mode with /plan command", "Structured plan_mode_question tool", "Tool safety in planning phase"],
-    icon: "📋",
-  },
 ];
 
 // ── Discovery ───────────────────────────────────────────────────────

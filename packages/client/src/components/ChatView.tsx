@@ -30,6 +30,7 @@ import { ChatDiffViewProvider } from "./ChatEditDiff";
 import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
 import { SplitFlapText } from "./SplitFlapText";
+import { ThinkingIndicator } from "./ThinkingIndicator";
 import {
 	ToolCallEntry,
 	ToolGroupCard,
@@ -37,6 +38,10 @@ import {
 	type GroupedTurn,
 	type PairableMessage,
 } from "./ToolGroupCard";
+import { useI18n } from "../hooks/useI18n";
+import { formatModelDisplayName } from "../lib/model-name";
+
+import { PlanSubmittedCard } from "./PlanSubmittedCard";
 
 // Register custom tool renderers
 toolRegistry.register("javascript_repl", ({ part }) => (
@@ -52,6 +57,7 @@ toolRegistry.register("javascript_repl", ({ part }) => (
 		isError={part.state === "error"}
 	/>
 ));
+toolRegistry.register("submit_plan", PlanSubmittedCard);
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore, EMPTY_COMPACTIONS } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
@@ -246,6 +252,7 @@ const ArchivedMessages = memo(function ArchivedMessages({
 
 /** Render the thinking block content. */
 function ThinkingBlock({ text }: { text: string }) {
+	const { t } = useI18n();
 	const showThinking = usePreferencesStore((s) => s.showThinking);
 	const [open, setOpen] = useState(false);
 
@@ -260,7 +267,7 @@ function ThinkingBlock({ text }: { text: string }) {
 				}}
 			>
 				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">Thinking</span>
+				<span className="thinking-block-label">{t("chat.thinking")}</span>
 			</summary>
 			<div className="thinking-block-content">{text}</div>
 		</details>
@@ -308,23 +315,26 @@ function RunningToolCard({
 				block={displayed.block}
 				result={undefined}
 				initialExpanded={false}
+				isActive={true}
+				isLastInTurn={true}
 			/>
 		</div>
 	);
 }
 
 /** Render a batch of tool calls as a collapsible timeline group. */
-function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
+const ToolCallBatchCard = memo(function ToolCallBatchCard({
+	entries,
+}: {
+	entries: ToolBatchEntry[];
+}) {
 	const { open: sharedOpen, toggle: sharedToggle } =
 		useContext(ToolBatchOpenContext);
-	// Each card owns its own open state, seeded from the shared preference once on mount.
-	// This prevents all cards from snapping open/closed when one card's preference changes
-	// (e.g. when a live card finishes and re-joins the group as a batch card).
 	const [open, setOpen] = useState(() => sharedOpen);
 	const toggle = () => {
 		const next = !open;
 		setOpen(next);
-		sharedToggle(); // keep shared preference in sync for future cards
+		sharedToggle();
 	};
 	const toolEntries = entries.filter((entry) => entry.kind === "tool");
 	const toolCount = toolEntries.length;
@@ -414,13 +424,13 @@ function ToolCallBatchCard({ entries }: { entries: ToolBatchEntry[] }) {
 							text={(entry.block.thinking as string) ?? ""}
 						/>
 					) : (
-						<ToolCallEntry key={j} block={entry.block} result={entry.result} />
+						<ToolCallEntry key={j} block={entry.block} result={entry.result} isActive={false} isLastInTurn={j === entries.length - 1} />
 					),
 				)}
 			</div>
 		</details>
 	);
-}
+});
 
 /** Render an assistant prose/thinking block. */
 
@@ -510,7 +520,7 @@ function renderUserRefs(text: string): React.ReactNode {
 	return nodes;
 }
 
-function UserMessageBubble({
+const UserMessageBubble = memo(function UserMessageBubble({
 	text,
 	isSteer,
 	isFollowUp,
@@ -523,6 +533,7 @@ function UserMessageBubble({
 	images?: { mimeType: string; data: string; __blobUrl?: boolean }[];
 	animated?: boolean;
 }) {
+	const { t } = useI18n();
 	const [expanded, setExpanded] = useState(false);
 	const [isLong, setIsLong] = useState(false);
 	const textRef = useRef<HTMLDivElement>(null);
@@ -544,8 +555,8 @@ function UserMessageBubble({
 	return (
 		<div className={`message-row user${animated ? " msg-enter" : ""}`}>
 			<div className="message-bubble user">
-				{isSteer && <span className="steer-tag">steer</span>}
-				{isFollowUp && <span className="steer-tag">follow-up</span>}
+				{isSteer && <span className="steer-tag">{t("chat.steer")}</span>}
+				{isFollowUp && <span className="steer-tag">{t("chat.followUp")}</span>}
 				{images !== undefined && images.length > 0 && (
 					<UserImages images={images} />
 				)}
@@ -585,7 +596,7 @@ function UserMessageBubble({
 			</div>
 		</div>
 	);
-}
+});
 
 /* ── Copy button for assistant messages ── */
 
@@ -644,6 +655,20 @@ function CopyMsgButton({ getText }: { getText: () => string }) {
 
 /* ── Save as PNG button for assistant messages ── */
 
+const FALLBACK_IMG_PLACEHOLDER =
+	"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60' viewBox='0 0 120 60'%3E%3Crect width='120' height='60' fill='%23262626' rx='4'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23888888' font-size='12' font-family='sans-serif'%3EImage%3C/text%3E%3C/svg%3E";
+
+function dataUrlToBlob(dataUrl: string): Blob {
+	const parts = dataUrl.split(",");
+	const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+	const binary = atob(parts[1]);
+	const array = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) {
+		array[i] = binary.charCodeAt(i);
+	}
+	return new Blob([array], { type: mime });
+}
+
 function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 	const [saving, setSaving] = useState(false);
 
@@ -689,6 +714,7 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 		if (sourceBubbles.length === 0) return;
 
 		setSaving(true);
+		let wrapper: HTMLElement | null = null;
 		try {
 			const rootStyle = window.getComputedStyle(document.documentElement);
 			const bgColor =
@@ -698,7 +724,7 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 				"#1a1a1a";
 			const paddingSize = 40;
 
-			const wrapper = document.createElement("div");
+			wrapper = document.createElement("div");
 			wrapper.style.cssText = `
         padding: ${paddingSize}px;
         background-color: ${bgColor};
@@ -722,6 +748,10 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 				// Strip scrollbars from all child elements too (Firefox + legacy Edge)
 				clone.querySelectorAll<HTMLElement>("*").forEach((el) => {
 					el.style.scrollbarWidth = "none";
+					const bg = el.style.backgroundImage;
+					if (bg && (bg.includes("http://") || bg.includes("https://"))) {
+						el.style.backgroundImage = "none";
+					}
 				});
 
 				// Inject a tiny style to suppress WebKit scrollbars (Chrome, Safari)
@@ -743,6 +773,33 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 					el.style.overflow = "visible";
 				});
 
+				// Pre-convert / sanitize all images in the clone to avoid html-to-image fetch errors (CORS, offline, tailscale, broken URLs)
+				const originalImages = originalBubble.querySelectorAll<HTMLImageElement>("img");
+				const clonedImages = clone.querySelectorAll<HTMLImageElement>("img");
+				clonedImages.forEach((img, idx) => {
+					const origImg = originalImages[idx];
+					img.removeAttribute("srcset");
+					try {
+						if (origImg && origImg.complete && origImg.naturalWidth > 0 && origImg.naturalHeight > 0) {
+							const canvas = document.createElement("canvas");
+							canvas.width = origImg.naturalWidth;
+							canvas.height = origImg.naturalHeight;
+							const ctx = canvas.getContext("2d");
+							if (ctx) {
+								ctx.drawImage(origImg, 0, 0);
+								img.src = canvas.toDataURL("image/png");
+								return;
+							}
+						}
+					} catch {
+						// Tainted canvas or draw failure
+					}
+					// If already data URL, keep it
+					if (img.src.startsWith("data:")) return;
+					// Fallback for failed / cross-origin / dead external images (e.g. via.placeholder.com)
+					img.src = FALLBACK_IMG_PLACEHOLDER;
+				});
+
 				// Hide interactive elements by data-attr or class
 				clone
 					.querySelectorAll<HTMLElement>(
@@ -757,34 +814,36 @@ function SaveAsPngButton({ getText: _getText }: { getText: () => string }) {
 
 			document.body.appendChild(wrapper);
 
+			// Adaptive pixelRatio to prevent exceeding browser canvas dimension/memory limits on very long messages
+			const wrapperHeight = wrapper.offsetHeight || 800;
+			const pixelRatio = wrapperHeight > 3000 ? 1.5 : 2;
+
 			const dataUrl = await toPng(wrapper, {
-				quality: 1,
-				pixelRatio: 3,
+				quality: 0.95,
+				pixelRatio,
 				backgroundColor: bgColor,
 				// Skip web font embedding — html-to-image can't read CSS rules
 				// from cross-origin stylesheets (Google Fonts via fonts.googleapis.com).
 				// The PNG will use system fallback fonts, which is fine for screenshots.
 				skipFonts: true,
+				imagePlaceholder: FALLBACK_IMG_PLACEHOLDER,
 			});
 
-			document.body.removeChild(wrapper);
-
-			// Convert data URL to blob to avoid Chromium's
-			// "loaded over an insecure connection" warning for HTTP origins.
-			const res = await fetch(dataUrl);
-			const blob = await res.blob();
+			const blob = dataUrlToBlob(dataUrl);
 			const blobUrl = URL.createObjectURL(blob);
-
 			const link = document.createElement("a");
 			link.download = `message-${Date.now()}.png`;
 			link.href = blobUrl;
 			document.body.appendChild(link);
 			link.click();
 			document.body.removeChild(link);
-			URL.revokeObjectURL(blobUrl);
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 		} catch (err) {
 			console.error("Failed to save message as PNG:", err);
 		} finally {
+			if (wrapper && wrapper.parentNode) {
+				wrapper.parentNode.removeChild(wrapper);
+			}
 			setSaving(false);
 		}
 	};
@@ -1073,16 +1132,33 @@ function ModelBadge({
 	fallbackModel?: string;
 	fallbackProvider?: string;
 }) {
-	const modelName =
+	const rawModel =
 		(typeof msg?.model === "string" ? msg.model : undefined) ?? fallbackModel;
 	const providerName =
 		(typeof msg?.provider === "string" ? msg.provider : undefined) ??
 		fallbackProvider;
-	if (!modelName) return null;
+	if (!rawModel) return null;
+
+	const displayModel = formatModelDisplayName(rawModel);
+	const fullTitle = providerName
+		? `${providerName} / ${rawModel}`
+		: rawModel;
+
 	return (
-		<span className="assistant-msg-model">
+		<span className="assistant-msg-model" title={fullTitle}>
 			{providerName ? `${providerName} / ` : ""}
-			{modelName}
+			{displayModel}
+		</span>
+	);
+}
+
+/** The "thinking…" placeholder shown while a part streams in. */
+function StreamingHint({ label }: { label?: string }) {
+	const { t } = useI18n();
+	return (
+		<span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-dim)' }}>
+			<ThinkingIndicator style={{ width: '16px', height: '16px', color: 'var(--text-primary)' }} />
+			<span className="chat-shimmer" style={{ fontSize: '14px' }}>{label ?? t("chat.waitingForModel")}</span>
 		</span>
 	);
 }
@@ -1092,12 +1168,19 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 	const content = msg.content;
 	if (!Array.isArray(content)) {
 		const text = typeof content === "string" ? content : "";
-		return text ? <ChatMarkdown text={text} /> : null;
+		return text ? <ChatMarkdown text={text} /> : <StreamingHint />;
 	}
+	
+	const hasVisibleText = content.some(chunk => chunk.type === "text" && typeof chunk.text === "string" && chunk.text.trim().length > 0);
+	
 	return (
 		<>
+			{content.length === 0 && <StreamingHint />}
 			{content.map((chunk: Record<string, unknown>, i: number) => {
 				if (chunk.type === "text" && typeof chunk.text === "string") {
+					if (chunk.text.length === 0) {
+						return <StreamingHint key={i} label="waiting for model…" />;
+					}
 					return <ChatMarkdown key={i} text={chunk.text} />;
 				}
 				if (
@@ -1108,6 +1191,9 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 				}
 				return null;
 			})}
+			{!hasVisibleText && content.length > 0 && !content.some(c => c.type === "thinking" || c.type === "reasoning" || (c.type === "text" && (c.text as string).length === 0)) && (
+				<StreamingHint />
+			)}
 		</>
 	);
 }
@@ -1117,6 +1203,7 @@ function renderStreamingContent(msg: Record<string, unknown>): React.ReactNode {
 const MAX_TOOL_BATCH_TOOLS = 100;
 
 export function ChatView({ sessionId, modelName, providerName }: Props) {
+	const { t } = useI18n();
 	const messages = useSessionStore((s) => s.messages);
 	const streamingMessage = useSessionStore((s) => s.streamingMessage);
 	const isStreaming = useSessionStore((s) => s.isStreaming);
@@ -1143,7 +1230,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const showTurnFiles = usePreferencesStore((s) => s.showTurnFiles);
 	const emptyFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
 	const emptyFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
-	const emptyFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 
 	// Build tool-result lookup at render time from messages (SDK has separate toolResult messages)
 	const buildToolResultMap = (
@@ -1168,6 +1254,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			...messages,
 			...(streamingMessage ? [streamingMessage] : []),
 		];
+		// Build the result map ONCE for this effect run, not once per tool call
+		// block — previously called N times for N tool calls, rebuilding the full
+		// map each time.
+		const resultMap = buildToolResultMap(messages);
 		for (const msg of allMsgs) {
 			const m = msg as Record<string, unknown>;
 			const contents = m.content;
@@ -1182,7 +1272,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					seenArtifactIds.current.add(toolCallId);
 
 					// Find the paired result for output
-					const resultMap = buildToolResultMap(messages);
 					const result = resultMap.get(toolCallId);
 					const outputText = extractContentText(result?.content);
 					const trimmed = outputText.trim();
@@ -1537,6 +1626,19 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		return map;
 	}, [messages]);
 
+	// Per-turn cache for buildGroupedTurn results.
+	// Key = stable join of assistant message IDs in the turn + turn-local result count.
+	// When the streaming turn finishes (all results arrive) it becomes a past
+	// turn and is served from cache on subsequent SSE events.
+	// The cache is intentionally unbounded per session (turns don't grow without
+	// bound in a single conversation, and we want the full history to stay fast).
+	const groupedTurnCache = useRef(new Map<string, GroupedTurn>());
+	// Clear cache on session switch — guards against ChatView being reused
+	// across sessions without unmounting (different sessionId, same instance).
+	useEffect(() => {
+		groupedTurnCache.current.clear();
+	}, [sessionId]);
+
 	const renderedRows = useMemo(() => {
 		const out: React.ReactNode[] = [];
 
@@ -1706,7 +1808,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						>
 							<div className="message-bubble assistant">
 								<div className="branch-summary-block">
-									<div className="branch-summary-label">Branch Summary</div>
+									<div className="branch-summary-label">{t("chat.branchSummary")}</div>
 									<ChatMarkdown text={summary} />
 									{fromId && (
 										<div className="branch-summary-from" title={fromId}>
@@ -1720,6 +1822,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					continue;
 				}
 				if (role === "custom") {
+					if (m.display === false) {
+						continue;
+					}
 					const customType = (m.customType as string) ?? "custom";
 					const customContent = m.content;
 					const details = m.details;
@@ -1760,7 +1865,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									{renderedContent}
 									{details != null && (
 										<details className="custom-message-details">
-											<summary>Details</summary>
+											<summary>{t("chat.details")}</summary>
 											<pre>{JSON.stringify(details, null, 2)}</pre>
 										</details>
 									)}
@@ -1901,7 +2006,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					<div key={key} className="message-row assistant">
 						<div className="message-bubble assistant">
 							<div className="branch-summary-block">
-								<div className="branch-summary-label">Branch Summary</div>
+								<div className="branch-summary-label">{t("chat.branchSummary")}</div>
 								<ChatMarkdown text={summary} />
 								{fromId && (
 									<div className="branch-summary-from" title={fromId}>
@@ -1914,6 +2019,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 			}
 			if (role === "custom") {
+				if (m.display === false) {
+					return null;
+				}
 				const customType = (m.customType as string) ?? "custom";
 				const customContent = m.content;
 				const details = m.details;
@@ -1950,7 +2058,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 								{renderedContent}
 								{details != null && (
 									<details className="custom-message-details">
-										<summary>Details</summary>
+										<summary>{t("chat.details")}</summary>
 										<pre>{JSON.stringify(details, null, 2)}</pre>
 									</details>
 								)}
@@ -1995,10 +2103,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				);
 			};
 
-			turn.segments.forEach((seg, i) => pushSegment(seg, i));
-
-			// Custom-rendered tools break out of the trail into their own bubble
-			for (const ct of turn.customTools) {
+			const renderCustomTool = (
+				ct: GroupedTurn["customTools"][number],
+			) => {
 				const CustomRenderer = toolRegistry.get(ct.name);
 				const part: ToolCallPart = {
 					type: "tool-call",
@@ -2029,8 +2136,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						</div>,
 					);
 				} else {
-					// Defensive fallback — registry lookups stay in sync, but keep
-					// the call visible if one is ever missing.
 					pushSegment(
 						{
 							entries: [
@@ -2042,17 +2147,38 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 							],
 							firstToolId: ct.id,
 						},
-						0,
+						elements.length,
 					);
 				}
-			}
+			};
 
-			for (const m of turn.specials) {
-				const el = renderSpecialMessage(
-					m,
-					`special-${turnKey}-${elements.length}`,
-				);
-				if (el) elements.push(el);
+			if (turn.items && turn.items.length > 0) {
+				let segIdx = 0;
+				for (const item of turn.items) {
+					if (item.kind === "segment") {
+						pushSegment(item.segment, segIdx++);
+					} else if (item.kind === "customTool") {
+						renderCustomTool(item.customTool);
+					} else if (item.kind === "special") {
+						const el = renderSpecialMessage(
+							item.message,
+							`special-${turnKey}-${elements.length}`,
+						);
+						if (el) elements.push(el);
+					}
+				}
+			} else {
+				turn.segments.forEach((seg, i) => pushSegment(seg, i));
+				for (const ct of turn.customTools) {
+					renderCustomTool(ct);
+				}
+				for (const m of turn.specials) {
+					const el = renderSpecialMessage(
+						m,
+						`special-${turnKey}-${elements.length}`,
+					);
+					if (el) elements.push(el);
+				}
 			}
 
 			// Final answer text after the last tool call
@@ -2122,11 +2248,45 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			let combinedAssistantText: string;
 			let assistantElements: React.ReactNode[];
 			if (groupedToolDisplay) {
-				const turn = buildGroupedTurn(
-					currentAssistants,
-					getToolResult,
-					isCustomTool,
-				);
+				// Build a stable cache key from the assistant message IDs in this
+				// turn. For the live streaming turn the last message is the
+				// streamingMessage (no stable id) so its key changes every SSE delta
+				// and always misses — which is correct, we always want to recompute.
+				// Past turns have stable ids and hit the cache, skipping the full
+				// N×M content scan on every SSE event.
+				// We count only the tool results belonging to THIS turn's tool calls
+				// (not global toolResults.size) so a result arriving for turn B
+				// doesn't invalidate the cache for unrelated turn A.
+				const turnToolCallIds = new Set<string>();
+				for (const m of currentAssistants) {
+					const content = m.content;
+					if (!Array.isArray(content)) continue;
+					for (const chunk of content as Record<string, unknown>[]) {
+						if (chunk.type === "toolCall" && typeof chunk.id === "string") {
+							turnToolCallIds.add(chunk.id);
+						}
+					}
+				}
+				const turnResultCount = [...turnToolCallIds].filter(
+					(id) => toolResults.has(id),
+				).length;
+				const cacheKey =
+					currentAssistants.map((m) => String(m.id ?? "")).join(",") +
+					`:tr${turnResultCount}`;
+				let turn = groupedTurnCache.current.get(cacheKey);
+				if (turn === undefined) {
+					turn = buildGroupedTurn(
+						currentAssistants,
+						getToolResult,
+						isCustomTool,
+					);
+					// Only cache completed turns (those whose last message has a
+					// stable id). Streaming messages have no id yet.
+					const lastId = String(
+						currentAssistants[currentAssistants.length - 1]?.id ?? "",
+					);
+					if (lastId) groupedTurnCache.current.set(cacheKey, turn);
+				}
 				combinedAssistantText = turn.finalParts
 					.filter((p) => p.type === "text")
 					.map((p) => p.text)
@@ -2138,6 +2298,19 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					.filter((t) => t.length > 0)
 					.join("\n\n");
 				assistantElements = renderAssistantParts(currentAssistants);
+			}
+
+			if (assistantElements.length === 0 && isLastTurn && isStreaming) {
+				assistantElements.push(
+					<div
+						key={`streaming-${turnKey}`}
+						className="message-row assistant streaming-row"
+					>
+						<div className="message-bubble assistant streaming-bubble">
+							<StreamingHint />
+						</div>
+					</div>
+				);
 			}
 
 			const isSteer =
@@ -2237,8 +2410,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						ref={isLastTurn ? attachLastTurnRef : undefined}
 					>
 						<div className="message-bubble user">
-							{isSteer && <span className="steer-tag">steer</span>}
-							{isFollowUp && <span className="steer-tag">follow-up</span>}
+							{isSteer && <span className="steer-tag">{t("chat.steer")}</span>}
+							{isFollowUp && <span className="steer-tag">{t("chat.followUp")}</span>}
 							<UserImages images={extractImages(currentUser.content)} />
 							{text}
 						</div>
@@ -2331,6 +2504,9 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				currentUser = msg;
 				currentTurnStart = idx;
 			} else if (role === "toolResult") {
+			} else if (role === "custom" && msg.display === false) {
+				// Internal system or extension message flagged as hidden — do not render
+				continue;
 			} else {
 				// Assistant / bashExecution / branchSummary / custom
 				if (currentUser !== undefined) {
@@ -2403,18 +2579,18 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									gap={5}
 									tileRadius={6}
 									charset="ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-/"
-									fontSize={`min(${emptyFlapSize}px, 6vw)`}
+									fontSize={`min(64px, calc((100cqi - ${(Math.max(12, ...emptyFlapWords.map(w => w.length)) - 1) * 5}px) / ${Math.max(12, ...emptyFlapWords.map(w => w.length)) * 0.78}))`}
 									className="welcome-flap"
 								/>
 							) : (
 								<>
 									<div className="welcome-icon">💬</div>
 									<div className="welcome-text">
-										Send a message to start chatting
+										{t("chat.startChatting")}
 									</div>
 								</>
 							)}
-							<div className="welcome-hint">chat with pi coding agent</div>
+							<div className="welcome-hint">{t("chat.emptyState")}</div>
 						</div>
 					) : (
 						<div
@@ -2432,21 +2608,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 										// Streaming content is always rendered inside renderedRows via
 										// currentAssistants injection. No standalone row needed.
 										return null;
-										return (
-											<div className="message-row assistant streaming-row">
-												<div className="message-bubble assistant streaming-bubble">
-													{activeToolName && (
-														<div className="tool-badge">
-															<span className="tool-badge-dot" />
-															{activeToolName}
-														</div>
-													)}
-													{renderStreamingContent(
-														streamingMessage as Record<string, unknown>,
-													)}
-												</div>
-											</div>
-										);
 									})()}
 
 								{activeCompaction !== null && (
@@ -2468,8 +2629,8 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 												})),
 											].map((q, i) => (
 												<div key={i} className="queued-msg-item">
-													<span className={`queued-badge ${q.kind}`}>
-														{q.kind === "steer" ? "steer" : "follow-up"}
+													<span className="steer-tag" style={{ marginLeft: 6 }}>
+														{q.kind === "steer" ? t("chat.steer") : t("chat.followUp")}
 													</span>
 													<span className="queued-msg-text" title={q.text}>
 														{q.text}

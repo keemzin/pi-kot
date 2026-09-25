@@ -26,6 +26,28 @@ export interface RefChip {
 
 const RANGE_RE = /^#L(\d+)(?:-L?(\d+))?/;
 
+const KNOWN_EXTENSIONLESS_FILES = new Set([
+  "dockerfile",
+  "makefile",
+  "license",
+  "readme",
+  "procfile",
+  "gemfile",
+  "rakefile",
+  "containerfile",
+]);
+
+export function looksLikeFilePath(path: string): boolean {
+  if (!path || path.length === 0) return false;
+  // Path with directory separators (e.g. src/foo, .pi/settings.json)
+  if (path.includes("/") || path.includes("\\")) return true;
+  // Has a file extension (e.g. settings.json, foo.ts, a.py, .gitignore)
+  if (/\.[a-zA-Z0-9_-]+$/.test(path) && path !== "." && path !== "..") return true;
+  // Known extensionless files
+  if (KNOWN_EXTENSIONLESS_FILES.has(path.toLowerCase())) return true;
+  return false;
+}
+
 /**
  * Scan `value` for all `@` file markers. Returns chips in document order.
  * Handles quoted forms (`@"my dir/file.ts"#L2-4`) and bare forms
@@ -39,40 +61,83 @@ export function parseRefChips(value: string): RefChip[] {
       continue;
     }
     // Avoid matching ordinary occurrences like email addresses or
-    // `user@something` unless the `@` is at start / after whitespace / `(`.
-    if (i > 0 && !/[\s(]/.test(value[i - 1])) {
+    // `user@something` or `func(@arg)`: @ must be at start of string or preceded by whitespace.
+    if (i > 0 && !/\s/.test(value[i - 1])) {
       continue;
     }
 
     let j = i + 1;
+    if (j >= n) continue;
+
+    // Reject @ immediately followed by (, {, [, -, or whitespace
+    // (PowerShell/Python/Java syntax: @(...), @{...}, @[...], CLI flags @--flag)
+    const firstChar = value[j];
+    if (firstChar === "(" || firstChar === "{" || firstChar === "[" || firstChar === "-" || /\s/.test(firstChar)) {
+      continue;
+    }
+
     let path = "";
     let startLine: number | undefined;
     let endLine: number | undefined;
 
-    if (value[j] === '"') {
-      const jPrev = j++;
-      const qStart = j;
-      while (j < n && value[j] !== '"') {
-        j++;
+    if (firstChar === '"') {
+      const qStart = j + 1;
+      let qEnd = qStart;
+      while (qEnd < n && value[qEnd] !== '"' && value[qEnd] !== "\n" && value[qEnd] !== "\r") {
+        qEnd++;
       }
-      if (j >= n) {
-        continue; // unterminated quote — not (yet) a complete marker
+      if (qEnd >= n || value[qEnd] !== '"') {
+        continue; // unterminated quote or multi-line
       }
-      path = value.slice(qStart, j);
-      j++; // past closing quote
+      const rawPath = value.slice(qStart, qEnd);
+      // Quotes with commas (e.g. @"a, b" or argument list) are not file references
+      if (rawPath.length === 0 || rawPath.includes(",")) {
+        continue;
+      }
+      path = rawPath;
+      j = qEnd + 1; // past closing quote
+
+      // If immediately followed by a comma (e.g. @"foo", @"bar"), it's code/list, not a file tag
+      if (j < n && value[j] === ",") {
+        continue;
+      }
+
       const m = value.slice(j).match(RANGE_RE);
       if (m) {
         startLine = Number(m[1]);
         endLine = m[2] !== undefined ? Number(m[2]) : startLine;
         j += m[0].length;
       }
-      void jPrev;
+
+      // After optional line range, if followed by a comma, it's code syntax
+      if (j < n && value[j] === ",") {
+        continue;
+      }
     } else {
       const tStart = j;
       while (j < n && !/\s/.test(value[j])) {
         j++;
       }
-      const tok = value.slice(tStart, j);
+      let tok = value.slice(tStart, j);
+
+      // Strip trailing sentence punctuation (?,;:!)]) that may be attached at the end of sentence
+      const trailingMatch = tok.match(/[?,;:!)\]]+$/);
+      if (trailingMatch) {
+        tok = tok.slice(0, -trailingMatch[0].length);
+        j -= trailingMatch[0].length;
+      }
+
+      // Bare token hardening:
+      // Must not start with - or $
+      if (tok.startsWith("-") || tok.startsWith("$")) {
+        continue;
+      }
+
+      // Must not contain (, ), {, }, [, ], ,, ", ', ;, =, $, *, <, >, |
+      if (/[(){}[\],"';=$*<>|]/.test(tok)) {
+        continue;
+      }
+
       const m = tok.match(/^(.*?)#L(\d+)(?:-L?(\d+))?$/);
       if (m) {
         path = m[1] ?? "";
@@ -80,6 +145,12 @@ export function parseRefChips(value: string): RefChip[] {
         endLine = m[3] !== undefined ? Number(m[3]) : startLine;
       } else {
         path = tok;
+      }
+
+      // Bare tokens must look like a file path (have an extension, slash, or line range).
+      // Bare identifiers like @ServerArgs, @args, @Override, @param are code syntax, not file tags.
+      if (startLine === undefined && !looksLikeFilePath(path)) {
+        continue;
       }
     }
 

@@ -14,6 +14,7 @@ import { PackagesTab } from "./PackagesTab";
 import { SkillsTab } from "./SkillsTab";
 import { TunnelTab } from "./TunnelTab";
 import { useSessionStore } from "../stores/session-store";
+import { useI18n } from "../hooks/useI18n";
 
 type Tab = "appearance" | "providers" | "agent" | "general" | "packages" | "skills" | "tunnel";
 
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function SettingsPanel({ onClose, initialTab }: Props) {
+  const { t } = useI18n();
   const visibleTabs: Tab[] = ["appearance", "providers", "agent", "general", "packages", "skills", "tunnel"];
 
   const [tab, setTab] = useState<Tab>(initialTab ?? "appearance");
@@ -71,25 +73,13 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
             msOverflowStyle: "none",
             scrollbarWidth: "none",
           }}>
-            {visibleTabs.map((t) => (
+            {visibleTabs.map((tName) => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`settings-tab ${tab === t ? "settings-tab-active" : ""}`}
+                key={tName}
+                onClick={() => setTab(tName)}
+                className={`settings-tab ${tab === tName ? "settings-tab-active" : ""}`}
               >
-                {t === "appearance"
-                  ? "Appearance"
-                  : t === "providers"
-                    ? "Providers"
-                    : t === "agent"
-                      ? "Agent"
-                      : t === "packages"
-                        ? "Packages 📦"
-                        : t === "skills"
-                          ? "Skills"
-                          : t === "tunnel"
-                        ? "Tunnel 🚇"
-                        : "General"}
+                {t(`settings.tabs.${tName}`)}{tName === "packages" ? " 📦" : tName === "tunnel" ? " 🚇" : ""}
               </button>
             ))}
           </div>

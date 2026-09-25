@@ -1,13 +1,17 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
-import { FileText, X } from "lucide-react";
+import { FileText, X, ClipboardList } from "lucide-react";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
+import { usePlanReviewStore } from "../stores/plan-review-store";
+import { useExtensionUIStore } from "../stores/extension-ui-store";
 import type { ImageContent } from "../lib/api-client";
 import { fetchSessionExtensions, execCommand, execCommandStream, completeFiles } from "../lib/api-client";
 import { ModelDropdown } from "./ModelDropdown";
 import { getSessionModel, setSessionThinking } from "../lib/api-client";
 import { useSelectionBridge } from "../stores/selection-bridge";
+import { useLayoutStore } from "../stores/layout-store";
 import { parseRefChips, type RefChip } from "../lib/ref-chips";
+import { useI18n } from "../hooks/useI18n";
 
 interface Props {
   sessionId: string;
@@ -24,17 +28,21 @@ interface Props {
 interface SlashCommand {
   name: string;
   description: string;
-  handler: (sessionId: string) => Promise<void>;
+  /** args = everything the user typed after the command name (may be empty string). */
+  handler: (sessionId: string, args: string) => Promise<void>;
   /** Whether this is an extension command that needs the invokeExtensionCommand API */
   isExtension?: boolean;
 }
 
 export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onModelSelect, onModelError }: Props) {
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const pendingSend = useSelectionBridge((s) => s.pendingSend);
   const consumeSend = useSelectionBridge((s) => s.consumeSend);
   const isStreaming = useSessionStore((s) => s.streamState.isStreaming);
   const activeToolName = useSessionStore((s) => s.streamState.activeToolName);
+  const planModeActive = usePlanReviewStore((s) => s.planModeActive);
+  const hasPendingReview = usePlanReviewStore((s) => Boolean(s.activeReview?.requestId));
   const sendPrompt = useSessionStore((s) => s.sendPrompt);
   const sendSteer = useSessionStore((s) => s.sendSteer);
   const sendFollowUp = useSessionStore((s) => s.sendFollowUp);
@@ -46,6 +54,12 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [thinkingLevel, setThinkingLevel] = useState<string | undefined>(undefined);
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
+  const isMobile = useLayoutStore((s) => s.isMobile);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  useEffect(() => {
+    if (planModeActive) setBannerDismissed(false);
+  }, [planModeActive]);
 
   // ── Hold-to-followUp state (streaming only) ──
   const HOLD_DURATION = 600; // ms to hold before followUp triggers
@@ -139,9 +153,10 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
         const cmds: SlashCommand[] = info.commands.map((cmd) => ({
           name: "/" + cmd.invocationName,
           description: cmd.description || "Extension command",
-          handler: async (sid: string) => {
+          handler: async (sid: string, args: string) => {
             const { invokeExtensionCommand } = await import("../lib/api-client");
-            await invokeExtensionCommand(sid, cmd.invocationName);
+            // Forward the typed args (e.g. "/vision config provider openai" → args = "config provider openai")
+            await invokeExtensionCommand(sid, cmd.invocationName, args || undefined);
           },
           isExtension: true,
         }));
@@ -150,17 +165,46 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
       .catch(() => {
         // session may not be live yet — that's fine
       });
+    usePlanReviewStore.getState().fetchPlanModeStatus(sessionId);
     return () => {
       cancelled = true;
     };
   }, [sessionId]);
 
   // Build the full slash command list from builtins + extension commands
+  const handleTogglePlanMode = useCallback(async () => {
+    if (!sessionId) return;
+    const nextActive = !planModeActive;
+    usePlanReviewStore.getState().setPlanModeActive(nextActive);
+    try {
+      const { setPlanMode } = await import("../lib/api-client");
+      await setPlanMode(sessionId, nextActive);
+    } catch {
+      // Revert on failure
+      usePlanReviewStore.getState().setPlanModeActive(planModeActive);
+    }
+  }, [sessionId, planModeActive]);
+
   const builtinCommands: SlashCommand[] = [
+    {
+      name: "/plan",
+      description: "Toggle Plan Mode on or off",
+      handler: async (sid: string, _args: string) => {
+        const currentActive = usePlanReviewStore.getState().planModeActive;
+        const nextActive = !currentActive;
+        usePlanReviewStore.getState().setPlanModeActive(nextActive);
+        try {
+          const { setPlanMode } = await import("../lib/api-client");
+          await setPlanMode(sid, nextActive);
+        } catch {
+          usePlanReviewStore.getState().setPlanModeActive(currentActive);
+        }
+      },
+    },
     {
       name: "/compact",
       description: "Manually compact the session context",
-      handler: async (sid: string) => {
+      handler: async (sid: string, _args: string) => {
         try {
           await useSessionStore.getState().compactAndReload(sid);
         } catch (err: unknown) {
@@ -177,7 +221,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/compact with summary",
       description: "Compact and keep focus on specific areas",
-      handler: async (sid: string) => {
+      handler: async (sid: string, _args: string) => {
         try {
           await useSessionStore.getState().compactAndReload(sid);
         } catch (err: unknown) {
@@ -194,7 +238,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/reload",
       description: "Reload agent config and rebuild session tools",
-      handler: async () => {
+      handler: async (_sid: string, _args: string) => {
         const { reloadAgent } = await import("../lib/api-client");
         await reloadAgent();
       },
@@ -202,7 +246,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     {
       name: "/abort",
       description: "Abort the current streaming response",
-      handler: async () => {
+      handler: async (_sid: string, _args: string) => {
         useSessionStore.getState().abort();
       },
     },
@@ -499,16 +543,24 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
     // Check if the input is a slash command
     if (text.startsWith("/") && !isStreaming) {
-      const trimmed = text.trim().toLowerCase();
-      const matched = allSlashCommands.find((cmd) => cmd.name.startsWith(trimmed));
+      // Split typed text into command-name token + trailing args.
+      // e.g. "/vision config provider openai" → name="/vision", args="config provider openai"
+      // Also support multi-word builtin names like "/compact with summary".
+      const trimmedLower = text.trim().toLowerCase();
+      // Find the longest registered command name that is a prefix of the typed text
+      // (prefer longer matches so "/compact with summary" wins over "/compact").
+      const matched = allSlashCommands
+        .filter((cmd) => trimmedLower === cmd.name.toLowerCase() || trimmedLower.startsWith(cmd.name.toLowerCase() + " "))
+        .sort((a, b) => b.name.length - a.name.length)[0];
       if (matched) {
+        const args = text.trim().slice(matched.name.length).trim();
         el.value = "";
         el.style.height = "auto";
         setSlashSuggestions([]);
         setImages([]);
         acClose();
         syncChips();
-        await matched.handler(sessionId);
+        await matched.handler(sessionId, args);
         return;
       }
     }
@@ -683,8 +735,13 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
 
     // ── Detect slash commands ──
     if (text.startsWith("/")) {
-      const trimmed = text.trim().toLowerCase();
-      const matched = allSlashCommands.filter((cmd) => cmd.name.startsWith(trimmed));
+      // Show suggestions for any registered command whose name starts with the
+      // first token the user has typed (i.e. cmd.name starts with the first word).
+      // This keeps the dropdown visible even after the user types args.
+      const firstToken = text.trim().toLowerCase().split(/\s+/)[0] ?? "";
+      const matched = allSlashCommands.filter((cmd) =>
+        cmd.name.toLowerCase().startsWith(firstToken),
+      );
       setSlashSuggestions(matched);
     } else {
       setSlashSuggestions([]);
@@ -704,6 +761,12 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const handleSlashCommand = async (cmd: SlashCommand) => {
     const el = textareaRef.current;
     if (el === null) return;
+    // Read args BEFORE clearing the input — the user may have typed
+    // "/vision config" and clicked the suggestion, so args = "config".
+    const typedText = el.value.trim();
+    const args = typedText.toLowerCase().startsWith(cmd.name.toLowerCase())
+      ? typedText.slice(cmd.name.length).trim()
+      : "";
     el.value = "";
     el.style.height = "auto";
     setSlashSuggestions([]);
@@ -711,7 +774,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
     syncChips();
     setCompacting(true);
     try {
-      await cmd.handler(sessionId);
+      await cmd.handler(sessionId, args);
     } catch (err) {
       console.error("Slash command failed:", err);
     } finally {
@@ -868,6 +931,114 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
           </div>
         )}
 
+        {planModeActive && !bannerDismissed && (
+          <div
+            className="chat-input-plan-banner"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: isMobile ? "2px 8px" : "3px 12px",
+              minHeight: isMobile ? "22px" : "26px",
+              height: isMobile ? "22px" : "26px",
+              background: "var(--accent-glow)",
+              borderBottom: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
+              fontSize: isMobile ? "10px" : "11px",
+              color: "var(--accent)",
+              fontWeight: 500,
+              boxSizing: "border-box",
+              gap: "6px",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, overflow: "hidden", flex: 1 }}>
+              <ClipboardList size={isMobile ? 11 : 12} style={{ color: "var(--accent)", flexShrink: 0 }} />
+              <span style={{ fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+                {hasPendingReview
+                  ? (isMobile ? "Review Ready" : "Plan Ready for Review")
+                  : (isMobile ? "Plan Mode" : "Plan Mode Active")}
+              </span>
+              {!isMobile && (
+                <span
+                  className="plan-banner-desc"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontSize: "10.5px",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {hasPendingReview
+                    ? "— click Approve & Execute to begin"
+                    : "— drafts plan before modifying code"}
+                </span>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+              <button
+                type="button"
+                className="plan-banner-review-btn"
+                onClick={() => usePlanReviewStore.getState().openFileReview("PLAN.md", sessionId)}
+                title={hasPendingReview ? "Review plan" : "View plan"}
+                style={{
+                  background: "var(--bg-solid)",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent)",
+                  fontSize: isMobile ? "9.5px" : "10.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  borderRadius: "3px",
+                  padding: isMobile ? "1px 6px" : "2px 8px",
+                  lineHeight: "13px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {hasPendingReview
+                  ? (isMobile ? "Review" : "Review Plan")
+                  : (isMobile ? "Plan" : "View Plan")}
+              </button>
+              <button
+                type="button"
+                onClick={handleTogglePlanMode}
+                title="Exit Plan Mode"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-secondary)",
+                  fontSize: isMobile ? "9.5px" : "10px",
+                  cursor: "pointer",
+                  padding: "1px 4px",
+                  lineHeight: "13px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Exit
+              </button>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                title="Dismiss banner (Plan Mode stays active)"
+                aria-label="Dismiss banner"
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-dim)",
+                  cursor: "pointer",
+                  padding: "1px 2px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                  borderRadius: "2px",
+                }}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <textarea
           ref={textareaRef}
           className="ti-input"
@@ -879,7 +1050,7 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               ? "Compacting…"
               : isStreaming
                 ? "Steer the agent…"
-                : "Send a message... (/compact, /abort, !cmd, @file)"
+                : t("chat.placeholder")
           }
           disabled={compacting}
           rows={1}
@@ -943,6 +1114,44 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" style={{ fill: showOrch ? "currentColor" : "none" }} />
               </svg>
+            </button>
+
+            <button
+              type="button"
+              className={`ti-toolbar-btn${planModeActive ? " active" : ""}`}
+              onClick={() => {
+                if (planModeActive && bannerDismissed) {
+                  setBannerDismissed(false);
+                } else {
+                  handleTogglePlanMode();
+                }
+              }}
+              title={
+                planModeActive
+                  ? bannerDismissed
+                    ? "Plan Mode Active (click to show banner)"
+                    : "Plan Mode Active (click to exit)"
+                  : "Toggle Plan Mode (/plan)"
+              }
+              tabIndex={-1}
+              style={{
+                color: planModeActive ? "var(--accent)" : undefined,
+                background: planModeActive ? "var(--accent-glow)" : undefined,
+                borderColor: planModeActive ? "var(--accent)" : "transparent",
+                boxShadow: planModeActive
+                  ? "0 0 12px var(--accent-glow), 0 0 3px var(--accent)"
+                  : undefined,
+                transition: "all 0.2s ease-in-out",
+              }}
+            >
+              <ClipboardList
+                size={14}
+                style={{
+                  color: planModeActive ? "var(--accent)" : "currentColor",
+                  filter: planModeActive ? "drop-shadow(0 0 3px var(--accent))" : undefined,
+                  transition: "all 0.2s ease-in-out",
+                }}
+              />
             </button>
           </div>
 

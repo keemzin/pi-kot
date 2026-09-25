@@ -2,6 +2,7 @@ import { memo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, ChevronUp, Layers } from "lucide-react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import type { CompactionEvent } from "../lib/api-client";
+import { useI18n } from "../hooks/useI18n";
 
 const NEAR_BOTTOM_PX = 96;
 
@@ -39,6 +40,7 @@ export function CompactionCard({
    *  fast by avoiding markdown-heavy archived messages on every tick. */
   renderArchived?: () => React.ReactNode;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const when = new Date(event.timestamp);
   const timeLabel = `${when.toLocaleDateString()} ${when.toLocaleTimeString()}`;
@@ -78,11 +80,11 @@ export function CompactionCard({
         borderRadius: "var(--radius-sm)",
         cursor: "pointer",
       }}
-      title="Collapse archived messages"
+      title={t("chat.hideArchived")}
       aria-label={`Collapse compaction summary from ${pos}`}
     >
       <ChevronDown size={11} />
-      Collapse
+      {t("chat.collapse")}
     </button>
   );
 
@@ -166,8 +168,8 @@ export function CompactionCard({
         }}
         title={
           open
-            ? "Hide archived messages"
-            : `Expand ${archivedCount} archived message${archivedCount === 1 ? "" : "s"}`
+            ? t("chat.hideArchived")
+            : t("chat.expandArchived").replace("{count}", archivedCount.toString())
         }
       >
         {open ? (
@@ -184,7 +186,7 @@ export function CompactionCard({
             fontFeatureSettings: "'tnum'",
           }}
         >
-          Compacted
+          {t("chat.compacted")}
         </span>
         <span
           style={{
@@ -195,7 +197,7 @@ export function CompactionCard({
             whiteSpace: "nowrap",
           }}
         >
-          -{archivedCount} msg · -{event.tokensBefore.toLocaleString()} tok
+          -{archivedCount} {t("chat.msg")} · -{event.tokensBefore.toLocaleString()} {t("chat.tok")}
           {event.estimatedTokensAfter !== undefined && (
             <>
               <span style={{ margin: "0 2px", color: "var(--border)" }}>→</span>

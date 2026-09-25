@@ -57,9 +57,10 @@ const AGGREGATE_INLINE_BUDGET_BYTES = 512 * 1024;
 /**
  * Regex shared by `findRefs` and `parseFileReferences`. Match `@` at
  * start-or-after-whitespace then either a `"path with spaces"` quoted
- * form or a bare non-whitespace token.
+ * form (disallowing commas or comma-trailing) or a bare path token
+ * (disallowing (, {, [, commas, quotes, and code operators).
  */
-const REF_RE = /(^|\s)@(?:"([^"\n]+)"(#L\d+(?:-L?\d+)?)?|([^\s]+?))(?=[?,;:!)\]]?(?:\s|$))/g;
+const REF_RE = /(^|\s)@(?:"([^",\n]+)"(#L\d+(?:-L?\d+)?)?(?!,)|([^\s(){}[\],"';=$*<>|]+))(?=[?,;:!)\]]?(?:\s|$))/g;
 
 interface RefRange {
   start: number;
@@ -85,6 +86,25 @@ function parseRange(text: string | undefined): RefRange | undefined {
   return { start, end };
 }
 
+const KNOWN_EXTENSIONLESS_FILES = new Set([
+  "dockerfile",
+  "makefile",
+  "license",
+  "readme",
+  "procfile",
+  "gemfile",
+  "rakefile",
+  "containerfile",
+]);
+
+export function looksLikeFilePath(path: string): boolean {
+  if (!path || path.length === 0) return false;
+  if (path.includes("/") || path.includes("\\")) return true;
+  if (/\.[a-zA-Z0-9_-]+$/.test(path) && path !== "." && path !== "..") return true;
+  if (KNOWN_EXTENSIONLESS_FILES.has(path.toLowerCase())) return true;
+  return false;
+}
+
 function findRefs(text: string): RefMatch[] {
   const matches: RefMatch[] = [];
   REF_RE.lastIndex = 0;
@@ -107,7 +127,11 @@ function findRefs(text: string): RefMatch[] {
         path = bare;
         range = undefined;
       }
+      if (range === undefined && !looksLikeFilePath(path)) {
+        continue;
+      }
     }
+    if (path.length === 0) continue;
     matches.push({ start: m.index, end: m.index + m[0].length, lead: m[1] ?? "", path, range });
   }
   return matches;

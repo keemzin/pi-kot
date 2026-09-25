@@ -28,6 +28,7 @@ import {
   fetchProviders,
 } from "../lib/api-client";
 import type { ProbeResult } from "../lib/api-client";
+import { useI18n } from "../hooks/useI18n";
 
 // ── API type options ──────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ interface Props {
 }
 
 export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
+  const { t } = useI18n();
   // ── Step 1 state ──────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>("url");
   const [baseUrl, setBaseUrl] = useState("");
@@ -365,7 +367,9 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
               </div>
 
               <div className="add-provider-field">
-                <label className="add-provider-label">API Key (optional)</label>
+                <label className="add-provider-label">
+                  <Key size={16} /> {t("settings.addProvider.apiKey")}
+                </label>
                 <div className="add-provider-input-row">
                   <Key size={14} className="add-provider-input-icon" />
                   <input
@@ -421,9 +425,13 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
                   onClick={() => void handleTestConnection()}
                 >
                   {testing ? (
-                    <><Loader2 size={14} className="animate-spin" /> Testing…</>
+                    <>
+                      <Loader2 size={16} className="add-provider-spin" /> {t("settings.addProvider.testing")}
+                    </>
                   ) : (
-                    <><Zap size={14} /> Test Connection</>
+                    <>
+                      <RefreshCw size={16} /> {t("settings.addProvider.testConnection")}
+                    </>
                   )}
                 </button>
                 <button
@@ -441,7 +449,6 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
             <div className="add-provider-testing">
               <Loader2 size={32} className="animate-spin" style={{ color: "var(--accent-text)" }} />
               <p>Testing connection to {baseUrl}…</p>
-              {/* This step auto-transitions in handleTestConnection */}
             </div>
           )}
 
@@ -500,7 +507,7 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
                               />
                             </div>
                             <div className="add-provider-model-field">
-                              <label>Context</label>
+                              <div className="model-col" style={{ width: "100px" }}>{t("settings.addProvider.context")}</div>
                               <select
                                 value={m.contextWindow}
                                 onChange={(e) =>
@@ -540,7 +547,7 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
                               </select>
                             </div>
                             <div className="add-provider-model-field">
-                              <label>Thinking</label>
+                              <div className="model-col" style={{ width: "80px", textAlign: "center" }}>{t("settings.addProvider.thinking")}</div>
                               <label className="add-provider-toggle-label">
                                 <input
                                   type="checkbox"
@@ -625,9 +632,13 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
                   onClick={() => void handleSave()}
                 >
                   {saving ? (
-                    <><Loader2 size={14} className="animate-spin" /> Saving…</>
+                    <>
+                      <Loader2 size={16} className="add-provider-spin" /> {t("settings.addProvider.saving")}
+                    </>
                   ) : (
-                    <><Save size={14} /> Save Provider</>
+                    <>
+                      <Save size={16} /> {t("settings.addProvider.saveProvider")}
+                    </>
                   )}
                 </button>
                 <button className="add-provider-btn" onClick={handleRetest}>
@@ -642,14 +653,11 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
 
           {/* ── STEP 4: Saved ── */}
           {step === "save" && (
-            <div className="add-provider-saved">
-              <CheckCircle size={48} style={{ color: "var(--accent-text)" }} />
-              <h3>Provider Added</h3>
+            <div className="add-provider-success">
+              <CheckCircle size={48} color="var(--accent-green)" />
+              <h3>{t("settings.addProvider.providerAdded")}</h3>
               <p>
-                <strong>{providerName}</strong> has been saved to{" "}
-                <code className="font-mono">models.json</code> with{" "}
-                {models.filter((m) => m.selected).length} model
-                {models.filter((m) => m.selected).length !== 1 ? "s" : ""}.
+                {t("settings.addProvider.providerAddedDesc")}
               </p>
               <p className="add-provider-hint">
                 Reload the page or open the model picker to use the new provider.

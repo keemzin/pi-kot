@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 import { usePreferencesStore } from "../stores/preferences-store";
+import { ThinkingIndicator } from "./ThinkingIndicator";
+import { useI18n } from "../hooks/useI18n";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -33,17 +35,26 @@ export type TrailSegment = {
 	firstToolId?: string;
 };
 
+export type CustomToolCall = {
+	name: string;
+	id: string;
+	args: Record<string, unknown>;
+	result?: PairableMessage | undefined;
+	msgId?: string;
+};
+
+export type GroupedTurnItem =
+	| { kind: "segment"; segment: TrailSegment }
+	| { kind: "customTool"; customTool: CustomToolCall }
+	| { kind: "special"; message: Record<string, unknown> };
+
 export type GroupedTurn = {
+	/** Chronologically ordered items (segments, custom tools, specials). */
+	items: GroupedTurnItem[];
 	/** Trail runs, each rendered as one ToolGroupCard. */
 	segments: TrailSegment[];
 	/** Tool calls handled by a registered custom renderer (break out of the trail). */
-	customTools: {
-		name: string;
-		id: string;
-		args: Record<string, unknown>;
-		result?: PairableMessage | undefined;
-		msgId?: string;
-	}[];
+	customTools: CustomToolCall[];
 	/** Non-assistant role messages (bashExecution, branchSummary, custom…). */
 	specials: Record<string, unknown>[];
 	/** Text/thinking after the last tool call — the actual answer. */
@@ -75,6 +86,7 @@ export function buildGroupedTurn(
 	getResult: (id: string) => PairableMessage | undefined,
 	isCustomTool: (name: string) => boolean,
 ): GroupedTurn {
+	const items: GroupedTurnItem[] = [];
 	const segments: TrailSegment[] = [];
 	const customTools: GroupedTurn["customTools"] = [];
 	const specials: Record<string, unknown>[] = [];
@@ -84,7 +96,9 @@ export function buildGroupedTurn(
 
 	const pushSegment = (): void => {
 		if (current !== undefined && current.length > 0) {
-			segments.push({ entries: current, firstToolId: currentFirstToolId });
+			const seg: TrailSegment = { entries: current, firstToolId: currentFirstToolId };
+			segments.push(seg);
+			items.push({ kind: "segment", segment: seg });
 		}
 		current = undefined;
 		currentFirstToolId = undefined;
@@ -109,6 +123,7 @@ export function buildGroupedTurn(
 			// bashExecution / branchSummary / custom / unknown roles
 			pushSegment();
 			specials.push(m);
+			items.push({ kind: "special", message: m });
 			continue;
 		}
 
@@ -136,13 +151,15 @@ export function buildGroupedTurn(
 
 				if (isCustomTool(toolName)) {
 					pushSegment();
-					customTools.push({
+					const ct: CustomToolCall = {
 						name: toolName,
 						id,
 						args,
 						result: id ? getResult(id) : undefined,
 						msgId: String(m.id ?? ""),
-					});
+					};
+					customTools.push(ct);
+					items.push({ kind: "customTool", customTool: ct });
 				} else {
 					if (current === undefined) current = [];
 					if (!currentFirstToolId && id) currentFirstToolId = id;
@@ -172,7 +189,7 @@ export function buildGroupedTurn(
 	const finalParts = prose;
 	pushSegment();
 
-	return { segments, customTools, specials, finalParts };
+	return { items, segments, customTools, specials, finalParts };
 }
 
 /* ── Tool presentation helpers (openkot-style friendly names/icons) ────── */
@@ -472,7 +489,7 @@ export function countDiffLines(diff: string): { adds: number; dels: number } {
 
 /* ── ToolCallEntry — single tool call + result as a timeline node ──────── */
 
-export function ToolCallEntry({
+export const ToolCallEntry = memo(function ToolCallEntry({
 	block,
 	result,
 	initialExpanded = false,
@@ -480,6 +497,8 @@ export function ToolCallEntry({
 	previewOverride,
 	icon,
 	suppressRunning = false,
+	isActive,
+	isLastInTurn,
 }: {
 	block: Record<string, unknown>;
 	result: PairableMessage | undefined;
@@ -493,7 +512,12 @@ export function ToolCallEntry({
 	/** When true, a missing result is treated as cancelled/aborted rather than
 	 *  running (used after the turn stopped streaming). */
 	suppressRunning?: boolean;
+	isActive: boolean;
+	isLastInTurn: boolean;
 }) {
+	const { t } = useI18n();
+	// Local override for expanded state. If undefined, we follow the global preference.
+	const [localExpanded, setLocalExpanded] = useState<boolean | undefined>();
 	const [detailsOpen, setDetailsOpen] = useState(initialExpanded);
 	const [justCompleted, setJustCompleted] = useState(false);
 	const wasRunning = useRef(result === undefined);
@@ -514,12 +538,14 @@ export function ToolCallEntry({
 	const isError = result?.isError === true;
 	const isRunning = result === undefined && !suppressRunning;
 
-	// Auto-scroll the args pane to bottom while the tool is streaming
+	// Auto-scroll the args pane to bottom while the tool is streaming.
+	// Dep array is intentional: run only when running/open state changes, not
+	// every render — missing it caused a layout reflow per SSE tick per entry.
 	useEffect(() => {
 		if (isRunning && detailsOpen && argsPreRef.current) {
 			argsPreRef.current.scrollTop = argsPreRef.current.scrollHeight;
 		}
-	});
+	}, [isRunning, detailsOpen]);
 
 	const resultContent = Array.isArray(result?.content) ? result?.content : [];
 	const outputText = resultContent
@@ -590,7 +616,7 @@ export function ToolCallEntry({
 					)}
 					{isRunning && (
 						<span className="tool-timeline-running" aria-label="running">
-							running…
+							{t("chat.running")}
 						</span>
 					)}
 					{hasDetails && (
@@ -604,7 +630,7 @@ export function ToolCallEntry({
 					<div className="tool-timeline-details">
 						{argsText.length > 2 && (
 							<div>
-								<div className="tool-timeline-section-label">input</div>
+								<div className="tool-timeline-section-label">{t("chat.toolInput")}</div>
 								<pre className="tool-timeline-code" ref={argsPreRef}>
 									{argsText}
 								</pre>
@@ -645,11 +671,12 @@ export function ToolCallEntry({
 			</div>
 		</div>
 	);
-}
+});
 
 /* ── Thinking row (only rendered when showThinking is on) ───────────────── */
 
 function TrailThinkingRow({ text }: { text: string }) {
+	const { t } = useI18n();
 	const showThinking = usePreferencesStore((s) => s.showThinking);
 	const [open, setOpen] = useState(false);
 	
@@ -664,7 +691,7 @@ function TrailThinkingRow({ text }: { text: string }) {
 				}}
 			>
 				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">Thinking</span>
+				<span className="thinking-block-label">{t("chat.thinking")}</span>
 			</summary>
 			<div className="thinking-block-content">{text}</div>
 		</details>
@@ -684,6 +711,7 @@ function JustificationRow({
 	open: boolean;
 	onToggle: () => void;
 }) {
+	const { t } = useI18n();
 	const stripped = text
 		.replace(/#+\s+/g, "") // remove headers like "## "
 		.replace(/[*_~`]/g, "") // remove bold, italic, strikethrough, code ticks
@@ -719,10 +747,10 @@ function JustificationRow({
 						</svg>
 					</span>
 					{open ? (
-						<span className="trail-justification-label">Justification</span>
+						<span className="trail-justification-label">{t("chat.toolJustification")}</span>
 					) : (
 						<span className="trail-justification-preview" title={preview}>
-							{preview || "Justification"}
+							{preview || t("chat.toolJustification")}
 						</span>
 					)}
 				</div>
@@ -850,6 +878,7 @@ function ConsecutiveToolGroup({
 	startIndex: number;
 	renderEntry: (entry: ToolGroupEntry, idx: number) => React.ReactNode;
 }) {
+	const { t } = useI18n();
 	const [isOpen, setIsOpen] = useState(false);
 
 	const anyRunning =
@@ -893,11 +922,12 @@ function ConsecutiveToolGroup({
 							{count} × {displayName}
 						</span>
 						{!expanded && (
-							<span className="tool-timeline-arg">Grouped tools</span>
-						)}
+						<div className="tool-timeline-summary">
+							<span className="tool-timeline-arg">{t("chat.groupedTools")}</span>
+						</div>)}
 						{isRunning && (
 							<span className="tool-timeline-running" aria-label="running">
-								running…
+								{t("chat.running")}
 							</span>
 						)}
 						<span className={`tool-timeline-chevron-toggle ${expanded ? "open" : ""}`}>
@@ -927,13 +957,14 @@ function ConsecutiveToolGroup({
 	);
 }
 
-export function ToolGroupCard({
+export const ToolGroupCard = memo(function ToolGroupCard({
 	entries,
 	isStreaming = false,
 }: {
 	entries: ToolGroupEntry[];
 	isStreaming?: boolean;
 }) {
+	const { t } = useI18n();
 	const hasJustifications = entries.some((e) => e.kind === "justification");
 	// Default resting view for a trail comes from the user preference.
 	const trailDefaultView = usePreferencesStore((s) => s.trailDefaultView);
@@ -980,7 +1011,10 @@ export function ToolGroupCard({
 		isStreaming &&
 		entries.some((e) => e.kind === "tool" && e.result === undefined);
 
-	const { chunks, leading } = groupChunks(entries);
+	// Memoize chunk grouping so it doesn't recompute on every SSE delta.
+	// entries is only a new reference when the outer useMemo in ChatView
+	// rebuilds — which is already gated on message/toolResult changes.
+	const { chunks, leading } = useMemo(() => groupChunks(entries), [entries]);
 
 	// Live-turn "only the step being worked on" focus: while the turn is
 	// streaming in Justify view, the newest chunk expands automatically
@@ -1013,10 +1047,18 @@ export function ToolGroupCard({
 	const viewLabel = view === "full" ? "Collapse All" : "Expand All";
 
 	const scrollRef = useRef<HTMLDivElement>(null);
+	// Scroll to bottom when in full view during streaming.
+	// Use rAF to avoid forcing a synchronous layout reflow on every SSE event
+	// (scrollTop = scrollHeight forces layout; batching it to the paint frame
+	// prevents blocking input events during heavy tool calling).
 	useEffect(() => {
-		if (isStreaming && view === "full" && scrollRef.current) {
-			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-		}
+		if (!isStreaming || view !== "full") return;
+		const raf = requestAnimationFrame(() => {
+			if (scrollRef.current) {
+				scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+			}
+		});
+		return () => cancelAnimationFrame(raf);
 	}, [entries.length, isStreaming, view]);
 
 	/** Render a single entry in Full view (tools, thinking, or full prose). */
@@ -1033,6 +1075,8 @@ export function ToolGroupCard({
 					previewOverride={getToolDescription(name, args) || undefined}
 					icon={<TrailIcon toolName={name} />}
 					suppressRunning={!isStreaming}
+					isActive={isStreaming && entry.result === undefined}
+					isLastInTurn={idx === entries.length - 1}
 				/>
 			);
 		}
@@ -1120,23 +1164,24 @@ export function ToolGroupCard({
 					onClick={cycle}
 				>
 					<span className="trail-toggle-icon">
-						<svg
-							width="14"
-							height="14"
-							viewBox="0 0 24 24"
-							fill="var(--bg-solid)"
-							strokeWidth="2"
-							style={{
-								animation: anyRunning ? "pulse 2s infinite ease-in-out" : "none",
-								stroke: anyRunning ? "var(--accent)" : "currentColor",
-							}}
-						>
-							<circle cx="12" cy="12" r="10" />
-						</svg>
+						{anyRunning ? (
+							<ThinkingIndicator style={{ width: "12px", height: "12px", color: "var(--accent)", margin: "1px" }} />
+						) : (
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="var(--bg-solid)"
+								strokeWidth="2"
+								style={{ stroke: "currentColor" }}
+							>
+								<circle cx="12" cy="12" r="10" />
+							</svg>
+						)}
 					</span>
-					<span className="trail-toggle-label">Trail</span>
+					<span className="trail-toggle-label">{t("chat.trail")}</span>
 					<span className="trail-toggle-view">{viewLabel}</span>
-					{anyRunning && <span className="trail-running-label">running</span>}
+					{anyRunning && <span className="trail-running-label">{t("chat.runningShort")}</span>}
 				</button>
 			</div>
 
@@ -1163,7 +1208,7 @@ export function ToolGroupCard({
 			</div>
 		</div>
 	);
-}
+});
 
 function TrailIcon({ toolName }: { toolName: string }) {
 	return (

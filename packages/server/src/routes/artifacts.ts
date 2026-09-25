@@ -1,9 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
-import { existsSync, statSync } from "node:fs";
-import { createReadStream } from "node:fs";
-import { join, extname, resolve } from "node:path";
+import { existsSync, statSync, readdirSync, createReadStream } from "node:fs";
+import { join, extname, resolve, relative } from "node:path";
 import { config } from "../config.js";
-import { readdirSync } from "node:fs";
 
 // Track all CWDs where the agent has worked, so we can find artifacts anywhere
 const knownCwds = new Set<string>([config.workspacePath]);
@@ -17,6 +15,7 @@ const MIME_TYPES: Record<string, string> = {
   ".htm": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -34,17 +33,34 @@ const MIME_TYPES: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
   ".markdown": "text/markdown; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
 };
 
-function safeName(raw: string): string | undefined {
-  const name = decodeURIComponent(raw).replace(/^\/+/, "");
-  if (!name || name.includes("..") || name.includes("/") || name.includes("\\")) {
+export function safeArtifactPath(raw: string): string | undefined {
+  if (!raw) return undefined;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
     return undefined;
   }
-  return name;
+  if (decoded.includes("\0")) return undefined;
+  const normalized = decoded.replace(/\\/g, "/").replace(/\/+/g, "/");
+
+  const segments = normalized.split("/");
+  for (const seg of segments) {
+    if (seg === ".." || seg === ".") {
+      return undefined;
+    }
+  }
+
+  const clean = normalized.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!clean) return undefined;
+
+  return clean;
 }
 
-interface ArtifactFileInfo {
+export interface ArtifactFileInfo {
   name: string;
   type: string;
   size: number;
@@ -52,28 +68,69 @@ interface ArtifactFileInfo {
   source: string;
 }
 
-function getArtifactDirs(): string[] {
+export function walkArtifactDir(baseDir: string, currentDir: string = baseDir, maxDepth = 10): ArtifactFileInfo[] {
+  if (maxDepth <= 0) return [];
+  const results: ArtifactFileInfo[] = [];
+  try {
+    const entries = readdirSync(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      const fullPath = join(currentDir, entry.name);
+      if (entry.isFile()) {
+        try {
+          const stat = statSync(fullPath);
+          const relPath = relative(baseDir, fullPath).replace(/\\/g, "/");
+          results.push({
+            name: relPath,
+            type: extname(entry.name).toLowerCase().slice(1) || "unknown",
+            size: stat.size,
+            modified: stat.mtime.toISOString(),
+            source: baseDir,
+          });
+        } catch {
+          // ignore stat error
+        }
+      } else if (entry.isDirectory()) {
+        results.push(...walkArtifactDir(baseDir, fullPath, maxDepth - 1));
+      }
+    }
+  } catch {
+    // ignore readdir error
+  }
+  return results;
+}
+
+export function getArtifactDirs(cwd?: string): string[] {
   const dirs: string[] = [];
   const seen = new Set<string>();
 
   const addDir = (dir: string) => {
-    if (!seen.has(dir) && existsSync(dir)) {
-      seen.add(dir);
-      dirs.push(dir);
+    const resolved = resolve(dir);
+    if (!seen.has(resolved) && existsSync(resolved)) {
+      seen.add(resolved);
+      dirs.push(resolved);
     }
   };
 
-  for (const cwd of knownCwds) {
+  if (cwd) {
     addDir(join(cwd, ".pi", "artifacts"));
+    addDir(join(cwd, ".pi", "artifact"));
+  }
+
+  for (const known of knownCwds) {
+    addDir(join(known, ".pi", "artifacts"));
+    addDir(join(known, ".pi", "artifact"));
   }
 
   addDir(join(config.workspacePath, ".pi", "artifacts"));
+  addDir(join(config.workspacePath, ".pi", "artifact"));
 
   try {
     const entries = readdirSync(config.workspacePath, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory() && !entry.name.startsWith(".")) {
         addDir(join(config.workspacePath, entry.name, ".pi", "artifacts"));
+        addDir(join(config.workspacePath, entry.name, ".pi", "artifact"));
       }
     }
   } catch {
@@ -95,14 +152,20 @@ export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
     { config: { public: true } },
     async (req, reply) => {
       const files: ArtifactFileInfo[] = [];
+      const seenNames = new Set<string>();
 
       // If cwd is provided, only search that directory
       const dirs: string[] = [];
       if (req.query.cwd) {
         const specificDir = join(req.query.cwd, ".pi", "artifacts");
+        const specificAltDir = join(req.query.cwd, ".pi", "artifact");
         if (existsSync(specificDir)) {
           dirs.push(specificDir);
-        } else {
+        }
+        if (existsSync(specificAltDir)) {
+          dirs.push(specificAltDir);
+        }
+        if (dirs.length === 0) {
           return reply.send({ files: [] });
         }
       } else {
@@ -110,23 +173,12 @@ export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       for (const dir of dirs) {
-        try {
-          const entries = readdirSync(dir, { withFileTypes: true });
-          for (const entry of entries) {
-            if (entry.isFile()) {
-              const filePath = join(dir, entry.name);
-              const stat = statSync(filePath);
-              files.push({
-                name: entry.name,
-                type: extname(entry.name).toLowerCase().slice(1) || "unknown",
-                size: stat.size,
-                modified: stat.mtime.toISOString(),
-                source: dir,
-              });
-            }
+        const found = walkArtifactDir(dir);
+        for (const file of found) {
+          if (!seenNames.has(file.name)) {
+            seenNames.add(file.name);
+            files.push(file);
           }
-        } catch {
-          // ignore
         }
       }
 
@@ -136,64 +188,35 @@ export const artifactRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send({ files });
     },
   );
-  fastify.get<{ Params: { filename: string }; Querystring: { cwd?: string } }>(
-    "/artifacts/:filename",
+
+  // Serve artifact file (supports nested subpaths e.g. /artifacts/folder/html.html)
+  fastify.get<{ Params: { "*": string }; Querystring: { cwd?: string } }>(
+    "/artifacts/*",
     {
       config: { public: true },
-      schema: { params: { type: "object", properties: { filename: { type: "string" } }, required: ["filename"] } },
     },
     async (req, reply) => {
-      const name = safeName(req.params.filename);
+      const raw = (req.params as Record<string, string>)["*"] || "";
+      const name = safeArtifactPath(raw);
       if (!name) {
         return reply.code(400).send({ error: "Invalid artifact name" });
       }
 
-      // Search for .pi/artifacts/ in:
-      // 1. All known CWDs (registered via registerArtifactCwd)
-      // 2. Workspace root
-      // 3. All project subdirectories (scan for .pi/artifacts/)
-      // 4. Specific cwd passed as query param (for external projects)
-      const artifactDirs: string[] = [];
-      const seen = new Set<string>();
-
-      const addDir = (dir: string) => {
-        if (!seen.has(dir) && existsSync(dir)) {
-          seen.add(dir);
-          artifactDirs.push(dir);
-        }
-      };
-
-      // Specific CWD (external projects)
-      if (req.query.cwd) {
-        addDir(join(req.query.cwd, ".pi", "artifacts"));
-      }
-
-      // Known CWDs
-      for (const cwd of knownCwds) {
-        addDir(join(cwd, ".pi", "artifacts"));
-      }
-
-      // Workspace root
-      addDir(join(config.workspacePath, ".pi", "artifacts"));
-
-      // Scan project subdirectories
-      try {
-        const entries = readdirSync(config.workspacePath, { withFileTypes: true });
-        for (const entry of entries) {
-          if (entry.isDirectory() && !entry.name.startsWith(".")) {
-            addDir(join(config.workspacePath, entry.name, ".pi", "artifacts"));
-          }
-        }
-      } catch {
-        // ignore
-      }
+      const artifactDirs = getArtifactDirs(req.query.cwd);
 
       let resolvedFile = "";
       for (const artifactDir of artifactDirs) {
-        const filePath = resolve(artifactDir, name);
-        if (filePath.startsWith(artifactDir) && existsSync(filePath)) {
-          resolvedFile = filePath;
-          break;
+        const resolvedDir = resolve(artifactDir);
+        const candidate = resolve(resolvedDir, name);
+        if ((candidate === resolvedDir || candidate.startsWith(resolvedDir + "/")) && existsSync(candidate)) {
+          try {
+            if (statSync(candidate).isFile()) {
+              resolvedFile = candidate;
+              break;
+            }
+          } catch {
+            // ignore
+          }
         }
       }
 

@@ -6,15 +6,18 @@ import { useEffect, useState, useMemo } from "react";
 import {
   listSkills,
   setSkillEnabled,
+  setAllSkillsEnabled,
 } from "../lib/api-client";
 import type { SkillSummary, SkillDiagnostic, SkillsListResponse } from "../lib/api-client/types";
 import { SkillEditor } from "./SkillEditor";
+import { useI18n } from "../hooks/useI18n";
 
 interface Props {
   onError: (msg: string | undefined) => void;
 }
 
 export function SkillsTab({ onError }: Props) {
+  const { t } = useI18n();
   const [data, setData] = useState<SkillsListResponse | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
@@ -43,6 +46,20 @@ export function SkillsTab({ onError }: Props) {
       await refresh();
     } catch (err) {
       onError(`Toggle failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleAll = async () => {
+    if (!data) return;
+    setBusy(true);
+    try {
+      const nextEnabled = Boolean(data.disableAll);
+      await setAllSkillsEnabled(nextEnabled);
+      await refresh();
+    } catch (err) {
+      onError(`Toggle all failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setBusy(false);
     }
@@ -83,7 +100,7 @@ export function SkillsTab({ onError }: Props) {
     data && data.diagnostics && data.diagnostics.length > 0;
 
   if (data === undefined) {
-    return <p className="settings-hint">Loading skills…</p>;
+    return <p className="settings-hint">{t("settings.skills.loading")}</p>;
   }
 
   return (
@@ -96,9 +113,7 @@ export function SkillsTab({ onError }: Props) {
     }}>
       {!editingSkill && (
         <p className="settings-hint">
-          Skills are self-contained capability packages loaded from{" "}
-          <code className="font-mono">~/.pi/agent/skills/</code> and project skill
-          directories. Toggle individual skills on or off.
+          {t("settings.skills.description")}
         </p>
       )}
 
@@ -126,11 +141,11 @@ export function SkillsTab({ onError }: Props) {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search skills…"
+          placeholder={t("settings.skills.searchPlaceholder")}
           className="settings-input"
           style={{ flex: 1, minWidth: 140 }}
         />
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           {(["all", "global", "project", "extension"] as const).map((f) => {
             const count =
               f === "all" ? data.skills.length : (sourceCounts[f] ?? 0);
@@ -148,11 +163,27 @@ export function SkillsTab({ onError }: Props) {
                 }}
               >
                 {f === "all"
-                  ? `All (${count})`
+                  ? t("settings.skills.allCount").replace("{count}", String(count))
                   : `${f} (${count})`}
               </button>
             );
           })}
+          <button
+            onClick={() => void handleToggleAll()}
+            disabled={busy}
+            className="settings-tab"
+            style={{
+              fontSize: 11,
+              padding: "2px 8px",
+              borderRadius: 4,
+              border: "1px solid var(--border, rgba(255,255,255,0.15))",
+              cursor: busy ? "not-allowed" : "pointer",
+              color: data.disableAll ? "var(--accent, #6366f1)" : "var(--danger, #e74c3c)",
+              fontWeight: 500,
+            }}
+          >
+            {data.disableAll ? t("settings.skills.enableAll") : t("settings.skills.disableAll")}
+          </button>
         </div>
       </div>
       )}
@@ -170,8 +201,8 @@ export function SkillsTab({ onError }: Props) {
           {filtered.length === 0 && (
             <p className="settings-hint" style={{ marginTop: 16 }}>
               {search
-                ? `No skills match "${search}"`
-                : "No skills found."}
+                ? t("settings.skills.noSkillsMatch").replace("{search}", search)
+                : t("settings.skills.noSkillsFound")}
             </p>
           )}
 
@@ -205,12 +236,13 @@ function SkillCard({
   onEdit: () => void;
   disabled: boolean;
 }) {
+  const { t } = useI18n();
   const sourceLabel =
     skill.source === "extension"
-      ? `Extension: ${skill.extensionPath ?? "unknown"}`
+      ? t("settings.skills.sourceExtension").replace("{path}", skill.extensionPath ?? "unknown")
       : skill.source === "project"
-        ? "Project skill"
-        : "Global skill";
+        ? t("settings.skills.sourceProject")
+        : t("settings.skills.sourceGlobal");
 
   const sourceBadgeClass =
     skill.source === "extension"
@@ -274,7 +306,7 @@ function SkillCard({
             <button
               onClick={onEdit}
               disabled={skill.source === "extension"}
-              title={skill.source === "extension" ? "Extension skills cannot be edited" : "Edit skill"}
+              title={skill.source === "extension" ? t("settings.skills.editExtensionDisabled") : t("settings.skills.editSkill")}
               style={{
                 fontSize: 10,
                 padding: "2px 8px",
@@ -287,7 +319,7 @@ function SkillCard({
                 opacity: skill.source === "extension" ? 0.5 : 1,
               }}
             >
-              ✎ Edit
+              {t("settings.skills.edit")}
             </button>
           </div>
           <div
@@ -311,9 +343,9 @@ function SkillCard({
             {skill.disableModelInvocation && (
               <span
                 className="settings-badge settings-badge-off"
-                title="Hidden from system prompt; use /skill:name to invoke"
+                title={t("settings.skills.manualOnlyTitle")}
               >
-                manual only
+                {t("settings.skills.manualOnly")}
               </span>
             )}
             {skill.projectOverride !== undefined && (
@@ -323,12 +355,12 @@ function SkillCard({
                     ? "settings-badge settings-badge-on"
                     : "settings-badge settings-badge-off"
                 }
-                title="Per-project override active"
+                title={t("settings.skills.projectOverrideActive")}
                 style={{ fontSize: 10 }}
               >
                 {skill.projectOverride === "enabled"
-                  ? "project: on"
-                  : "project: off"}
+                  ? t("settings.skills.projectOn")
+                  : t("settings.skills.projectOff")}
               </span>
             )}
           </div>
@@ -365,7 +397,7 @@ function SkillCard({
             {!skill.effective && (
               <>
                 <span>·</span>
-                <span style={{ color: "var(--danger, #e74c3c)" }}>disabled</span>
+                <span style={{ color: "var(--danger, #e74c3c)" }}>{t("settings.skills.disabled")}</span>
               </>
             )}
           </div>
@@ -378,6 +410,7 @@ function SkillCard({
 // ── Diagnostic Banner ──────────────────────────────────────────────────
 
 function DiagnosticBanner({ diagnostic }: { diagnostic: SkillDiagnostic }) {
+  const { t } = useI18n();
   const isError = diagnostic.type === "error";
   const isCollision = diagnostic.type === "collision";
 
@@ -391,7 +424,7 @@ function DiagnosticBanner({ diagnostic }: { diagnostic: SkillDiagnostic }) {
     : isCollision
       ? "1px solid rgba(243, 156, 18, 0.3)"
       : "1px solid rgba(243, 156, 18, 0.2)";
-  const label = isError ? "Error" : isCollision ? "Collision" : "Warning";
+  const label = isError ? t("settings.skills.diagnosticError") : isCollision ? t("settings.skills.diagnosticCollision") : t("settings.skills.diagnosticWarning");
 
   return (
     <div
@@ -416,9 +449,9 @@ function DiagnosticBanner({ diagnostic }: { diagnostic: SkillDiagnostic }) {
       )}
       {diagnostic.collision && (
         <div style={{ fontSize: 10, color: "var(--text-dim)", marginTop: 4 }}>
-          Winner: {diagnostic.collision.winnerPath}
+          {t("settings.skills.diagnosticWinner").replace("{path}", diagnostic.collision.winnerPath)}
           <br />
-          Loser: {diagnostic.collision.loserPath}
+          {t("settings.skills.diagnosticLoser").replace("{path}", diagnostic.collision.loserPath)}
         </div>
       )}
     </div>

@@ -1137,6 +1137,57 @@ export async function answerAskQuestion(
   );
 }
 
+export interface PendingPlanReviewItem {
+  requestId: string;
+  planFilePath: string;
+  planContent: string;
+}
+
+export async function getPendingPlanReviews(
+  sessionId: string,
+): Promise<PendingPlanReviewItem[]> {
+  const res = await request<{ pending: PendingPlanReviewItem[] }>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-review/pending`,
+  );
+  return res.pending;
+}
+
+export async function submitPlanReviewDecision(
+  sessionId: string,
+  requestId: string,
+  decision: { approved: boolean; feedback?: string; updatedContent?: string },
+): Promise<void> {
+  await request(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-review/${encodeURIComponent(requestId)}/decision`,
+    decision,
+  );
+}
+
+export interface PlanModeStatus {
+  phase: "planning" | "idle";
+  planModeActive: boolean;
+}
+
+export async function getPlanModeStatus(sessionId: string): Promise<PlanModeStatus> {
+  return request<PlanModeStatus>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-mode`,
+  );
+}
+
+export async function setPlanMode(
+  sessionId: string,
+  active?: boolean,
+): Promise<{ ok: boolean; planModeActive: boolean; phase: string }> {
+  return request<{ ok: boolean; planModeActive: boolean; phase: string }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/plan-mode`,
+    typeof active === "boolean" ? { active } : {},
+  );
+}
+
 // ── Orchestration ──
 
 export interface OrchestrationConfig {
@@ -1702,6 +1753,16 @@ export async function clearSkillProjectOverride(
   return request<{ ok: boolean }>(
     "DELETE",
     `/api/v1/config/skills/${encodeURIComponent(name)}/enabled?projectId=${encodeURIComponent(projectId)}`,
+  );
+}
+
+export async function setAllSkillsEnabled(
+  enabled: boolean,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    "PUT",
+    "/api/v1/config/skills/all/enabled",
+    { enabled },
   );
 }
 

@@ -8,12 +8,14 @@ import {
   type ProvidersResponse,
 } from "../../lib/api-client";
 import { Field, errorMsg } from "./shared";
+import { useI18n } from "../../hooks/useI18n";
 
 interface Props {
   onError: (msg: string | undefined) => void;
 }
 
 export function AgentTab({ onError }: Props) {
+  const { t } = useI18n();
   const [settings, setSettings] = useState<Record<string, unknown> | undefined>(undefined);
   const [allProviders, setAllProviders] = useState<ProvidersResponse | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -201,12 +203,12 @@ export function AgentTab({ onError }: Props) {
   };
 
   if (settings === undefined) {
-    return <p className="settings-hint">Loading settings…</p>;
+    return <p className="settings-hint">{t("settings.agent.loading")}</p>;
   }
 
   return (
     <div className="settings-fields">
-      <Field label="Default provider" hint="Select an LLM provider">
+      <Field label={t("settings.agent.defaultProvider")} hint={t("settings.agent.defaultProviderHint")}>
         <select
           value={selectedProvider}
           disabled={busy}
@@ -219,7 +221,7 @@ export function AgentTab({ onError }: Props) {
           ))}
         </select>
       </Field>
-      <Field label="Default model" hint="Model from the selected provider">
+      <Field label={t("settings.agent.defaultModel")} hint={t("settings.agent.defaultModelHint")}>
         <select
           value={selectedModel}
           disabled={busy || selectedProvider.length === 0}
@@ -232,7 +234,7 @@ export function AgentTab({ onError }: Props) {
           ))}
         </select>
       </Field>
-      <Field label="Thinking level" hint="off, minimal, low, medium, high, xhigh">
+      <Field label={t("settings.agent.thinkingLevel")} hint={t("settings.agent.thinkingLevelHint")}>
         <SelectSetting
           value={
             settings && typeof settings.defaultThinkingLevel === "string"
@@ -247,7 +249,7 @@ export function AgentTab({ onError }: Props) {
 
       <hr className="settings-divider" />
 
-      <p className="settings-section-title">Model Scope</p>
+      <p className="settings-section-title">{t("settings.agent.modelScope")}</p>
       <div className="settings-field">
         <label
           style={{
@@ -271,21 +273,21 @@ export function AgentTab({ onError }: Props) {
               cursor: "pointer",
             }}
           />
-          Hide unused models — only show selected models in dropdowns
+          {t("settings.agent.hideUnusedModels")}
         </label>
         {scopedOn && !showScopePicker && (
           <div style={{ marginTop: 8 }}>
             <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {scopedDraft === null
-                ? "All models visible"
-                : `${scopedDraft.length} of ${allModelEntries.length} models selected`}
+                ? t("settings.agent.allModelsVisible")
+                : t("settings.agent.modelsSelected").replace("{n}", String(scopedDraft.length)).replace("{m}", String(allModelEntries.length))}
             </span>
             <button
               onClick={() => setShowScopePicker(true)}
               className="settings-btn"
               style={{ marginLeft: 12 }}
             >
-              Select models
+              {t("settings.agent.selectModels")}
             </button>
           </div>
         )}
@@ -297,7 +299,7 @@ export function AgentTab({ onError }: Props) {
             type="text"
             value={scopeSearch}
             onChange={(e) => setScopeSearch(e.target.value)}
-            placeholder="Search models…"
+            placeholder={t("settings.agent.searchModels")}
             className="settings-input"
             style={{ marginBottom: 8, width: "100%" }}
             autoFocus
@@ -307,13 +309,13 @@ export function AgentTab({ onError }: Props) {
               onClick={() => setScopedDraft(null)}
               style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
             >
-              Select All
+              {t("settings.agent.selectAll")}
             </button>
             <button
               onClick={() => setScopedDraft([])}
               style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
             >
-              Untick All
+              {t("settings.agent.untickAll")}
             </button>
           </div>
           <div className="scope-model-list">
@@ -358,7 +360,7 @@ export function AgentTab({ onError }: Props) {
                   <span style={{ fontSize: 13 }}>{entry.modelName}</span>
                   {!entry.hasAuth && (
                     <span className="settings-badge settings-badge-off">
-                      no key
+                      {t("settings.providers.noKey")}
                     </span>
                   )}
                 </label>
@@ -366,7 +368,7 @@ export function AgentTab({ onError }: Props) {
             })}
             {filteredEntries.length === 0 && (
               <p style={{ fontSize: 12, color: "var(--text-secondary)", padding: "8px 0" }}>
-                No models match &ldquo;{scopeSearch}&rdquo;
+                {t("settings.agent.noModelsMatch").replace("{search}", scopeSearch)}
               </p>
             )}
           </div>
@@ -376,7 +378,7 @@ export function AgentTab({ onError }: Props) {
               disabled={busy}
               className="settings-btn settings-btn-primary"
             >
-              {busy ? "Saving…" : "Save selection"}
+              {busy ? t("settings.agent.saving") : t("settings.agent.saveSelection")}
             </button>
             <button
               onClick={() => {
@@ -389,7 +391,7 @@ export function AgentTab({ onError }: Props) {
               }}
               className="settings-btn"
             >
-              Cancel
+              {t("settings.agent.cancel")}
             </button>
           </div>
         </div>
@@ -397,28 +399,28 @@ export function AgentTab({ onError }: Props) {
 
       <hr className="settings-divider" />
 
-      <p className="settings-section-title">Orchestrator</p>
-      <Field label="Orch provider" hint="Model for supervisor/worker sessions (leave empty to use default)">
+      <p className="settings-section-title">{t("settings.agent.orchestrator")}</p>
+      <Field label={t("settings.agent.orchProvider")} hint={t("settings.agent.orchProviderHint")}>
         <select
           value={orchProvider}
           disabled={busy}
           onChange={(e) => handleOrchProviderChange(e.target.value)}
           className="settings-select"
         >
-          <option value="">(use default)</option>
+          <option value="">{t("settings.agent.useDefault")}</option>
           {providerOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
       </Field>
-      <Field label="Orch model" hint="Model for supervisor/worker sessions">
+      <Field label={t("settings.agent.orchModel")} hint={t("settings.agent.orchModelHint")}>
         <select
           value={orchModel}
           disabled={busy || orchProvider.length === 0}
           onChange={(e) => handleOrchModelChange(e.target.value)}
           className="settings-select"
         >
-          <option value="">(use default)</option>
+          <option value="">{t("settings.agent.useDefault")}</option>
           {orchModelOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}

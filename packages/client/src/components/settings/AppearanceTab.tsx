@@ -11,6 +11,7 @@ import {
 import { getUiSettings, updateUiSettings } from "../../lib/api-client";
 import { usePreferencesStore } from "../../stores/preferences-store";
 import { SplitFlapText } from "../SplitFlapText";
+import { useI18n } from "../../hooks/useI18n";
 
 type UiSettings = {
 	theme?: string;
@@ -28,7 +29,6 @@ type UiSettings = {
 	userBubbleBorderColor?: string | null;
 	emptyFlapEnabled?: boolean;
 	emptyFlapWords?: string[];
-	emptyFlapSize?: number;
 };
 
 // ── Apply user bubble overrides to CSS :root ──
@@ -89,6 +89,7 @@ const BUBBLE_PRESETS = [
 ];
 
 export function AppearanceTab() {
+	const { t } = useI18n();
 	const [theme, setTheme] = useState<ThemeMode>(() => getSavedTheme());
 	const [accent, setAccent] = useState(() => getSavedAccent());
 	const [serverSynced, setServerSynced] = useState(false);
@@ -114,10 +115,8 @@ export function AppearanceTab() {
 	const zSetSwipeSidebar = usePreferencesStore((s) => s.setSwipeToOpenSidebar);
 	const zFlapEnabled = usePreferencesStore((s) => s.emptyFlapEnabled);
 	const zFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
-	const zFlapSize = usePreferencesStore((s) => s.emptyFlapSize);
 	const zSetFlapEnabled = usePreferencesStore((s) => s.setEmptyFlapEnabled);
 	const zSetFlapWords = usePreferencesStore((s) => s.setEmptyFlapWords);
-	const zSetFlapSize = usePreferencesStore((s) => s.setEmptyFlapSize);
 
 	const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
 	const [flyToTop, setFlyToTop] = useState(zFly);
@@ -131,7 +130,6 @@ export function AppearanceTab() {
 	const [flapEnabled, setFlapEnabled] = useState(zFlapEnabled);
 	const [flapWords, setFlapWords] = useState(zFlapWords);
 	const [flapWordsDraft, setFlapWordsDraft] = useState(zFlapWords.join(", "));
-	const [flapSize, setFlapSize] = useState(zFlapSize);
 
 	// ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
 	const [bubbleBg, setBubbleBg] = useState<string | null>(() =>
@@ -359,18 +357,11 @@ export function AppearanceTab() {
 				? words
 				: flapWords.length > 0
 					? flapWords
-					: ["PI-KOT 0.1.38", "PI-SDK 0.84.2"];
+					: ["PI-KOT 0.1.39", "PI-SDK 0.87.1"];
 		setFlapWords(cleaned);
 		setFlapWordsDraft(cleaned.join(", "));
 		zSetFlapWords(cleaned);
 		persist({ emptyFlapWords: cleaned });
-	};
-
-	const saveFlapSize = (val: number) => {
-		const clamped = Math.min(64, Math.max(14, Math.round(Number(val) || 30)));
-		setFlapSize(clamped);
-		zSetFlapSize(clamped);
-		persist({ emptyFlapSize: clamped });
 	};
 
 	const selectBubblePreset = (idx: number) => {
@@ -435,13 +426,13 @@ export function AppearanceTab() {
 		<div className="settings-fields">
 			<p className="settings-hint">
 				{serverSynced
-					? "Preferences saved server-side (survives cache clears)."
-					: "Server offline — saved locally only."}
+					? t("settings.appearance.preferencesSaved")
+					: t("settings.appearance.preferencesLocal")}
 			</p>
 
 			{/* ── Theme ── */}
 			<div className="settings-field">
-				<label className="settings-label">Theme</label>
+				<label className="settings-label">{t("settings.appearance.theme")}</label>
 				<div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
 					{themes.map((t) => (
 						<button
@@ -472,8 +463,8 @@ export function AppearanceTab() {
 			</div>
 
 			{/* ── Accent ── */}
-			<div className="settings-field">
-				<label className="settings-label">Accent</label>
+			<div className="settings-field" style={{ marginTop: 8 }}>
+				<label className="settings-label">{t("settings.appearance.accent")}</label>
 				<div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
 					{accents.map((a) => (
 						<button
@@ -503,8 +494,8 @@ export function AppearanceTab() {
 			</div>
 
 			{/* ── User Bubble ── */}
-			<div className="settings-field">
-				<label className="settings-label">Your Message Bubble</label>
+			<div className="settings-field" style={{ marginTop: 8 }}>
+				<label className="settings-label">{t("settings.appearance.yourMessageBubble")}</label>
 				<div
 					style={{
 						display: "flex",
@@ -579,11 +570,11 @@ export function AppearanceTab() {
 							}}
 						>
 							<span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-								Preview
+								{t("settings.appearance.preview")}
 							</span>
 							<div className="message-row user" style={{ padding: 0 }}>
 								<div className="message-bubble user">
-									Your messages will look like this.
+									{t("settings.appearance.previewUser")}
 								</div>
 							</div>
 							<div className="message-row assistant" style={{ padding: 0 }}>
@@ -591,7 +582,7 @@ export function AppearanceTab() {
 									className="message-bubble assistant"
 									style={{ fontSize: 13, color: "var(--text-secondary)" }}
 								>
-									The assistant reply sits here for reference.
+									{t("settings.appearance.previewAssistant")}
 								</div>
 							</div>
 						</div>
@@ -599,7 +590,7 @@ export function AppearanceTab() {
 							<label
 								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
 							>
-								Background
+								{t("settings.appearance.background")}
 							</label>
 							<input
 								type="color"
@@ -635,7 +626,7 @@ export function AppearanceTab() {
 							<label
 								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
 							>
-								Text
+								{t("settings.appearance.text")}
 							</label>
 							<input
 								type="color"
@@ -673,7 +664,7 @@ export function AppearanceTab() {
 							<label
 								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
 							>
-								Border
+								{t("settings.appearance.border")}
 							</label>
 							<input
 								type="color"
@@ -722,7 +713,7 @@ export function AppearanceTab() {
 							}}
 							type="button"
 						>
-							Reset to accent default
+							{t("settings.appearance.resetDefaults")}
 						</button>
 					</div>
 				)}
@@ -730,7 +721,7 @@ export function AppearanceTab() {
 
 			{/* ── Toggles ── */}
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -753,12 +744,12 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Sticky user header
+					{t("settings.appearance.stickyUserHeader")}
 				</label>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -781,16 +772,15 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Fly to top
+					{t("settings.appearance.flyToTop")}
 				</label>
-				<div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 2 }}>
-					Anchors your newest message near the top while it streams. Reply grows
-					below and auto-scroll takes over once it fills the screen.
-				</div>
+				<p className="settings-hint">
+					{t("settings.appearance.flyToTopDesc")}
+				</p>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -813,12 +803,12 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Show token usage
+					{t("settings.appearance.showTokenUsage")}
 				</label>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -841,16 +831,15 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Show turn-written files
+					{t("settings.appearance.showTurnFiles")}
 				</label>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					File chips under each reply for files the agent wrote, with per-turn
-					diff.
+				<p className="settings-hint">
+					{t("settings.appearance.showTurnFilesDesc")}
 				</p>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Images</label>
+				<label className="settings-label">{t("settings.appearance.images")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -873,12 +862,12 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Compress images
+					{t("settings.appearance.compressImages")}
 				</label>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -901,12 +890,12 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Show thinking blocks
+					{t("settings.appearance.showThinking")}
 				</label>
 			</div>
 
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -929,11 +918,10 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Grouped tool trail
+					{t("settings.appearance.groupedToolDisplay")}
 				</label>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					One Trail card per turn; in-between agent text collapses into
-					justification previews.
+				<p className="settings-hint">
+					{t("settings.appearance.groupedToolDisplayDesc")}
 				</p>
 				{/* Default resting view for finished trails */}
 				<div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -961,16 +949,16 @@ export function AppearanceTab() {
 								transition: "all 0.15s",
 							}}
 						>
-							{v === "justify" ? "Auto" : "Expand All"}
+							{v === "justify" ? t("settings.appearance.trailAuto") : t("settings.appearance.trailExpandAll")}
 						</button>
 					))}
 				</div>
 				<p className="settings-hint" style={{ marginTop: 4 }}>
-					Default view for tool trails. Applies to both active and finished runs.
+					{t("settings.appearance.trailHint")}
 				</p>
 			</div>
 			<div className="settings-field">
-				<label className="settings-label">Chat</label>
+				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -993,17 +981,16 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Swipe left/right opens sidebar
+					{t("settings.appearance.swipeSidebar")}
 				</label>
 				<p className="settings-hint" style={{ marginTop: 4 }}>
-					Touch screens: horizontal swipes open/collapse the sidebar. Turn off
-					if scrolling triggers it.
+					{t("settings.appearance.swipeSidebarHint")}
 				</p>
 			</div>
 
 			{/* ── Empty state — split-flap departure board ── */}
 			<div className="settings-field">
-				<label className="settings-label">Empty state</label>
+				<label className="settings-label">{t("settings.appearance.emptyState")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -1026,18 +1013,17 @@ export function AppearanceTab() {
 							cursor: "pointer",
 						}}
 					/>
-					Animated split-flap welcome
+					{t("settings.appearance.splitFlap")}
 				</label>
 				<p className="settings-hint" style={{ marginTop: 4 }}>
-					Airport-style departure board centered in an empty chat. Off → classic
-					“send a message” welcome.
+					{t("settings.appearance.splitFlapHint")}
 				</p>
 
 				{flapEnabled && (
 					<>
 						<div style={{ marginTop: 10 }}>
 							<label className="settings-label" style={{ fontSize: 12 }}>
-								Phrases (comma-separated)
+								{t("settings.appearance.splitFlapPhrases")}
 							</label>
 							<input
 								value={flapWordsDraft}
@@ -1047,51 +1033,11 @@ export function AppearanceTab() {
 									if (e.key === "Enter") saveFlapWords(flapWordsDraft);
 								}}
 								className="settings-input"
-								placeholder="PI-KOT 0.1.38, PI-SDK 0.84.2"
+								placeholder="PI-KOT 0.1.39, PI-SDK 0.87.1"
 							/>
 							<p className="settings-hint" style={{ marginTop: 4 }}>
-								Board flips between phrases. Enter or click away to apply (shown
-								in caps on the board).
+								{t("settings.appearance.splitFlapPhrasesHint")}
 							</p>
-						</div>
-
-						<div
-							style={{
-								display: "flex",
-								alignItems: "center",
-								gap: 10,
-								marginTop: 10,
-							}}
-						>
-							<input
-								type="range"
-								min={14}
-								max={64}
-								value={flapSize}
-								onChange={(e) => {
-									const v = Number(e.target.value);
-									setFlapSize(v);
-									zSetFlapSize(v);
-								}}
-								onPointerUp={() => saveFlapSize(flapSize)}
-								onKeyUp={() => saveFlapSize(flapSize)}
-								onBlur={() => saveFlapSize(flapSize)}
-								style={{
-									flex: 1,
-									accentColor: "var(--accent)",
-									cursor: "pointer",
-								}}
-							/>
-							<span
-								style={{
-									fontSize: 12,
-									color: "var(--text-secondary)",
-									minWidth: 34,
-									textAlign: "right",
-								}}
-							>
-								{flapSize}px
-							</span>
 						</div>
 
 						{/* Live preview */}
@@ -1116,7 +1062,7 @@ export function AppearanceTab() {
 								flipsPerChar={7}
 								gap={4}
 								tileRadius={6}
-								fontSize={Math.min(flapSize, 24)}
+								fontSize={14}
 							/>
 						</div>
 					</>

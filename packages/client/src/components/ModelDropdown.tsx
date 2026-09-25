@@ -7,6 +7,7 @@ import {
   type ProviderGroup,
   type ModelInfo,
 } from "../lib/api-client";
+import { formatModelDisplayName } from "../lib/model-name";
 
 interface Props {
   sessionId: string | undefined;
@@ -140,13 +141,14 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError, compact 
 
   const selectedOption = options.find((o) => o.value === selected);
 
+  const selectedName = selectedOption?.name ?? defaultModel?.modelId ?? "default";
   const triggerLabel =
     compact
-      ? (selectedOption?.name ?? defaultModel?.modelId ?? "default").slice(0, 20)
+      ? formatModelDisplayName(selectedName).slice(0, 20)
       : selectedOption !== undefined
-        ? `${selectedOption.provider} / ${selectedOption.name}`
+        ? `${selectedOption.provider} / ${formatModelDisplayName(selectedOption.name)}`
         : defaultModel !== undefined && defaultModel.provider.length > 0 && defaultModel.modelId.length > 0
-          ? `${defaultModel.provider} / ${defaultModel.modelId} (default)`
+          ? `${defaultModel.provider} / ${formatModelDisplayName(defaultModel.modelId)} (default)`
           : "default model";
 
   const commit = (idx: number): void => {
@@ -278,7 +280,9 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError, compact 
                 >
                   <span className="model-dropdown-item-main">
                     <span className="model-dropdown-provider">{opt.provider}</span>
-                    <span className="model-dropdown-name">{opt.name}</span>
+                    <span className="model-dropdown-name" title={opt.name}>
+                      {formatModelDisplayName(opt.name)}
+                    </span>
                   </span>
                   {!opt.hasAuth && (
                     <span className="model-dropdown-warn">⚠</span>

@@ -194,6 +194,10 @@ describe("buildGroupedTurn", () => {
 		).toEqual(["edit"]);
 		expect(turn.customTools).toHaveLength(1);
 		expect(turn.customTools[0]!.name).toBe("javascript_repl");
+		expect(turn.items).toHaveLength(3);
+		expect(turn.items[0]?.kind).toBe("segment");
+		expect(turn.items[1]?.kind).toBe("customTool");
+		expect(turn.items[2]?.kind).toBe("segment");
 	});
 
 	it("collects non-assistant role messages as specials", () => {

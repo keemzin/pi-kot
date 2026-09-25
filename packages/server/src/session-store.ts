@@ -6,10 +6,12 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { compactionContinuationExtension } from "./compaction-continuation.js";
+import { planModeExtension } from "./plan-mode-extension.js";
 import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { createPlanModeQuestionTool } from "./ask-user-question/plan-mode-question-tool.js";
+import { createSubmitPlanTool } from "./ask-user-question/submit-plan-tool.js";
 import { join, basename } from "node:path";
 import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
@@ -50,11 +52,18 @@ export async function buildResourceLoader(
       appendSystemPrompt.push(webUiContext);
     }
   }
+
+  const skillOverrides = await readSkillOverrides();
+
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: config.piConfigDir,
-    extensionFactories: [compactionContinuationExtension],
+    extensionFactories: [compactionContinuationExtension, planModeExtension],
     appendSystemPrompt,
+    skillsOverride: (base) => ({
+      skills: base.skills.filter((s) => isSkillEffective(skillOverrides, projectId, s.name)),
+      diagnostics: base.diagnostics,
+    }),
   });
   await loader.reload();
   return loader;
@@ -71,6 +80,7 @@ import {
   isGloballyEnabled as mcpIsGloballyEnabled,
 } from "./mcp/manager.js";
 import { filterEnabledTools, readToolOverrides, isToolEffective } from "./tool-policy.js";
+import { readSkillOverrides, isSkillEffective } from "./skill-policy.js";
 
 /**
  * Build the ExtensionBindings for a session with real command context
@@ -133,6 +143,8 @@ export interface LiveSession {
   unsubscribe: () => void;
   /** The session name set via appendSessionInfo, if any. */
   name: string | undefined;
+  /** In-memory plan mode toggle state. */
+  planModeActive?: boolean;
   /** Abort handle for the currently executing !cmd / !!cmd stream. */
   currentExecAbort: (() => void) | undefined;
 }
@@ -258,6 +270,7 @@ export async function createSession(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
@@ -265,12 +278,18 @@ export async function createSession(
   registerArtifactCwd(workspacePath);
 
   const resourceLoader = await buildResourceLoader(workspacePath, projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    projectId,
+    workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Trigger session_start event and wire real command context actions
@@ -555,6 +574,8 @@ async function buildToolsAllowlist(
   // orchestration) are treated as "builtin"; MCP tools remain "mcp".
   const builtinCustomToolNames = new Set<string>([
     "ask_user_question",
+    "plan_mode_question",
+    "submit_plan",
     ...BUILTIN_TOOL_NAMES,
   ]);
 
@@ -596,6 +617,7 @@ export async function rebuildSessionTools(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
@@ -775,16 +797,23 @@ export async function resumeSessionById(
     ...mcpTools,
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
+    createSubmitPlanTool(sessionId),
     ...orchestrationTools,
   ];
 
   const resourceLoader = await buildResourceLoader(loc.workspacePath, loc.projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    loc.projectId,
+    loc.workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: loc.workspacePath,
     sessionManager,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Wire real command context actions (navigateTree, etc.) so
@@ -889,16 +918,23 @@ export async function forkSession(
     ...mcpTools,
     createAskUserQuestionTool(forkedId),
     createPlanModeQuestionTool(forkedId),
+    createSubmitPlanTool(forkedId),
     ...orchestrationTools,
   ];
 
   const resourceLoader = await buildResourceLoader(sourceLive.workspacePath, sourceLive.projectId);
+  const toolsAllowlist = await buildToolsAllowlist(
+    customTools,
+    sourceLive.projectId,
+    sourceLive.workspacePath,
+  );
   const { session } = await createAgentSession({
     cwd: sourceLive.workspacePath,
     sessionManager: forkedSM,
     agentDir: config.piConfigDir,
     customTools,
     resourceLoader,
+    tools: toolsAllowlist,
   });
 
   // Wire real command context actions (navigateTree, etc.) so

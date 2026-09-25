@@ -34,6 +34,7 @@ import {
   REASONING_LEVELS,
   type ReasoningLevel,
 } from "../lib/api-client";
+import { useI18n } from "../hooks/useI18n";
 
 // ── Styles ──────────────────────────────────────────────────────────
 
@@ -214,7 +215,7 @@ const STATUS_COLORS: Record<string, string> = {
   missing: "var(--red, #ef4444)",
 };
 
-const CATEGORY_LABELS: Record<string, string> = {
+const CATEGORIES: Record<string, string> = {
   orchestration: "🎯 Orchestration",
   tools: "🛠️ Tools & Integrations",
   productivity: "⚡ Productivity",
@@ -263,6 +264,7 @@ function RecommendedExtCard({
   projectPath?: string;
   onInstall: (scope: "user" | "project") => void;
 }) {
+  const { t } = useI18n();
   const hasProject = projectPath !== undefined && projectPath.length > 0;
   const [scope, setScope] = useState<"user" | "project">(hasProject ? "project" : "user");
   const canBeProject = hasProject;
@@ -377,7 +379,7 @@ function RecommendedExtCard({
         }}
         disabled={installing || alreadyInstalled}
       >
-        {installing ? "…" : alreadyInstalled ? (scope === "project" ? `Installed (project)` : "Installed") : "Install"}
+        {installing ? t("settings.packages.installing") : alreadyInstalled ? (scope === "project" ? t("settings.packages.installedProject") : t("settings.packages.installedGlobal")) : t("settings.packages.installAction")}
       </button>
     </div>
   );
@@ -410,6 +412,7 @@ function PackageCard({
   onUninstall: () => void;
   onUpdate: (pkgSource: string) => void;
 }) {
+  const { t } = useI18n();
   const key = `${pkg.scope}\0${pkg.source}`;
   const hasResources = pkg.resources.length > 0;
 
@@ -487,7 +490,7 @@ function PackageCard({
               disabled={updating === pkgUpdate.package}
               title={`Update: ${pkgUpdate.installed} → ${pkgUpdate.latest}`}
             >
-              {updating === pkgUpdate.package ? "…" : "Update"}
+              {updating === pkgUpdate.package ? "…" : t("settings.packages.update")}
             </button>
           )}
 
@@ -499,7 +502,7 @@ function PackageCard({
             }}
             disabled={busy}
           >
-            {pkg.disabled ? "Enable" : "Disable"}
+            {pkg.disabled ? t("settings.packages.enable") : t("settings.packages.disable")}
           </button>
 
           <button
@@ -510,7 +513,7 @@ function PackageCard({
             }}
             disabled={uninstalling === pkg.source}
           >
-            {uninstalling === pkg.source ? "…" : "Uninstall"}
+            {uninstalling === pkg.source ? "…" : t("settings.packages.uninstall")}
           </button>
         </div>
       </div>
@@ -569,6 +572,7 @@ interface Props {
 }
 
 export function PackagesTab({ onError, projectPath }: Props) {
+  const { t } = useI18n();
   // ── SDK packages ──
   const [sdkData, setSdkData] = useState<SdkPackagesResponse | undefined>();
   const [extData, setExtData] = useState<ExtensionsResponse | null>(null);
@@ -695,7 +699,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
   };
 
   const handleUninstall = async (pkg: SdkPackageInfo) => {
-    if (!confirm(`Uninstall "${pkg.packageName || pkg.source}"?`)) return;
+    if (!confirm(`${t("settings.packages.uninstallConfirm")} "${pkg.packageName || pkg.source}"?`)) return;
     setUninstalling(pkg.source);
     onError(undefined);
     try {
@@ -836,16 +840,15 @@ export function PackagesTab({ onError, projectPath }: Props) {
 
       {/* ── Install ── */}
       <div style={s.section}>
-        <div style={s.heading}>📥 Install Package</div>
+        <div style={s.heading}>{t("settings.packages.install")}</div>
         <div style={s.subheading}>
-          Install from npm (<code>npm:@org/package</code>), git (<code>git:github.com/...</code>),
-          or a local path.
+          {t("settings.packages.installSubheading")}
         </div>
 
         {/* Primary install row */}
         <div style={s.installBox}>
           <div style={{ flex: 1 }}>
-            <div style={s.label}>Package source</div>
+            <div style={s.label}>{t("settings.packages.packageSource")}</div>
             <input
               style={s.installInput}
               placeholder="npm:@org/package"
@@ -879,7 +882,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
             onClick={() => void handleInstall(installSource)}
             disabled={installing !== null || !installSource.trim()}
           >
-            {installing ? "Installing…" : "Install"}
+            {installing ? t("settings.packages.installing") : t("settings.packages.installAction")}
           </button>
         </div>
 
@@ -913,7 +916,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
               onClick={() => void handleManualInstall()}
               disabled={installing !== null || !manualInput.trim()}
             >
-              pi install
+              {t("settings.packages.piInstall")}
             </button>
           </div>
         </details>
@@ -922,7 +925,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
       {/* ── Package cards (grouped by scope) ── */}
       {sdkData && sdkData.packages.length === 0 && !extData?.detected.length && (
         <div style={s.empty}>
-          No extension packages configured yet.
+          {t("settings.packages.noPackages")}
         </div>
       )}
 
@@ -937,7 +940,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
               <div style={s.section}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                    🌐 Global scope
+                    🌐 {t("settings.packages.globalScope")}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)" }}>
                     ~/.pi/agent/
@@ -967,10 +970,10 @@ export function PackagesTab({ onError, projectPath }: Props) {
               <div style={s.section}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-                    📁 Project scope
+                    📁 {t("settings.packages.projectScope")}
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-dim)", fontFamily: "var(--font-mono)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {projectPath?.replace(/^\/[^/]+\/[^/]+/, "~") ?? "unknown"}
+                    {projectPath?.replace(/^\/[^/]+\/[^/]+/, "~") ?? t("settings.packages.unknown")}
                   </div>
                 </div>
                 {projectPkgs.map((pkg) => (
@@ -998,9 +1001,9 @@ export function PackagesTab({ onError, projectPath }: Props) {
       {/* ── Recommended ── */}
       {extData && extData.recommended.length > 0 && (
         <div style={s.section}>
-          <div style={s.heading}>💎 Recommended</div>
+          <div style={s.heading}>{t("settings.packages.recommended")}</div>
           <div style={s.subheading}>
-            Curated extensions optimised for pi-kot.
+            {t("settings.packages.recommendedSubheading")}
           </div>
           {groupByCategory(extData.recommended).map(([cat, items]) => (
             <div key={cat} style={{ marginBottom: 12 }}>
@@ -1013,7 +1016,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
                   padding: "0 4px",
                 }}
               >
-                {CATEGORY_LABELS[cat] ?? cat}
+                {CATEGORIES[cat] ?? cat}
               </div>
               {items.map((ext) => {
                 const matchedPkg = sdkData?.packages.find(
@@ -1044,25 +1047,25 @@ export function PackagesTab({ onError, projectPath }: Props) {
 
       {/* ── Update check ── */}
       <div style={s.section}>
-        <div style={s.heading}>🔄 Updates</div>
+        <div style={s.heading}>{t("settings.packages.updates")}</div>
         <button
           style={s.actionBtn}
           onClick={() => void handleCheckUpdates()}
           disabled={checkingUpdates}
         >
-          {checkingUpdates ? "Checking…" : "Check Updates"}
+          {checkingUpdates ? t("settings.packages.checking") : t("settings.packages.checkUpdates")}
         </button>
 
         {hasUpdates && (
           <div style={{ marginTop: 8, fontSize: 11, color: "var(--text-dim)" }}>
-            {updates!.filter((u) => u.updateAvailable).length} update(s) available.
-            Use the <strong>Update</strong> button on each package card above.
+            {updates!.filter((u) => u.updateAvailable).length} {t("settings.packages.updatesAvailable")}.
+            {t("settings.packages.useUpdateButton")}
           </div>
         )}
 
         {updates && !hasUpdates && (
           <div style={{ marginTop: 8, fontSize: 11, color: "#34d399" }}>
-            All packages are up to date.
+            {t("settings.packages.allUpToDate")}
           </div>
         )}
       </div>
@@ -1078,20 +1081,19 @@ export function PackagesTab({ onError, projectPath }: Props) {
             }}
           >
             <div>
-              <div style={s.heading}>👁️ Vision Tool Settings</div>
+              <div style={s.heading}>{t("settings.packages.visionTool")}</div>
               <div style={s.subheading}>
-                Select which provider/model to delegate image analysis to.{" "}
-                <code style={{ fontSize: 10 }}>describe_image</code> will route to this model.
+                {t("settings.packages.visionToolSubheading")}
               </div>
             </div>
-            <span style={s.badge}>pi-vision-tool detected</span>
+            <span style={s.badge}>{t("settings.packages.visionToolDetected")}</span>
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "end", marginTop: 8, flexWrap: "wrap" }}>
             {/* Provider */}
             <div style={{ flex: 1, minWidth: 120 }}>
               <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
-                Provider
+                {t("settings.packages.provider")}
               </div>
               <select
                 style={{ ...SELECT_STYLE, width: "100%" }}
@@ -1101,7 +1103,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
                 }
                 disabled={visionCfgSaving}
               >
-                <option value="">— auto —</option>
+                <option value="">— {t("settings.packages.auto")} —</option>
                 {visionProviders.map((g) => (
                   <option key={g.provider} value={g.provider}>{g.provider}</option>
                 ))}
@@ -1111,7 +1113,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
             {/* Model */}
             <div style={{ flex: 1, minWidth: 120 }}>
               <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
-                Model
+                {t("settings.packages.model")}
               </div>
               <select
                 style={{ ...SELECT_STYLE, width: "100%" }}
@@ -1121,7 +1123,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
                 }
                 disabled={visionCfgSaving}
               >
-                <option value="">— auto —</option>
+                <option value="">— {t("settings.packages.auto")} —</option>
                 {visionProviders
                   .find((g) => g.provider === visionConfig.provider)
                   ?.models?.filter((m) => m.input?.includes("image"))
@@ -1134,7 +1136,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
             {/* Max dimension */}
             <div>
               <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
-                Max dimension
+                {t("settings.packages.maxDimension")}
               </div>
               <input
                 style={INPUT_STYLE}
@@ -1154,7 +1156,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
             {/* JPEG quality */}
             <div>
               <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
-                JPEG quality
+                {t("settings.packages.jpegQuality")}
               </div>
               <input
                 style={INPUT_STYLE}
@@ -1174,7 +1176,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
             {/* Reasoning effort */}
             <div>
               <div style={{ fontSize: 10, color: "var(--text-dim)", marginBottom: 4 }}>
-                Reasoning
+                {t("settings.packages.reasoning")}
               </div>
               <select
                 style={SELECT_STYLE}
@@ -1217,7 +1219,7 @@ export function PackagesTab({ onError, projectPath }: Props) {
                   }
                   disabled={visionCfgSaving}
                 />
-                Enabled
+                {t("settings.packages.enabledStatus")}
               </label>
             </div>
           </div>
@@ -1226,10 +1228,9 @@ export function PackagesTab({ onError, projectPath }: Props) {
 
       {/* ── Reload ── */}
       <div style={s.section}>
-        <div style={s.heading}>🔄 Agent Reload</div>
+        <div style={s.heading}>{t("settings.packages.agentReload")}</div>
         <div style={s.subheading}>
-          Reload the pi agent configuration (MCP + extension cache) after installing
-          or updating extensions.
+          {t("settings.packages.agentReloadSubheading")}
         </div>
         <button
           onClick={() => void handleReload()}

@@ -1,6 +1,6 @@
 {
   "name": "pi-kot-monorepo",
-  "version": "0.1.38",
+  "version": "0.1.39",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@ayulab/pi-rewind": "^0.3.1",
-    "@earendil-works/pi-agent-core": "^0.84.2",
-    "@earendil-works/pi-ai": "^0.84.2",
-    "@earendil-works/pi-coding-agent": "^0.84.2"
+    "@earendil-works/pi-agent-core": "^0.87.1",
+    "@earendil-works/pi-ai": "^0.87.1",
+    "@earendil-works/pi-coding-agent": "^0.87.1"
   }
 }

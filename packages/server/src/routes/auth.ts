@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { FastifyPluginAsync } from "fastify";
@@ -77,14 +77,22 @@ function readSdkVersion(): string {
  */
 function readServerVersion(): string {
   try {
-    const pkgPath = resolve(
-      dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "..",
-      "package.json",
-    );
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-    return pkg.version ?? "0.0.0";
+    let currentDir = dirname(fileURLToPath(import.meta.url));
+    while (currentDir !== "/" && currentDir !== ".") {
+      const pkgPath = resolve(currentDir, "package.json");
+      if (existsSync(pkgPath)) {
+        const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
+        if (pkg.name === "@pi-kot/server") {
+          currentDir = resolve(currentDir, "..");
+          continue;
+        }
+        if (pkg.name === "pi-kot" || pkg.name === "pi-kot-monorepo") {
+          return pkg.version ?? "0.0.0";
+        }
+      }
+      currentDir = resolve(currentDir, "..");
+    }
+    return "0.0.0";
   } catch {
     return "0.0.0";
   }

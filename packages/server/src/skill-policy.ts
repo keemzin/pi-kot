@@ -33,26 +33,38 @@ interface ProjectSkillOverrides {
   disable: string[];
 }
 
-interface SkillOverrides {
+export interface SkillOverrides {
+  disableAll?: boolean;
   global: string[];
   projects: Record<string, ProjectSkillOverrides>;
 }
 
 function empty(): SkillOverrides {
-  return { global: [], projects: {} };
+  return { disableAll: false, global: [], projects: {} };
+}
+
+let overrideFilePath: string | undefined;
+
+export function _setSkillOverridesFileForTesting(path: string | undefined): void {
+  overrideFilePath = path;
+}
+
+function getFilePath(): string {
+  return overrideFilePath ?? config.skillOverridesFile;
 }
 
 async function ensureDir(): Promise<void> {
-  await mkdir(dirname(config.skillOverridesFile), { recursive: true });
+  await mkdir(dirname(getFilePath()), { recursive: true });
 }
 
 async function readSkillOverrides(): Promise<SkillOverrides> {
   try {
-    const raw = await readFile(config.skillOverridesFile, "utf8");
+    const raw = await readFile(getFilePath(), "utf8");
     if (raw.trim().length === 0) return empty();
     const parsed = JSON.parse(raw) as SkillOverrides;
     if (typeof parsed !== "object" || parsed === null) return empty();
     return {
+      disableAll: Boolean(parsed.disableAll),
       global: Array.isArray(parsed.global) ? parsed.global : [],
       projects:
         typeof parsed.projects === "object" && parsed.projects !== null
@@ -67,7 +79,7 @@ async function readSkillOverrides(): Promise<SkillOverrides> {
 
 async function writeSkillOverrides(data: SkillOverrides): Promise<void> {
   await ensureDir();
-  const path = config.skillOverridesFile;
+  const path = getFilePath();
   const tmp = `${path}.${randomUUID()}.tmp`;
   await writeFile(tmp, JSON.stringify(data, null, 2), { mode: 0o600 });
   try {
@@ -84,12 +96,27 @@ async function writeSkillOverrides(data: SkillOverrides): Promise<void> {
 }
 
 /**
+ * Set the global enabled/disabled state for all skills at once.
+ */
+export async function setAllSkillsEnabled(enabled: boolean): Promise<void> {
+  const data = await readSkillOverrides();
+  data.disableAll = !enabled;
+  if (enabled) {
+    data.global = [];
+  }
+  await writeSkillOverrides(data);
+}
+
+/**
  * Set the global enabled/disabled state for a skill.
  * - `enabled = true`  → removes the skill name from the global disabled list
  * - `enabled = false` → adds the skill name to the global disabled list
  */
 export async function setSkillEnabled(name: string, enabled: boolean): Promise<void> {
   const data = await readSkillOverrides();
+  if (enabled && data.disableAll) {
+    data.disableAll = false;
+  }
   const idx = data.global.indexOf(name);
   if (enabled && idx !== -1) {
     data.global.splice(idx, 1);
@@ -102,7 +129,7 @@ export async function setSkillEnabled(name: string, enabled: boolean): Promise<v
 /**
  * Check whether a skill is effectively enabled for a given project.
  * - Per-project override takes precedence
- * - Falls back to global setting (not in global disabled list)
+ * - Falls back to global setting (not in global disabled list, and disableAll is not active)
  */
 export function isSkillEffective(
   data: SkillOverrides,
@@ -115,6 +142,9 @@ export function isSkillEffective(
       if (proj.enable.includes(name)) return true;
       if (proj.disable.includes(name)) return false;
     }
+  }
+  if (data.disableAll) {
+    return false;
   }
   return !data.global.includes(name);
 }
@@ -194,4 +224,4 @@ export async function clearProjectSkillOverrides(projectId: string): Promise<voi
   await writeSkillOverrides(data);
 }
 
-export { readSkillOverrides };
+export { readSkillOverrides, writeSkillOverrides };
