@@ -2359,6 +2359,35 @@ strong {
 	gap: 10px;
 }
 
+.header-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm, 6px);
+	color: var(--text-dim);
+	cursor: pointer;
+	line-height: 1;
+	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+	flex-shrink: 0;
+}
+
+.header-btn:hover {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover);
+	border-color: var(--border);
+}
+
+.header-btn.active {
+	color: var(--accent-text);
+	background: var(--accent-subtle);
+	border-color: var(--accent-subtle-border, transparent);
+}
+
 /* ── Mobile header overflow ── */
 @media (max-width: 600px) {
 	.desktop-only {
@@ -6313,10 +6342,82 @@ strong {
 	opacity: 0.35;
 }
 
-/* ══ Viewer tab close button ── */
+/* ══ Viewer tab and action buttons ── */
+.viewer-back-btn,
+.viewer-close-all-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	background: transparent;
+	border: 1px solid transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+	border-radius: var(--radius-xs, 4px);
+	transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+	flex-shrink: 0;
+}
+
+.viewer-back-btn:hover,
+.viewer-close-all-btn:hover {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover);
+	border-color: var(--border);
+}
+
+.viewer-tab-item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px 3px 10px;
+	height: 28px;
+	font-size: 12px;
+	white-space: nowrap;
+	border-radius: var(--radius-xs, 4px);
+	background: transparent;
+	color: var(--text-secondary);
+	border: 1px solid transparent;
+	cursor: pointer;
+	min-width: 0;
+	flex-shrink: 0;
+	transition: all 0.15s ease;
+}
+
+.viewer-tab-item:hover:not(.active) {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover);
+}
+
+.viewer-tab-item.active {
+	font-weight: 500;
+	background: var(--bg-card, rgba(255, 255, 255, 0.08));
+	color: var(--text-primary);
+	border-color: var(--border);
+}
+
+.viewer-tab-close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	padding: 0;
+	background: transparent;
+	border: none;
+	color: var(--text-dim);
+	cursor: pointer;
+	border-radius: 3px;
+	opacity: 0.5;
+	transition: all 0.12s ease;
+	flex-shrink: 0;
+}
+
 .viewer-tab-close:hover {
 	opacity: 1 !important;
-	background: var(--bg-glass);
+	color: var(--text-primary);
+	background: var(--bg-glass-hover, rgba(255, 255, 255, 0.15));
 }
 
 /* ══ Main content row (chat + viewer + explorer) ── */
@@ -6349,19 +6450,27 @@ strong {
 		display: none !important;
 	}
 
-	/* Bigger tab bar for touch */
-	.fe-tab-bar button {
-		padding: 12px 16px !important;
-		font-size: 14px !important;
+	/* Bigger tab buttons for touch */
+	.fe-tab-bar .fe-tab-btn {
+		padding: 10px 14px !important;
+		font-size: 13px !important;
 	}
 }
 
 /* ── File explorer tab buttons ── */
+.fe-tab-bar {
+	height: 38px;
+	min-height: 38px;
+	box-sizing: border-box;
+}
+
 .fe-tab-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
-	padding: 8px 10px;
+	gap: 6px;
+	height: 38px;
+	box-sizing: border-box;
+	padding: 0 10px;
 	border: none;
 	background: transparent;
 	color: var(--text-dim);
@@ -6374,12 +6483,11 @@ strong {
 		color var(--duration) var(--ease),
 		border-color var(--duration) var(--ease),
 		background var(--duration) var(--ease);
-	border-radius: var(--radius-xs) var(--radius-xs) 0 0;
 	white-space: nowrap;
 }
 
 .fe-tab-btn:hover {
-	color: var(--text-secondary);
+	color: var(--text-primary);
 	background: var(--bg-glass-hover);
 }
 
@@ -6387,6 +6495,7 @@ strong {
 	color: var(--accent-text);
 	border-bottom-color: var(--accent);
 	background: transparent;
+	font-weight: 600;
 }
 
 /* Label hidden by default — show if panel is wide enough */
@@ -6394,7 +6503,7 @@ strong {
 	display: none;
 }
 
-@media (min-width: 400px) {
+@media (min-width: 380px) {
 	.fe-tab-label {
 		display: inline;
 	}
@@ -6406,13 +6515,14 @@ strong {
 	justify-content: center;
 	width: 26px;
 	height: 26px;
-	border: none;
+	border: 1px solid transparent;
 	background: transparent;
 	color: var(--text-dim);
 	cursor: pointer;
-	border-radius: var(--radius-xs);
+	border-radius: var(--radius-xs, 4px);
 	transition:
 		color var(--duration) var(--ease),
+		border-color var(--duration) var(--ease),
 		background var(--duration) var(--ease);
 	flex-shrink: 0;
 }
@@ -6420,6 +6530,7 @@ strong {
 .fe-tab-close:hover {
 	color: var(--text-primary);
 	background: var(--bg-glass-hover);
+	border-color: var(--border);
 }
 
 /* ── File explorer toolbar icon buttons ── */
@@ -6429,13 +6540,14 @@ strong {
 	justify-content: center;
 	width: 26px;
 	height: 26px;
-	border: none;
+	border: 1px solid transparent;
 	background: transparent;
 	color: var(--text-dim);
 	cursor: pointer;
-	border-radius: var(--radius-xs);
+	border-radius: var(--radius-xs, 4px);
 	transition:
 		color var(--duration) var(--ease),
+		border-color var(--duration) var(--ease),
 		background var(--duration) var(--ease);
 	flex-shrink: 0;
 }
@@ -6443,6 +6555,7 @@ strong {
 .fe-toolbar-btn:hover:not(:disabled) {
 	color: var(--text-primary);
 	background: var(--bg-glass-hover);
+	border-color: var(--border);
 }
 
 .fe-toolbar-btn:disabled {

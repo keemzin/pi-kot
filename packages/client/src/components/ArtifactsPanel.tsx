@@ -8,11 +8,7 @@ import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore } from "../stores/session-store";
 import { listArtifacts, type ArtifactFileInfo } from "../lib/api-client";
 import { useI18n } from "../hooks/useI18n";
-
-const ARTIFACT_ICONS: Record<string, string> = {
-  html: "◈", svg: "◇", markdown: "📝", json: "{}", text: "¶", image: "🖼",
-  css: "#", js: "⚡", ts: "TS", unknown: "📄",
-};
+import { getFileTypeIcon } from "./FileIcon";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -157,8 +153,8 @@ export function ArtifactsPanel() {
                 }}
                 title={item.title}
               >
-                <span style={{ flexShrink: 0, fontSize: 14, lineHeight: 1 }}>
-                  {ARTIFACT_ICONS[item.type] ?? "◈"}
+                <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                  {getFileTypeIcon(item.title || item.type, 14)}
                 </span>
                 <span
                   style={{
@@ -278,8 +274,8 @@ export function ArtifactsPanel() {
                 onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-glass-strong, rgba(255,255,255,0.05))")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                <span style={{ flexShrink: 0, fontSize: 14, lineHeight: 1 }}>
-                  {ARTIFACT_ICONS[file.type] ?? "📄"}
+                <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                  {getFileTypeIcon(file.name ?? file.type, 14)}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div

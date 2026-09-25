@@ -90,27 +90,29 @@ export const FileEditor = memo(function FileEditor({
         >
           {/* Left section: Path & seamless Raw/Rendered segmented toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
-            {/* File Path */}
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "5px",
-                minWidth: 0,
-                color: "var(--text-dim)",
-                fontSize: "11px",
-              }}
-              title={path}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, opacity: 0.65 }}>
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {pathDir && <span style={{ opacity: 0.55 }}>{pathDir}/</span>}
-                <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{pathBase}</span>
-              </span>
-            </div>
+            {/* Directory Breadcrumb (only when file is in a subfolder, since the tab already displays the filename) */}
+            {pathDir ? (
+              <>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    minWidth: 0,
+                    color: "var(--text-dim)",
+                    fontSize: "11px",
+                  }}
+                  title={path}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", opacity: 0.7 }}>
+                    {pathDir} /
+                  </span>
+                </div>
+                {isRenderable && (
+                  <span style={{ width: "1px", height: "14px", background: "var(--border)", flexShrink: 0, margin: "0 2px" }} />
+                )}
+              </>
+            ) : null}
 
             {/* Redesigned Raw / Rendered Toggle on the left (only for markdown/html/svg) */}
             {isRenderable && (

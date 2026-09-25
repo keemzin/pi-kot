@@ -6,6 +6,7 @@ import { ArtifactsPanel } from "./ArtifactsPanel";
 import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesBatchDelete, filesBatchMove, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
+import { getFileTypeIcon } from "./FileIcon";
 
 interface TreeNode {
   name: string;
@@ -749,11 +750,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               </svg>
             </button>
           ) : (
-            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", flexShrink: 0, color: "var(--text-dim)" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                <polyline points="13 2 13 9 20 9" />
-              </svg>
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "20px", height: "20px", flexShrink: 0 }}>
+              {getFileTypeIcon(node.name, 15)}
             </span>
           )}
 
@@ -897,12 +895,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
         display: "flex", borderBottom: "1px solid var(--border)",
         background: "var(--bg-glass)", flexShrink: 0,
         alignItems: "center", padding: "0 6px", gap: "2px",
+        height: "38px", minHeight: "38px", boxSizing: "border-box",
       }}>
         {(
           [
-            { key: "files",         label: "Files",    icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); } },
-            { key: "git",           label: "Git",      icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
-            { key: "artifacts",     label: "Artifacts",icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
+            { key: "files",         label: "Files",    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); } },
+            { key: "git",           label: "Git",      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
+            { key: "artifacts",     label: "Artifacts",icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
           ] as { key: string; label: string; icon: React.ReactNode; onClick: () => void }[]
         ).map(({ key, label, icon, onClick }) => (
           <button
@@ -916,18 +915,94 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             <span className="fe-tab-label">{label}</span>
           </button>
         ))}
+
+        {/* When in Files tab: action icons integrated directly into the tab bar */}
+        {tab === "files" && (
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1px" }}>
+            {/* Multi-select toggle */}
+            <button
+              onClick={() => {
+                const next = !selectMode;
+                setSelectMode(next);
+                if (!next) {
+                  clearSelection();
+                }
+              }}
+              title={selectMode ? "Exit selection mode" : "Select multiple files"}
+              className={`fe-toolbar-btn${selectMode ? " fe-toolbar-btn-active" : ""}`}
+              style={selectMode ? { color: "var(--accent)", background: "var(--accent-subtle)" } : undefined}
+              type="button"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 11 12 14 22 4"/>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+            </button>
+
+            {/* Upload files */}
+            <button onClick={() => uploadRef.current?.click()} title="Upload files" disabled={uploading} className="fe-toolbar-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </button>
+
+            {/* Upload folder */}
+            <button onClick={() => uploadFolderRef.current?.click()} title="Upload folder" disabled={uploading} className="fe-toolbar-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <polyline points="12 11 12 17"/>
+                <polyline points="9 14 12 11 15 14"/>
+              </svg>
+            </button>
+
+            {/* New file */}
+            <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" className="fe-toolbar-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="15" y2="15"/>
+              </svg>
+            </button>
+
+            {/* New folder */}
+            <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" className="fe-toolbar-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/>
+                <line x1="9" y1="14" x2="15" y2="14"/>
+              </svg>
+            </button>
+
+            {/* Refresh */}
+            <button onClick={loadTree} title="Refresh" className="fe-toolbar-btn" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={loading ? { animation: "spin 1s linear infinite" } : undefined}>
+                <polyline points="23 4 23 10 17 10"/>
+                <polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+
+            <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 2px 0 3px", flexShrink: 0 }} />
+          </div>
+        )}
+
         {/* Close panel */}
-        <button
-          onClick={onClose}
-          title="Close panel"
-          type="button"
-          className="fe-tab-close"
-          style={{ marginLeft: "auto" }}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            title="Close panel"
+            type="button"
+            className="fe-tab-close"
+            style={{ marginLeft: tab === "files" ? "0" : "auto" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* ── Git tab ── */}
@@ -967,87 +1042,6 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             onChange={(e) => { handleUpload(e.target.files ? Array.from(e.target.files) : null); e.target.value = ""; }}
           />
 
-          {/* Header */}
-          <div style={{
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            padding: "8px 10px", borderBottom: "1px solid var(--border)",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-                Files
-              </span>
-              {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading…</span>}
-            </div>
-            <div style={{ display: "flex", gap: "1px", alignItems: "center" }}>
-              {/* Multi-select toggle */}
-              <button
-                onClick={() => {
-                  const next = !selectMode;
-                  setSelectMode(next);
-                  if (!next) {
-                    clearSelection();
-                  }
-                }}
-                title={selectMode ? "Exit selection mode" : "Select multiple files"}
-                className={`fe-toolbar-btn${selectMode ? " fe-toolbar-btn-active" : ""}`}
-                style={selectMode ? { color: "var(--accent)", background: "var(--accent-subtle)" } : undefined}
-                type="button"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 11 12 14 22 4"/>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                </svg>
-              </button>
-              {/* Divider */}
-              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
-              {/* Upload files */}
-              <button onClick={() => uploadRef.current?.click()} title="Upload files" disabled={uploading} className="fe-toolbar-btn" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-              </button>
-              {/* Upload folder */}
-              <button onClick={() => uploadFolderRef.current?.click()} title="Upload folder" disabled={uploading} className="fe-toolbar-btn" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                  <polyline points="12 11 12 17"/>
-                  <polyline points="9 14 12 11 15 14"/>
-                </svg>
-              </button>
-              {/* Divider */}
-              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
-              {/* New file */}
-              <button onClick={() => { setCreateParent(""); setShowCreate("file"); setCreateName(""); }} title="New file" className="fe-toolbar-btn" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14 2 14 8 20 8"/>
-                  <line x1="12" y1="18" x2="12" y2="12"/>
-                  <line x1="9" y1="15" x2="15" y2="15"/>
-                </svg>
-              </button>
-              {/* New folder */}
-              <button onClick={() => { setCreateParent(""); setShowCreate("folder"); setCreateName(""); }} title="New folder" className="fe-toolbar-btn" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                  <line x1="12" y1="11" x2="12" y2="17"/>
-                  <line x1="9" y1="14" x2="15" y2="14"/>
-                </svg>
-              </button>
-              {/* Divider */}
-              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
-              {/* Refresh */}
-              <button onClick={loadTree} title="Refresh" className="fe-toolbar-btn" type="button">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="23 4 23 10 17 10"/>
-                  <polyline points="1 20 1 14 7 14"/>
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
           {/* Error */}
           {error && (
             <div style={{ padding: "4px 12px", fontSize: "10px", color: "var(--error)", background: "rgba(248,113,113,0.08)", borderBottom: "1px solid var(--tool-border)" }}>
@@ -1057,16 +1051,59 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
           {/* Search */}
           <div style={{ padding: "6px 10px" }}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search files or code..."
-              style={{
-                width: "100%", background: "var(--bg-glass)", border: "1px solid var(--border)",
-                borderRadius: "var(--radius-sm)", padding: "4px 8px", fontSize: "12px",
-                color: "var(--text-primary)", outline: "none",
-              }}
-            />
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ position: "absolute", left: "8px", color: "var(--text-dim)", pointerEvents: "none" }}
+              >
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search files..."
+                style={{
+                  width: "100%",
+                  background: "var(--bg-glass)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  padding: "4px 8px 4px 26px",
+                  fontSize: "12px",
+                  color: "var(--text-primary)",
+                  outline: "none",
+                }}
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    right: "6px",
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-dim)",
+                    cursor: "pointer",
+                    padding: "2px",
+                    lineHeight: 1,
+                  }}
+                  title="Clear search"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Create dialog */}
@@ -1359,7 +1396,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               {contextMenu.node.type === "directory" ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
               ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                getFileTypeIcon(contextMenu.node.name, 13)
               )} {contextMenu.node.name}
             </div>
 
@@ -1369,7 +1406,12 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               onClick={(e) => { e.stopPropagation(); handleCopyRelativePath(contextMenu.node.path); }}
               style={contextMenuItemStyle}
             >
-              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📋</span>
+              <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
+              </span>
               <span>Copy Relative Path</span>
             </div>
 
@@ -1379,7 +1421,12 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               onClick={(e) => { e.stopPropagation(); handleCopyAbsolutePath(contextMenu.node.path); }}
               style={contextMenuItemStyle}
             >
-              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>📎</span>
+              <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </span>
               <span>Copy Absolute Path</span>
             </div>
 
@@ -1397,7 +1444,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               }}
               style={contextMenuItemStyle}
             >
-              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>⬇️</span>
+              <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+              </span>
               <span>{contextMenu.node.type === "directory" ? "Download as Zip" : "Download"}</span>
             </div>
 
@@ -1417,7 +1470,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 }}
                 style={contextMenuItemStyle}
               >
-                <span style={{ width: "16px", textAlign: "center", flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                 </span>
                 <span>New File</span>
@@ -1437,7 +1490,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 }}
                 style={contextMenuItemStyle}
               >
-                <span style={{ width: "16px", textAlign: "center", flexShrink: 0, display: "inline-flex", alignItems: "center" }}>
+                <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
                 </span>
                 <span>New Folder</span>
@@ -1456,7 +1509,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               }}
               style={contextMenuItemStyle}
             >
-              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>✏️</span>
+              <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                </svg>
+              </span>
               <span>Rename</span>
             </div>
 
@@ -1477,7 +1534,12 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 color: "var(--error)",
               }}
             >
-              <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>🗑</span>
+              <span style={{ width: "16px", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </span>
               <span>
                 {selectedPaths.size > 1 && selectedPaths.has(contextMenu.node.path)
                   ? `Delete ${selectedPaths.size} items`

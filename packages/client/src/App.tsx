@@ -908,7 +908,19 @@ export function App() {
               className="sidebar-toggle"
               title={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
             >
-              {sidebarCollapsed ? "☰" : "✕"}
+              {sidebarCollapsed ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="m14 9 3 3-3 3" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="m16 15-3-3 3-3" />
+                </svg>
+              )}
             </button>
             {activeSessionId !== undefined && (
               <>
@@ -930,36 +942,25 @@ export function App() {
                   type="button"
                   onClick={() => setShowTreePanel(true)}
                   title="Session tree (branching history)"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "var(--text-dim)",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                    padding: "3px 6px",
-                    borderRadius: "var(--radius-sm)",
-                    lineHeight: 1,
-                  }}
+                  className="header-btn"
                 >
-                  🌿
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="6" y1="3" x2="6" y2="15" />
+                    <circle cx="18" cy="6" r="3" />
+                    <circle cx="6" cy="18" r="3" />
+                    <path d="M18 9a9 9 0 0 1-9 9" />
+                  </svg>
                 </button>
                 {activeProjectId !== undefined && (
                   <button
                     type="button"
                     onClick={() => setShowPrompt((v) => !v)}
                     title="System prompt for this project"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: showPrompt ? "var(--accent-text)" : "var(--text-dim)",
-                      fontSize: "13px",
-                      cursor: "pointer",
-                      padding: "3px 6px",
-                      borderRadius: "var(--radius-sm)",
-                      lineHeight: 1,
-                    }}
+                    className={`header-btn${showPrompt ? " active" : ""}`}
                   >
-                    ✦
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" />
+                    </svg>
                   </button>
                 )}
               </>
@@ -974,52 +975,30 @@ export function App() {
               type="button"
               onClick={() => toggleExplorerTab("files")}
               title="File explorer"
-              style={{
-                background: "none",
-                border: "none",
-                color: explorerTab === "files" ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
+              className={`header-btn${explorerTab === "files" ? " active" : ""}`}
             >
-              📂
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+              </svg>
             </button>
 
             <button
               type="button"
               onClick={() => { setShowTerminal(true); setSidebarCollapsed(true); }}
               title="Terminal"
-              style={{
-                background: "none",
-                border: "none",
-                color: showTerminal ? "var(--accent-text)" : "var(--text-dim)",
-                fontSize: "12px",
-                cursor: "pointer",
-                padding: "3px 6px",
-                borderRadius: "var(--radius-sm)",
-                lineHeight: 1,
-              }}
+              className={`header-btn${showTerminal ? " active" : ""}`}
             >
-              &gt;_
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
             </button>
             <div className="header-overflow desktop-only">
               <button
                 type="button"
                 onClick={() => setShowMCP(true)}
                 title={t("sidebar.nav.mcp")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: showMCP ? "var(--accent-text)" : "var(--text-dim)",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  padding: "3px 6px",
-                  borderRadius: "var(--radius-sm)",
-                  lineHeight: 1,
-                }}
+                className={`header-btn${showMCP ? " active" : ""}`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -1031,35 +1010,24 @@ export function App() {
                 type="button"
                 onClick={() => setShowSettings(true)}
                 title={t("sidebar.nav.settings")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: showSettings ? "var(--accent-text)" : "var(--text-dim)",
-                  fontSize: "14px",
-                  cursor: "pointer",
-                  padding: "3px 6px",
-                  borderRadius: "var(--radius-sm)",
-                  lineHeight: 1,
-                }}
+                className={`header-btn${showSettings ? " active" : ""}`}
               >
-                ⚙
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
               </button>
               <button
                 type="button"
                 onClick={handleClearToken}
                 title={t("sidebar.nav.signOut")}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-dim)",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  padding: "3px 6px",
-                  borderRadius: "var(--radius-sm)",
-                  lineHeight: 1,
-                }}
+                className="header-btn"
               >
-                {t("sidebar.nav.signOut")}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
               </button>
             </div>
           </div>

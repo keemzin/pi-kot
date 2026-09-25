@@ -550,9 +550,17 @@ export function GitPanel({ projectId }: Props) {
         background: "var(--bg-glass)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 500, color: "var(--text-primary)", fontSize: "13px" }}>
-          <span style={{ fontWeight: 700 }}>
+          <span style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "5px" }}>
             {status?.branch ? (
-              <><span style={{ color: "var(--accent-text)" }}>⎇</span> {status.branch}</>
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent-text)", flexShrink: 0 }}>
+                  <line x1="6" y1="3" x2="6" y2="15"/>
+                  <circle cx="18" cy="6" r="3"/>
+                  <circle cx="6" cy="18" r="3"/>
+                  <path d="M18 9a9 9 0 0 1-9 9"/>
+                </svg>
+                <span>{status.branch}</span>
+              </>
             ) : "—"}
           </span>
           {status && status.files.length > 0 && (
@@ -561,10 +569,10 @@ export function GitPanel({ projectId }: Props) {
             </span>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
           <button
             onClick={toggleGitViewType}
-            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            className="fe-toolbar-btn"
             title={gitViewType === "split" ? "Switch to unified view" : "Switch to side-by-side view"}
             type="button"
           >
@@ -573,10 +581,14 @@ export function GitPanel({ projectId }: Props) {
           <button
             onClick={fetchStatus}
             title="Refresh"
-            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            className="fe-toolbar-btn"
             type="button"
           >
-            ↻
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={busy ? { animation: "spin 1s linear infinite" } : undefined}>
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -861,11 +873,18 @@ export function GitPanel({ projectId }: Props) {
                           style={{
                             background: "none", border: "none", cursor: "pointer",
                             fontSize: "10px", color: copied ? "var(--accent-text)" : "var(--text-dim)",
-                            padding: "1px 4px", opacity: 0.7,
+                            padding: "2px 4px", opacity: 0.8, display: "inline-flex", alignItems: "center",
                           }}
                           type="button"
                         >
-                          {copied ? "✓" : "📋"}
+                          {copied ? (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          ) : (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                          )}
                         </button>
                         <button
                           onClick={() => handleRemoveWorktree(w.path)}
