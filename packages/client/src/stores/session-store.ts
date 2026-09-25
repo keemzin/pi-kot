@@ -24,6 +24,7 @@ import { useAskUserQuestionStore } from "./ask-user-question-store";
 import { usePlanReviewStore } from "./plan-review-store";
 import { useExtensionUIStore } from "./extension-ui-store";
 import { useLayoutStore } from "./layout-store";
+import { useFavoriteStore } from "./favorite-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
@@ -1018,6 +1019,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 		const projectId = session?.projectId ?? state.activeProjectId;
 		try {
 			await archiveSessionAPI(sessionId, projectId);
+			useFavoriteStore.getState().unfavorite(sessionId);
 			const wasActive = get().activeSessionId === sessionId;
 			set((s) => ({
 				sessions: s.sessions.filter((sess) => sess.sessionId !== sessionId),

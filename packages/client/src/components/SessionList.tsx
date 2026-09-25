@@ -46,6 +46,7 @@ export function SessionList({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [favoritesCollapsed, setFavoritesCollapsed] = useState(false);
 
   const supervisors = useMemo(() => sessions.filter((s) => !s.supervisorId), [sessions]);
   const workers = useMemo(() => sessions.filter((s) => s.supervisorId), [sessions]);
@@ -64,36 +65,38 @@ export function SessionList({
     );
   }, [supervisors, q]);
 
-  // Paginate — always keep active session visible regardless of page
-  const truncated = !showAll && !q && filteredSupervisors.length > PAGE_SIZE;
-  const visibleSupervisors = truncated
-    ? filteredSupervisors.slice(0, PAGE_SIZE).includes(
-        filteredSupervisors.find((s) => s.sessionId === activeSessionId) ?? filteredSupervisors[0],
-      )
-      // active is within first page — just slice
-      ? filteredSupervisors.slice(0, PAGE_SIZE)
-      // active is beyond first page — show first PAGE_SIZE-1 + the active one
-      : [
-          ...filteredSupervisors.slice(0, PAGE_SIZE - 1),
-          filteredSupervisors.find((s) => s.sessionId === activeSessionId) ?? filteredSupervisors[PAGE_SIZE - 1],
-        ].filter(Boolean) as SessionSummary[]
-    : filteredSupervisors;
+  const { favorites: favIds, toggle: toggleFav, isFavorite, unfavorite: unfavoriteFav } = useFavoriteStore();
 
-  const hiddenCount = filteredSupervisors.length - visibleSupervisors.length;
-
-  const { favorites: favIds, toggle: toggleFav } = useFavoriteStore();
-  const { favSessions, normalSessions } = useMemo(() => {
+  // Separate supervisors into favorites and non-favorites across ALL matching supervisors
+  const { favSupervisors, nonFavSupervisors } = useMemo(() => {
     const fav: SessionSummary[] = [];
-    const normal: SessionSummary[] = [];
-    for (const s of visibleSupervisors) {
-      if (favIds.includes(s.sessionId)) {
+    const nonFav: SessionSummary[] = [];
+    for (const s of filteredSupervisors) {
+      if (isFavorite(s.sessionId)) {
         fav.push(s);
       } else {
-        normal.push(s);
+        nonFav.push(s);
       }
     }
-    return { favSessions: fav, normalSessions: normal };
-  }, [visibleSupervisors, favIds]);
+    return { favSupervisors: fav, nonFavSupervisors: nonFav };
+  }, [filteredSupervisors, isFavorite, favIds]);
+
+  // Paginate non-favorite supervisors — always keep active session visible regardless of page
+  const truncated = !showAll && !q && nonFavSupervisors.length > PAGE_SIZE;
+  const visibleNormalSupervisors = truncated
+    ? nonFavSupervisors.slice(0, PAGE_SIZE).includes(
+        nonFavSupervisors.find((s) => s.sessionId === activeSessionId) ?? nonFavSupervisors[0],
+      )
+      // active is within first page — just slice
+      ? nonFavSupervisors.slice(0, PAGE_SIZE)
+      // active is beyond first page — show first PAGE_SIZE-1 + the active one
+      : [
+          ...nonFavSupervisors.slice(0, PAGE_SIZE - 1),
+          nonFavSupervisors.find((s) => s.sessionId === activeSessionId) ?? nonFavSupervisors[PAGE_SIZE - 1],
+        ].filter(Boolean) as SessionSummary[]
+    : nonFavSupervisors;
+
+  const hiddenCount = nonFavSupervisors.length - visibleNormalSupervisors.length;
 
   const showSearch = sessions.length >= SEARCH_THRESHOLD;
 
@@ -102,7 +105,7 @@ export function SessionList({
     const isExpandedGroup = expandedWorkerGroups.has(supervisor.sessionId);
     const isActive = activeSessionId === supervisor.sessionId;
     const displayName = supervisor.name ?? `Session ${supervisor.sessionId.slice(0, 8)}`;
-    const isFav = favIds.includes(supervisor.sessionId);
+    const isFav = isFavorite(supervisor.sessionId);
 
     return (
       <div key={supervisor.sessionId}>
@@ -159,6 +162,7 @@ export function SessionList({
               onClick={(e) => {
                 e.stopPropagation();
                 if (confirm(`Archive "${displayName}"?`)) {
+                  unfavoriteFav(supervisor.sessionId);
                   useSessionStore.getState().archiveSession(supervisor.sessionId);
                 }
               }}
@@ -214,15 +218,23 @@ export function SessionList({
       )}
 
       {/* ── Favorites section ── */}
-      {favSessions.length > 0 && !q && (
+      {favSupervisors.length > 0 && !q && (
         <>
-          <div className="favorites-section-header">{t("sidebar.favorites")}</div>
-          {favSessions.map(renderRow)}
-          {normalSessions.length > 0 && <div className="favorites-section-divider" />}
+          <div
+            className="favorites-section-header clickable"
+            onClick={() => setFavoritesCollapsed((c) => !c)}
+            title={favoritesCollapsed ? "Expand favorites" : "Collapse favorites"}
+          >
+            <span className="favorites-chevron">{favoritesCollapsed ? "▶" : "▾"}</span>
+            <span>{t("sidebar.favorites")}</span>
+            <span style={{ marginLeft: "auto", fontSize: "10px", opacity: 0.6 }}>{favSupervisors.length}</span>
+          </div>
+          {!favoritesCollapsed && favSupervisors.map(renderRow)}
+          {visibleNormalSupervisors.length > 0 && <div className="favorites-section-divider" />}
         </>
       )}
       {/* ── All sessions ── */}
-      {q ? visibleSupervisors.map(renderRow) : normalSessions.map(renderRow)}
+      {q ? filteredSupervisors.map(renderRow) : visibleNormalSupervisors.map(renderRow)}
 
       {/* ── Show more / less ── */}
       {truncated && hiddenCount > 0 && (
@@ -234,7 +246,7 @@ export function SessionList({
           {hiddenCount !== 1 ? t("sidebar.showMorePlural", { count: hiddenCount }) : t("sidebar.showMore", { count: hiddenCount })}
         </button>
       )}
-      {showAll && filteredSupervisors.length > PAGE_SIZE && (
+      {showAll && nonFavSupervisors.length > PAGE_SIZE && (
         <button
           className="session-show-more-btn"
           onClick={() => setShowAll(false)}

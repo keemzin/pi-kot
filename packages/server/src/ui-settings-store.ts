@@ -41,6 +41,8 @@ export type UiSettings = {
 	emptyFlapEnabled: boolean;
 	/** Phrases shown/cycled by the board when the chat is empty. */
 	emptyFlapWords: string[];
+	/** Starred / favorited session IDs. */
+	favoriteSessions: string[];
 };
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -64,6 +66,7 @@ const DEFAULTS: UiSettings = {
 	userBubbleBorderColor: null,
 	emptyFlapEnabled: true,
 	emptyFlapWords: ["PI-KOT 0.1.39", "PI-SDK 0.87.1"],
+	favoriteSessions: [],
 };
 
 // ── Path ──────────────────────────────────────────────────────────────────
@@ -125,6 +128,12 @@ function normalize(value: unknown): UiSettings {
 			.slice(0, 8)
 			.map((w) => w.slice(0, 32));
 		if (words.length > 0) settings.emptyFlapWords = words;
+	}
+	if (Array.isArray(v.favoriteSessions)) {
+		settings.favoriteSessions = v.favoriteSessions
+			.map((id) => (typeof id === "string" ? id.trim() : ""))
+			.filter((id) => id.length > 0)
+			.slice(0, 1000);
 	}
 
 	return settings;

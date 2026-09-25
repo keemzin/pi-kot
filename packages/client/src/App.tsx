@@ -26,6 +26,7 @@ import { useTouchSwipe } from "./hooks/useTouchSwipe";
 import { useLayoutStore } from "./stores/layout-store";
 import { usePreferencesStore } from "./stores/preferences-store";
 import { useI18n } from "./hooks/useI18n";
+import { fetchAndApplyUiSettings } from "./lib/apply-ui-settings";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -185,6 +186,7 @@ export function App() {
           }
         }
         await loadProjects();
+        void fetchAndApplyUiSettings();
       } catch {
         // server not reachable yet
       }
@@ -396,6 +398,7 @@ export function App() {
       setLoginError(undefined);
       setAuthRequired(false);
       await loadProjects();
+      void fetchAndApplyUiSettings();
     } catch {
       setLoginError("Invalid password");
     }

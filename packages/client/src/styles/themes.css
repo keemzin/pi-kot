@@ -949,6 +949,24 @@ strong {
 	opacity: 0.7;
 }
 
+.favorites-section-header.clickable {
+	cursor: pointer;
+	user-select: none;
+	transition: opacity var(--duration) var(--ease);
+}
+
+.favorites-section-header.clickable:hover {
+	opacity: 1;
+}
+
+.favorites-chevron {
+	display: inline-block;
+	width: 12px;
+	font-size: 8px;
+	margin-right: 3px;
+	opacity: 0.8;
+}
+
 /* Thin divider between favorites and all sessions */
 .favorites-section-divider {
 	height: 1px;

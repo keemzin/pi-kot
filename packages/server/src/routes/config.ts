@@ -706,7 +706,7 @@ function friendlySourceName(src: string): string {
       schema: {
         description: "Read user-facing UI preferences (theme, toggles).",
         tags: ["config"],
-        response: { 200: { type: "object" }, 500: errorSchema },
+        response: { 200: { type: "object", additionalProperties: true }, 500: errorSchema },
       },
     },
     async (_req, reply) => {
@@ -727,7 +727,7 @@ function friendlySourceName(src: string): string {
         description: "Partial-update UI preferences (patch).",
         tags: ["config"],
         body: { type: "object" },
-        response: { 200: { type: "object" }, 500: errorSchema },
+        response: { 200: { type: "object", additionalProperties: true }, 500: errorSchema },
       },
     },
     async (req, reply) => {
