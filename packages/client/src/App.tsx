@@ -778,6 +778,7 @@ export function App() {
           <>
             <div
               className="archived-toggle"
+              title="Archived sessions are automatically deleted after 30 days if not restored"
               onClick={() => {
                 const next = showArchived === activeProjectId ? undefined : activeProjectId;
                 if (next !== undefined) {
@@ -788,7 +789,10 @@ export function App() {
             >
               <span className="project-chevron">{showArchived === activeProjectId ? "▾" : "▸"}</span>
               <span className="project-name" style={{ fontSize: "12px" }}>
-                Archived
+                Archive
+              </span>
+              <span style={{ fontSize: "9px", marginLeft: "auto", opacity: 0.6, textTransform: "none", letterSpacing: "normal" }}>
+                30d auto-delete
               </span>
             </div>
             {showArchived === activeProjectId && (() => {
@@ -800,23 +804,49 @@ export function App() {
                     <div className="archived-status">{t("app.noArchived")}</div>
                   ) : (
                     <div className="session-list project-sublist archived-list">
-                      {archived.map((s: SessionSummary) => (
-                        <div key={s.sessionId} className="session-item archived">
-                          <span className="session-name">
-                            {s.name ?? `Session ${s.sessionId.slice(0, 8)}`}
-                          </span>
-                          <button
-                            className="session-restore-btn"
-                            title="Restore session"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              useSessionStore.getState().unarchiveSession(s.sessionId, activeProjectId);
-                            }}
-                          >
-                            ↻
-                          </button>
-                        </div>
-                      ))}
+                      {archived.map((s: SessionSummary) => {
+                        const displayName = s.name ?? `Session ${s.sessionId.slice(0, 8)}`;
+                        const isExpiringSoon = typeof s.expiresInDays === "number" && s.expiresInDays <= 3;
+                        return (
+                          <div key={s.sessionId} className="session-item archived">
+                            <span className="session-name" title={displayName}>
+                              {displayName}
+                            </span>
+                            {s.expiresInDays !== undefined && (
+                              <span
+                                className={`session-expiry-badge${isExpiringSoon ? " expiring-soon" : ""}`}
+                                title={`Auto-deletes in ${s.expiresInDays} day${s.expiresInDays === 1 ? "" : "s"} if not restored`}
+                              >
+                                {s.expiresInDays}d left
+                              </span>
+                            )}
+                            <div className="archived-actions">
+                              <button
+                                className="session-restore-btn"
+                                title="Restore session to active list"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  useSessionStore.getState().unarchiveSession(s.sessionId, activeProjectId);
+                                }}
+                              >
+                                ↻
+                              </button>
+                              <button
+                                className="session-permanent-delete-btn"
+                                title="Permanently delete session now"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Permanently delete "${displayName}" now? This cannot be undone.`)) {
+                                    useSessionStore.getState().deleteArchivedSession(s.sessionId, activeProjectId);
+                                  }
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

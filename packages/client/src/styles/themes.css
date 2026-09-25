@@ -985,25 +985,79 @@ strong {
 	opacity: 0.85;
 }
 
-/* Restore button on archived session items */
-.session-restore-btn {
+/* Archived session items, action buttons, and expiry badge */
+.session-item.archived {
+	display: flex;
+	align-items: center;
+	position: relative;
+	padding-right: 6px;
+}
+
+.session-item.archived .session-name {
+	flex: 1;
+	min-width: 0;
+}
+
+.session-expiry-badge {
+	font-size: 9px;
+	padding: 1px 5px;
+	border-radius: var(--radius-xs, 4px);
+	background: var(--bg-glass-hover);
+	color: var(--text-dim);
+	margin-left: 4px;
+	margin-right: 4px;
+	white-space: nowrap;
+	flex-shrink: 0;
+	user-select: none;
+}
+
+.session-expiry-badge.expiring-soon {
+	background: rgba(239, 68, 68, 0.15);
+	color: var(--accent-red, #ef4444);
+	font-weight: 600;
+}
+
+.archived-actions {
 	display: none;
-	position: absolute;
-	right: 4px;
-	top: 50%;
-	transform: translateY(-50%);
+	align-items: center;
+	gap: 2px;
+	margin-left: auto;
+}
+
+.session-item.archived:hover .archived-actions {
+	display: flex;
+}
+
+.session-restore-btn {
 	background: none;
 	border: none;
 	color: var(--accent);
 	cursor: pointer;
-	font-size: 14px;
+	font-size: 13px;
 	padding: 2px 4px;
 	border-radius: var(--radius-xs);
 	line-height: 1;
+	transition: opacity var(--duration) var(--ease);
 }
 
-.session-item.archived:hover .session-restore-btn {
-	display: inline-block;
+.session-restore-btn:hover {
+	opacity: 0.8;
+}
+
+.session-permanent-delete-btn {
+	background: none;
+	border: none;
+	color: var(--text-dim);
+	cursor: pointer;
+	font-size: 11px;
+	padding: 2px 4px;
+	border-radius: var(--radius-xs);
+	line-height: 1;
+	transition: color var(--duration) var(--ease);
+}
+
+.session-permanent-delete-btn:hover {
+	color: var(--accent-red, #ef4444);
 }
 
 /* Archived section toggle */

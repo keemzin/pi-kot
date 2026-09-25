@@ -165,6 +165,8 @@ export interface SessionSummary {
   lastActivityAt: string;
   messageCount: number;
   supervisorId?: string;
+  archivedAt?: string;
+  expiresInDays?: number;
 }
 
 export interface CreateSessionRequest {
@@ -303,6 +305,16 @@ export async function listArchivedSessions(
   return request<{ sessions: SessionSummary[] }>(
     "GET",
     `/api/v1/sessions?projectId=${encodeURIComponent(projectId)}&archived=true`,
+  );
+}
+
+export async function deleteArchivedSession(
+  sessionId: string,
+  projectId: string,
+): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(
+    "DELETE",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/archived?projectId=${encodeURIComponent(projectId)}`,
   );
 }
 

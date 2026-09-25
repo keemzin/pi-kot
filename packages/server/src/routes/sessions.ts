@@ -11,6 +11,7 @@ import {
   archiveSession,
   unarchiveSession,
   listArchivedSessions,
+  deleteArchivedSession,
   resumeSessionById,
   forkSession,
   findSessionLocation,
@@ -159,6 +160,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               lastActivityAt: s.lastActivityAt.toISOString(),
               messageCount: s.messageCount,
               supervisorId: (await getSupervisorIdForWorker(s.sessionId)) ?? undefined,
+              archivedAt: s.archivedAt?.toISOString(),
+              expiresInDays: s.expiresInDays,
             })),
           );
           return { sessions };
@@ -428,6 +431,42 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       // Fire worker.deleted if this session was an orchestration worker
       void bridgeWorkerDeleted(sessionId, { wasLive: disposed }).catch(() => undefined);
       return { disposed };
+    },
+  );
+
+  // DELETE /api/v1/sessions/:id/archived — permanently delete an archived session file immediately
+  fastify.delete<{
+    Params: { id: string };
+    Querystring: { projectId?: string };
+    Body?: { projectId?: string };
+  }>(
+    "/sessions/:id/archived",
+    {
+      schema: {
+        description: "Permanently delete an archived session file immediately.",
+        tags: ["sessions"],
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string" } },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["deleted"],
+            properties: { deleted: { type: "boolean" } },
+          },
+        },
+      },
+    },
+    async (req, reply) => {
+      const sessionId = req.params.id;
+      const projectId = req.query.projectId ?? req.body?.projectId;
+      if (!projectId) {
+        return reply.code(400).send({ error: "projectId is required" });
+      }
+      const deleted = await deleteArchivedSession(sessionId, projectId);
+      return { deleted };
     },
   );
 

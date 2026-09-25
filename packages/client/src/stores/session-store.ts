@@ -128,6 +128,7 @@ interface SessionActions {
 	renameSession: (sessionId: string, name: string) => Promise<void>;
 	archiveSession: (sessionId: string) => Promise<void>;
 	unarchiveSession: (sessionId: string, projectId: string) => Promise<void>;
+	deleteArchivedSession: (sessionId: string, projectId: string) => Promise<void>;
 	loadArchivedSessions: (projectId: string) => Promise<void>;
 	loadCompactions: (sessionId: string) => Promise<void>;
 	compactAndReload: (
@@ -1041,6 +1042,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 					/* private */
 				}
 			}
+			if (projectId) void get().loadArchivedSessions(projectId);
 		} catch (err) {
 			set({
 				error: err instanceof Error ? err.message : "Failed to archive session",
@@ -1069,6 +1071,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 			}));
 		} catch {
 			// silently fail
+		}
+	},
+
+	deleteArchivedSession: async (sessionId: string, projectId: string) => {
+		try {
+			const { deleteArchivedSession: deleteArchivedAPI } = await import("../lib/api-client");
+			await deleteArchivedAPI(sessionId, projectId);
+			set((s) => ({
+				archivedSessions: {
+					...s.archivedSessions,
+					[projectId]: (s.archivedSessions[projectId] ?? []).filter(
+						(sess) => sess.sessionId !== sessionId,
+					),
+				},
+			}));
+		} catch (err) {
+			set({
+				error: err instanceof Error ? err.message : "Failed to permanently delete session",
+			});
 		}
 	},
 

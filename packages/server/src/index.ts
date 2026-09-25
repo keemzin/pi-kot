@@ -296,6 +296,14 @@ export async function start(): Promise<void> {
   try {
     await fastify.listen({ port: config.port, host: config.host });
     fastify.log.info(`pi-kot server listening on :${config.port}`);
+
+    // 30-day archive retention: purge expired files on boot and every 6h
+    const { purgeExpiredArchivedSessions } = await import("./session-store.js");
+    void purgeExpiredArchivedSessions().catch((err) => fastify.log.warn({ err }, "failed archive purge"));
+    const purgeInterval = setInterval(() => {
+      void purgeExpiredArchivedSessions().catch((err) => fastify.log.warn({ err }, "failed archive purge"));
+    }, 6 * 60 * 60 * 1000);
+    purgeInterval.unref();
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
