@@ -392,7 +392,7 @@ Access settings via the **⚙** icon in the header.
 | --- | --- |
 | **UI** | React, TypeScript, Vite, xterm.js, CodeMirror, Zustand |
 | **Server** | Fastify, ws (WebSocket), node-pty |
-| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.84.2) |
+| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.87.1) |
 | **Auth** | JWT, scrypt password hashing |
 | **State** | Zustand (client), JSONL session files (server) |
 | **i18n** | Lightweight custom registry supporting English & 简体中文 |

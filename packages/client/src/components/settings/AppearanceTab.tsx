@@ -357,7 +357,7 @@ export function AppearanceTab() {
 				? words
 				: flapWords.length > 0
 					? flapWords
-					: ["PI-KOT 0.1.38", "PI-SDK 0.84.2"];
+					: ["PI-KOT 0.1.39", "PI-SDK 0.87.1"];
 		setFlapWords(cleaned);
 		setFlapWordsDraft(cleaned.join(", "));
 		zSetFlapWords(cleaned);
@@ -1033,7 +1033,7 @@ export function AppearanceTab() {
 									if (e.key === "Enter") saveFlapWords(flapWordsDraft);
 								}}
 								className="settings-input"
-								placeholder="PI-KOT 0.1.38, PI-SDK 0.84.2"
+								placeholder="PI-KOT 0.1.39, PI-SDK 0.87.1"
 							/>
 							<p className="settings-hint" style={{ marginTop: 4 }}>
 								{t("settings.appearance.splitFlapPhrasesHint")}

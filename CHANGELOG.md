@@ -2,6 +2,23 @@
 
 All notable changes to pi-kot, with focus on SDK upgrades and behavior that affects users.
 
+## [0.1.39] — 2026-09-25
+
+### SDK Upgrade: pi-coding-agent → 0.87.1
+
+pi-kot now runs on `@earendil-works/pi-coding-agent@^0.87.1` (+ `pi-ai@^0.87.1` + `pi-agent-core@^0.87.1`).
+
+#### Changed
+- Bumped `@earendil-works` SDK dependencies across root, server, and client packages to `^0.87.1`.
+- Updated split-flap board defaults to `PI-KOT 0.1.39` / `PI-SDK 0.87.1`.
+- Hardened `@` reference chip parsing to ignore PowerShell/Java/Python syntax like `@(` or `@{`.
+- Supported deep nested folder artifact previews under `.pi/artifacts/**`.
+
+#### What users get (inherited from SDK 0.87.1)
+- New frontier model support: Claude Opus 5.5 (1M context + adaptive thinking), GPT-6 Sol and Luna, Grok 4.7 default for xAI, Meta Muse Spark.
+- Prompt cache warming support during long tool calls.
+- Stricter schema handling and faster startup with Node compile cache.
+
 ## [0.1.25] — 2026-08-02
 
 ### SDK Upgrade: pi-coding-agent → 0.83.0
