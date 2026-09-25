@@ -3,7 +3,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
 import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
-import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
+import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesBatchDelete, filesBatchMove, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
 
@@ -134,6 +134,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const [createName, setCreateName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>();
   const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
+
+  // ── Multi-select & Batch Delete ──
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+
+  useEffect(() => {
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
+    setSelectMode(false);
+  }, [projectId]);
 
   const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 
@@ -288,8 +301,12 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const handleRowContextMenu = useCallback((e: React.MouseEvent, node: TreeNode) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!selectedPaths.has(node.path)) {
+      setSelectedPaths(new Set([node.path]));
+      setLastSelectedPath(node.path);
+    }
     showContextMenu(e, node);
-  }, [showContextMenu]);
+  }, [showContextMenu, selectedPaths]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent, node: TreeNode) => {
     const touch = e.touches[0];
@@ -443,12 +460,162 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
     return filter(tree);
   }, [tree, search]);
 
+  // Flattened visible nodes in current tree order (accounting for search & expanded folders)
+  const flattenedVisibleNodes = useMemo(() => {
+    const list: TreeNode[] = [];
+    const traverse = (nodes: TreeNode[]) => {
+      for (const n of nodes) {
+        list.push(n);
+        if (n.type === "directory" && expanded.has(n.path) && n.children) {
+          traverse(n.children);
+        }
+      }
+    };
+    traverse(filteredTree);
+    return list;
+  }, [filteredTree, expanded]);
+
+  const handleToggleSelect = useCallback((path: string, isShift: boolean, isMulti: boolean) => {
+    setSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (isShift && lastSelectedPath) {
+        const idx1 = flattenedVisibleNodes.findIndex((n) => n.path === lastSelectedPath);
+        const idx2 = flattenedVisibleNodes.findIndex((n) => n.path === path);
+        if (idx1 !== -1 && idx2 !== -1) {
+          const start = Math.min(idx1, idx2);
+          const end = Math.max(idx1, idx2);
+          for (let i = start; i <= end; i++) {
+            next.add(flattenedVisibleNodes[i].path);
+          }
+          return next;
+        }
+      }
+      if (next.has(path)) {
+        next.delete(path);
+        if (lastSelectedPath === path) setLastSelectedPath(null);
+      } else {
+        next.add(path);
+        setLastSelectedPath(path);
+      }
+      return next;
+    });
+  }, [flattenedVisibleNodes, lastSelectedPath]);
+
+  const selectAllVisible = useCallback(() => {
+    setSelectedPaths(new Set(flattenedVisibleNodes.map((n) => n.path)));
+  }, [flattenedVisibleNodes]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
+  }, []);
+
+  const handleBatchDelete = async () => {
+    if (selectedPaths.size === 0) return;
+    setBatchDeleting(true);
+    setError(undefined);
+    try {
+      const paths = Array.from(selectedPaths);
+      const res = await filesBatchDelete(projectId, paths, { recursive: true });
+      setSelectedPaths(new Set());
+      setLastSelectedPath(null);
+      setConfirmBatchDelete(false);
+      await loadTree();
+      if (res.errors && Object.keys(res.errors).length > 0) {
+        const errList = Object.entries(res.errors).map(([p, msg]) => `${p}: ${msg}`).join(", ");
+        setError(`Deleted ${res.deleted.length} items. Errors: ${errList}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "batch delete failed");
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
+  const handleMoveEntries = useCallback(async (srcPaths: string[], targetDir: string) => {
+    // Filter out invalid moves
+    const validMoves: Array<{ src: string; dest: string }> = [];
+    for (const src of srcPaths) {
+      if (src === targetDir) continue; // cannot move into itself
+      if (targetDir && (targetDir === src || targetDir.startsWith(`${src}/`))) continue; // cannot move into descendant
+      const parent = src.includes("/") ? src.slice(0, src.lastIndexOf("/")) : "";
+      if (parent === targetDir) continue; // already in target folder
+      const name = src.split("/").pop() ?? "";
+      const dest = targetDir ? `${targetDir}/${name}` : name;
+      if (src === dest) continue;
+      validMoves.push({ src, dest });
+    }
+
+    if (validMoves.length === 0) return;
+
+    setError(undefined);
+    try {
+      let errors: Record<string, string> | undefined;
+      try {
+        const res = await filesBatchMove(projectId, validMoves);
+        errors = res.errors;
+      } catch {
+        // Fallback to individual filesMove if batch endpoint is not available
+        const results = await Promise.allSettled(
+          validMoves.map((m) => filesMove(projectId, m.src, m.dest)),
+        );
+        const errMap: Record<string, string> = {};
+        results.forEach((r, idx) => {
+          if (r.status === "rejected") {
+            errMap[validMoves[idx].src] = r.reason instanceof Error ? r.reason.message : "Move failed";
+          }
+        });
+        if (Object.keys(errMap).length > 0) errors = errMap;
+      }
+
+      if (errors && Object.keys(errors).length > 0) {
+        const errList = Object.entries(errors).map(([p, msg]) => `${p}: ${msg}`).join(", ");
+        setError(`Moved with errors: ${errList}`);
+      }
+      setSelectedPaths(new Set());
+      setLastSelectedPath(null);
+      await loadTree();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Move failed");
+    }
+  }, [projectId, loadTree]);
+
+  // Keyboard shortcuts: Delete/Backspace to delete selected, Ctrl+A to select all, Escape to cancel
+  useEffect(() => {
+    if (tab !== "files" || !open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedPaths.size > 0) {
+          e.preventDefault();
+          setConfirmBatchDelete(true);
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
+        e.preventDefault();
+        selectAllVisible();
+      } else if (e.key === "Escape") {
+        if (confirmBatchDelete) {
+          setConfirmBatchDelete(false);
+        } else if (selectedPaths.size > 0) {
+          clearSelection();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [tab, open, selectedPaths, confirmBatchDelete, selectAllVisible, clearSelection]);
+
   // ---- Tree node renderer ----
   const renderNode = (node: TreeNode, depth: number) => {
     const isExpanded = expanded.has(node.path);
     const isDir = node.type === "directory";
     const isRenaming = renaming === node.path;
     const isDropTarget = isDir && dropTargetFolder === node.path;
+    const isSelected = selectedPaths.has(node.path);
+    const showCheckboxes = selectMode || selectedPaths.size > 0;
 
     return (
       <div key={node.path}>
@@ -457,15 +624,52 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           onTouchStart={(e) => handleTouchStart(e, node)}
           onTouchEnd={handleTouchEnd}
           onTouchMove={handleTouchMove}
+          onClick={(e) => {
+            if (isRenaming) return;
+            if (e.ctrlKey || e.metaKey) {
+              handleToggleSelect(node.path, false, true);
+            } else if (e.shiftKey) {
+              handleToggleSelect(node.path, true, false);
+            } else if (selectMode) {
+              handleToggleSelect(node.path, false, true);
+            }
+          }}
           onDragStart={(e) => {
             e.stopPropagation();
+            const pathsToMove = selectedPaths.has(node.path) && selectedPaths.size > 0
+              ? Array.from(selectedPaths)
+              : [node.path];
+
+            e.dataTransfer.setData("application/x-pi-paths", JSON.stringify(pathsToMove));
             e.dataTransfer.setData("application/x-pi-path", node.path);
             e.dataTransfer.effectAllowed = "move";
+
+            // Visual badge when dragging multiple files
+            if (pathsToMove.length > 1) {
+              const badge = document.createElement("div");
+              badge.style.position = "absolute";
+              badge.style.top = "-9999px";
+              badge.style.left = "-9999px";
+              badge.style.background = "var(--accent, #6366f1)";
+              badge.style.color = "#ffffff";
+              badge.style.padding = "4px 10px";
+              badge.style.borderRadius = "12px";
+              badge.style.fontSize = "12px";
+              badge.style.fontWeight = "600";
+              badge.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+              badge.style.pointerEvents = "none";
+              badge.textContent = `Moving ${pathsToMove.length} items`;
+              document.body.appendChild(badge);
+              e.dataTransfer.setDragImage(badge, 20, 15);
+              setTimeout(() => {
+                if (document.body.contains(badge)) document.body.removeChild(badge);
+              }, 0);
+            }
           }}
           onDragOver={isDir ? (e) => {
             e.preventDefault();
             e.stopPropagation();
-            const hasPiPath = e.dataTransfer.types.includes("application/x-pi-path");
+            const hasPiPath = e.dataTransfer.types.includes("application/x-pi-path") || e.dataTransfer.types.includes("application/x-pi-paths");
             e.dataTransfer.dropEffect = hasPiPath ? "move" : "copy";
             dragOverFolder.current = node.path;
             setDropTargetFolder(node.path);
@@ -484,19 +688,21 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
             // Unified drop handler: check for in-app drag (move) first,
             // then fall back to OS file drag (upload).
-            const src = e.dataTransfer.getData("application/x-pi-path");
-            if (src.length > 0) {
-              // In-app drag → MOVE
-              if (src === node.path) return;  // same dir = no-op
-              if (node.path.startsWith(`${src}/`)) return;  // refuse descendant
-              const name = src.split("/").pop() ?? "";
-              const dest = `${node.path}/${name}`;
+            const rawPaths = e.dataTransfer.getData("application/x-pi-paths");
+            const singleSrc = e.dataTransfer.getData("application/x-pi-path");
+            let paths: string[] = [];
+            if (rawPaths) {
               try {
-                await filesMove(projectId, src, dest);
-                await loadTree();
+                paths = JSON.parse(rawPaths);
               } catch {
-                // error rendered via store/error slot
+                paths = singleSrc ? [singleSrc] : [];
               }
+            } else if (singleSrc) {
+              paths = [singleSrc];
+            }
+
+            if (paths.length > 0) {
+              await handleMoveEntries(paths, node.path);
               return;
             }
 
@@ -512,12 +718,29 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             outlineOffset: "-1px",
             borderRadius: "2px",
           }}
-          className={`file-tree-row${contextMenu?.node.path === node.path ? " file-tree-row-active" : ""}${isDropTarget ? " file-tree-row-drop-target" : ""}`}
+          className={`file-tree-row${isSelected ? " file-tree-row-selected" : ""}${contextMenu?.node.path === node.path ? " file-tree-row-active" : ""}${isDropTarget ? " file-tree-row-drop-target" : ""}`}
           draggable={true}
         >
+          {showCheckboxes && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleToggleSelect(node.path, false, true);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="file-tree-checkbox"
+              title="Select"
+            />
+          )}
+
           {isDir ? (
             <button
-              onClick={() => toggleFolder(node.path)}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(node.path);
+              }}
               style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: "2px", width: "20px", height: "20px", flexShrink: 0, color: "var(--accent)" }}
               type="button"
             >
@@ -553,7 +776,24 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             />
           ) : (
             <button
-              onClick={() => { if (isDir) toggleFolder(node.path); else openFile(node.path); }}
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  e.stopPropagation();
+                  handleToggleSelect(node.path, false, true);
+                } else if (e.shiftKey) {
+                  e.stopPropagation();
+                  handleToggleSelect(node.path, true, false);
+                } else if (selectMode) {
+                  e.stopPropagation();
+                  handleToggleSelect(node.path, false, true);
+                } else {
+                  if (selectedPaths.size > 0) {
+                    clearSelection();
+                  }
+                  if (isDir) toggleFolder(node.path);
+                  else openFile(node.path);
+                }
+              }}
               style={{
                 flex: 1, background: "none", border: "none",
                 color: "var(--text-primary)", cursor: "pointer", fontSize: "12px",
@@ -571,18 +811,18 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             <div style={{ display: "flex", gap: "1px", flexShrink: 0 }} className="file-row-actions">
               {isDir && (
                 <button
-                  onClick={() => { setCreateParent(node.path); setShowCreate("file"); setCreateName(""); }}
+                  onClick={(e) => { e.stopPropagation(); setCreateParent(node.path); setShowCreate("file"); setCreateName(""); }}
                   title="New file in this folder"
                   style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", fontSize: "11px", color: "var(--text-dim)" }} type="button"
                 >+</button>
               )}
               <button
-                onClick={() => { setRenaming(node.path); setRenameDraft(node.name); setTimeout(() => renameRef.current?.focus(), 50); }}
+                onClick={(e) => { e.stopPropagation(); setRenaming(node.path); setRenameDraft(node.name); setTimeout(() => renameRef.current?.focus(), 50); }}
                 title="Rename"
                 style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", fontSize: "11px", color: "var(--text-dim)" }} type="button"
               >✏️</button>
               <button
-                onClick={() => setConfirmDelete(node.path)}
+                onClick={(e) => { e.stopPropagation(); setConfirmDelete(node.path); }}
                 title="Delete"
                 style={{ background: "none", border: "none", cursor: "pointer", padding: "1px 3px", fontSize: "11px", color: "var(--text-dim)" }} type="button"
               >🗑</button>
@@ -739,6 +979,27 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               {loading && <span style={{ fontSize: "10px", color: "var(--text-dim)" }}>loading…</span>}
             </div>
             <div style={{ display: "flex", gap: "1px", alignItems: "center" }}>
+              {/* Multi-select toggle */}
+              <button
+                onClick={() => {
+                  const next = !selectMode;
+                  setSelectMode(next);
+                  if (!next) {
+                    clearSelection();
+                  }
+                }}
+                title={selectMode ? "Exit selection mode" : "Select multiple files"}
+                className={`fe-toolbar-btn${selectMode ? " fe-toolbar-btn-active" : ""}`}
+                style={selectMode ? { color: "var(--accent)", background: "var(--accent-subtle)" } : undefined}
+                type="button"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 11 12 14 22 4"/>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+              </button>
+              {/* Divider */}
+              <span style={{ width: "1px", height: "14px", background: "var(--border)", margin: "0 3px", flexShrink: 0 }} />
               {/* Upload files */}
               <button onClick={() => uploadRef.current?.click()} title="Upload files" disabled={uploading} className="fe-toolbar-btn" type="button">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -863,11 +1124,8 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               e.preventDefault();
               // Set dropEffect based on drag source: in-app drags use "move",
               // OS drags (files, folders from desktop) use "copy".
-              const hasCustomMime = e.dataTransfer.types.includes("application/x-pi-path");
+              const hasCustomMime = e.dataTransfer.types.includes("application/x-pi-path") || e.dataTransfer.types.includes("application/x-pi-paths");
               e.dataTransfer.dropEffect = hasCustomMime ? "move" : "copy";
-              // Capture the folder being hovered from the ref set by row-level
-              // onDragOver handlers. The ref lets us read the latest value
-              // without re-rendering on every dragover event.
             }}
             onDrop={async (e) => {
               e.preventDefault();
@@ -875,17 +1133,22 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
               // Unified drop handler: check for in-app drag (move) first,
               // then fall back to OS file drag (upload).
-              const src = e.dataTransfer.getData("application/x-pi-path");
-              if (src.length > 0) {
-                // In-app drag → MOVE to project root (empty area = root)
-                const name = src.split("/").pop() ?? "";
-                const dest = name;  // root = no folder prefix
+              const rawPaths = e.dataTransfer.getData("application/x-pi-paths");
+              const singleSrc = e.dataTransfer.getData("application/x-pi-path");
+              let paths: string[] = [];
+              if (rawPaths) {
                 try {
-                  await filesMove(projectId, src, dest);
-                  await loadTree();
+                  paths = JSON.parse(rawPaths);
                 } catch {
-                  // error rendered via store/error slot
+                  paths = singleSrc ? [singleSrc] : [];
                 }
+              } else if (singleSrc) {
+                paths = [singleSrc];
+              }
+
+              if (paths.length > 0) {
+                // In-app drag → MOVE to project root (empty area = root "")
+                await handleMoveEntries(paths, "");
                 dragOverFolder.current = undefined;
                 return;
               }
@@ -1001,6 +1264,53 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             )}
             {filteredTree.map((node) => renderNode(node, 0))}
           </div>
+
+          {/* Floating batch action bar */}
+          {selectedPaths.size > 0 && (
+            <div className="file-tree-batch-bar">
+              <div className="file-tree-batch-info">
+                <span className="file-tree-batch-count">{selectedPaths.size}</span>
+                <span>selected</span>
+              </div>
+              <div className="file-tree-batch-actions">
+                <button
+                  type="button"
+                  className="file-tree-batch-btn select-all"
+                  onClick={() => {
+                    if (selectedPaths.size === flattenedVisibleNodes.length) {
+                      clearSelection();
+                    } else {
+                      selectAllVisible();
+                    }
+                  }}
+                  title={selectedPaths.size === flattenedVisibleNodes.length ? "Deselect all" : "Select all"}
+                >
+                  {selectedPaths.size === flattenedVisibleNodes.length ? "Deselect all" : "Select all"}
+                </button>
+                <button
+                  type="button"
+                  className="file-tree-batch-btn delete"
+                  onClick={() => setConfirmBatchDelete(true)}
+                  disabled={batchDeleting}
+                  title="Delete selected files"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                  <span>Delete ({selectedPaths.size})</span>
+                </button>
+                <button
+                  type="button"
+                  className="file-tree-batch-btn close"
+                  onClick={clearSelection}
+                  title="Clear selection"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1156,7 +1466,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               onClick={(e) => {
                 e.stopPropagation();
                 setContextMenu(null);
-                setConfirmDelete(contextMenu.node.path);
+                if (selectedPaths.size > 1 && selectedPaths.has(contextMenu.node.path)) {
+                  setConfirmBatchDelete(true);
+                } else {
+                  setConfirmDelete(contextMenu.node.path);
+                }
               }}
               style={{
                 ...contextMenuItemStyle,
@@ -1164,10 +1478,58 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
               }}
             >
               <span style={{ width: "16px", textAlign: "center", flexShrink: 0 }}>🗑</span>
-              <span>Delete</span>
+              <span>
+                {selectedPaths.size > 1 && selectedPaths.has(contextMenu.node.path)
+                  ? `Delete ${selectedPaths.size} items`
+                  : "Delete"}
+              </span>
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Batch Delete Confirmation Modal ── */}
+      {confirmBatchDelete && (
+        <div className="file-confirm-modal-overlay" onClick={() => !batchDeleting && setConfirmBatchDelete(false)}>
+          <div className="file-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="file-confirm-modal-title">
+              Delete {selectedPaths.size} {selectedPaths.size === 1 ? "item" : "items"}?
+            </div>
+            <div className="file-confirm-modal-desc">
+              Are you sure you want to permanently delete these items? This action cannot be undone.
+            </div>
+            <div className="file-confirm-modal-list">
+              {Array.from(selectedPaths).slice(0, 50).map((p) => (
+                <div key={p} className="file-confirm-item">
+                  • {p}
+                </div>
+              ))}
+              {selectedPaths.size > 50 && (
+                <div className="file-confirm-item-more">
+                  ...and {selectedPaths.size - 50} more items
+                </div>
+              )}
+            </div>
+            <div className="file-confirm-modal-actions">
+              <button
+                type="button"
+                className="file-confirm-btn cancel"
+                onClick={() => setConfirmBatchDelete(false)}
+                disabled={batchDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="file-confirm-btn danger"
+                onClick={handleBatchDelete}
+                disabled={batchDeleting}
+              >
+                {batchDeleting ? "Deleting…" : `Delete ${selectedPaths.size} ${selectedPaths.size === 1 ? "item" : "items"}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
 

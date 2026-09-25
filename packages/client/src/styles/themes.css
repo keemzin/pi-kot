@@ -6072,6 +6072,203 @@ strong {
 	background: var(--accent-bg);
 	opacity: 0.85;
 }
+.file-tree-row-selected {
+	background: var(--accent-subtle, rgba(255, 255, 255, 0.08)) !important;
+	outline: 1px solid var(--accent);
+	outline-offset: -1px;
+}
+.file-tree-checkbox {
+	margin: 0 4px 0 2px;
+	cursor: pointer;
+	accent-color: var(--accent);
+	width: 14px;
+	height: 14px;
+	flex-shrink: 0;
+}
+
+/* ── Floating Batch Action Bar ── */
+.file-tree-batch-bar {
+	position: absolute;
+	bottom: 12px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 50;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 12px;
+	border-radius: var(--radius-full, 9999px);
+	background: var(--bg-solid, #1e1e1e);
+	border: 1px solid var(--border-bright, #333);
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+	animation: slideUp 0.15s ease-out;
+	white-space: nowrap;
+	font-size: 12px;
+	max-width: calc(100% - 24px);
+}
+
+.file-tree-batch-info {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-secondary);
+	font-weight: 500;
+}
+
+.file-tree-batch-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--accent);
+	color: #fff;
+	font-weight: 700;
+	font-size: 11px;
+	border-radius: 9999px;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 5px;
+}
+
+.file-tree-batch-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.file-tree-batch-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border-radius: var(--radius-sm, 6px);
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+	border: none;
+	transition: all 0.15s ease;
+	line-height: 1.2;
+}
+
+.file-tree-batch-btn.select-all {
+	background: var(--bg-glass-hover, rgba(255, 255, 255, 0.08));
+	color: var(--text-primary);
+}
+.file-tree-batch-btn.select-all:hover {
+	background: var(--bg-glass-active, rgba(255, 255, 255, 0.15));
+}
+
+.file-tree-batch-btn.delete {
+	background: var(--accent-red, #ef4444);
+	color: #ffffff;
+}
+.file-tree-batch-btn.delete:hover {
+	filter: brightness(1.1);
+}
+
+.file-tree-batch-btn.close {
+	background: transparent;
+	color: var(--text-dim);
+	padding: 4px 6px;
+	font-size: 13px;
+}
+.file-tree-batch-btn.close:hover {
+	color: var(--text-primary);
+}
+
+/* ── File Confirmation Modal ── */
+.file-confirm-modal-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 1050;
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(2px);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+}
+
+.file-confirm-modal {
+	background: var(--bg-solid, #18181b);
+	border: 1px solid var(--border-bright, #333);
+	border-radius: var(--radius-md, 8px);
+	padding: 18px 20px;
+	max-width: 420px;
+	width: 100%;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+	animation: fadeIn 0.15s ease-out;
+}
+
+.file-confirm-modal-title {
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--text-primary);
+	margin-bottom: 8px;
+}
+
+.file-confirm-modal-desc {
+	font-size: 12px;
+	color: var(--text-secondary);
+	margin-bottom: 12px;
+	line-height: 1.4;
+}
+
+.file-confirm-modal-list {
+	max-height: 140px;
+	overflow-y: auto;
+	background: var(--bg-glass-hover, rgba(0, 0, 0, 0.2));
+	border-radius: var(--radius-sm, 4px);
+	padding: 8px 10px;
+	margin-bottom: 16px;
+	font-size: 11px;
+	font-family: var(--font-mono, monospace);
+	color: var(--text-dim);
+}
+
+.file-confirm-item {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	margin-bottom: 3px;
+}
+
+.file-confirm-item-more {
+	font-style: italic;
+	opacity: 0.8;
+	margin-top: 4px;
+}
+
+.file-confirm-modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.file-confirm-btn {
+	padding: 6px 14px;
+	border-radius: var(--radius-sm, 6px);
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	border: none;
+	transition: all 0.15s ease;
+}
+
+.file-confirm-btn.cancel {
+	background: var(--bg-glass-hover, rgba(255, 255, 255, 0.08));
+	color: var(--text-primary);
+}
+.file-confirm-btn.cancel:hover {
+	background: var(--bg-glass-active, rgba(255, 255, 255, 0.15));
+}
+
+.file-confirm-btn.danger {
+	background: var(--accent-red, #ef4444);
+	color: #fff;
+}
+.file-confirm-btn.danger:hover {
+	filter: brightness(1.1);
+}
 
 /* ── Context menu items ── */
 .context-menu-item:hover {

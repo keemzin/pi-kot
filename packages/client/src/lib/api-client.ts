@@ -514,6 +514,36 @@ export async function filesDelete(
   return request("DELETE", `/api/v1/files/delete?${qs.toString()}`);
 }
 
+export async function filesBatchDelete(
+  projectId: string,
+  paths: string[],
+  opts?: { recursive?: boolean },
+): Promise<{ deleted: string[]; errors?: Record<string, string> }> {
+  return request<{ deleted: string[]; errors?: Record<string, string> }>(
+    "POST",
+    "/api/v1/files/batch-delete",
+    {
+      projectId,
+      paths,
+      recursive: opts?.recursive ?? true,
+    },
+  );
+}
+
+export async function filesBatchMove(
+  projectId: string,
+  moves: Array<{ src: string; dest: string }>,
+): Promise<{ moved: string[]; errors?: Record<string, string> }> {
+  return request<{ moved: string[]; errors?: Record<string, string> }>(
+    "POST",
+    "/api/v1/files/batch-move",
+    {
+      projectId,
+      moves,
+    },
+  );
+}
+
 /**
  * Move a file or directory within a project.
  * @param projectId - project target
