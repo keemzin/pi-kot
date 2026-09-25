@@ -75,4 +75,46 @@ describe("parseFileReferences", () => {
     const paths = parseFileReferences("@src/foo.ts#L3-7 and @a/b.ts#L2");
     expect(paths).toEqual(["src/foo.ts", "a/b.ts"]);
   });
+
+  it("does not parse @( or PowerShell arrays/hashtables as file references", () => {
+    const text = `
+      $model = @("27B", "8B")
+      $candidates = @(
+        "bin\\llama.exe"
+      )
+      $ht = @{ key = "val" }
+      $arr = @[1, 2]
+      $quoted1 = @"foo, bar"
+      $quoted2 = @"baz",
+    `;
+    const paths = parseFileReferences(text);
+    expect(paths).toEqual([]);
+  });
+
+  it("does not mangle PowerShell code with not included errors", async () => {
+    const { dir } = makeWorkspace();
+    const script = `if ($m -notin @("27B", "8B")) { exit 1 }`;
+    const out = await expandFileReferences(script, dir);
+    expect(out).toBe(script);
+    expect(out).not.toContain("not included");
+  });
+
+  it("accurately inlines Send selection to chat format (@settings.json#L2-2)", async () => {
+    const { dir, write } = makeWorkspace();
+    write(".pi/settings.json", '{\n  "packages": []\n}\n');
+    const out = await expandFileReferences("@.pi/settings.json#L2-2 check this", dir);
+    expect(out).toContain("file: .pi/settings.json (lines 2-2)");
+    expect(out).toContain('2 |   "packages": []');
+    expect(out).toContain("check this");
+  });
+
+  it("does not parse bare identifiers like @ServerArgs or @args as file references", async () => {
+    const { dir } = makeWorkspace();
+    const text = "& $Bin @ServerArgs @args";
+    const paths = parseFileReferences(text);
+    expect(paths).toEqual([]);
+
+    const out = await expandFileReferences(text, dir);
+    expect(out).toBe(text);
+  });
 });
