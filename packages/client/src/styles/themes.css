@@ -6279,6 +6279,21 @@ strong {
 	background: var(--accent-bg);
 }
 
+/* ── File Editor Toolbar ── */
+.file-editor-toolbar {
+	user-select: none;
+}
+.file-mode-btn:hover {
+	color: var(--text-primary) !important;
+}
+.file-editor-btn:hover {
+	color: var(--text-primary) !important;
+	border-color: var(--border-bright) !important;
+}
+.file-editor-btn.send-selection.active:hover {
+	filter: brightness(1.1);
+}
+
 /* ── Row action buttons: appear on row hover ── */
 .file-row-actions {
 	opacity: 0 !important;
