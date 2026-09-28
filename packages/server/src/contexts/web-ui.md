@@ -24,3 +24,11 @@ The `/api/v1/artifacts/<path>` route serves files from `.pi/artifacts/` (includi
 ## Diagrams
 
 When drawing diagrams, use Mermaid instead of ASCII art. The web UI renders Mermaid code fences inline as diagrams, so prefer a fenced ```mermaid block over hand-drawn ASCII boxes, arrows, or trees.
+
+## Background processes
+
+When running dev servers, test watchers, file watchers, builds, or any command intended to run in the background:
+- **NEVER** use `nohup`, `&`, `disown`, or background shell patterns in `bash`. Raw background shell commands cannot be tracked or controlled by the UI.
+- **ALWAYS** use the `process` tool with `action: "start"`. This registers the process in the web UI, streams its live logs, and gives the user one-click kill controls.
+- Use `bash` ONLY for quick, synchronous commands where you need the output immediately before continuing your turn.
+

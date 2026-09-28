@@ -925,10 +925,17 @@ function BashExecBubble({
 	}
 
 	return (
-		<div className="message-row user">
+		<div className="message-row user" style={{ width: "100%", margin: "8px 0" }}>
 			<div
 				className="message-bubble user"
-				style={{ borderLeft: "3px solid var(--accent-text)", maxWidth: "100%" }}
+				style={{
+					borderLeft: "3px solid var(--accent-text)",
+					maxWidth: "100%",
+					width: "100%",
+					borderRadius: "var(--radius-lg)",
+					whiteSpace: "normal",
+					boxSizing: "border-box",
+				}}
 			>
 				<div
 					role={hasOutput ? "button" : undefined}
@@ -2465,12 +2472,23 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				flushTurn();
 				currentUser = msg;
 				currentTurnStart = idx;
+			} else if (role === "bashExecution") {
+				// User-initiated bash commands (!cmd / !!cmd) render chronologically
+				// as their own rows below preceding agent responses.
+				flushTurn();
+				out.push(
+					<BashExecBubble
+						key={`bash-${String((msg as unknown as BashExecMessage).timestamp ?? `${(msg as unknown as BashExecMessage).command ?? ""}-${idx}`)}`}
+						msg={msg as unknown as BashExecMessage}
+						sessionId={sessionId}
+					/>,
+				);
 			} else if (role === "toolResult") {
 			} else if (role === "custom" && msg.display === false) {
 				// Internal system or extension message flagged as hidden — do not render
 				continue;
 			} else {
-				// Assistant / bashExecution / branchSummary / custom
+				// Assistant / branchSummary / custom
 				if (currentUser !== undefined) {
 					currentAssistants.push(msg);
 				} else if (groupedToolDisplay) {
