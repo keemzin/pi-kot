@@ -610,7 +610,6 @@ export function App() {
                       alignItems: "center",
                       cursor: "grab",
                       color: "var(--text-ghost)",
-                      opacity: 0.5,
                       marginRight: "2px",
                     }}
                   >

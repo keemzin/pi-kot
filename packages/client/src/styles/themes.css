@@ -710,8 +710,8 @@ strong {
 .project-row.active {
 	background: var(--accent-subtle);
 	color: var(--accent-text);
-	box-shadow: inset 3px 0 0 var(--accent);
-	border-radius: 0 var(--radius) var(--radius) 0;
+	border-radius: var(--radius);
+	box-shadow: inset 0 0 0 1px var(--accent-border, rgba(56, 189, 248, 0.25));
 }
 
 .project-row.drag-over {
@@ -732,7 +732,11 @@ strong {
 }
 
 .project-row:hover .project-drag-handle {
-	opacity: 1;
+	opacity: 0.65;
+}
+
+.project-drag-handle:hover {
+	opacity: 1 !important;
 }
 
 @media (max-width: 600px) {
@@ -802,18 +806,20 @@ strong {
 	padding: 0 0 2px 24px;
 }
 
-/* Session items in project tree — compact, dense */
+/* Session items in project tree — compact, modern */
 .project-sublist .session-item {
 	font-size: 12px;
-	padding: 5px 12px;
+	padding: 4px 8px;
 	border-radius: var(--radius-xs);
 	cursor: pointer;
 	color: var(--text-secondary);
-	margin-bottom: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	margin-bottom: 1px;
 	transition: all var(--duration) var(--ease);
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 26px;
+	box-sizing: border-box;
 }
 
 .project-sublist .session-item:hover {
@@ -824,13 +830,17 @@ strong {
 .project-sublist .session-item.active {
 	background: var(--accent-subtle);
 	color: var(--accent-text);
-	font-weight: 600;
-	box-shadow: inset 2px 0 0 var(--accent);
+	font-weight: 500;
+	border-radius: var(--radius-xs);
+	box-shadow: inset 0 0 0 1px var(--accent-border, rgba(56, 189, 248, 0.25));
 }
 
 .session-name {
+	flex: 1;
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .session-rename-input {
@@ -850,103 +860,96 @@ strong {
 	border-color: var(--input-focus-border);
 }
 
-/* Archive button on session items (hidden by default, shown on hover) */
-.session-item {
-	position: relative;
+.session-item-meta {
 	display: flex;
-	align-items: baseline;
-	gap: 4px;
-}
-
-.session-archive-btn {
-	opacity: 0.2;
-	background: none;
-	border: none;
-	color: var(--text-dim);
-	cursor: pointer;
-	font-size: 12px;
-	padding: 2px 4px;
-	min-width: 20px;
-	min-height: 20px;
-	border-radius: var(--radius-xs);
-	line-height: 1;
+	align-items: center;
+	justify-content: flex-end;
 	margin-left: auto;
 	flex-shrink: 0;
-	transition:
-		opacity var(--duration) var(--ease),
-		color var(--duration) var(--ease),
-		background var(--duration) var(--ease);
+	position: relative;
 }
 
-.session-archive-btn:hover {
-	opacity: 1;
-	color: var(--error);
-	background: var(--bg-glass-hover);
+.session-time {
+	font-size: 10px;
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	user-select: none;
+	transition: opacity var(--duration) var(--ease);
 }
 
-.session-item:hover .session-archive-btn {
-	opacity: 0.6;
+.session-fav-indicator {
+	display: flex;
+	align-items: center;
+	color: var(--warning, #fbbf24);
+	margin-right: 4px;
+	user-select: none;
 }
 
-.session-item:hover .session-archive-btn:hover {
-	opacity: 1;
+.session-item:hover .session-time,
+.session-item:hover .session-fav-indicator {
+	display: none;
 }
 
-/* Star/favorite button on session items — always visible */
-.session-fav-btn {
-	opacity: 0.3;
+.session-actions {
+	display: none;
+	align-items: center;
+	gap: 2px;
+}
+
+.session-item:hover .session-actions {
+	display: flex;
+}
+
+.session-action-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	background: none;
 	border: none;
 	color: var(--text-dim);
 	cursor: pointer;
-	font-size: 12px;
-	padding: 2px 4px;
+	padding: 3px;
 	min-width: 20px;
 	min-height: 20px;
 	border-radius: var(--radius-xs);
 	line-height: 1;
-	flex-shrink: 0;
 	transition:
-		opacity var(--duration) var(--ease),
 		color var(--duration) var(--ease),
+		background var(--duration) var(--ease),
 		transform var(--duration) var(--ease);
 }
 
+.session-action-btn:hover {
+	background: var(--bg-glass-active);
+	color: var(--text-primary);
+}
+
 .session-fav-btn.favorited {
-	opacity: 1;
 	color: var(--warning, #fbbf24);
 }
 
 .session-fav-btn:hover {
-	opacity: 1;
-	transform: scale(1.2);
-}
-
-.session-fav-btn.favorited:hover {
 	color: var(--warning, #fbbf24);
+	transform: scale(1.1);
 }
 
-.session-item:hover .session-fav-btn:not(.favorited) {
-	opacity: 0.7;
-}
-
-.session-item:hover .session-fav-btn:not(.favorited):hover {
-	opacity: 1;
-	color: var(--warning, #fbbf24);
+.session-archive-btn:hover {
+	color: var(--error, #f87171);
 }
 
 /* Favorites section header — tighter */
 .favorites-section-header {
 	display: flex;
 	align-items: center;
-	padding: 2px 10px 1px;
-	margin-top: 2px;
+	padding: 4px 8px 2px;
+	margin-top: 4px;
 	font-size: 9px;
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 	color: var(--warning, #fbbf24);
-	opacity: 0.7;
+	opacity: 0.85;
 }
 
 .favorites-section-header.clickable {
@@ -960,11 +963,19 @@ strong {
 }
 
 .favorites-chevron {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 12px;
-	font-size: 8px;
-	margin-right: 3px;
+	margin-right: 4px;
 	opacity: 0.8;
+}
+
+.favorites-count-badge {
+	margin-left: auto;
+	font-size: 10px;
+	opacity: 0.6;
+	font-variant-numeric: tabular-nums;
 }
 
 /* Thin divider between favorites and all sessions */
@@ -1191,12 +1202,12 @@ strong {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 4px 10px;
-	margin: 4px 0;
-	border-radius: var(--radius-sm);
-	border: 1px dashed var(--border);
+	padding: 5px 8px;
+	margin: 4px 0 2px;
+	border-radius: var(--radius-xs);
+	border: 1px solid transparent;
 	background: transparent;
-	color: var(--text-tertiary);
+	color: var(--text-dim);
 	font-size: 11px;
 	font-weight: 500;
 	font-family: inherit;
@@ -1207,10 +1218,9 @@ strong {
 }
 
 .new-session-row:hover {
-	background: var(--accent-subtle);
-	color: var(--accent-text);
-	border-color: var(--accent);
-	color: var(--accent-text);
+	background: var(--bg-glass-hover);
+	color: var(--text-primary);
+	border-color: var(--border);
 }
 
 @media (max-width: 600px) {
@@ -2321,7 +2331,9 @@ strong {
 .session-item.active {
 	background: var(--accent-subtle);
 	color: var(--accent-text);
-	font-weight: 600;
+	font-weight: 500;
+	border-radius: var(--radius-xs);
+	box-shadow: inset 0 0 0 1px var(--accent-border, rgba(56, 189, 248, 0.25));
 }
 
 /* ═══ Main Area ═══ */
@@ -6021,6 +6033,17 @@ strong {
 .session-worker-item.active {
 	background: var(--active-bg);
 	color: var(--accent-text);
+	border-radius: var(--radius-xs);
+	box-shadow: inset 0 0 0 1px var(--accent-border, rgba(56, 189, 248, 0.25));
+}
+
+.session-worker-time {
+	margin-left: auto;
+	font-size: 10px;
+	color: var(--text-dim);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	user-select: none;
 }
 
 .session-worker-dot {
@@ -6865,30 +6888,47 @@ strong {
    Session List — search + truncation
    ═══════════════════════════════════════════════════════ */
 
+.session-search-box {
+	position: relative;
+	display: flex;
+	align-items: center;
+	padding: 2px 8px 4px;
+}
+
+.session-search-icon {
+	position: absolute;
+	left: 16px;
+	color: var(--text-dim);
+	pointer-events: none;
+	opacity: 0.7;
+}
+
 .session-search-input {
 	width: 100%;
-	padding: 6px 10px;
+	padding: 5px 8px 5px 26px;
 	border-radius: var(--radius-sm);
 	border: 1px solid var(--border);
 	background: var(--bg-glass);
 	color: var(--text-primary);
-	font-size: 12px;
+	font-size: 11px;
 	font-family: inherit;
 	outline: none;
 	box-sizing: border-box;
-	transition: border-color var(--duration) var(--ease);
+	transition: all var(--duration) var(--ease);
 	/* remove default search chrome (X button) */
 	-webkit-appearance: none;
 	appearance: none;
 }
 
 .session-search-input:focus {
-	border-color: var(--border-bright);
+	border-color: var(--accent);
 	background: var(--bg-glass-hover);
+	box-shadow: 0 0 0 1px var(--accent-subtle);
 }
 
 .session-search-input::placeholder {
 	color: var(--text-dim);
+	opacity: 0.8;
 }
 
 /* clear button from type=search */

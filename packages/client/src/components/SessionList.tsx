@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Star, Archive, Plus, Search, ChevronRight, ChevronDown } from "lucide-react";
 import type { SessionSummary } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useFavoriteStore } from "../stores/favorite-store";
@@ -6,6 +7,25 @@ import { useI18n } from "../hooks/useI18n";
 
 const PAGE_SIZE = 8; // sessions shown before "Show more"
 const SEARCH_THRESHOLD = 0; // show search input once a project has this many sessions
+
+function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const diffMs = Date.now() - date.getTime();
+  if (Number.isNaN(diffMs) || diffMs < 0) return "";
+  const sec = Math.floor(diffMs / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "1d";
+  if (days < 7) return `${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w`;
+  return `${Math.floor(days / 30)}mo`;
+}
 
 interface Props {
   projectId: string;
@@ -106,6 +126,7 @@ export function SessionList({
     const isActive = activeSessionId === supervisor.sessionId;
     const displayName = supervisor.name ?? `Session ${supervisor.sessionId.slice(0, 8)}`;
     const isFav = isFavorite(supervisor.sessionId);
+    const relativeTime = formatRelativeTime(supervisor.lastActivityAt || supervisor.createdAt);
 
     return (
       <div key={supervisor.sessionId}>
@@ -125,9 +146,9 @@ export function SessionList({
             <span
               className="project-chevron"
               onClick={(e) => { e.stopPropagation(); onToggleWorkerGroup(supervisor.sessionId); }}
-              style={{ cursor: "pointer", marginRight: "4px" }}
+              style={{ cursor: "pointer", marginRight: "4px", display: "inline-flex", alignItems: "center" }}
             >
-              {isExpandedGroup ? "▾" : "▶"}
+              {isExpandedGroup ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </span>
           )}
           {renamingSessionId === supervisor.sessionId ? (
@@ -145,30 +166,41 @@ export function SessionList({
             />
           ) : (
             <>
-            <button
-              className={`session-fav-btn${isFav ? " favorited" : ""}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFav(supervisor.sessionId);
-              }}
-              title={isFav ? "Remove from favorites" : "Add to favorites"}
-            >
-              {isFav ? "★" : "☆"}
-            </button>
-            <span className="session-name">{displayName}</span>
-            <button
-              className="session-archive-btn"
-              title="Archive session"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm(`Archive "${displayName}"?`)) {
-                  unfavoriteFav(supervisor.sessionId);
-                  useSessionStore.getState().archiveSession(supervisor.sessionId);
-                }
-              }}
-            >
-              ✕
-            </button>
+              <span className="session-name" title={displayName}>{displayName}</span>
+
+              <div className="session-item-meta">
+                {isFav && (
+                  <span className="session-fav-indicator" title="Favorited">
+                    <Star size={11} fill="currentColor" />
+                  </span>
+                )}
+                {relativeTime && <span className="session-time">{relativeTime}</span>}
+                <div className="session-actions">
+                  <button
+                    className={`session-action-btn session-fav-btn${isFav ? " favorited" : ""}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFav(supervisor.sessionId);
+                    }}
+                    title={isFav ? "Remove from favorites" : "Add to favorites"}
+                  >
+                    <Star size={12} fill={isFav ? "currentColor" : "none"} />
+                  </button>
+                  <button
+                    className="session-action-btn session-archive-btn"
+                    title="Archive session"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Archive "${displayName}"?`)) {
+                        unfavoriteFav(supervisor.sessionId);
+                        useSessionStore.getState().archiveSession(supervisor.sessionId);
+                      }
+                    }}
+                  >
+                    <Archive size={12} />
+                  </button>
+                </div>
+              </div>
             </>
           )}
         </div>
@@ -194,7 +226,8 @@ export function SessionList({
     <div className="session-list project-sublist">
       {/* ── Search ── */}
       {showSearch && (
-        <div style={{ padding: "2px 8px 3px" }}>
+        <div className="session-search-box">
+          <Search size={12} className="session-search-icon" />
           <input
             value={query}
             onChange={(e) => { setQuery(e.target.value); setShowAll(false); }}
@@ -225,9 +258,11 @@ export function SessionList({
             onClick={() => setFavoritesCollapsed((c) => !c)}
             title={favoritesCollapsed ? "Expand favorites" : "Collapse favorites"}
           >
-            <span className="favorites-chevron">{favoritesCollapsed ? "▶" : "▾"}</span>
+            <span className="favorites-chevron">
+              {favoritesCollapsed ? <ChevronRight size={10} /> : <ChevronDown size={10} />}
+            </span>
             <span>{t("sidebar.favorites")}</span>
-            <span style={{ marginLeft: "auto", fontSize: "10px", opacity: 0.6 }}>{favSupervisors.length}</span>
+            <span className="favorites-count-badge">{favSupervisors.length}</span>
           </div>
           {!favoritesCollapsed && favSupervisors.map(renderRow)}
           {visibleNormalSupervisors.length > 0 && <div className="favorites-section-divider" />}
@@ -273,8 +308,8 @@ export function SessionList({
         onClick={(e) => { e.stopPropagation(); onNewSession(); }}
         type="button"
       >
-        <span style={{ fontSize: "14px", lineHeight: 1 }}>＋</span>
-        {t("sidebar.newSession")}
+        <Plus size={13} strokeWidth={2.2} />
+        <span>{t("sidebar.newSession")}</span>
       </button>
     </div>
   );
@@ -292,6 +327,8 @@ function WorkerItem({
   isStreaming: boolean;
   onSelect: (id: string) => void;
 }) {
+  const relativeTime = formatRelativeTime(worker.lastActivityAt || worker.createdAt);
+
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onSelect(worker.sessionId); }}
@@ -310,6 +347,7 @@ function WorkerItem({
       <span className="session-worker-name">
         {worker.name ?? `Session ${worker.sessionId.slice(0, 8)}`}
       </span>
+      {relativeTime && <span className="session-time session-worker-time">{relativeTime}</span>}
     </div>
   );
 }
