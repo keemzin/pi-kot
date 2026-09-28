@@ -17,6 +17,7 @@ type UiSettings = {
 	theme?: string;
 	accent?: string;
 	stickyUserHeader?: boolean;
+	flyToTop?: boolean;
 	showTokenUsage?: boolean;
 	compressImages?: boolean;
 	showThinking?: boolean;
@@ -192,6 +193,10 @@ export function AppearanceTab() {
 					setStickyUserHeader(server.stickyUserHeader);
 					zSetSticky(server.stickyUserHeader);
 				}
+				if (typeof server.flyToTop === "boolean") {
+					setFlyToTop(server.flyToTop);
+					zSetFly(server.flyToTop);
+				}
 				if (typeof server.showTokenUsage === "boolean") {
 					setShowTokenUsage(server.showTokenUsage);
 					zSetToken(server.showTokenUsage);
@@ -295,11 +300,10 @@ export function AppearanceTab() {
 		zSetSticky(val);
 		persist({ stickyUserHeader: val });
 	};
-	// Local-only preference (not part of the server UiSettings schema) — the
-	// zustand store persists it to localStorage on its own.
 	const toggleFlyToTop = (val: boolean) => {
 		setFlyToTop(val);
 		zSetFly(val);
+		persist({ flyToTop: val });
 	};
 	const toggleToken = (val: boolean) => {
 		setShowTokenUsage(val);
@@ -719,125 +723,222 @@ export function AppearanceTab() {
 				)}
 			</div>
 
-			{/* ── Toggles ── */}
+			{/* ── Chat Toggles ── */}
 			<div className="settings-field">
 				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={stickyUserHeader}
-						onChange={(e) => toggleSticky(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.stickyUserHeader")}
-				</label>
+				<div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 4 }}>
+					{/* Sticky user header */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={stickyUserHeader}
+								onChange={(e) => toggleSticky(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.stickyUserHeader")}
+						</label>
+					</div>
+
+					{/* Fly to top */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={flyToTop}
+								onChange={(e) => toggleFlyToTop(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.flyToTop")}
+						</label>
+						<p className="settings-hint" style={{ marginTop: 2, marginLeft: 26 }}>
+							{t("settings.appearance.flyToTopDesc")}
+						</p>
+					</div>
+
+					{/* Show token usage */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={showTokenUsage}
+								onChange={(e) => toggleToken(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.showTokenUsage")}
+						</label>
+					</div>
+
+					{/* Show turn files */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={showTurnFiles}
+								onChange={(e) => toggleTurnFiles(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.showTurnFiles")}
+						</label>
+						<p className="settings-hint" style={{ marginTop: 2, marginLeft: 26 }}>
+							{t("settings.appearance.showTurnFilesDesc")}
+						</p>
+					</div>
+
+					{/* Show thinking */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={showThinking}
+								onChange={(e) => toggleThinking(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.showThinking")}
+						</label>
+					</div>
+
+					{/* Grouped tool display */}
+					<div>
+						<label
+							style={{
+								display: "flex",
+								alignItems: "center",
+								gap: 10,
+								cursor: "pointer",
+								userSelect: "none",
+								fontSize: 13,
+								color: "var(--text-secondary)",
+							}}
+						>
+							<input
+								type="checkbox"
+								checked={groupedToolDisplay}
+								onChange={(e) => toggleGrouped(e.target.checked)}
+								style={{
+									width: 16,
+									height: 16,
+									accentColor: "var(--accent)",
+									cursor: "pointer",
+								}}
+							/>
+							{t("settings.appearance.groupedToolDisplay")}
+						</label>
+						<p className="settings-hint" style={{ marginTop: 2, marginLeft: 26 }}>
+							{t("settings.appearance.groupedToolDisplayDesc")}
+						</p>
+						<div style={{ display: "flex", gap: 8, marginTop: 8, marginLeft: 26 }}>
+							{(["justify", "full"] as const).map((v) => (
+								<button
+									key={v}
+									type="button"
+									onClick={() => selectTrailView(v)}
+									style={{
+										padding: "4px 12px",
+										borderRadius: "var(--radius-sm)",
+										border: `1px solid ${trailView === v ? "var(--accent)" : "var(--border)"}`,
+										background:
+											trailView === v
+												? "var(--accent-subtle)"
+												: "var(--bg-glass)",
+										color:
+											trailView === v
+												? "var(--accent-text)"
+												: "var(--text-secondary)",
+										fontSize: "11px",
+										fontWeight: trailView === v ? 600 : 400,
+										cursor: "pointer",
+										fontFamily: "inherit",
+										transition: "all 0.15s",
+									}}
+								>
+									{v === "justify" ? t("settings.appearance.trailAuto") : t("settings.appearance.trailExpandAll")}
+								</button>
+							))}
+						</div>
+						<p className="settings-hint" style={{ marginTop: 4, marginLeft: 26 }}>
+							{t("settings.appearance.trailHint")}
+						</p>
+					</div>
+				</div>
 			</div>
 
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={flyToTop}
-						onChange={(e) => toggleFlyToTop(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.flyToTop")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.flyToTopDesc")}
-				</p>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showTokenUsage}
-						onChange={(e) => toggleToken(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showTokenUsage")}
-				</label>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showTurnFiles}
-						onChange={(e) => toggleTurnFiles(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showTurnFiles")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.showTurnFilesDesc")}
-				</p>
-			</div>
-
+			{/* ── Images ── */}
 			<div className="settings-field">
 				<label className="settings-label">{t("settings.appearance.images")}</label>
 				<label
@@ -866,99 +967,8 @@ export function AppearanceTab() {
 				</label>
 			</div>
 
+			{/* ── Sidebar ── */}
 			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showThinking}
-						onChange={(e) => toggleThinking(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showThinking")}
-				</label>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={groupedToolDisplay}
-						onChange={(e) => toggleGrouped(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.groupedToolDisplay")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.groupedToolDisplayDesc")}
-				</p>
-				{/* Default resting view for finished trails */}
-				<div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-					{(["justify", "full"] as const).map((v) => (
-						<button
-							key={v}
-							type="button"
-							onClick={() => selectTrailView(v)}
-							style={{
-								padding: "4px 12px",
-								borderRadius: "var(--radius-sm)",
-								border: `1px solid ${trailView === v ? "var(--accent)" : "var(--border)"}`,
-								background:
-									trailView === v
-										? "var(--accent-subtle)"
-										: "var(--bg-glass)",
-								color:
-									trailView === v
-										? "var(--accent-text)"
-										: "var(--text-secondary)",
-								fontSize: "11px",
-								fontWeight: trailView === v ? 600 : 400,
-								cursor: "pointer",
-								fontFamily: "inherit",
-								transition: "all 0.15s",
-							}}
-						>
-							{v === "justify" ? t("settings.appearance.trailAuto") : t("settings.appearance.trailExpandAll")}
-						</button>
-					))}
-				</div>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					{t("settings.appearance.trailHint")}
-				</p>
-			</div>
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
 				<label
 					style={{
 						display: "flex",
@@ -983,7 +993,7 @@ export function AppearanceTab() {
 					/>
 					{t("settings.appearance.swipeSidebar")}
 				</label>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
+				<p className="settings-hint" style={{ marginTop: 2, marginLeft: 26 }}>
 					{t("settings.appearance.swipeSidebarHint")}
 				</p>
 			</div>

@@ -31,6 +31,9 @@ export function applyServerUiSettings(settings: Record<string, unknown> | null |
   if (typeof settings.stickyUserHeader === "boolean") {
     setState({ stickyUserHeader: settings.stickyUserHeader });
   }
+  if (typeof settings.flyToTop === "boolean") {
+    setState({ flyToTop: settings.flyToTop });
+  }
   if (typeof settings.showTokenUsage === "boolean") {
     setState({ showTokenUsage: settings.showTokenUsage });
   }

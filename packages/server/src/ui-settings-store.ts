@@ -17,6 +17,7 @@ export type UiSettings = {
 	theme?: string;
 	accent?: string;
 	stickyUserHeader: boolean;
+	flyToTop: boolean;
 	showTokenUsage: boolean;
 	compressImages: boolean;
 	showThinking: boolean;
@@ -52,6 +53,7 @@ const DEFAULTS: UiSettings = {
 	theme: undefined,
 	accent: undefined,
 	stickyUserHeader: true,
+	flyToTop: true,
 	showTokenUsage: false,
 	compressImages: true,
 	showThinking: false,
@@ -88,6 +90,8 @@ function normalize(value: unknown): UiSettings {
 	if (typeof v.accent === "string") settings.accent = v.accent;
 	if (typeof v.stickyUserHeader === "boolean")
 		settings.stickyUserHeader = v.stickyUserHeader;
+	if (typeof v.flyToTop === "boolean")
+		settings.flyToTop = v.flyToTop;
 	if (typeof v.showTokenUsage === "boolean")
 		settings.showTokenUsage = v.showTokenUsage;
 	if (typeof v.compressImages === "boolean")

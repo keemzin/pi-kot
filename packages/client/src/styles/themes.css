@@ -4983,7 +4983,7 @@ strong {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
-	overflow-anchor: auto;
+	overflow-anchor: none;
 	scroll-behavior: auto;
 	padding: 4px 16px 2px;
 	scrollbar-width: none; /* Firefox */
