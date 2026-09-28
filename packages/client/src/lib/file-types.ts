@@ -42,7 +42,18 @@ export function isHtmlPath(filePath: string): boolean {
 
 export function isMarkdownPath(filePath: string): boolean {
 	const ext = getExtension(filePath);
-	return ext === "md" || ext === "mdx";
+	return ext === "md" || ext === "mdx" || ext === "markdown";
+}
+
+export function isSvgPath(filePath: string): boolean {
+	const ext = getExtension(filePath);
+	return ext === "svg";
+}
+
+/** Returns true if the file format has a visual rendered preview (markdown, HTML, SVG). */
+export function isRenderablePath(filePath: string): boolean {
+	const ext = getExtension(filePath);
+	return ext === "md" || ext === "mdx" || ext === "markdown" || ext === "html" || ext === "htm" || ext === "svg";
 }
 
 /** Get document preview kind (pdf or docx) or null. */

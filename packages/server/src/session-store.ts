@@ -7,7 +7,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { compactionContinuationExtension } from "./compaction-continuation.js";
 import { planModeExtension } from "./plan-mode-extension.js";
-import { mkdir, rename, unlink, readdir, stat } from "node:fs/promises";
+import { mkdir, rename, unlink, readdir, stat, utimes } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { createAskUserQuestionTool } from "./ask-user-question/tool.js";
 import { createPlanModeQuestionTool } from "./ask-user-question/plan-mode-question-tool.js";
@@ -17,6 +17,8 @@ import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
 import { getProjectSystemPromptAddendum } from "./system-prompt-overrides.js";
 import { registerArtifactCwd } from "./routes/artifacts.js";
+import { createProcessTool } from "./processes/tool.js";
+import { processManager } from "./processes/manager.js";
 
 /**
  * Build a DefaultResourceLoader with pi-kot's always-on extensions and
@@ -209,6 +211,8 @@ export interface UnifiedSession {
   createdAt: Date;
   lastActivityAt: Date;
   messageCount: number;
+  archivedAt?: Date;
+  expiresInDays?: number;
 }
 
 export async function listSessionsForProject(
@@ -271,6 +275,7 @@ export async function createSession(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, workspacePath),
     ...orchestrationTools,
   ];
 
@@ -369,14 +374,83 @@ export function registerSession(live: LiveSession): void {
   registry.set(live.sessionId, live);
 }
 
-/* ── Archive / Unarchive ── */
+/* ── Archive / Unarchive & 30-Day Retention ── */
+
+export const ARCHIVE_RETENTION_DAYS = 30;
+export const ARCHIVE_RETENTION_MS = ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
 function archivedDirFor(projectId: string): string {
   return join(config.sessionDir, projectId, "_archived");
 }
 
 /**
+ * Permanently purge archived session files older than 30 days that have not been restored.
+ * Can be run across all projects or scoped to a specific projectId.
+ */
+export async function purgeExpiredArchivedSessions(projectId?: string): Promise<number> {
+  let deletedCount = 0;
+  const now = Date.now();
+
+  try {
+    let archiveDirs: string[] = [];
+    if (projectId) {
+      archiveDirs = [archivedDirFor(projectId)];
+    } else {
+      const pids = await readdir(config.sessionDir).catch(() => []);
+      archiveDirs = pids.map((pid) => archivedDirFor(pid));
+    }
+
+    for (const archiveDir of archiveDirs) {
+      let files: string[] = [];
+      try {
+        files = await readdir(archiveDir);
+      } catch {
+        continue;
+      }
+      for (const file of files) {
+        if (!file.endsWith(".jsonl")) continue;
+        const filePath = join(archiveDir, file);
+        try {
+          const s = await stat(filePath);
+          if (now - s.mtimeMs > ARCHIVE_RETENTION_MS) {
+            await unlink(filePath);
+            deletedCount++;
+            console.log(
+              `[archive-purge] Permanently deleted expired session file: ${file} ` +
+              `(${Math.round((now - s.mtimeMs) / (24 * 3600 * 1000))}d old, retention=${ARCHIVE_RETENTION_DAYS}d)`,
+            );
+          }
+        } catch {
+          // ignore transient stat/unlink errors
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[archive-purge] Error during archive purge:`, err);
+  }
+
+  return deletedCount;
+}
+
+/**
+ * Permanently delete an archived session file immediately without waiting for 30-day auto-purge.
+ */
+export async function deleteArchivedSession(sessionId: string, projectId: string): Promise<boolean> {
+  const archiveDir = archivedDirFor(projectId);
+  try {
+    const files = await readdir(archiveDir);
+    const match = files.find((f) => f.endsWith(".jsonl") && f.includes(sessionId));
+    if (!match) return false;
+    await unlink(join(archiveDir, match));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Archive a session: move JSONL to _archived/ subfolder, remove from live registry.
+ * Touches mtime so 30-day auto-purge countdown begins from archive time.
  * Works for both live and disk-only sessions.
  * Returns true if archived, false if not found on disk or in registry.
  */
@@ -397,7 +471,11 @@ export async function archiveSession(sessionId: string, projectId?: string): Pro
     if (match) {
       const archiveDir = archivedDirFor(pid);
       await mkdir(archiveDir, { recursive: true });
-      await rename(join(srcDir, match), join(archiveDir, match));
+      const destPath = join(archiveDir, match);
+      await rename(join(srcDir, match), destPath);
+      // Touch mtime so the 30-day expiry counts from when it was archived
+      const now = new Date();
+      await utimes(destPath, now, now).catch(() => {});
       fileMoved = true;
     }
   } catch {
@@ -415,6 +493,9 @@ export async function archiveSession(sessionId: string, projectId?: string): Pro
     try { live.session.dispose(); } catch {}
     registry.delete(sessionId);
   }
+
+  // Trigger background purge of any expired sessions
+  void purgeExpiredArchivedSessions(pid).catch(() => {});
 
   return fileMoved || live !== undefined;
 }
@@ -439,12 +520,15 @@ export async function unarchiveSession(sessionId: string, projectId: string): Pr
 }
 
 /**
- * List archived sessions for a project.
+ * List archived sessions for a project. Automatically purges sessions older than 30 days first.
  */
 export async function listArchivedSessions(
   projectId: string,
   workspacePath: string,
 ): Promise<UnifiedSession[]> {
+  // First, purge any sessions older than 30 days that have not been restored
+  await purgeExpiredArchivedSessions(projectId);
+
   const archiveDir = archivedDirFor(projectId);
   try {
     await stat(archiveDir);
@@ -456,6 +540,7 @@ export async function listArchivedSessions(
     const files = await readdir(archiveDir);
     const jsonls = files.filter((f) => f.endsWith(".jsonl"));
     const results: UnifiedSession[] = [];
+    const now = Date.now();
 
     for (const file of jsonls) {
       try {
@@ -468,6 +553,16 @@ export async function listArchivedSessions(
         const ctx = sm.buildSessionContext();
         const info = SessionManager.list(workspacePath, archiveDir);
         const match = (await info).find((i) => i.id === sessionId);
+
+        let archivedAt: Date | undefined;
+        let expiresInDays: number | undefined;
+        try {
+          const s = await stat(sessionPath);
+          archivedAt = s.mtime;
+          const remainingMs = Math.max(0, ARCHIVE_RETENTION_MS - (now - s.mtimeMs));
+          expiresInDays = Math.max(1, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+        } catch {}
+
         results.push({
           sessionId,
           projectId,
@@ -476,6 +571,8 @@ export async function listArchivedSessions(
           createdAt: match?.created ?? new Date(0),
           lastActivityAt: match?.modified ?? new Date(0),
           messageCount: ctx.messages.length,
+          archivedAt,
+          expiresInDays,
         });
       } catch {
         // skip corrupt files
@@ -618,6 +715,7 @@ export async function rebuildSessionTools(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, live.workspacePath),
     ...orchestrationTools,
   ];
 
@@ -732,6 +830,7 @@ export async function disposeSession(sessionId: string): Promise<boolean> {
   registry.delete(live.sessionId);
   // Clean up orchestration dedupe state for this session
   notifySupervisorDisposed(live.sessionId);
+  await processManager.disposeSession(live.sessionId);
 
   return true;
 }
@@ -798,6 +897,7 @@ export async function resumeSessionById(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, loc.workspacePath),
     ...orchestrationTools,
   ];
 
@@ -919,6 +1019,7 @@ export async function forkSession(
     createAskUserQuestionTool(forkedId),
     createPlanModeQuestionTool(forkedId),
     createSubmitPlanTool(forkedId),
+    createProcessTool(forkedId, sourceLive.workspacePath),
     ...orchestrationTools,
   ];
 

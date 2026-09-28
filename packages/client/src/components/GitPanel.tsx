@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Columns2, Rows2 } from "lucide-react";
+import {
+  Columns2,
+  Rows2,
+  Plus,
+  Minus,
+  RotateCcw,
+  FileText,
+  X,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { getStoredToken } from "../lib/api-client";
 import { useLayoutStore } from "../stores/layout-store";
 import { DiffBlock } from "./DiffBlock";
@@ -95,6 +105,8 @@ export function GitPanel({ projectId }: Props) {
 
   // Per-file diff cache
   const [openDiffs, setOpenDiffs] = useState<Record<string, string | "loading" | "error">>({});
+  const [diffStats, setDiffStats] = useState<Record<string, { additions: number; deletions: number }>>({});
+  const openFileViewer = useLayoutStore((s) => s.openFileViewer);
   // Revert confirm state (click-twice)
   const [pendingRevert, setPendingRevert] = useState<string | undefined>();
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -150,6 +162,25 @@ export function GitPanel({ projectId }: Props) {
         }
         return changed ? next : prev;
       });
+
+      // Fetch diffs to calculate per-file stats (+/-)
+      Promise.all([
+        authFetch(`/api/v1/git/diff?${qs}`).then((r) => r.ok ? (r.json() as Promise<{ diff: string }>) : { diff: "" }),
+        authFetch(`/api/v1/git/diff/staged?${qs}`).then((r) => r.ok ? (r.json() as Promise<{ diff: string }>) : { diff: "" }),
+      ]).then(([uData, sData]) => {
+        const uStats = parseDiffStats(uData.diff);
+        const sStats = parseDiffStats(sData.diff);
+        const merged: Record<string, { additions: number; deletions: number }> = { ...uStats };
+        for (const [k, v] of Object.entries(sStats)) {
+          if (merged[k]) {
+            merged[k].additions += v.additions;
+            merged[k].deletions += v.deletions;
+          } else {
+            merged[k] = { ...v };
+          }
+        }
+        setDiffStats(merged);
+      }).catch(() => {});
     } catch (err) {
       const msg = err instanceof Error ? err.message : "fetch failed";
       setStatusError(msg);
@@ -550,9 +581,17 @@ export function GitPanel({ projectId }: Props) {
         background: "var(--bg-glass)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 500, color: "var(--text-primary)", fontSize: "13px" }}>
-          <span style={{ fontWeight: 700 }}>
+          <span style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "5px" }}>
             {status?.branch ? (
-              <><span style={{ color: "var(--accent-text)" }}>⎇</span> {status.branch}</>
+              <>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--accent-text)", flexShrink: 0 }}>
+                  <line x1="6" y1="3" x2="6" y2="15"/>
+                  <circle cx="18" cy="6" r="3"/>
+                  <circle cx="6" cy="18" r="3"/>
+                  <path d="M18 9a9 9 0 0 1-9 9"/>
+                </svg>
+                <span>{status.branch}</span>
+              </>
             ) : "—"}
           </span>
           {status && status.files.length > 0 && (
@@ -561,10 +600,10 @@ export function GitPanel({ projectId }: Props) {
             </span>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
           <button
             onClick={toggleGitViewType}
-            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            className="fe-toolbar-btn"
             title={gitViewType === "split" ? "Switch to unified view" : "Switch to side-by-side view"}
             type="button"
           >
@@ -573,10 +612,14 @@ export function GitPanel({ projectId }: Props) {
           <button
             onClick={fetchStatus}
             title="Refresh"
-            style={{ background: "none", border: "none", borderRadius: "var(--radius-sm)", padding: "4px", color: "var(--text-dim)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+            className="fe-toolbar-btn"
             type="button"
           >
-            ↻
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={busy ? { animation: "spin 1s linear infinite" } : undefined}>
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -612,6 +655,9 @@ export function GitPanel({ projectId }: Props) {
             openDiffs={openDiffs}
             staged
             viewType={gitViewType}
+            diffStats={diffStats}
+            onOpenFile={openFileViewer}
+            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -630,6 +676,9 @@ export function GitPanel({ projectId }: Props) {
             openDiffs={openDiffs}
             staged={false}
             viewType={gitViewType}
+            diffStats={diffStats}
+            onOpenFile={openFileViewer}
+            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -646,6 +695,9 @@ export function GitPanel({ projectId }: Props) {
             openDiffs={openDiffs}
             staged={false}
             viewType={gitViewType}
+            diffStats={diffStats}
+            onOpenFile={openFileViewer}
+            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -861,11 +913,18 @@ export function GitPanel({ projectId }: Props) {
                           style={{
                             background: "none", border: "none", cursor: "pointer",
                             fontSize: "10px", color: copied ? "var(--accent-text)" : "var(--text-dim)",
-                            padding: "1px 4px", opacity: 0.7,
+                            padding: "2px 4px", opacity: 0.8, display: "inline-flex", alignItems: "center",
                           }}
                           type="button"
                         >
-                          {copied ? "✓" : "📋"}
+                          {copied ? (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          ) : (
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                          )}
                         </button>
                         <button
                           onClick={() => handleRemoveWorktree(w.path)}
@@ -1034,6 +1093,9 @@ interface FileGroupProps {
   onRevert?: (f: GitFileStatus) => void;
   pendingRevert?: string;
   viewType?: "unified" | "split";
+  diffStats?: Record<string, { additions: number; deletions: number }>;
+  onOpenFile?: (path: string, name: string) => void;
+  onToggleViewType?: () => void;
 }
 
 function FileGroup(props: FileGroupProps) {
@@ -1059,63 +1121,308 @@ function FileGroup(props: FileGroupProps) {
         {props.files.map((f) => {
           const key = `${f.path}|${props.staged ? "staged" : "unstaged"}`;
           const diffState = props.openDiffs[key];
+          const isDiffOpen = diffState !== undefined;
+          const { fileName, dirPath } = splitPath(f.path);
+          const stats = getStatsForFile(f, props.staged, props.diffStats, props.openDiffs);
+
           return (
             <li key={f.path} style={{ borderBottom: "1px solid var(--border)" }}>
-              <div className="git-file-row">
+              <div
+                className={`git-file-row${isDiffOpen ? " diff-open" : ""}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 12px",
+                  background: isDiffOpen ? "var(--bg-glass-active)" : undefined,
+                }}
+              >
                 {/* Badge */}
-                <span style={{
-                  width: "20px", flexShrink: 0, textAlign: "center",
-                  fontSize: "12px", fontFamily: "monospace", fontWeight: 700,
-                  color: kindColor(f.kind),
-                }}>
+                <span
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "var(--radius-xs, 3px)",
+                    fontSize: "10px",
+                    fontFamily: "monospace",
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    color: kindColor(f.kind),
+                    background: kindBg(f.kind),
+                  }}
+                  title={f.kind}
+                >
                   {kindBadge(f.kind)}
                 </span>
-                {/* File name */}
-                <button
+
+                {/* File info (click to toggle diff) */}
+                <div
                   onClick={() => props.onClickFile(f)}
                   style={{
-                    flex: 1, background: "none", border: "none",
-                    color: "var(--text-primary)", cursor: "pointer",
-                    fontSize: "12px", fontFamily: "monospace",
-                    textAlign: "left", overflow: "hidden", textOverflow: "ellipsis",
-                    whiteSpace: "nowrap", padding: "2px 4px", borderRadius: "var(--radius-sm)",
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1px",
+                    cursor: "pointer",
+                    padding: "2px 0",
                   }}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      props.onClickFile(f);
+                    }
+                  }}
                 >
-                  {f.path}
-                </button>
-                {/* Revert */}
-                {props.onRevert && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "12px",
+                        color: "var(--text-primary)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {fileName}
+                    </span>
+                    {/* Diff stats (+/-) */}
+                    {stats && (stats.additions > 0 || stats.deletions > 0) && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                          fontSize: "10px",
+                          fontFamily: "monospace",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {stats.additions > 0 && (
+                          <span style={{ color: "var(--accent-text, #4ade80)" }}>
+                            +{stats.additions}
+                          </span>
+                        )}
+                        {stats.deletions > 0 && (
+                          <span style={{ color: "var(--error, #f87171)" }}>
+                            -{stats.deletions}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {dirPath && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: "var(--text-dim)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        fontFamily: "monospace",
+                      }}
+                      title={f.path}
+                    >
+                      {dirPath}
+                    </span>
+                  )}
+                </div>
+
+                {/* Hover icon actions */}
+                <div className={`git-file-actions${props.pendingRevert === f.path ? " has-pending" : ""}`}>
+                  {/* Open in Editor button */}
+                  {props.onOpenFile && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        props.onOpenFile!(f.path, fileName);
+                      }}
+                      className="git-icon-btn"
+                      title="Open in editor"
+                      type="button"
+                    >
+                      <FileText size={12} />
+                    </button>
+                  )}
+
+                  {/* Revert / Discard button */}
+                  {props.onRevert && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        props.onRevert!(f);
+                      }}
+                      className={`git-icon-btn danger${props.pendingRevert === f.path ? " pending" : ""}`}
+                      title="Discard changes"
+                      style={
+                        props.pendingRevert === f.path
+                          ? {
+                              width: "auto",
+                              padding: "2px 6px",
+                              fontSize: "10px",
+                              color: "var(--error)",
+                              fontWeight: 600,
+                              background: "rgba(248, 113, 113, 0.15)",
+                              borderColor: "rgba(248, 113, 113, 0.3)",
+                            }
+                          : undefined
+                      }
+                      type="button"
+                    >
+                      {props.pendingRevert === f.path ? (
+                        "Confirm?"
+                      ) : (
+                        <RotateCcw size={12} />
+                      )}
+                    </button>
+                  )}
+
+                  {/* Stage / Unstage icon button */}
                   <button
-                    onClick={() => props.onRevert!(f)}
-                    className={`git-action-btn git-revert-btn${props.pendingRevert === f.path ? " pending" : ""}`}
-                    title="Revert (discard changes)"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onFileAction(f);
+                    }}
+                    className="git-icon-btn"
+                    title={props.staged ? "Unstage file" : "Stage file"}
                     type="button"
                   >
-                    {props.pendingRevert === f.path ? "Confirm?" : "↩"}
+                    {props.staged ? <Minus size={13} /> : <Plus size={13} />}
                   </button>
-                )}
-                {/* Action */}
-                <button
-                  onClick={() => props.onFileAction(f)}
-                  className="git-action-btn git-file-action-btn"
-                  type="button"
-                >
-                  {props.fileActionLabel}
-                </button>
+
+                  {/* Diff toggle chevron */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onClickFile(f);
+                    }}
+                    className="git-icon-btn"
+                    title={isDiffOpen ? "Collapse diff" : "Show diff"}
+                    type="button"
+                  >
+                    {isDiffOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                  </button>
+                </div>
               </div>
-              {/* Inline diff */}
-              {diffState !== undefined && (
-                <div style={{ borderTop: "1px solid var(--border)", background: "var(--bg-glass)", padding: "4px 12px", overflow: "hidden" }}>
-                  {diffState === "loading" ? (
-                    <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>Loading diff…</div>
-                  ) : diffState === "error" ? (
-                    <div style={{ fontSize: "10px", color: "var(--error)" }}>Failed to load diff.</div>
-                  ) : diffState.length === 0 ? (
-                    <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic" }}>(no diff)</div>
-                  ) : (
-                    <DiffBlock diff={diffState} viewType={props.viewType} />
-                  )}
+
+              {/* Inline diff with header toolbar */}
+              {isDiffOpen && (
+                <div>
+                  <div
+                    className="git-diff-header"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "4px 10px",
+                      background: "var(--bg-glass-active, rgba(255, 255, 255, 0.05))",
+                      borderTop: "1px solid var(--border)",
+                      borderBottom: "1px solid var(--border)",
+                      fontSize: "11px",
+                      minWidth: 0,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
+                      <span style={{ fontWeight: 600, color: "var(--text-secondary)", fontSize: "11px" }}>Diff</span>
+                      <span style={{ color: "var(--text-dim)", fontSize: "10px" }}>•</span>
+                      <span
+                        style={{
+                          color: "var(--text-primary)",
+                          fontFamily: "monospace",
+                          fontWeight: 600,
+                          fontSize: "11px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={f.path}
+                      >
+                        {fileName}
+                      </span>
+                      {stats && (stats.additions > 0 || stats.deletions > 0) && (
+                        <span style={{ fontSize: "10px", fontFamily: "monospace", flexShrink: 0 }}>
+                          {stats.additions > 0 && <span style={{ color: "var(--accent-text, #4ade80)" }}>+{stats.additions}</span>}{" "}
+                          {stats.deletions > 0 && <span style={{ color: "var(--error, #f87171)" }}>-{stats.deletions}</span>}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
+                      {/* View mode toggle */}
+                      {props.onToggleViewType && (
+                        <button
+                          type="button"
+                          onClick={props.onToggleViewType}
+                          className="fe-toolbar-btn"
+                          title={props.viewType === "split" ? "Unified view" : "Side-by-side view"}
+                          style={{ padding: "3px 6px" }}
+                        >
+                          {props.viewType === "split" ? <Rows2 size={12} /> : <Columns2 size={12} />}
+                        </button>
+                      )}
+
+                      {/* Open file in editor */}
+                      {props.onOpenFile && (
+                        <button
+                          type="button"
+                          onClick={() => props.onOpenFile!(f.path, fileName)}
+                          className="fe-toolbar-btn"
+                          title="Open file in editor"
+                          style={{ padding: "3px 6px" }}
+                        >
+                          <FileText size={12} />
+                        </button>
+                      )}
+
+                      {/* Quick Stage / Unstage in diff header */}
+                      <button
+                        type="button"
+                        onClick={() => props.onFileAction(f)}
+                        className="fe-toolbar-btn"
+                        title={props.staged ? "Unstage this file" : "Stage this file"}
+                        style={{
+                          padding: "2px 7px",
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          borderRadius: "var(--radius-xs, 3px)",
+                          border: "1px solid var(--border-bright)",
+                          background: "var(--accent-subtle)",
+                          color: "var(--accent-text)",
+                        }}
+                      >
+                        {props.staged ? "Unstage" : "Stage"}
+                      </button>
+
+                      {/* Close diff preview */}
+                      <button
+                        type="button"
+                        onClick={() => props.onClickFile(f)}
+                        className="fe-toolbar-btn"
+                        title="Close diff preview"
+                        style={{ padding: "3px 5px", color: "var(--text-dim)" }}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ background: "var(--bg-glass)", padding: "4px 8px", overflow: "hidden" }}>
+                    {diffState === "loading" ? (
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic", padding: "8px" }}>Loading diff…</div>
+                    ) : diffState === "error" ? (
+                      <div style={{ fontSize: "10px", color: "var(--error)", padding: "8px" }}>Failed to load diff.</div>
+                    ) : diffState.length === 0 ? (
+                      <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic", padding: "8px" }}>(no diff)</div>
+                    ) : (
+                      <DiffBlock diff={diffState} viewType={props.viewType} />
+                    )}
+                  </div>
                 </div>
               )}
             </li>
@@ -1176,13 +1483,82 @@ function kindBadge(kind: FileStatusKind): string {
 
 function kindColor(kind: FileStatusKind): string {
   switch (kind) {
-    case "modified": return "var(--accent-text)";
+    case "modified": return "var(--accent-text, #e5c07b)";
     case "added": return "#98c379";
-    case "deleted": return "var(--error)";
-    case "untracked": return "var(--text-dim)";
-    case "conflicted": return "var(--error)";
+    case "deleted": return "var(--error, #e06c75)";
+    case "untracked": return "#61afef";
+    case "conflicted": return "var(--error, #e06c75)";
     default: return "var(--text-dim)";
   }
+}
+
+function kindBg(kind: FileStatusKind): string {
+  switch (kind) {
+    case "modified": return "var(--accent-subtle, rgba(229, 192, 123, 0.12))";
+    case "added": return "rgba(152, 195, 121, 0.12)";
+    case "deleted": return "rgba(248, 113, 113, 0.12)";
+    case "untracked": return "rgba(97, 175, 239, 0.12)";
+    case "conflicted": return "rgba(224, 108, 117, 0.15)";
+    default: return "transparent";
+  }
+}
+
+function splitPath(fullPath: string): { fileName: string; dirPath: string } {
+  const lastSlash = fullPath.lastIndexOf("/");
+  if (lastSlash === -1) {
+    return { fileName: fullPath, dirPath: "" };
+  }
+  return {
+    fileName: fullPath.slice(lastSlash + 1),
+    dirPath: fullPath.slice(0, lastSlash),
+  };
+}
+
+function parseDiffStats(diffText: string): Record<string, { additions: number; deletions: number }> {
+  const stats: Record<string, { additions: number; deletions: number }> = {};
+  if (!diffText) return stats;
+  let currentFile: string | undefined;
+  for (const line of diffText.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      const parts = line.split(" ");
+      const bPath = parts[parts.length - 1]?.replace(/^b\//, "");
+      currentFile = bPath;
+      if (currentFile && !stats[currentFile]) {
+        stats[currentFile] = { additions: 0, deletions: 0 };
+      }
+    } else if (currentFile && !line.startsWith("+++") && !line.startsWith("---")) {
+      if (line.startsWith("+")) {
+        stats[currentFile].additions++;
+      } else if (line.startsWith("-")) {
+        stats[currentFile].deletions++;
+      }
+    }
+  }
+  return stats;
+}
+
+function getStatsForFile(
+  f: GitFileStatus,
+  staged: boolean,
+  statsMap?: Record<string, { additions: number; deletions: number }>,
+  openDiffs?: Record<string, string | "loading" | "error">,
+): { additions: number; deletions: number } | undefined {
+  if (statsMap && statsMap[f.path]) return statsMap[f.path];
+  if (openDiffs) {
+    const key = `${f.path}|${staged ? "staged" : "unstaged"}`;
+    const diff = openDiffs[key];
+    if (typeof diff === "string" && diff.length > 0) {
+      let additions = 0;
+      let deletions = 0;
+      for (const line of diff.split("\n")) {
+        if (line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@")) continue;
+        if (line.startsWith("+")) additions++;
+        else if (line.startsWith("-")) deletions++;
+      }
+      return { additions, deletions };
+    }
+  }
+  return undefined;
 }
 
 /* ─── Commit file helpers (same visual style) ─── */

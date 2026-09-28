@@ -12,11 +12,14 @@ import { getUiSettings, updateUiSettings } from "../../lib/api-client";
 import { usePreferencesStore } from "../../stores/preferences-store";
 import { SplitFlapText } from "../SplitFlapText";
 import { useI18n } from "../../hooks/useI18n";
+import { Palette, MessageSquare, Sliders, Sparkles, RotateCcw, MessageCircle } from "lucide-react";
+import { SettingCard, SettingRow, SettingToggle, SettingDivider } from "./shared";
 
 type UiSettings = {
 	theme?: string;
 	accent?: string;
 	stickyUserHeader?: boolean;
+	flyToTop?: boolean;
 	showTokenUsage?: boolean;
 	compressImages?: boolean;
 	showThinking?: boolean;
@@ -192,6 +195,10 @@ export function AppearanceTab() {
 					setStickyUserHeader(server.stickyUserHeader);
 					zSetSticky(server.stickyUserHeader);
 				}
+				if (typeof server.flyToTop === "boolean") {
+					setFlyToTop(server.flyToTop);
+					zSetFly(server.flyToTop);
+				}
 				if (typeof server.showTokenUsage === "boolean") {
 					setShowTokenUsage(server.showTokenUsage);
 					zSetToken(server.showTokenUsage);
@@ -295,11 +302,10 @@ export function AppearanceTab() {
 		zSetSticky(val);
 		persist({ stickyUserHeader: val });
 	};
-	// Local-only preference (not part of the server UiSettings schema) — the
-	// zustand store persists it to localStorage on its own.
 	const toggleFlyToTop = (val: boolean) => {
 		setFlyToTop(val);
 		zSetFly(val);
+		persist({ flyToTop: val });
 	};
 	const toggleToken = (val: boolean) => {
 		setShowTokenUsage(val);
@@ -424,119 +430,130 @@ export function AppearanceTab() {
 
 	return (
 		<div className="settings-fields">
-			<p className="settings-hint">
-				{serverSynced
-					? t("settings.appearance.preferencesSaved")
-					: t("settings.appearance.preferencesLocal")}
-			</p>
+			{/* Server sync status banner */}
+			<div
+				style={{
+					display: "flex",
+					alignItems: "center",
+					justifyContent: "space-between",
+					padding: "8px 12px",
+					borderRadius: "var(--radius-sm)",
+					background: "var(--bg-glass)",
+					border: "1px solid var(--border)",
+					fontSize: 12,
+				}}
+			>
+				<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+					<span
+						style={{
+							width: 8,
+							height: 8,
+							borderRadius: "50%",
+							background: serverSynced
+								? "var(--success, #34d399)"
+								: "var(--warning, #fbbf24)",
+						}}
+					/>
+					<span style={{ color: "var(--text-secondary)" }}>
+						{serverSynced
+							? t("settings.appearance.preferencesSaved")
+							: t("settings.appearance.preferencesLocal")}
+					</span>
+				</div>
+			</div>
 
-			{/* ── Theme ── */}
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.theme")}</label>
-				<div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-					{themes.map((t) => (
+			{/* Card 1: Theme & Palette */}
+			<SettingCard
+				icon={<Palette size={15} />}
+				title={`${t("settings.appearance.theme")} & ${t("settings.appearance.accent")}`}
+				subtitle="Customize theme modes and system accent highlights"
+			>
+				<div className="settings-item-row stacked">
+					<div className="settings-item-info">
+						<div className="settings-item-label">{t("settings.appearance.theme")}</div>
+						<div className="settings-item-desc">
+							Select dark, light, or warm editor color palettes
+						</div>
+					</div>
+					<div className="settings-theme-grid">
+						{themes.map((th) => (
+							<button
+								key={th.id}
+								type="button"
+								className={`settings-theme-card ${theme === th.id ? "active" : ""}`}
+								onClick={() => selectTheme(th.id as ThemeMode)}
+							>
+								<span className="settings-theme-icon">{th.icon}</span>
+								<span>{th.name}</span>
+							</button>
+						))}
+					</div>
+				</div>
+
+				<SettingDivider />
+
+				<div className="settings-item-row stacked">
+					<div className="settings-item-info">
+						<div className="settings-item-label">{t("settings.appearance.accent")}</div>
+						<div className="settings-item-desc">
+							Focus rings, active tabs, buttons, and highlighted indicators
+						</div>
+					</div>
+					<div className="settings-accents-row">
+						{accents.map((a) => (
+							<button
+								key={a.id}
+								type="button"
+								onClick={() => selectAccent(a.id)}
+								title={a.name}
+								className={`settings-accent-dot ${accent === a.id ? "active" : ""}`}
+								style={{ backgroundColor: a.color }}
+							/>
+						))}
+					</div>
+				</div>
+			</SettingCard>
+
+			{/* Card 2: Message Bubble Style */}
+			<SettingCard
+				icon={<MessageSquare size={15} />}
+				title={t("settings.appearance.yourMessageBubble")}
+				subtitle="Customize the color scheme and appearance of your user prompts"
+				action={
+					selectedPreset !== 0 ? (
 						<button
-							key={t.id}
-							onClick={() => selectTheme(t.id as ThemeMode)}
-							style={{
-								padding: "6px 12px",
-								borderRadius: "var(--radius-sm)",
-								border: `1px solid ${theme === t.id ? "var(--accent)" : "var(--border)"}`,
-								background:
-									theme === t.id ? "var(--accent-subtle)" : "var(--bg-glass)",
-								color:
-									theme === t.id
-										? "var(--accent-text)"
-										: "var(--text-secondary)",
-								fontSize: "12px",
-								fontWeight: theme === t.id ? 600 : 400,
-								cursor: "pointer",
-								fontFamily: "inherit",
-								transition: "all 0.15s",
-							}}
 							type="button"
+							onClick={resetBubble}
+							className="settings-btn settings-btn-xs"
+							title={t("settings.appearance.resetDefaults")}
 						>
-							{t.icon} {t.name}
+							<RotateCcw size={11} />
+							<span>{t("settings.appearance.resetDefaults")}</span>
 						</button>
-					))}
-				</div>
-			</div>
-
-			{/* ── Accent ── */}
-			<div className="settings-field" style={{ marginTop: 8 }}>
-				<label className="settings-label">{t("settings.appearance.accent")}</label>
+					) : undefined
+				}
+			>
+				{/* Presets */}
 				<div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-					{accents.map((a) => (
-						<button
-							key={a.id}
-							onClick={() => selectAccent(a.id)}
-							title={a.name}
-							style={{
-								width: 28,
-								height: 28,
-								borderRadius: "50%",
-								border:
-									accent === a.id
-										? `2px solid ${a.color}`
-										: "2px solid var(--border)",
-								background: a.color,
-								cursor: "pointer",
-								boxShadow:
-									accent === a.id
-										? `0 0 0 2px var(--bg-solid), 0 0 0 4px ${a.color}`
-										: "none",
-								transition: "all 0.15s",
-							}}
-							type="button"
-						/>
-					))}
-				</div>
-			</div>
-
-			{/* ── User Bubble ── */}
-			<div className="settings-field" style={{ marginTop: 8 }}>
-				<label className="settings-label">{t("settings.appearance.yourMessageBubble")}</label>
-				<div
-					style={{
-						display: "flex",
-						gap: "6px",
-						flexWrap: "wrap",
-						marginBottom: 8,
-					}}
-				>
 					{BUBBLE_PRESETS.map((p, i) => (
 						<button
 							key={p.name}
+							type="button"
 							onClick={() => selectBubblePreset(i)}
+							className={`providers-filter-tab ${selectedPreset === i ? "active" : ""}`}
 							style={{
-								display: "flex",
+								display: "inline-flex",
 								alignItems: "center",
 								gap: 6,
-								padding: "4px 10px",
-								borderRadius: "var(--radius-sm)",
 								border: `1px solid ${selectedPreset === i ? "var(--accent)" : "var(--border)"}`,
-								background:
-									selectedPreset === i
-										? "var(--accent-subtle)"
-										: "var(--bg-glass)",
-								color:
-									selectedPreset === i
-										? "var(--accent-text)"
-										: "var(--text-secondary)",
-								fontSize: "11px",
-								fontWeight: selectedPreset === i ? 600 : 400,
-								cursor: "pointer",
-								fontFamily: "inherit",
-								transition: "all 0.15s",
 							}}
-							type="button"
 						>
 							{p.bg !== "__custom__" && p.bg !== null && (
 								<span
 									style={{
-										width: 12,
-										height: 12,
-										borderRadius: 3,
+										width: 10,
+										height: 10,
+										borderRadius: 2,
 										background: p.bg,
 										border: `1px solid ${p.border ?? "transparent"}`,
 										flexShrink: 0,
@@ -548,483 +565,365 @@ export function AppearanceTab() {
 					))}
 				</div>
 
-				{selectedPreset === BUBBLE_PRESETS.length - 1 && (
+				{/* Live Preview & Custom Editor */}
+				<div
+					style={{
+						display: "flex",
+						flexDirection: "column",
+						gap: 12,
+						padding: 12,
+						borderRadius: "var(--radius-sm)",
+						background: "var(--bg-glass-strong)",
+						border: "1px solid var(--border)",
+					}}
+				>
+					<div
+						style={{
+							display: "flex",
+							justifyContent: "space-between",
+							alignItems: "center",
+						}}
+					>
+						<span
+							style={{
+								fontSize: 11,
+								fontWeight: 600,
+								color: "var(--text-dim)",
+								textTransform: "uppercase",
+								letterSpacing: "0.05em",
+							}}
+						>
+							{t("settings.appearance.preview")}
+						</span>
+					</div>
+
+					<div className="message-row user" style={{ padding: 0 }}>
+						<div className="message-bubble user">
+							{t("settings.appearance.previewUser")}
+						</div>
+					</div>
+					<div className="message-row assistant" style={{ padding: 0 }}>
+						<div
+							className="message-bubble assistant"
+							style={{ fontSize: 13, color: "var(--text-secondary)" }}
+						>
+							{t("settings.appearance.previewAssistant")}
+						</div>
+					</div>
+
+					{selectedPreset === BUBBLE_PRESETS.length - 1 && (
+						<div
+							style={{
+								display: "grid",
+								gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+								gap: 10,
+								marginTop: 6,
+								paddingTop: 10,
+								borderTop: "1px solid var(--border)",
+							}}
+						>
+							{/* Background color */}
+							<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+								<label
+									style={{
+										fontSize: 11,
+										color: "var(--text-secondary)",
+										fontWeight: 500,
+									}}
+								>
+									{t("settings.appearance.background")}
+								</label>
+								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+									<input
+										type="color"
+										value={bubbleBg ?? "#1e40af"}
+										onChange={(e) => updateBubbleColor("bg", e.target.value)}
+										style={{
+											width: 28,
+											height: 28,
+											padding: 0,
+											border: "1px solid var(--border)",
+											borderRadius: 4,
+											cursor: "pointer",
+										}}
+									/>
+									<input
+										type="text"
+										value={bubbleBg ?? ""}
+										onChange={(e) =>
+											updateBubbleColor("bg", e.target.value || "")
+										}
+										placeholder="accent default"
+										className="settings-input"
+										style={{
+											fontSize: 11,
+											padding: "4px 8px",
+											fontFamily: "var(--font-mono)",
+										}}
+									/>
+								</div>
+							</div>
+
+							{/* Text color */}
+							<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+								<label
+									style={{
+										fontSize: 11,
+										color: "var(--text-secondary)",
+										fontWeight: 500,
+									}}
+								>
+									{t("settings.appearance.text")}
+								</label>
+								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+									<input
+										type="color"
+										value={bubbleText ?? "#ffffff"}
+										onChange={(e) => updateBubbleColor("text", e.target.value)}
+										style={{
+											width: 28,
+											height: 28,
+											padding: 0,
+											border: "1px solid var(--border)",
+											borderRadius: 4,
+											cursor: "pointer",
+										}}
+									/>
+									<input
+										type="text"
+										value={bubbleText ?? ""}
+										onChange={(e) =>
+											updateBubbleColor("text", e.target.value || "")
+										}
+										placeholder="accent default"
+										className="settings-input"
+										style={{
+											fontSize: 11,
+											padding: "4px 8px",
+											fontFamily: "var(--font-mono)",
+										}}
+									/>
+								</div>
+							</div>
+
+							{/* Border color */}
+							<div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+								<label
+									style={{
+										fontSize: 11,
+										color: "var(--text-secondary)",
+										fontWeight: 500,
+									}}
+								>
+									{t("settings.appearance.border")}
+								</label>
+								<div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+									<input
+										type="color"
+										value={bubbleBorder ?? "#3b82f6"}
+										onChange={(e) =>
+											updateBubbleColor("border", e.target.value)
+										}
+										style={{
+											width: 28,
+											height: 28,
+											padding: 0,
+											border: "1px solid var(--border)",
+											borderRadius: 4,
+											cursor: "pointer",
+										}}
+									/>
+									<input
+										type="text"
+										value={bubbleBorder ?? ""}
+										onChange={(e) =>
+											updateBubbleColor("border", e.target.value || "")
+										}
+										placeholder="accent default"
+										className="settings-input"
+										style={{
+											fontSize: 11,
+											padding: "4px 8px",
+											fontFamily: "var(--font-mono)",
+										}}
+									/>
+								</div>
+							</div>
+						</div>
+					)}
+				</div>
+			</SettingCard>
+
+			{/* Card 3: Chat & Stream Experience */}
+			<SettingCard
+				icon={<MessageCircle size={15} />}
+				title={t("settings.appearance.chat")}
+				subtitle="Layout behavior, streaming flow, and execution trail visibility"
+			>
+				<SettingRow
+					label={t("settings.appearance.stickyUserHeader")}
+					hint="Pins your prompt header to the top when scrolling through long replies"
+				>
+					<SettingToggle
+						checked={stickyUserHeader}
+						onChange={toggleSticky}
+						ariaLabel={t("settings.appearance.stickyUserHeader")}
+					/>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label={t("settings.appearance.flyToTop")}
+					hint={t("settings.appearance.flyToTopDesc")}
+				>
+					<SettingToggle
+						checked={flyToTop}
+						onChange={toggleFlyToTop}
+						ariaLabel={t("settings.appearance.flyToTop")}
+					/>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label={t("settings.appearance.showTokenUsage")}
+					hint="Show input and output token consumption chips on each turn"
+				>
+					<SettingToggle
+						checked={showTokenUsage}
+						onChange={toggleToken}
+						ariaLabel={t("settings.appearance.showTokenUsage")}
+					/>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label={t("settings.appearance.showTurnFiles")}
+					hint={t("settings.appearance.showTurnFilesDesc")}
+				>
+					<SettingToggle
+						checked={showTurnFiles}
+						onChange={toggleTurnFiles}
+						ariaLabel={t("settings.appearance.showTurnFiles")}
+					/>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label={t("settings.appearance.showThinking")}
+					hint="Render reasoning and thinking blocks emitted by compatible models"
+				>
+					<SettingToggle
+						checked={showThinking}
+						onChange={toggleThinking}
+						ariaLabel={t("settings.appearance.showThinking")}
+					/>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label={t("settings.appearance.groupedToolDisplay")}
+					hint={t("settings.appearance.groupedToolDisplayDesc")}
+					alignTop={groupedToolDisplay}
+				>
 					<div
 						style={{
 							display: "flex",
 							flexDirection: "column",
+							alignItems: "flex-end",
 							gap: 8,
-							padding: "8px 0",
 						}}
 					>
-						{/* ── Live preview: mirrors .message-bubble.user exactly ── */}
-						<div
-							style={{
-								display: "flex",
-								flexDirection: "column",
-								gap: 10,
-								padding: 12,
-								borderRadius: "var(--radius-sm)",
-								background: "var(--bg-glass)",
-								border: "1px solid var(--border)",
-							}}
-						>
-							<span style={{ fontSize: 11, color: "var(--text-dim)" }}>
-								{t("settings.appearance.preview")}
-							</span>
-							<div className="message-row user" style={{ padding: 0 }}>
-								<div className="message-bubble user">
-									{t("settings.appearance.previewUser")}
-								</div>
+						<SettingToggle
+							checked={groupedToolDisplay}
+							onChange={toggleGrouped}
+							ariaLabel={t("settings.appearance.groupedToolDisplay")}
+						/>
+						{groupedToolDisplay && (
+							<div className="settings-segmented">
+								{(["justify", "full"] as const).map((v) => (
+									<button
+										key={v}
+										type="button"
+										className={`settings-segmented-btn ${trailView === v ? "active" : ""}`}
+										onClick={() => selectTrailView(v)}
+										title={t("settings.appearance.trailHint")}
+									>
+										{v === "justify"
+											? t("settings.appearance.trailAuto")
+											: t("settings.appearance.trailExpandAll")}
+									</button>
+								))}
 							</div>
-							<div className="message-row assistant" style={{ padding: 0 }}>
-								<div
-									className="message-bubble assistant"
-									style={{ fontSize: 13, color: "var(--text-secondary)" }}
-								>
-									{t("settings.appearance.previewAssistant")}
-								</div>
-							</div>
-						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<label
-								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
-							>
-								{t("settings.appearance.background")}
-							</label>
-							<input
-								type="color"
-								value={bubbleBg ?? "#1e40af"}
-								onChange={(e) => updateBubbleColor("bg", e.target.value)}
-								style={{
-									width: 32,
-									height: 24,
-									padding: 0,
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									cursor: "pointer",
-								}}
-							/>
-							<input
-								type="text"
-								value={bubbleBg ?? ""}
-								onChange={(e) => updateBubbleColor("bg", e.target.value || "")}
-								placeholder="accent default"
-								style={{
-									flex: 1,
-									padding: "3px 6px",
-									fontSize: 11,
-									fontFamily: "var(--font-mono)",
-									background: "var(--bg-glass)",
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									color: "var(--text-primary)",
-								}}
-							/>
-						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<label
-								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
-							>
-								{t("settings.appearance.text")}
-							</label>
-							<input
-								type="color"
-								value={bubbleText ?? "#ffffff"}
-								onChange={(e) => updateBubbleColor("text", e.target.value)}
-								style={{
-									width: 32,
-									height: 24,
-									padding: 0,
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									cursor: "pointer",
-								}}
-							/>
-							<input
-								type="text"
-								value={bubbleText ?? ""}
-								onChange={(e) =>
-									updateBubbleColor("text", e.target.value || "")
-								}
-								placeholder="accent default"
-								style={{
-									flex: 1,
-									padding: "3px 6px",
-									fontSize: 11,
-									fontFamily: "var(--font-mono)",
-									background: "var(--bg-glass)",
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									color: "var(--text-primary)",
-								}}
-							/>
-						</div>
-						<div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-							<label
-								style={{ fontSize: 11, color: "var(--text-dim)", width: 60 }}
-							>
-								{t("settings.appearance.border")}
-							</label>
-							<input
-								type="color"
-								value={bubbleBorder ?? "#3b82f6"}
-								onChange={(e) => updateBubbleColor("border", e.target.value)}
-								style={{
-									width: 32,
-									height: 24,
-									padding: 0,
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									cursor: "pointer",
-								}}
-							/>
-							<input
-								type="text"
-								value={bubbleBorder ?? ""}
-								onChange={(e) =>
-									updateBubbleColor("border", e.target.value || "")
-								}
-								placeholder="accent default"
-								style={{
-									flex: 1,
-									padding: "3px 6px",
-									fontSize: 11,
-									fontFamily: "var(--font-mono)",
-									background: "var(--bg-glass)",
-									border: "1px solid var(--border)",
-									borderRadius: 4,
-									color: "var(--text-primary)",
-								}}
-							/>
-						</div>
-						<button
-							onClick={resetBubble}
-							style={{
-								alignSelf: "flex-start",
-								padding: "4px 10px",
-								fontSize: 11,
-								border: "1px solid var(--border)",
-								borderRadius: "var(--radius-sm)",
-								background: "var(--bg-glass)",
-								color: "var(--text-secondary)",
-								cursor: "pointer",
-								fontFamily: "inherit",
-							}}
-							type="button"
-						>
-							{t("settings.appearance.resetDefaults")}
-						</button>
+						)}
 					</div>
-				)}
-			</div>
+				</SettingRow>
+			</SettingCard>
 
-			{/* ── Toggles ── */}
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
+			{/* Card 4: Gestures & Media */}
+			<SettingCard
+				icon={<Sliders size={15} />}
+				title="Touch & Media"
+				subtitle="Gestures for touchscreen navigation and media optimization"
+			>
+				<SettingRow
+					label={t("settings.appearance.compressImages")}
+					hint="Automatically downscale high-resolution images to conserve context tokens"
 				>
-					<input
-						type="checkbox"
-						checked={stickyUserHeader}
-						onChange={(e) => toggleSticky(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.stickyUserHeader")}
-				</label>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={flyToTop}
-						onChange={(e) => toggleFlyToTop(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.flyToTop")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.flyToTopDesc")}
-				</p>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showTokenUsage}
-						onChange={(e) => toggleToken(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showTokenUsage")}
-				</label>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showTurnFiles}
-						onChange={(e) => toggleTurnFiles(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showTurnFiles")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.showTurnFilesDesc")}
-				</p>
-			</div>
-
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.images")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
+					<SettingToggle
 						checked={compressImages}
-						onChange={(e) => toggleCompress(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
+						onChange={toggleCompress}
+						ariaLabel={t("settings.appearance.compressImages")}
 					/>
-					{t("settings.appearance.compressImages")}
-				</label>
-			</div>
+				</SettingRow>
 
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
-						checked={showThinking}
-						onChange={(e) => toggleThinking(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.showThinking")}
-				</label>
-			</div>
+				<SettingDivider />
 
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
+				<SettingRow
+					label={t("settings.appearance.swipeSidebar")}
+					hint={t("settings.appearance.swipeSidebarHint")}
 				>
-					<input
-						type="checkbox"
-						checked={groupedToolDisplay}
-						onChange={(e) => toggleGrouped(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
-					/>
-					{t("settings.appearance.groupedToolDisplay")}
-				</label>
-				<p className="settings-hint">
-					{t("settings.appearance.groupedToolDisplayDesc")}
-				</p>
-				{/* Default resting view for finished trails */}
-				<div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-					{(["justify", "full"] as const).map((v) => (
-						<button
-							key={v}
-							type="button"
-							onClick={() => selectTrailView(v)}
-							style={{
-								padding: "4px 12px",
-								borderRadius: "var(--radius-sm)",
-								border: `1px solid ${trailView === v ? "var(--accent)" : "var(--border)"}`,
-								background:
-									trailView === v
-										? "var(--accent-subtle)"
-										: "var(--bg-glass)",
-								color:
-									trailView === v
-										? "var(--accent-text)"
-										: "var(--text-secondary)",
-								fontSize: "11px",
-								fontWeight: trailView === v ? 600 : 400,
-								cursor: "pointer",
-								fontFamily: "inherit",
-								transition: "all 0.15s",
-							}}
-						>
-							{v === "justify" ? t("settings.appearance.trailAuto") : t("settings.appearance.trailExpandAll")}
-						</button>
-					))}
-				</div>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					{t("settings.appearance.trailHint")}
-				</p>
-			</div>
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.chat")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
-				>
-					<input
-						type="checkbox"
+					<SettingToggle
 						checked={swipeToOpenSidebar}
-						onChange={(e) => toggleSwipeSidebar(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
+						onChange={toggleSwipeSidebar}
+						ariaLabel={t("settings.appearance.swipeSidebar")}
 					/>
-					{t("settings.appearance.swipeSidebar")}
-				</label>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					{t("settings.appearance.swipeSidebarHint")}
-				</p>
-			</div>
+				</SettingRow>
+			</SettingCard>
 
-			{/* ── Empty state — split-flap departure board ── */}
-			<div className="settings-field">
-				<label className="settings-label">{t("settings.appearance.emptyState")}</label>
-				<label
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: 10,
-						cursor: "pointer",
-						userSelect: "none",
-						fontSize: 13,
-						color: "var(--text-secondary)",
-					}}
+			{/* Card 5: Empty State Welcome */}
+			<SettingCard
+				icon={<Sparkles size={15} />}
+				title={t("settings.appearance.emptyState")}
+				subtitle="Interactive greeting board for newly created chat sessions"
+			>
+				<SettingRow
+					label={t("settings.appearance.splitFlap")}
+					hint={t("settings.appearance.splitFlapHint")}
 				>
-					<input
-						type="checkbox"
+					<SettingToggle
 						checked={flapEnabled}
-						onChange={(e) => toggleFlapEnabled(e.target.checked)}
-						style={{
-							width: 16,
-							height: 16,
-							accentColor: "var(--accent)",
-							cursor: "pointer",
-						}}
+						onChange={toggleFlapEnabled}
+						ariaLabel={t("settings.appearance.splitFlap")}
 					/>
-					{t("settings.appearance.splitFlap")}
-				</label>
-				<p className="settings-hint" style={{ marginTop: 4 }}>
-					{t("settings.appearance.splitFlapHint")}
-				</p>
+				</SettingRow>
 
 				{flapEnabled && (
 					<>
-						<div style={{ marginTop: 10 }}>
-							<label className="settings-label" style={{ fontSize: 12 }}>
-								{t("settings.appearance.splitFlapPhrases")}
-							</label>
+						<SettingDivider />
+						<div className="settings-item-row stacked">
+							<div className="settings-item-info">
+								<div className="settings-item-label">
+									{t("settings.appearance.splitFlapPhrases")}
+								</div>
+								<div className="settings-item-desc">
+									{t("settings.appearance.splitFlapPhrasesHint")}
+								</div>
+							</div>
 							<input
 								value={flapWordsDraft}
 								onChange={(e) => setFlapWordsDraft(e.target.value)}
@@ -1035,19 +934,16 @@ export function AppearanceTab() {
 								className="settings-input"
 								placeholder="PI-KOT 0.1.39, PI-SDK 0.87.1"
 							/>
-							<p className="settings-hint" style={{ marginTop: 4 }}>
-								{t("settings.appearance.splitFlapPhrasesHint")}
-							</p>
 						</div>
 
-						{/* Live preview */}
+						{/* Live departure board preview */}
 						<div
 							style={{
-								marginTop: 12,
-								padding: "18px 12px",
+								marginTop: 4,
+								padding: "16px 12px",
 								borderRadius: "var(--radius-md)",
 								border: "1px solid var(--border)",
-								background: "var(--bg-glass)",
+								background: "var(--bg-glass-strong)",
 								display: "flex",
 								justifyContent: "center",
 								overflow: "hidden",
@@ -1067,7 +963,7 @@ export function AppearanceTab() {
 						</div>
 					</>
 				)}
-			</div>
+			</SettingCard>
 		</div>
 	);
 }

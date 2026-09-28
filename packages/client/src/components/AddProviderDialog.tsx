@@ -52,7 +52,23 @@ interface ModelEntry {
   selected: boolean;
 }
 
-// ── Steps ─────────────────────────────────────────────────────────────────
+// ── Local provider presets ───────────────────────────────────────────────
+
+export interface ProviderPreset {
+  name: string;
+  label: string;
+  baseUrl: string;
+  port?: string;
+  apiType?: string;
+  apiKey?: string;
+}
+
+export const LOCAL_PROVIDER_PRESETS: ProviderPreset[] = [
+  { name: "ollama", label: "Ollama", baseUrl: "http://localhost:11434/v1", port: "11434", apiType: "openai-completions" },
+  { name: "lmstudio", label: "LM Studio", baseUrl: "http://localhost:1234/v1", port: "1234", apiType: "openai-completions" },
+  { name: "vllm", label: "vLLM", baseUrl: "http://localhost:8000/v1", port: "8000", apiType: "openai-completions" },
+  { name: "localai", label: "LocalAI", baseUrl: "http://localhost:8080/v1", port: "8080", apiType: "openai-completions" },
+];
 
 type Step = "url" | "testing" | "models" | "save";
 
@@ -61,9 +77,10 @@ interface Props {
   onClose: () => void;
   onError: (msg: string | undefined) => void;
   onSaved: () => void;
+  initialPreset?: ProviderPreset | null;
 }
 
-export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
+export function AddProviderDialog({ open, onClose, onError, onSaved, initialPreset }: Props) {
   const { t } = useI18n();
   // ── Step 1 state ──────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>("url");
@@ -93,10 +110,14 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
   useEffect(() => {
     if (!open) return;
     setStep("url");
-    setBaseUrl("");
-    setProviderName("");
-    setApiKey("");
-    setApiType("openai-completions");
+    const initUrl = initialPreset?.baseUrl ?? "";
+    const initName = initialPreset?.name ?? "";
+    const initKey = initialPreset?.apiKey ?? "";
+    const initType = initialPreset?.apiType ?? "openai-completions";
+    setBaseUrl(initUrl);
+    setProviderName(initName);
+    setApiKey(initKey);
+    setApiType(initType);
     setShowKey(false);
     setConnectionTested(false);
     setTestResult(undefined);
@@ -106,8 +127,10 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
     setSaving(false);
     setSaved(false);
     onError(undefined);
-    requestAnimationFrame(() => urlRef.current?.focus());
-  }, [open, onError]);
+    if (!initUrl) {
+      requestAnimationFrame(() => urlRef.current?.focus());
+    }
+  }, [open, initialPreset, onError]);
 
   // ── Step 2: Test connection ───────────────────────────────────────────
 
@@ -329,6 +352,28 @@ export function AddProviderDialog({ open, onClose, onError, onSaved }: Props) {
           {/* ── STEP 1: URL / Provider Name / API Key ── */}
           {step === "url" && (
             <div className="add-provider-form">
+              <div className="add-provider-presets-row">
+                <span className="add-provider-presets-label">⚡ Local Presets:</span>
+                <div className="add-provider-presets-chips">
+                  {LOCAL_PROVIDER_PRESETS.map((p) => (
+                    <button
+                      key={p.name}
+                      type="button"
+                      className={`add-provider-preset-chip ${baseUrl === p.baseUrl ? "selected" : ""}`}
+                      onClick={() => {
+                        setBaseUrl(p.baseUrl);
+                        setProviderName(p.name);
+                        setApiType(p.apiType ?? "openai-completions");
+                        if (p.apiKey) setApiKey(p.apiKey);
+                      }}
+                    >
+                      <span className="preset-name">{p.label}</span>
+                      {p.port && <span className="preset-port">:{p.port}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="add-provider-field">
                 <label className="add-provider-label">Base URL</label>
                 <div className="add-provider-input-row">

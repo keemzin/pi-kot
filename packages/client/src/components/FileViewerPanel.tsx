@@ -7,6 +7,7 @@ import { useLayoutStore, VIEWER_MIN_WIDTH } from "../stores/layout-store";
 import { useSelectionBridge } from "../stores/selection-bridge";
 import { ConfirmDialog } from "./Modal";
 import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
+import { getFileTypeIcon } from "./FileIcon";
 
 export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: string; onClose?: () => void; fullWidth?: boolean }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
@@ -262,13 +263,15 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "2px",
-              padding: "4px 8px",
+              gap: "4px",
+              padding: "0 8px",
               borderBottom: "1px solid var(--border)",
               background: "var(--bg-glass)",
               flexShrink: 0,
               overflowX: "auto",
               minHeight: "38px",
+              height: "38px",
+              boxSizing: "border-box",
             }}
           >
             {onClose && (
@@ -276,20 +279,11 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                 onClick={onClose}
                 title="Close viewer"
                 className="viewer-back-btn"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-secondary)",
-                  cursor: "pointer",
-                  padding: "2px 6px",
-                  fontSize: "14px",
-                  borderRadius: "var(--radius-xs)",
-                  flexShrink: 0,
-                  lineHeight: 1,
-                }}
                 type="button"
               >
-                ←
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
               </button>
             )}
             {viewerTabs.length > 1 && (
@@ -299,19 +293,14 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                   closeAllViewerTabs();
                 }}
                 title="Close all tabs"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
-                  padding: "2px 6px",
-                  fontSize: "11px",
-                  borderRadius: "var(--radius-xs)",
-                  flexShrink: 0,
-                }}
+                className="viewer-close-all-btn"
                 type="button"
               >
-                ✕✕
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="13" height="13" rx="2" />
+                  <path d="m7 7 5 5m0-5-5 5" />
+                  <path d="M7 19h12a2 2 0 0 0 2-2V7" />
+                </svg>
               </button>
             )}
             {viewerTabs.map((tab) => {
@@ -319,31 +308,20 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
               return (
                 <div
                   key={tab.path}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    padding: "3px 8px",
-                    fontSize: "12px",
-                    fontWeight: isActive ? 600 : 400,
-                    whiteSpace: "nowrap",
-                    borderRadius: "var(--radius-xs)",
-                    background: isActive ? "var(--accent-subtle)" : "transparent",
-                    color: isActive ? "var(--accent-text)" : "var(--text-secondary)",
-                    cursor: "default",
-                    minWidth: 0,
-                    flexShrink: 0,
-                    borderBottom: isActive ? "2px solid var(--accent-text)" : "2px solid transparent",
-                    transition: "all 0.12s ease",
-                  }}
+                  onClick={() => setViewerActivePath(tab.path)}
+                  className={`viewer-tab-item${isActive ? " active" : ""}`}
+                  title={tab.path}
                 >
+                  {/* File type badge / icon */}
+                  {getFileTypeIcon(tab.name)}
+
                   {/* Dirty dot indicator — only for the active tab */}
                   {isActive && isDirty && (
                     <span
                       style={{
                         display: "inline-block",
-                        width: "8px",
-                        height: "8px",
+                        width: "6px",
+                        height: "6px",
                         borderRadius: "50%",
                         background: "var(--accent-text, #e8a838)",
                         flexShrink: 0,
@@ -352,24 +330,17 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                       title="Unsaved changes"
                     />
                   )}
-                  <button
-                    onClick={() => setViewerActivePath(tab.path)}
+
+                  <span
                     style={{
-                      background: "none",
-                      border: "none",
-                      color: "inherit",
-                      cursor: "pointer",
-                      padding: 0,
-                      fontSize: "12px",
-                      fontWeight: "inherit",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      maxWidth: "180px",
                     }}
-                    type="button"
-                    title={tab.path}
                   >
                     {tab.name}
-                  </button>
+                  </span>
+
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -379,22 +350,14 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                       }
                       closeFileViewerTab(tab.path);
                     }}
-                    title="Close"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-dim)",
-                      cursor: "pointer",
-                      padding: "1px 3px",
-                      fontSize: "10px",
-                      lineHeight: 1,
-                      opacity: 0.5,
-                      borderRadius: "2px",
-                    }}
-                    type="button"
+                    title="Close tab"
                     className="viewer-tab-close"
+                    type="button"
                   >
-                    ✕
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
                 </div>
               );

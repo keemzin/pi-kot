@@ -24,6 +24,8 @@ import { useAskUserQuestionStore } from "./ask-user-question-store";
 import { usePlanReviewStore } from "./plan-review-store";
 import { useExtensionUIStore } from "./extension-ui-store";
 import { useLayoutStore } from "./layout-store";
+import { useFavoriteStore } from "./favorite-store";
+import { useProcessesStore } from "./processes-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
@@ -127,6 +129,7 @@ interface SessionActions {
 	renameSession: (sessionId: string, name: string) => Promise<void>;
 	archiveSession: (sessionId: string) => Promise<void>;
 	unarchiveSession: (sessionId: string, projectId: string) => Promise<void>;
+	deleteArchivedSession: (sessionId: string, projectId: string) => Promise<void>;
 	loadArchivedSessions: (projectId: string) => Promise<void>;
 	loadCompactions: (sessionId: string) => Promise<void>;
 	compactAndReload: (
@@ -582,6 +585,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 							.resolveReview(resolvedId);
 						break;
 					}
+					case "process_update": {
+						const { processes } = event as unknown as {
+							processes: import("./processes-store").ProcessInfo[];
+						};
+						useProcessesStore.getState().setProcesses(sessionId, processes);
+						break;
+					}
+					case "process_alert": {
+						const { alert } = event as unknown as {
+							alert: import("./processes-store").ProcessAlert;
+						};
+						useProcessesStore.getState().addAlert(sessionId, alert);
+						break;
+					}
 					case "compaction_start": {
 						const compactionEvent = event as {
 							reason?: "manual" | "threshold" | "overflow";
@@ -1018,6 +1035,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 		const projectId = session?.projectId ?? state.activeProjectId;
 		try {
 			await archiveSessionAPI(sessionId, projectId);
+			useFavoriteStore.getState().unfavorite(sessionId);
 			const wasActive = get().activeSessionId === sessionId;
 			set((s) => ({
 				sessions: s.sessions.filter((sess) => sess.sessionId !== sessionId),
@@ -1039,6 +1057,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 					/* private */
 				}
 			}
+			if (projectId) void get().loadArchivedSessions(projectId);
 		} catch (err) {
 			set({
 				error: err instanceof Error ? err.message : "Failed to archive session",
@@ -1067,6 +1086,25 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 			}));
 		} catch {
 			// silently fail
+		}
+	},
+
+	deleteArchivedSession: async (sessionId: string, projectId: string) => {
+		try {
+			const { deleteArchivedSession: deleteArchivedAPI } = await import("../lib/api-client");
+			await deleteArchivedAPI(sessionId, projectId);
+			set((s) => ({
+				archivedSessions: {
+					...s.archivedSessions,
+					[projectId]: (s.archivedSessions[projectId] ?? []).filter(
+						(sess) => sess.sessionId !== sessionId,
+					),
+				},
+			}));
+		} catch (err) {
+			set({
+				error: err instanceof Error ? err.message : "Failed to permanently delete session",
+			});
 		}
 	},
 

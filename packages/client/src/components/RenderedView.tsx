@@ -111,7 +111,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
 
 function isMarkdown(fileName: string): boolean {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  return ext === "md" || ext === "mdx";
+  return ext === "md" || ext === "mdx" || ext === "markdown";
 }
 
 export function RenderedView({ content, fileName }: Props) {

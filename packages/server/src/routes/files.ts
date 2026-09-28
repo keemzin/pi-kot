@@ -774,6 +774,122 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  fastify.post<{
+    Body: { projectId: string; paths: string[]; recursive?: boolean };
+  }>(
+    "/files/batch-delete",
+    {
+      schema: {
+        description: "Batch delete multiple files or directories.",
+        tags: ["files"],
+        body: {
+          type: "object",
+          required: ["projectId", "paths"],
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            paths: { type: "array", items: { type: "string" }, minItems: 1 },
+            recursive: { type: "boolean" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["deleted"],
+            properties: {
+              deleted: { type: "array", items: { type: "string" } },
+              errors: { type: "object", additionalProperties: { type: "string" } },
+            },
+          },
+          400: errorSchema,
+          403: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await resolveProject(req.body.projectId, reply);
+      if (project === undefined) return reply;
+      const recursive = req.body.recursive ?? true;
+      const deleted: string[] = [];
+      const errors: Record<string, string> = {};
+
+      for (const p of req.body.paths) {
+        try {
+          await deleteEntry(join(project.path, p), project.path, { recursive });
+          deleted.push(p);
+        } catch (err) {
+          errors[p] = err instanceof Error ? err.message : "Delete failed";
+        }
+      }
+
+      return { deleted, errors: Object.keys(errors).length > 0 ? errors : undefined };
+    },
+  );
+
+  fastify.post<{
+    Body: {
+      projectId: string;
+      moves: Array<{ src: string; dest: string }>;
+    };
+  }>(
+    "/files/batch-move",
+    {
+      schema: {
+        description: "Batch move multiple files or directories.",
+        tags: ["files"],
+        body: {
+          type: "object",
+          required: ["projectId", "moves"],
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            moves: {
+              type: "array",
+              minItems: 1,
+              items: {
+                type: "object",
+                required: ["src", "dest"],
+                properties: {
+                  src: { type: "string", minLength: 1 },
+                  dest: { type: "string", minLength: 1 },
+                },
+              },
+            },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["moved"],
+            properties: {
+              moved: { type: "array", items: { type: "string" } },
+              errors: { type: "object", additionalProperties: { type: "string" } },
+            },
+          },
+          400: errorSchema,
+          403: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await resolveProject(req.body.projectId, reply);
+      if (project === undefined) return reply;
+      const moved: string[] = [];
+      const errors: Record<string, string> = {};
+
+      for (const m of req.body.moves) {
+        try {
+          await moveEntry(join(project.path, m.src), join(project.path, m.dest), project.path);
+          moved.push(m.src);
+        } catch (err) {
+          errors[m.src] = err instanceof Error ? err.message : "Move failed";
+        }
+      }
+
+      return { moved, errors: Object.keys(errors).length > 0 ? errors : undefined };
+    },
+  );
+
   fastify.get<{
     Querystring: {
       projectId: string;

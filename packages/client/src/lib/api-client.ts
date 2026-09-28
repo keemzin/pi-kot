@@ -165,6 +165,8 @@ export interface SessionSummary {
   lastActivityAt: string;
   messageCount: number;
   supervisorId?: string;
+  archivedAt?: string;
+  expiresInDays?: number;
 }
 
 export interface CreateSessionRequest {
@@ -303,6 +305,16 @@ export async function listArchivedSessions(
   return request<{ sessions: SessionSummary[] }>(
     "GET",
     `/api/v1/sessions?projectId=${encodeURIComponent(projectId)}&archived=true`,
+  );
+}
+
+export async function deleteArchivedSession(
+  sessionId: string,
+  projectId: string,
+): Promise<{ deleted: boolean }> {
+  return request<{ deleted: boolean }>(
+    "DELETE",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/archived?projectId=${encodeURIComponent(projectId)}`,
   );
 }
 
@@ -500,6 +512,36 @@ export async function filesDelete(
   const qs = new URLSearchParams({ projectId, path });
   if (opts?.recursive === true) qs.set("recursive", "true");
   return request("DELETE", `/api/v1/files/delete?${qs.toString()}`);
+}
+
+export async function filesBatchDelete(
+  projectId: string,
+  paths: string[],
+  opts?: { recursive?: boolean },
+): Promise<{ deleted: string[]; errors?: Record<string, string> }> {
+  return request<{ deleted: string[]; errors?: Record<string, string> }>(
+    "POST",
+    "/api/v1/files/batch-delete",
+    {
+      projectId,
+      paths,
+      recursive: opts?.recursive ?? true,
+    },
+  );
+}
+
+export async function filesBatchMove(
+  projectId: string,
+  moves: Array<{ src: string; dest: string }>,
+): Promise<{ moved: string[]; errors?: Record<string, string> }> {
+  return request<{ moved: string[]; errors?: Record<string, string> }>(
+    "POST",
+    "/api/v1/files/batch-move",
+    {
+      projectId,
+      moves,
+    },
+  );
 }
 
 /**
@@ -1880,3 +1922,47 @@ export async function listArtifacts(cwd?: string): Promise<{ files: ArtifactFile
   const qs = cwd ? `?cwd=${encodeURIComponent(cwd)}` : "";
   return request<{ files: ArtifactFileInfo[] }>("GET", `/api/v1/artifacts${qs}`);
 }
+
+// ---- Background Processes ----
+
+import type { ProcessInfo } from "../stores/processes-store";
+
+export async function listProcesses(sessionId: string): Promise<{ processes: ProcessInfo[] }> {
+  return request<{ processes: ProcessInfo[] }>("GET", `/api/v1/sessions/${encodeURIComponent(sessionId)}/processes`);
+}
+
+export async function killProcess(sessionId: string, processId: string): Promise<{ ok: boolean; process?: ProcessInfo }> {
+  return request<{ ok: boolean; process?: ProcessInfo }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/processes/${encodeURIComponent(processId)}/kill`,
+  );
+}
+
+export async function clearProcesses(sessionId: string): Promise<{ cleared: number }> {
+  return request<{ cleared: number }>("DELETE", `/api/v1/sessions/${encodeURIComponent(sessionId)}/processes/finished`);
+}
+
+export async function getProcessOutput(
+  sessionId: string,
+  processId: string,
+  lines: number = 200,
+): Promise<{ stdout: string[]; stderr: string[]; status: string }> {
+  return request<{ stdout: string[]; stderr: string[]; status: string }>(
+    "GET",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/processes/${encodeURIComponent(processId)}/output?lines=${lines}`,
+  );
+}
+
+export async function sendProcessStdin(
+  sessionId: string,
+  processId: string,
+  input: string,
+  end?: boolean,
+): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    "POST",
+    `/api/v1/sessions/${encodeURIComponent(sessionId)}/processes/${encodeURIComponent(processId)}/stdin`,
+    { input, end },
+  );
+}
+

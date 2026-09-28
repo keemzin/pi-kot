@@ -355,6 +355,8 @@ export interface SessionSummary {
    */
   modelProvider?: string;
   modelId?: string;
+  archivedAt?: string;
+  expiresInDays?: number;
 }
 
 export type SkillOverrideState = "enabled" | "disabled";

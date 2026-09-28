@@ -925,10 +925,17 @@ function BashExecBubble({
 	}
 
 	return (
-		<div className="message-row user">
+		<div className="message-row user" style={{ width: "100%", margin: "8px 0" }}>
 			<div
 				className="message-bubble user"
-				style={{ borderLeft: "3px solid var(--accent-text)", maxWidth: "100%" }}
+				style={{
+					borderLeft: "3px solid var(--accent-text)",
+					maxWidth: "100%",
+					width: "100%",
+					borderRadius: "var(--radius-lg)",
+					whiteSpace: "normal",
+					boxSizing: "border-box",
+				}}
 			>
 				<div
 					role={hasOutput ? "button" : undefined}
@@ -1249,16 +1256,17 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const pushArtifact = useLayoutStore((s) => s.pushArtifact);
 	const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 	const seenArtifactIds = useRef(new Set<string>());
+
+	// Clear seen artifacts on session switch
 	useEffect(() => {
-		const allMsgs = [
-			...messages,
-			...(streamingMessage ? [streamingMessage] : []),
-		];
-		// Build the result map ONCE for this effect run, not once per tool call
-		// block — previously called N times for N tool calls, rebuilding the full
-		// map each time.
+		seenArtifactIds.current.clear();
+	}, [sessionId]);
+
+	useEffect(() => {
+		// Scan finalized messages only — decoupled from streamingMessage to maintain
+		// 60fps streaming and eliminate redundant multi-turn regex scans on every token.
 		const resultMap = buildToolResultMap(messages);
-		for (const msg of allMsgs) {
+		for (const msg of messages) {
 			const m = msg as Record<string, unknown>;
 			const contents = m.content;
 			if (!Array.isArray(contents)) continue;
@@ -1268,12 +1276,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// ── Tool outputs ──
 				if (c.type === "toolCall") {
 					const toolCallId = typeof c.id === "string" ? c.id : "";
-					if (seenArtifactIds.current.has(toolCallId)) continue;
-					seenArtifactIds.current.add(toolCallId);
+					if (!toolCallId || seenArtifactIds.current.has(toolCallId)) continue;
 
 					// Find the paired result for output
 					const result = resultMap.get(toolCallId);
-					const outputText = extractContentText(result?.content);
+					if (!result) continue; // Wait until tool result is finalized
+
+					seenArtifactIds.current.add(toolCallId);
+					const outputText = extractContentText(result.content);
 					const trimmed = outputText.trim();
 
 					let artType: string | undefined;
@@ -1358,7 +1368,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				}
 			}
 		}
-	}, [messages, streamingMessage, pushArtifact, sessionId]);
+	}, [messages, pushArtifact, sessionId]);
 
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingBottomRef = useRef(true);
@@ -1378,10 +1388,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	const [flySpacer, setFlySpacer] = useState(0);
 	const flyPendingScrollRef = useRef(false);
 	const prevMsgLenRef = useRef(0);
-	// Bumped whenever the fly re-arms — lets the scroll-trigger effect re-fire
-	// even when the spacer value stays the same (layout shift above the anchor
-	// changes the target but not the spacer).
-	const [flyRetarget, setFlyRetarget] = useState(0);
+	const sessionReadyRef = useRef(false);
 
 	const NEAR_BOTTOM_PX = 24;
 
@@ -1472,6 +1479,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 
 	// Reset all anchor state when switching sessions.
 	useEffect(() => {
+		sessionReadyRef.current = false;
 		prevMsgLenRef.current = 0;
 		flyAnchorRef.current = false;
 		setFlyAnchor(false);
@@ -1483,12 +1491,25 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 	// A new user message (send / steer / follow-up) arms the anchor. Runs as a
 	// layout effect so this commit's ResizeObserver tick already sees the
 	// anchor + disarmed bottom-follow flags — no bottom-pin flash before the
-	// fly-to-top takes over. Initial load / session switch is skipped (prevLen
-	// 0 → treat as history load, keep the normal pin-to-bottom behavior).
+	// fly-to-top takes over. Initial load of existing session history is skipped,
+	// but message #1 in a new session is fully supported.
 	useLayoutEffect(() => {
 		const prevLen = prevMsgLenRef.current;
 		prevMsgLenRef.current = rawMessages.length;
-		if (!chatFlyToTop || prevLen === 0) return;
+
+		// Session hydration guard: if the session just mounted or switched,
+		// mark it ready. If it arrived with existing history (messages > 0),
+		// record length and skip fly-to-top. If empty (0 messages), it is now
+		// primed and ready so message #1 will anchor and fly!
+		if (!sessionReadyRef.current) {
+			sessionReadyRef.current = true;
+			if (rawMessages.length > 0) return;
+		}
+
+		// Also guard against asynchronous multi-message history hydration
+		if (rawMessages.length - prevLen > 1) return;
+
+		if (!chatFlyToTop) return;
 		if (rawMessages.length <= prevLen) return;
 		const last = rawMessages[rawMessages.length - 1] as
 			| Record<string, unknown>
@@ -1502,28 +1523,14 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		}
 	}, [rawMessages, chatFlyToTop]);
 
-	// Release the anchor once the turn completed (stream ended && the last
-	// message is the assistant reply).
-	useEffect(() => {
-		const last = rawMessages[rawMessages.length - 1] as
-			| Record<string, unknown>
-			| undefined;
-		const lastIsUser =
-			last !== undefined &&
-			(last.role === "user" || last.role === "user-with-attachments");
-		if (!isStreaming && !lastIsUser && flyAnchorRef.current) {
-			flyAnchorRef.current = false;
-			flyPendingScrollRef.current = false;
-			setFlyAnchor(false);
-		}
-	}, [isStreaming, rawMessages]);
-
 	// The anchor spacer: while the reply is shorter than the viewport, a
 	// bottom spacer keeps the newest turn near the top; as the reply grows the
 	// spacer shrinks; at zero the reply fills the screen and normal
 	// bottom-follow resumes for the rest of the stream.
+	// For short replies, the anchor spacer stays active on the latest turn so
+	// the newest message remains resting near the top without snapping down.
 	useLayoutEffect(() => {
-		if (!chatFlyToTop) {
+		if (!chatFlyToTop || !flyAnchor) {
 			if (flySpacerRef.current !== 0) {
 				flySpacerRef.current = 0;
 				setFlySpacer(0);
@@ -1531,74 +1538,47 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 			return;
 		}
 
-		if (!flyAnchor) return;
-
 		const container = scrollRef.current;
 		const userEl = lastUserTurnElRef.current;
 		if (container === null || userEl === null) return;
 
 		let active = true;
-		let lastTargetTop = -1;
-		let lastAnchorScrollTop = -1;
 		const update = () => {
 			if (!active) return;
-			const st = container.scrollTop;
-			const userTop =
-				userEl.getBoundingClientRect().top -
-				container.getBoundingClientRect().top +
-				st;
-			const targetTop = Math.max(0, userTop);
-			const maxScrollTopExclSpacer = Math.max(
-				0,
-				container.scrollHeight - flySpacerRef.current - container.clientHeight,
-			);
-			const next = Math.max(0, Math.ceil(targetTop - maxScrollTopExclSpacer));
-
-			// The anchor's document position moved while the scroll offset did
-			// NOT — that is a layout change above the newest message (content
-			// above resized), not a scroll. Re-arm the one-shot fly so it
-			// re-targets the anchor's new position; without this a mid-fly
-			// layout shift strands the viewport mid-document with no re-fly.
-			const layoutShift = st === lastAnchorScrollTop && targetTop !== lastTargetTop;
-			if (layoutShift && next > 0) {
-				flyPendingScrollRef.current = true;
-				setFlyRetarget((t) => t + 1);
-			}
-			lastTargetTop = targetTop;
-			lastAnchorScrollTop = st;
+			// Needed spacer is viewport height minus the turn's current height.
+			// This guarantees (turnHeight + spacer) >= container.clientHeight at all times,
+			// so the turn can sit flush at the top with zero scroll clamping.
+			const turnHeight = userEl.offsetHeight;
+			const next = Math.max(0, Math.ceil(container.clientHeight - turnHeight));
 
 			if (next !== flySpacerRef.current) {
 				const needsInitialScroll = flySpacerRef.current === 0 && next > 0;
 				flySpacerRef.current = next;
 				if (needsInitialScroll) flyPendingScrollRef.current = true;
 				if (next === 0) {
-					// Reply grew past the viewport — tail-follow takes over.
+					// Turn filled the screen — tail-follow takes over.
 					isFollowingBottomRef.current = true;
 				}
 				setFlySpacer(next);
-				return;
 			}
 		};
 
 		update();
 		const ro = new ResizeObserver(update);
 		ro.observe(container);
-		if (container.firstElementChild instanceof Element) {
-			ro.observe(container.firstElementChild);
-		}
 		ro.observe(userEl);
 		return () => {
 			active = false;
 			ro.disconnect();
 		};
-	}, [chatFlyToTop, flyAnchor, rawMessages.length, scrollUserMsgToTop]);
+	}, [chatFlyToTop, flyAnchor, rawMessages.length]);
 
 	useLayoutEffect(() => {
 		if (flyPendingScrollRef.current && flySpacer > 0) {
 			flyPendingScrollRef.current = false;
 			scrollUserMsgToTop();
 		}
-	}, [flySpacer, flyRetarget, scrollUserMsgToTop]);
+	}, [flySpacer, scrollUserMsgToTop]);
 
 	// Derive active tool name from the streaming message's tool call content blocks
 	// paired with pendingToolCalls from state.
@@ -2320,8 +2300,11 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				(currentUser.metadata as { followUp?: boolean } | undefined)
 					?.followUp === true;
 			const lastAssistant = currentAssistants[currentAssistants.length - 1];
+			const isStickyTurn =
+				(stickyUserHeader || (chatFlyToTop && isLastTurn && (isStreaming || flyAnchor))) &&
+				text.length > 0;
 
-			if (stickyUserHeader && text.length > 0) {
+			if (isStickyTurn) {
 				out.push(
 					<div
 						key={`turn-${turnKey}`}
@@ -2350,20 +2333,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 									{rewindAvailable && <RewindMsgButton sessionId={sessionId} />}
 								</div>
 							)}
-							<div
-								aria-hidden="true"
-								style={{
-									pointerEvents: "none",
-									position: "absolute",
-									left: 0,
-									right: 0,
-									top: "100%",
-									zIndex: 0,
-									height: 12,
-									background:
-										"linear-gradient(to bottom, var(--bg-solid), transparent)",
-								}}
-							/>
 						</div>
 						{lastAssistant && (
 							<div className="assistant-msg-model-header">
@@ -2503,12 +2472,23 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				flushTurn();
 				currentUser = msg;
 				currentTurnStart = idx;
+			} else if (role === "bashExecution") {
+				// User-initiated bash commands (!cmd / !!cmd) render chronologically
+				// as their own rows below preceding agent responses.
+				flushTurn();
+				out.push(
+					<BashExecBubble
+						key={`bash-${String((msg as unknown as BashExecMessage).timestamp ?? `${(msg as unknown as BashExecMessage).command ?? ""}-${idx}`)}`}
+						msg={msg as unknown as BashExecMessage}
+						sessionId={sessionId}
+					/>,
+				);
 			} else if (role === "toolResult") {
 			} else if (role === "custom" && msg.display === false) {
 				// Internal system or extension message flagged as hidden — do not render
 				continue;
 			} else {
-				// Assistant / bashExecution / branchSummary / custom
+				// Assistant / branchSummary / custom
 				if (currentUser !== undefined) {
 					currentAssistants.push(msg);
 				} else if (groupedToolDisplay) {
@@ -2552,6 +2532,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		groupedToolDisplay,
 		showTurnFiles,
 		flyAnchor,
+		chatFlyToTop,
 	]);
 
 	return (
@@ -2596,7 +2577,7 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 						<div
 							ref={scrollRef}
 							onScroll={onScroll}
-							style={stickyUserHeader ? { paddingTop: 0 } : undefined}
+							style={stickyUserHeader || chatFlyToTop ? { paddingTop: 0 } : undefined}
 							className="chat-scroll"
 						>
 							<div className="chat-message-list">

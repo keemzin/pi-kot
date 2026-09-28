@@ -144,7 +144,7 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError, compact 
   const selectedName = selectedOption?.name ?? defaultModel?.modelId ?? "default";
   const triggerLabel =
     compact
-      ? formatModelDisplayName(selectedName).slice(0, 20)
+      ? formatModelDisplayName(selectedName)
       : selectedOption !== undefined
         ? `${selectedOption.provider} / ${formatModelDisplayName(selectedOption.name)}`
         : defaultModel !== undefined && defaultModel.provider.length > 0 && defaultModel.modelId.length > 0
@@ -217,7 +217,7 @@ export function ModelDropdown({ sessionId, selected, onSelect, onError, compact 
         title={triggerLabel}
         style={{ opacity: setting !== undefined ? 0.6 : 1 }}
       >
-        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {setting !== undefined
             ? "Setting..."
             : triggerLabel}

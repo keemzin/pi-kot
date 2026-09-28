@@ -7,7 +7,8 @@ import {
   setEnabledModels as saveEnabledModels,
   type ProvidersResponse,
 } from "../../lib/api-client";
-import { Field, errorMsg } from "./shared";
+import { Bot, Filter, Network, SlidersHorizontal, Search, X } from "lucide-react";
+import { SettingCard, SettingRow, SettingToggle, SettingDivider, errorMsg } from "./shared";
 import { useI18n } from "../../hooks/useI18n";
 
 interface Props {
@@ -208,224 +209,346 @@ export function AgentTab({ onError }: Props) {
 
   return (
     <div className="settings-fields">
-      <Field label={t("settings.agent.defaultProvider")} hint={t("settings.agent.defaultProviderHint")}>
-        <select
-          value={selectedProvider}
-          disabled={busy}
-          onChange={(e) => handleProviderChange(e.target.value)}
-          className="settings-select"
+      {/* Card 1: Default Model & Reasoning */}
+      <SettingCard
+        icon={<Bot size={15} />}
+        title="Primary Model & Reasoning"
+        subtitle="Default model configuration and reasoning effort for new chats"
+      >
+        <SettingRow
+          label={t("settings.agent.defaultProvider")}
+          hint={t("settings.agent.defaultProviderHint")}
         >
-          <option value="">(none)</option>
-          {providerOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t("settings.agent.defaultModel")} hint={t("settings.agent.defaultModelHint")}>
-        <select
-          value={selectedModel}
-          disabled={busy || selectedProvider.length === 0}
-          onChange={(e) => handleModelChange(e.target.value)}
-          className="settings-select"
-        >
-          <option value="">(none)</option>
-          {modelOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t("settings.agent.thinkingLevel")} hint={t("settings.agent.thinkingLevelHint")}>
-        <SelectSetting
-          value={
-            settings && typeof settings.defaultThinkingLevel === "string"
-              ? settings.defaultThinkingLevel
-              : ""
-          }
-          options={["", "off", "minimal", "low", "medium", "high", "xhigh"]}
-          onSave={(v) => save({ defaultThinkingLevel: v.length === 0 ? null : v })}
-          disabled={busy}
-        />
-      </Field>
+          <select
+            value={selectedProvider}
+            disabled={busy}
+            onChange={(e) => handleProviderChange(e.target.value)}
+            className="settings-select"
+          >
+            <option value="">(none)</option>
+            {providerOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </SettingRow>
 
-      <hr className="settings-divider" />
+        <SettingDivider />
 
-      <p className="settings-section-title">{t("settings.agent.modelScope")}</p>
-      <div className="settings-field">
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            cursor: "pointer",
-            userSelect: "none",
-            fontSize: 13,
-            color: "var(--text-secondary)",
-          }}
+        <SettingRow
+          label={t("settings.agent.defaultModel")}
+          hint={t("settings.agent.defaultModelHint")}
         >
-          <input
-            type="checkbox"
-            checked={scopedOn}
-            onChange={(e) => void toggleScopedOn(e.target.checked)}
-            style={{
-              width: 16,
-              height: 16,
-              accentColor: "var(--accent-text)",
-              cursor: "pointer",
-            }}
+          <select
+            value={selectedModel}
+            disabled={busy || selectedProvider.length === 0}
+            onChange={(e) => handleModelChange(e.target.value)}
+            className="settings-select"
+          >
+            <option value="">(none)</option>
+            {modelOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </SettingRow>
+
+        <SettingDivider />
+
+        <SettingRow
+          label={t("settings.agent.thinkingLevel")}
+          hint={t("settings.agent.thinkingLevelHint")}
+        >
+          <SelectSetting
+            value={
+              settings && typeof settings.defaultThinkingLevel === "string"
+                ? settings.defaultThinkingLevel
+                : ""
+            }
+            options={["", "off", "minimal", "low", "medium", "high", "xhigh"]}
+            onSave={(v) => save({ defaultThinkingLevel: v.length === 0 ? null : v })}
+            disabled={busy}
           />
-          {t("settings.agent.hideUnusedModels")}
-        </label>
+        </SettingRow>
+      </SettingCard>
+
+      {/* Card 2: Model Scope & Filtering */}
+      <SettingCard
+        icon={<Filter size={15} />}
+        title={t("settings.agent.modelScope")}
+        subtitle="Filter which models appear in dropdown selectors across the app"
+        action={
+          scopedOn && !showScopePicker ? (
+            <button
+              type="button"
+              onClick={() => setShowScopePicker(true)}
+              className="settings-btn settings-btn-xs"
+            >
+              <SlidersHorizontal size={11} />
+              <span>{t("settings.agent.selectModels")}</span>
+            </button>
+          ) : undefined
+        }
+      >
+        <SettingRow
+          label={t("settings.agent.hideUnusedModels")}
+          hint="Only display ticked models in new session and chat model pickers"
+        >
+          <SettingToggle
+            checked={scopedOn}
+            onChange={(on) => void toggleScopedOn(on)}
+            ariaLabel={t("settings.agent.hideUnusedModels")}
+          />
+        </SettingRow>
+
         {scopedOn && !showScopePicker && (
-          <div style={{ marginTop: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "10px 12px",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-glass-strong)",
+              border: "1px solid var(--border)",
+              marginTop: 4,
+            }}
+          >
             <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
               {scopedDraft === null
                 ? t("settings.agent.allModelsVisible")
-                : t("settings.agent.modelsSelected").replace("{n}", String(scopedDraft.length)).replace("{m}", String(allModelEntries.length))}
+                : t("settings.agent.modelsSelected")
+                    .replace("{n}", String(scopedDraft.length))
+                    .replace("{m}", String(allModelEntries.length))}
             </span>
             <button
+              type="button"
               onClick={() => setShowScopePicker(true)}
-              className="settings-btn"
-              style={{ marginLeft: 12 }}
+              className="settings-btn settings-btn-xs"
             >
-              {t("settings.agent.selectModels")}
+              <SlidersHorizontal size={11} />
+              <span>{t("settings.agent.selectModels")}</span>
             </button>
           </div>
         )}
-      </div>
 
-      {scopedOn && showScopePicker && (
-        <div className="scope-picker-section">
-          <input
-            type="text"
-            value={scopeSearch}
-            onChange={(e) => setScopeSearch(e.target.value)}
-            placeholder={t("settings.agent.searchModels")}
-            className="settings-input"
-            style={{ marginBottom: 8, width: "100%" }}
-            autoFocus
-          />
-          <div style={{ display: "flex", gap: 12, marginBottom: 8, padding: "0 4px" }}>
-            <button
-              onClick={() => setScopedDraft(null)}
-              style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
-            >
-              {t("settings.agent.selectAll")}
-            </button>
-            <button
-              onClick={() => setScopedDraft([])}
-              style={{ background: "none", border: "none", color: "var(--accent-text)", fontSize: 12, cursor: "pointer", padding: 0 }}
-            >
-              {t("settings.agent.untickAll")}
-            </button>
-          </div>
-          <div className="scope-model-list">
-            {filteredEntries.map((entry) => {
-              const draft = scopedDraft ?? allModelEntries.map((e) => e.fullId);
-              const checked = draft.includes(entry.fullId);
-              return (
-                <label
-                  key={entry.fullId}
-                  className="scope-model-item"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: "pointer",
-                    padding: "4px 0",
-                    fontSize: 13,
-                    userSelect: "none",
-                  }}
+        {scopedOn && showScopePicker && (
+          <div
+            className="scope-picker-section"
+            style={{
+              marginTop: 6,
+              padding: 12,
+              borderRadius: "var(--radius-sm)",
+              background: "var(--bg-glass-strong)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <div className="providers-search-wrapper" style={{ marginBottom: 10 }}>
+              <Search size={13} className="providers-search-icon" />
+              <input
+                type="search"
+                value={scopeSearch}
+                onChange={(e) => setScopeSearch(e.target.value)}
+                placeholder={t("settings.agent.searchModels")}
+                className="providers-search-input"
+                autoFocus
+              />
+              {scopeSearch && (
+                <button
+                  type="button"
+                  onClick={() => setScopeSearch("")}
+                  className="providers-search-clear"
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleModelInDraft(entry.fullId)}
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 8, padding: "0 2px" }}>
+              <button
+                type="button"
+                onClick={() => setScopedDraft(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--accent-text)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  padding: 0,
+                  fontWeight: 500,
+                }}
+              >
+                {t("settings.agent.selectAll")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setScopedDraft([])}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--accent-text)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  padding: 0,
+                  fontWeight: 500,
+                }}
+              >
+                {t("settings.agent.untickAll")}
+              </button>
+            </div>
+
+            <div
+              className="scope-model-list"
+              style={{
+                maxHeight: 240,
+                overflowY: "auto",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "6px 10px",
+                background: "var(--bg-glass)",
+              }}
+            >
+              {filteredEntries.map((entry) => {
+                const draft = scopedDraft ?? allModelEntries.map((e) => e.fullId);
+                const checked = draft.includes(entry.fullId);
+                return (
+                  <label
+                    key={entry.fullId}
+                    className="scope-model-item"
                     style={{
-                      width: 14,
-                      height: 14,
-                      accentColor: "var(--accent-text)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                       cursor: "pointer",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontFamily: "var(--font-mono, monospace)",
-                      fontSize: 12,
-                      color: "var(--text-secondary)",
+                      padding: "6px 0",
+                      fontSize: 13,
+                      userSelect: "none",
+                      borderBottom: "1px solid var(--border-subtle, rgba(255,255,255,0.04))",
                     }}
                   >
-                    {entry.provider}/
-                  </span>
-                  <span style={{ fontSize: 13 }}>{entry.modelName}</span>
-                  {!entry.hasAuth && (
-                    <span className="settings-badge settings-badge-off">
-                      {t("settings.providers.noKey")}
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleModelInDraft(entry.fullId)}
+                      style={{
+                        width: 15,
+                        height: 15,
+                        accentColor: "var(--accent)",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: 11,
+                        color: "var(--text-dim)",
+                      }}
+                    >
+                      {entry.provider}/
                     </span>
-                  )}
-                </label>
-              );
-            })}
-            {filteredEntries.length === 0 && (
-              <p style={{ fontSize: 12, color: "var(--text-secondary)", padding: "8px 0" }}>
-                {t("settings.agent.noModelsMatch").replace("{search}", scopeSearch)}
-              </p>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button
-              onClick={() => void saveScopeDraft()}
-              disabled={busy}
-              className="settings-btn settings-btn-primary"
-            >
-              {busy ? t("settings.agent.saving") : t("settings.agent.saveSelection")}
-            </button>
-            <button
-              onClick={() => {
-                setShowScopePicker(false);
-                setScopeSearch("");
-                setScopedDraft(enabledModels);
-                if (enabledModels === null || enabledModels.length === 0) {
-                  setScopedOn(false);
-                }
-              }}
-              className="settings-btn"
-            >
-              {t("settings.agent.cancel")}
-            </button>
-          </div>
-        </div>
-      )}
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: checked ? 500 : 400,
+                        color: "var(--text-primary)",
+                      }}
+                    >
+                      {entry.modelName}
+                    </span>
+                    {!entry.hasAuth && (
+                      <span
+                        className="settings-badge settings-badge-off"
+                        style={{ marginLeft: "auto" }}
+                      >
+                        {t("settings.providers.noKey")}
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
+              {filteredEntries.length === 0 && (
+                <p
+                  style={{
+                    fontSize: 12,
+                    color: "var(--text-dim)",
+                    padding: "12px 0",
+                    textAlign: "center",
+                  }}
+                >
+                  {t("settings.agent.noModelsMatch").replace("{search}", scopeSearch)}
+                </p>
+              )}
+            </div>
 
-      <hr className="settings-divider" />
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={() => void saveScopeDraft()}
+                disabled={busy}
+                className="settings-btn settings-btn-primary"
+              >
+                {busy ? t("settings.agent.saving") : t("settings.agent.saveSelection")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScopePicker(false);
+                  setScopeSearch("");
+                  setScopedDraft(enabledModels);
+                  if (enabledModels === null || enabledModels.length === 0) {
+                    setScopedOn(false);
+                  }
+                }}
+                className="settings-btn"
+              >
+                {t("settings.agent.cancel")}
+              </button>
+            </div>
+          </div>
+        )}
+      </SettingCard>
 
-      <p className="settings-section-title">{t("settings.agent.orchestrator")}</p>
-      <Field label={t("settings.agent.orchProvider")} hint={t("settings.agent.orchProviderHint")}>
-        <select
-          value={orchProvider}
-          disabled={busy}
-          onChange={(e) => handleOrchProviderChange(e.target.value)}
-          className="settings-select"
+      {/* Card 3: Supervisor & Orchestrator */}
+      <SettingCard
+        icon={<Network size={15} />}
+        title={t("settings.agent.orchestrator")}
+        subtitle="Dedicated provider and model for supervisor & worker multi-agent runs"
+      >
+        <SettingRow
+          label={t("settings.agent.orchProvider")}
+          hint={t("settings.agent.orchProviderHint")}
         >
-          <option value="">{t("settings.agent.useDefault")}</option>
-          {providerOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label={t("settings.agent.orchModel")} hint={t("settings.agent.orchModelHint")}>
-        <select
-          value={orchModel}
-          disabled={busy || orchProvider.length === 0}
-          onChange={(e) => handleOrchModelChange(e.target.value)}
-          className="settings-select"
+          <select
+            value={orchProvider}
+            disabled={busy}
+            onChange={(e) => handleOrchProviderChange(e.target.value)}
+            className="settings-select"
+          >
+            <option value="">{t("settings.agent.useDefault")}</option>
+            {providerOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </SettingRow>
+
+        <SettingDivider />
+
+        <SettingRow
+          label={t("settings.agent.orchModel")}
+          hint={t("settings.agent.orchModelHint")}
         >
-          <option value="">{t("settings.agent.useDefault")}</option>
-          {orchModelOptions.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-      </Field>
+          <select
+            value={orchModel}
+            disabled={busy || orchProvider.length === 0}
+            onChange={(e) => handleOrchModelChange(e.target.value)}
+            className="settings-select"
+          >
+            <option value="">{t("settings.agent.useDefault")}</option>
+            {orchModelOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </SettingRow>
+      </SettingCard>
     </div>
   );
 }
