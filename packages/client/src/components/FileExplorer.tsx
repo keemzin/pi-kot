@@ -3,6 +3,8 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 import { GitPanel } from "./GitPanel";
 import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
+import { ProcessesPanel } from "./ProcessesPanel";
+import { useProcessesStore, selectRunningCount } from "../stores/processes-store";
 import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesBatchDelete, filesBatchMove, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
@@ -78,7 +80,7 @@ async function collectDroppedUploadFiles(dataTransfer: DataTransfer): Promise<Fi
   return files;
 }
 
-export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt";
+export type ExplorerTab = "files" | "git" | "artifacts" | "system-prompt" | "processes";
 
 interface Props {
   projectId: string;
@@ -135,6 +137,9 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const [createName, setCreateName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | undefined>();
   const [tab, setTab] = useState<ExplorerTab>(initialTab ?? "files");
+
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+  const runningProcessesCount = useProcessesStore((s) => selectRunningCount(s, activeSessionId));
 
   // ── Multi-select & Batch Delete ──
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
@@ -902,8 +907,20 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
             { key: "files",         label: "Files",    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, onClick: () => { setTab("files"); } },
             { key: "git",           label: "Git",      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>, onClick: () => setTab("git") },
             { key: "artifacts",     label: "Artifacts",icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>, onClick: () => setTab("artifacts") },
-          ] as { key: string; label: string; icon: React.ReactNode; onClick: () => void }[]
-        ).map(({ key, label, icon, onClick }) => (
+            {
+              key: "processes",
+              label: "Processes",
+              badge: runningProcessesCount > 0 ? runningProcessesCount : undefined,
+              icon: (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 17 10 11 4 5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+              ),
+              onClick: () => setTab("processes"),
+            },
+          ] as { key: string; label: string; badge?: number; icon: React.ReactNode; onClick: () => void }[]
+        ).map(({ key, label, badge, icon, onClick }) => (
           <button
             key={key}
             onClick={onClick}
@@ -913,6 +930,21 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           >
             {icon}
             <span className="fe-tab-label">{label}</span>
+            {badge !== undefined && (
+              <span
+                style={{
+                  fontSize: "10px",
+                  padding: "0 5px",
+                  borderRadius: "8px",
+                  background: "rgba(16, 185, 129, 0.2)",
+                  color: "#10b981",
+                  fontWeight: 600,
+                  marginLeft: "2px",
+                }}
+              >
+                {badge}
+              </span>
+            )}
           </button>
         ))}
 
@@ -1019,6 +1051,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       {tab === "artifacts" && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
           <ArtifactsPanel />
+        </div>
+      )}
+
+      {/* ── Processes tab ── */}
+      {tab === "processes" && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+          <ProcessesPanel sessionId={activeSessionId} />
         </div>
       )}
 

@@ -35,6 +35,9 @@ import { terminalRoutes } from "./routes/terminal.js";
 import { execRoutes } from "./routes/exec.js";
 import { tunnelRoutes } from "./routes/tunnel.js";
 import { artifactRoutes } from "./routes/artifacts.js";
+import { processRoutes } from "./routes/processes.js";
+import { processManager } from "./processes/manager.js";
+import { sendCustomLifecycleMessage } from "./session-alerts.js";
 import { disposeAll as disposeAllMcp, loadGlobal as loadGlobalMcp } from "./mcp/manager.js";
 
 /**
@@ -162,6 +165,7 @@ export async function buildServer() {
       await api.register(execRoutes);
       await api.register(tunnelRoutes);
       await api.register(artifactRoutes);
+      await api.register(processRoutes);
     },
     { prefix: "/api/v1" },
   );
@@ -194,6 +198,97 @@ export async function buildServer() {
 
   // Wire orchestration ask-user-question bridge
   initOrchestrationAskUserQuestionBridge();
+
+  // Wire process manager events into SSE fanout and session alerts
+  processManager.subscribe((event) => {
+    const live = getSession(event.sessionId);
+    if (live === undefined) return;
+
+    if (
+      event.type === "processes_changed" ||
+      event.type === "process_started" ||
+      event.type === "process_ended"
+    ) {
+      const processes = processManager.list(event.sessionId);
+      for (const client of live.clients) {
+        try {
+          client.send({
+            type: "process_update",
+            sessionId: event.sessionId,
+            processes,
+          } as unknown as { type: string; [k: string]: unknown });
+        } catch {
+          live.clients.delete(client);
+        }
+      }
+    }
+
+    if (event.type === "process_alert") {
+      for (const client of live.clients) {
+        try {
+          client.send({
+            type: "process_alert",
+            sessionId: event.sessionId,
+            alert: {
+              processId: event.info.id,
+              name: event.info.name,
+              reason: event.reason,
+              exitCode: event.info.exitCode,
+            },
+          } as unknown as { type: string; [k: string]: unknown });
+        } catch {
+          live.clients.delete(client);
+        }
+      }
+
+      const triggerTurn = event.reason === "failure";
+      const statusText =
+        event.reason === "failure"
+          ? `⚠️ Background process "${event.info.name}" (PID ${event.info.pid}) exited with code ${event.info.exitCode}.`
+          : `Background process "${event.info.name}" ${event.reason}.`;
+
+      sendCustomLifecycleMessage(
+        live.session,
+        {
+          customType: "process_alert",
+          content: statusText,
+          display: true,
+          details: {
+            processId: event.info.id,
+            name: event.info.name,
+            reason: event.reason,
+            exitCode: event.info.exitCode,
+          },
+        },
+        { triggerTurn },
+      );
+    }
+
+    if (event.type === "process_watch_matched") {
+      for (const client of live.clients) {
+        try {
+          client.send({
+            type: "process_watch_matched",
+            sessionId: event.sessionId,
+            match: event.match,
+          } as unknown as { type: string; [k: string]: unknown });
+        } catch {
+          live.clients.delete(client);
+        }
+      }
+
+      sendCustomLifecycleMessage(
+        live.session,
+        {
+          customType: "process_watch",
+          content: `⚡ Background process "${event.match.processName}" output matched watch [${event.match.watch.pattern}]:\n${event.match.line}`,
+          display: true,
+          details: event.match,
+        },
+        { triggerTurn: true },
+      );
+    }
+  });
 
   // ---- static client (production) ----
   // After `npm run build`, Fastify serves the Vite build directly.

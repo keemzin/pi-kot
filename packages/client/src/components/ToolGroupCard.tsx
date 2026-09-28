@@ -237,6 +237,7 @@ export function getToolDisplayName(toolName: string): string {
 		plan_mode_question: "Asked",
 		task: "Delegated Task",
 		javascript_repl: "Repl",
+		process: "Background Process",
 	};
 	if (map[t]) return map[t];
 	if (t.startsWith("ctx_"))

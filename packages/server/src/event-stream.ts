@@ -5,6 +5,7 @@ import type { LiveSession, SSEClient } from "./session-store.js";
 import { getPendingForSession } from "./ask-user-question/registry.js";
 import { getPendingPlanReviewsForSession } from "./ask-user-question/plan-review-registry.js";
 import { getSessionStatuses, setSessionStatus } from "./extension-ui-bridge.js";
+import { processManager } from "./processes/manager.js";
 
 /**
  * One-shot padding flush sent right after `compaction_start` so L7
@@ -71,6 +72,10 @@ const ALLOWED_EVENT_TYPES = new Set([
   "extension_ui_notify",
   "extension_ui_status",
   "extension_ui_done",
+  // Background process events
+  "process_update",
+  "process_alert",
+  "process_watch_matched",
 ]);
 
 function isAllowedEvent(event: { type: string }): boolean {
@@ -208,6 +213,18 @@ export function createSSEClient(reply: FastifyReply, live: LiveSession): SSEClie
           sessionId: live.sessionId,
           key: "plan-mode",
           status: "📋 Plan Mode",
+        } as unknown as { type: string; [k: string]: unknown }),
+      );
+    }
+
+    // Re-emit any active processes for this session
+    const activeProcesses = processManager.list(live.sessionId);
+    if (activeProcesses.length > 0) {
+      raw.write(
+        serializeSSE({
+          type: "process_update",
+          sessionId: live.sessionId,
+          processes: activeProcesses,
         } as unknown as { type: string; [k: string]: unknown }),
       );
     }

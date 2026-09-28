@@ -17,6 +17,8 @@ import { config } from "./config.js";
 import { isOrchestrationEnabled } from "./orchestration/config.js";
 import { getProjectSystemPromptAddendum } from "./system-prompt-overrides.js";
 import { registerArtifactCwd } from "./routes/artifacts.js";
+import { createProcessTool } from "./processes/tool.js";
+import { processManager } from "./processes/manager.js";
 
 /**
  * Build a DefaultResourceLoader with pi-kot's always-on extensions and
@@ -273,6 +275,7 @@ export async function createSession(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, workspacePath),
     ...orchestrationTools,
   ];
 
@@ -712,6 +715,7 @@ export async function rebuildSessionTools(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, live.workspacePath),
     ...orchestrationTools,
   ];
 
@@ -826,6 +830,7 @@ export async function disposeSession(sessionId: string): Promise<boolean> {
   registry.delete(live.sessionId);
   // Clean up orchestration dedupe state for this session
   notifySupervisorDisposed(live.sessionId);
+  await processManager.disposeSession(live.sessionId);
 
   return true;
 }
@@ -892,6 +897,7 @@ export async function resumeSessionById(
     createAskUserQuestionTool(sessionId),
     createPlanModeQuestionTool(sessionId),
     createSubmitPlanTool(sessionId),
+    createProcessTool(sessionId, loc.workspacePath),
     ...orchestrationTools,
   ];
 
@@ -1013,6 +1019,7 @@ export async function forkSession(
     createAskUserQuestionTool(forkedId),
     createPlanModeQuestionTool(forkedId),
     createSubmitPlanTool(forkedId),
+    createProcessTool(forkedId, sourceLive.workspacePath),
     ...orchestrationTools,
   ];
 

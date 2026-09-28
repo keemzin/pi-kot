@@ -27,6 +27,7 @@ import { useLayoutStore } from "./stores/layout-store";
 import { usePreferencesStore } from "./stores/preferences-store";
 import { useI18n } from "./hooks/useI18n";
 import { fetchAndApplyUiSettings } from "./lib/apply-ui-settings";
+import { useProcessesStore, selectRunningCount } from "./stores/processes-store";
 
 import type { SessionContextResponse } from "./lib/api-client/types";
 import {
@@ -132,6 +133,7 @@ export function App() {
   }, [draggingProjectId, projects, reorderProjects, resetDragState]);
 
   const contextData = useContextData(activeSessionId);
+  const runningProcessesCount = useProcessesStore((s) => selectRunningCount(s, activeSessionId));
 
   const {
     sidebarCollapsed, showTreePanel, showSettings, showOrch, showMCP, showTerminal,
@@ -992,6 +994,33 @@ export function App() {
                 <polyline points="4 17 10 11 4 5" />
                 <line x1="12" y1="19" x2="20" y2="19" />
               </svg>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleExplorerTab("processes")}
+              title={runningProcessesCount > 0 ? `${runningProcessesCount} background process(es) running` : "Background processes"}
+              className={`header-btn${explorerTab === "processes" ? " active" : ""}`}
+              style={{ position: "relative" }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              {runningProcessesCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "5px",
+                    right: "5px",
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    background: "#10b981",
+                    boxShadow: "0 0 6px #10b981",
+                  }}
+                />
+              )}
             </button>
             <div className="header-overflow desktop-only">
               <button

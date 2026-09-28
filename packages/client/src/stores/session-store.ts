@@ -25,6 +25,7 @@ import { usePlanReviewStore } from "./plan-review-store";
 import { useExtensionUIStore } from "./extension-ui-store";
 import { useLayoutStore } from "./layout-store";
 import { useFavoriteStore } from "./favorite-store";
+import { useProcessesStore } from "./processes-store";
 
 export const EMPTY_MESSAGES: unknown[] = [];
 export const EMPTY_COMPACTIONS: CompactionEvent[] = [];
@@ -582,6 +583,20 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 						usePlanReviewStore
 							.getState()
 							.resolveReview(resolvedId);
+						break;
+					}
+					case "process_update": {
+						const { processes } = event as unknown as {
+							processes: import("./processes-store").ProcessInfo[];
+						};
+						useProcessesStore.getState().setProcesses(sessionId, processes);
+						break;
+					}
+					case "process_alert": {
+						const { alert } = event as unknown as {
+							alert: import("./processes-store").ProcessAlert;
+						};
+						useProcessesStore.getState().addAlert(sessionId, alert);
 						break;
 					}
 					case "compaction_start": {
