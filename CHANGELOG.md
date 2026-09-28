@@ -2,6 +2,19 @@
 
 All notable changes to pi-kot, with focus on SDK upgrades and behavior that affects users.
 
+## [0.1.40] — 2026-09-28
+
+### Highlights & Features
+
+- **UI & Mobile Modernization**: Redesigned settings panel tabs, streamlined providers view, and optimized mobile chat toolbar to ensure action controls and send buttons remain fully accessible on narrow viewports.
+- **Background Process Manager**: Added background process manager tool with dedicated process monitoring UI.
+- **Session Explorer**: Modernized session list with Lucide icons, relative timestamps, and refined active session indicators.
+- **Git Panel & Diff Viewer**: Polished Git panel file rows, staging actions, and diff toolbar.
+- **File Management**: Added multi-file selection, batch delete, and drag-and-drop batch move in the file explorer; redesigned file editor toolbar.
+- **Archive Retention**: Automated 30-day archive retention purge and permanent deletion support.
+- **Session Favorites**: Server-persisted starred sessions across devices and resolved sidebar pagination edge cases.
+- **Streaming Performance**: Decoupled artifact parsing from streaming token processing for smoother chat output and chronological `!command` execution order.
+
 ## [0.1.39] — 2026-09-25
 
 ### SDK Upgrade: pi-coding-agent → 0.87.1
