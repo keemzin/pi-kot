@@ -6767,15 +6767,69 @@ strong {
 .git-file-row {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 7px 12px;
+	gap: 8px;
+	padding: 6px 12px;
 	font-size: 12px;
 	border-bottom: 1px solid var(--border);
+	transition: background var(--duration) var(--ease);
+}
+
+.git-file-row:hover {
+	background: var(--bg-glass-hover);
+}
+
+.git-file-row.diff-open {
+	background: var(--bg-glass-active);
+}
+
+.git-file-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.git-file-row:hover .git-file-actions,
+.git-file-row:focus-within .git-file-actions,
+.git-file-actions.has-pending {
+	opacity: 1;
+}
+
+.git-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	background: none;
+	border: 1px solid transparent;
+	border-radius: var(--radius-sm);
+	color: var(--text-dim);
+	cursor: pointer;
+	transition: all var(--duration) var(--ease);
+}
+
+.git-icon-btn:hover {
+	background: var(--accent-subtle);
+	color: var(--accent-text);
+	border-color: var(--border-bright);
+}
+
+.git-icon-btn.danger:hover {
+	background: rgba(248, 113, 113, 0.15);
+	color: var(--error);
+	border-color: rgba(248, 113, 113, 0.3);
 }
 
 @media (max-width: 600px) {
+	.git-file-actions {
+		opacity: 1;
+	}
+
 	.git-file-row {
-		padding: 9px 12px;
+		padding: 8px 12px;
 		gap: 8px;
 	}
 
