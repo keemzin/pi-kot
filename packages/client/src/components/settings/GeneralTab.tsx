@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { Info, Globe, Terminal, RotateCcw, RefreshCw } from "lucide-react";
 import { getVersions, checkSdkUpdate } from "../../lib/api-client";
-import { errorMsg } from "./shared";
+import { SettingCard, SettingRow, SettingDivider, errorMsg } from "./shared";
 import { useI18n } from "../../hooks/useI18n";
 import type { Locale } from "../../lib/i18n/types";
 
@@ -38,102 +39,136 @@ export function GeneralTab() {
 
   return (
     <div className="settings-fields">
-      <div className="settings-field">
-        <label className="settings-label">{t("settings.general.about")}</label>
-        <p className="settings-hint">
-          {t("settings.general.aboutDesc")}
-        </p>
-      </div>
-
-      <hr className="settings-divider" />
-
-      <div className="settings-field">
-        <label className="settings-label">{t("settings.language")}</label>
-        <select
-          className="settings-select"
-          value={locale}
-          onChange={(e) => setLocale(e.target.value as Locale)}
-          style={{ width: "fit-content" }}
-        >
-          {supportedLocales.map((loc) => (
-            <option key={loc.id} value={loc.id}>
-              {loc.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <hr className="settings-divider" />
-
-      <div className="settings-field">
-        <label className="settings-label">{t("settings.general.versions")}</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
-          <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.server")}</span>
-            <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
-              {versions?.serverVersion ?? "…"}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-            <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.sdk")}</span>
-            <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
-              {versions?.sdkVersion ?? "…"}
-            </span>
-          </div>
-          {checkResult !== undefined && (
-            <div style={{ display: "flex", gap: 16, fontSize: 13, alignItems: "center" }}>
-              <span style={{ color: "var(--text-secondary)", minWidth: 100 }}>{t("settings.general.latestSdk")}</span>
-              <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
-                {checkResult.error !== undefined ? (
-                  <span style={{ color: "var(--danger, #e74c3c)" }}>{t("settings.general.checkFailed")}</span>
-                ) : (
-                  checkResult.latestSdkVersion
-                )}
-              </span>
-              {checkResult.error === undefined && checkResult.updateAvailable && (
-                <span style={{
-                  fontSize: 11,
-                  color: "#fff",
-                  background: "var(--accent-text, #3b82f6)",
-                  padding: "1px 8px",
-                  borderRadius: 4,
-                  fontWeight: 600,
-                }}>
-                  {t("settings.general.updateAvailable")}
-                </span>
-              )}
-              {checkResult.error === undefined && !checkResult.updateAvailable && (
-                <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("settings.general.upToDate")}</span>
-              )}
-            </div>
-          )}
-          {checkResult?.error !== undefined && (
-            <p style={{ fontSize: 12, color: "var(--danger, #e74c3c)", margin: 0 }}>
-              {checkResult.error}
-            </p>
-          )}
+      {/* Card 1: About */}
+      <SettingCard
+        icon={<Info size={15} />}
+        title={t("settings.general.about")}
+        subtitle={t("settings.general.aboutDesc")}
+      >
+        <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          pi-kot is a local-first web UI and bridge client for the pi coding agent. It embeds the @earendil-works/pi-coding-agent SDK and exposes capabilities via REST, SSE, and WebSockets.
         </div>
-        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+      </SettingCard>
+
+      {/* Card 2: Language */}
+      <SettingCard
+        icon={<Globe size={15} />}
+        title={t("settings.language")}
+        subtitle="Select the interface language for pi-kot"
+      >
+        <SettingRow
+          label={t("settings.language")}
+          hint="UI labels, prompts, and dialog buttons"
+        >
+          <select
+            className="settings-select"
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+          >
+            {supportedLocales.map((loc) => (
+              <option key={loc.id} value={loc.id}>
+                {loc.label}
+              </option>
+            ))}
+          </select>
+        </SettingRow>
+      </SettingCard>
+
+      {/* Card 3: Versions & Diagnostics */}
+      <SettingCard
+        icon={<Terminal size={15} />}
+        title={t("settings.general.versions")}
+        subtitle="Installed server build and agent runtime SDK versions"
+        action={
           <button
+            type="button"
             onClick={() => void handleCheckUpdate()}
             disabled={checking}
+            className="settings-btn settings-btn-xs"
+          >
+            <RefreshCw size={11} className={checking ? "animate-spin" : ""} />
+            <span>
+              {checking
+                ? t("settings.general.checking")
+                : checkResult !== undefined
+                  ? t("settings.general.checkAgain")
+                  : t("settings.general.checkForUpdates")}
+            </span>
+          </button>
+        }
+      >
+        <SettingRow
+          label={t("settings.general.server")}
+          hint="Fastify bridge server version"
+        >
+          <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600, fontSize: 12 }}>
+            {versions?.serverVersion ?? "…"}
+          </span>
+        </SettingRow>
+
+        <SettingDivider />
+
+        <SettingRow
+          label={t("settings.general.sdk")}
+          hint="@earendil-works/pi-coding-agent version"
+        >
+          <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600, fontSize: 12 }}>
+            {versions?.sdkVersion ?? "…"}
+          </span>
+        </SettingRow>
+
+        {checkResult !== undefined && (
+          <>
+            <SettingDivider />
+            <SettingRow
+              label={t("settings.general.latestSdk")}
+              hint={checkResult.error !== undefined ? "Check error" : checkResult.updateAvailable ? "A newer SDK is published on npm" : "You are on the latest SDK"}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 600, fontSize: 12 }}>
+                  {checkResult.error !== undefined ? (
+                    <span style={{ color: "var(--danger, #e74c3c)" }}>{t("settings.general.checkFailed")}</span>
+                  ) : (
+                    checkResult.latestSdkVersion
+                  )}
+                </span>
+                {checkResult.error === undefined && checkResult.updateAvailable && (
+                  <span className="settings-badge" style={{ background: "var(--accent-subtle)", color: "var(--accent-text)", border: "1px solid var(--accent)" }}>
+                    {t("settings.general.updateAvailable")}
+                  </span>
+                )}
+                {checkResult.error === undefined && !checkResult.updateAvailable && (
+                  <span className="settings-badge settings-badge-on">
+                    {t("settings.general.upToDate")}
+                  </span>
+                )}
+              </div>
+            </SettingRow>
+          </>
+        )}
+      </SettingCard>
+
+      {/* Card 4: Quick Actions */}
+      <SettingCard
+        icon={<RotateCcw size={15} />}
+        title="App Session"
+        subtitle="Manage current browser window session"
+      >
+        <SettingRow
+          label={t("settings.general.reloadPage")}
+          hint="Refreshes the client and reconnects to active SSE streams"
+        >
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
             className="settings-btn"
           >
-            {checking ? t("settings.general.checking") : checkResult !== undefined ? t("settings.general.checkAgain") : t("settings.general.checkForUpdates")}
+            <RotateCcw size={12} />
+            <span>{t("settings.general.reloadPage")}</span>
           </button>
-        </div>
-      </div>
-
-      <hr className="settings-divider" />
-
-      <div className="settings-field">
-        <button
-          onClick={() => window.location.reload()}
-          className="settings-btn"
-        >
-          {t("settings.general.reloadPage")}
-        </button>
-      </div>
+        </SettingRow>
+      </SettingCard>
     </div>
   );
 }
+
