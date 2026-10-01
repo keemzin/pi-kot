@@ -950,7 +950,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
         {/* When in Files tab: action icons integrated directly into the tab bar */}
         {tab === "files" && (
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1px" }}>
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1px", flexShrink: 0 }}>
             {/* Multi-select toggle */}
             <button
               onClick={() => {

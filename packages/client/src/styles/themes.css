@@ -7773,6 +7773,11 @@ strong {
 }
 
 /* ── File explorer tab buttons ── */
+.file-explorer-panel {
+	container-type: inline-size;
+	container-name: explorer;
+}
+
 .fe-tab-bar {
 	height: 38px;
 	min-height: 38px;
@@ -7782,10 +7787,10 @@ strong {
 .fe-tab-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
 	height: 38px;
 	box-sizing: border-box;
-	padding: 0 10px;
+	padding: 0 8px;
 	border: none;
 	background: transparent;
 	color: var(--text-dim);
@@ -7799,6 +7804,7 @@ strong {
 		border-color var(--duration) var(--ease),
 		background var(--duration) var(--ease);
 	white-space: nowrap;
+	flex-shrink: 0;
 }
 
 .fe-tab-btn:hover {
@@ -7813,13 +7819,30 @@ strong {
 	font-weight: 600;
 }
 
-/* Label hidden by default — show if panel is wide enough */
+/* Tab label responsive behavior:
+   In compact sidebars (<500px), inactive tabs show icon-only to give priority
+   to file action buttons (upload, new file/folder, refresh/sync).
+   When sidebar is >=310px, the active tab shows its label.
+   When sidebar is >=500px, all tabs show labels. */
 .fe-tab-label {
 	display: none;
 }
 
-@media (min-width: 380px) {
+@container explorer (min-width: 310px) {
+	.fe-tab-btn.active .fe-tab-label {
+		display: inline;
+	}
+}
+
+@container explorer (min-width: 500px) {
 	.fe-tab-label {
+		display: inline;
+	}
+}
+
+/* Fallback for environments without container queries */
+@supports not (container-type: inline-size) {
+	.fe-tab-btn.active .fe-tab-label {
 		display: inline;
 	}
 }
