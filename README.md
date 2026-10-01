@@ -100,6 +100,20 @@ npm run start
 # Open http://localhost:3333
 ```
 
+### Docker
+
+Run pi-kot in an isolated container:
+
+```bash
+cd docker
+cp .env.example .env    # optional: configure port, password, or sudo
+docker compose up -d --build
+
+# Open http://localhost:3333 (or HOST_PORT configured in .env)
+```
+
+See [docs/containers.md](./docs/containers.md) for full container documentation, sandbox mode, and permission settings.
+
 All flags also work as environment variables (`PORT`, `HOST`, `UI_PASSWORD`, `API_KEY`, `WORKSPACE_PATH`, `LOG_LEVEL`, `MINIMAL_UI`, ...) — full reference in [Configuration](#configuration).
 
 ---

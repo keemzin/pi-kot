@@ -26,6 +26,7 @@
 
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import type { WebSocket } from "@fastify/websocket";
+import { existsSync } from "node:fs";
 import { authEnabled, verifyHmac } from "./auth.js";
 import { config } from "../config.js";
 import {
@@ -122,11 +123,12 @@ export const terminalRoutes: FastifyPluginAsync = async (fastify) => {
       let projectCwd: string | undefined;
       if (projectId) {
         const project = await getProject(projectId);
-        if (project) {
+        if (project && existsSync(project.path)) {
           projectCwd = project.path;
         }
       }
-      const cwd = projectCwd || query.cwd || config.workspacePath || process.env.HOME || "/tmp";
+      const rawCwd = projectCwd || query.cwd || config.workspacePath || process.env.HOME || "/tmp";
+      const cwd = existsSync(rawCwd) ? rawCwd : (existsSync(config.workspacePath) ? config.workspacePath : "/tmp");
 
       // Reattach path: if tabId is provided and a PTY exists, reuse it
       const requestedTabId = query.tabId;

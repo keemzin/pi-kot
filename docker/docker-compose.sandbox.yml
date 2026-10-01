@@ -1,0 +1,30 @@
+# Optional sandbox overlay.
+#
+# Use with the base compose file when AGENT_TOOL_SANDBOX_ENABLED=true:
+#   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d --build
+#
+# The base compose file starts as the pi user and drops all capabilities so
+# regular mode does not need SETUID/SETGID. Sandbox mode must start the server
+# as root and add back SETUID/SETGID so pi-kot can spawn model/user tool
+# children as AGENT_TOOL_UID:GID. CHOWN lets startup prepare standard writable
+# mounts and lets browser uploads/new-file APIs hand workspace paths to the
+# sandbox tool identity.
+
+services:
+  pi-kot:
+    user: "0:0"
+    environment:
+      AGENT_TOOL_SANDBOX_ENABLED: ${AGENT_TOOL_SANDBOX_ENABLED:-true}
+      AGENT_TOOL_UID: ${AGENT_TOOL_UID:-1001}
+      AGENT_TOOL_GID: ${AGENT_TOOL_GID:-1001}
+      AGENT_TOOL_HOME: ${AGENT_TOOL_HOME:-/home/pi-tools}
+      AGENT_TOOL_SANDBOX_CHOWN_PATHS: ${AGENT_TOOL_SANDBOX_CHOWN_PATHS:-}
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+    ports:
+      # Same LAN port as the base file so stacking with
+      # docker-compose.yml keeps the mapping (later file wins). Set
+      # UI_PASSWORD / API_KEY first — see SECURITY.md.
+      - "${HOST_PORT:-3399}:3000"

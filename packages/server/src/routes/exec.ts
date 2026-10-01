@@ -1,9 +1,11 @@
 import { spawn, execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import type { FastifyPluginAsync } from "fastify";
 import type { BashOperations } from "@earendil-works/pi-coding-agent";
 import { errorSchema } from "./_schemas.js";
 import { getSession } from "../session-store.js";
 import { serializeSSE } from "../event-stream.js";
+import { config } from "../config.js";
 
 /**
  * Cross-platform shell resolution.
@@ -43,6 +45,11 @@ function createBashOps(
 	timeoutSignal: AbortSignal,
 ): BashOperations {
 	const shellConfig = resolveShell();
+	const effectiveCwd = existsSync(workspacePath)
+		? workspacePath
+		: existsSync(config.workspacePath)
+			? config.workspacePath
+			: process.cwd();
 	return {
 		exec: (command, _cwd, options) => {
 			return new Promise<{ exitCode: number | null }>((resolve, reject) => {
@@ -51,7 +58,7 @@ function createBashOps(
 					shellConfig.shell,
 					shellConfig.argsTemplate(command),
 					{
-						cwd: workspacePath,
+						cwd: effectiveCwd,
 						env: {
 							...process.env,
 							PI_API_KEY: undefined,

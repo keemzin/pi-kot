@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, join } from "node:path";
-import { stat, createReadStream, watch as fsWatch } from "node:fs";
+import { stat, createReadStream, watch as fsWatch, existsSync } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import {
@@ -244,7 +244,8 @@ async function resolveProject(
     await reply.code(404).send({ error: "project_not_found", message: "no project with that id" });
     return undefined;
   }
-  return { id: project.id, path: project.path };
+  const effectivePath = existsSync(project.path) ? project.path : config.workspacePath;
+  return { id: project.id, path: effectivePath };
 }
 
 /**

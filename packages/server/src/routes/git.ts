@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply } from "fastify";
 import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { config } from "../config.js";
 import {
   GitCommandError,
   GitNotInstalledError,
@@ -227,7 +229,8 @@ async function resolveProject(
     await reply.code(404).send({ error: "project_not_found", message: "no project with that id" });
     return undefined;
   }
-  return { id: project.id, path: project.path };
+  const effectivePath = existsSync(project.path) ? project.path : config.workspacePath;
+  return { id: project.id, path: effectivePath };
 }
 
 /**

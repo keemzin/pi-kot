@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+**/node_modules
+.pnpm-store/
+
+# Build outputs — rebuilt inside the container.
+**/dist
+packages/*/dist
+dist
+
+# Version control
+.git
+.git-worktrees
+
+# Editor & OS noise
+.idea
+.vscode
+.DS_Store
+*.log
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data that shouldn't bake into the image.
+workspace
+forge
+pi-kot
+*.jsonl
+**/.pi/sessions
+
+# Test artifacts and notes (gitignored anyway, defense in depth).
+notes
+tests/scratch
+
+# Existing image layers / docker noise
+docker/*.tar
+.docker
