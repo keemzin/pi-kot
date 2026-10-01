@@ -258,13 +258,20 @@ export async function listSessionsForProject(
   );
 }
 
+function resolveSafeWorkspacePath(targetPath: string): string {
+  if (existsSync(targetPath)) return targetPath;
+  if (existsSync(config.workspacePath)) return config.workspacePath;
+  return process.cwd();
+}
+
 /**
  * Create a new session. Uses disk-backed SessionManager for persistence.
  */
 export async function createSession(
   projectId: string,
-  workspacePath: string,
+  rawWorkspacePath: string,
 ): Promise<LiveSession> {
+  const workspacePath = resolveSafeWorkspacePath(rawWorkspacePath);
   const dir = await ensureSessionDir(projectId);
   const sessionManager = SessionManager.create(workspacePath, dir);
   const sessionId = sessionManager.getSessionId();
@@ -708,6 +715,8 @@ export async function rebuildSessionTools(
   const live = registry.get(sessionId);
   if (live === undefined) return;
 
+  live.workspacePath = resolveSafeWorkspacePath(live.workspacePath);
+
   const mcpTools = await resolveMcpCustomTools(live.projectId, live.workspacePath);
   const orchestrationTools = await resolveOrchestrationTools(sessionId);
   const customTools: ToolDefinition[] = [
@@ -857,7 +866,7 @@ export async function findSessionLocation(
       try {
         const files = await readdir(dir);
         if (files.some((f) => f.includes(sessionId))) {
-          return { projectId: project.id, workspacePath: project.path };
+          return { projectId: project.id, workspacePath: resolveSafeWorkspacePath(project.path) };
         }
       } catch {
         // dir doesn't exist, skip
@@ -987,6 +996,8 @@ export async function forkSession(
     const resumed = await resumeSessionById(sessionId);
     return forkSession(resumed.sessionId, entryId);
   }
+
+  sourceLive.workspacePath = resolveSafeWorkspacePath(sourceLive.workspacePath);
 
   // Capture the source file path
   const sourceSessionFile = sourceLive.sessionManager.getSessionFile();

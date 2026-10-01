@@ -1,0 +1,79 @@
+# Single-tenant pi-kot.
+#   cd docker && docker compose up -d --build
+#
+# Bind mounts, env-var rationale, and operator trade-offs:
+# see ../docs/containers.md.
+
+services:
+  pi-kot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        # Override in .env to match `id -u` / `id -g` for writable bind mounts.
+        PUID: ${PUID:-1000}
+        PGID: ${PGID:-1000}
+        # Advanced: set when using docker-compose.sandbox.yml with
+        # non-default pi-tools IDs (see ../docs/agent-tool-sandbox.md).
+        PTOOLS_UID: ${AGENT_TOOL_UID:-1001}
+        PTOOLS_GID: ${AGENT_TOOL_GID:-1001}
+        EXTRA_APT_PACKAGES: ${EXTRA_APT_PACKAGES:-}
+    image: pi-kot:latest
+    container_name: ${CONTAINER_NAME:-pi-kot}
+    restart: unless-stopped
+    # Start container entrypoint as root so it can configure sudoers according
+    # to ENABLE_SUDO and drop privileges to user pi via gosu before launching the server.
+    user: "0:0"
+    ports:
+      # Loopback only by default — drop the `127.0.0.1:` prefix to expose
+      # to the LAN (and set UI_PASSWORD or API_KEY first; see SECURITY.md).
+      - "${HOST_PORT:-3333}:3000"
+    volumes:
+      - ${WORKSPACE_HOST_PATH:-./workspace}:/workspace
+      - ${PI_CONFIG_HOST_PATH:-~/.pi/agent}:/home/pi/.pi/agent
+      # Separate default from host so the container manages its own project list
+      - ${KOT_DATA_HOST_PATH:-~/.pi-kot-docker}:/home/pi/.pi-kot
+    environment:
+      # Container-internal paths — fixed.
+      WORKSPACE_PATH: /workspace
+      PI_CONFIG_DIR: /home/pi/.pi/agent
+      FORGE_DATA_DIR: /home/pi/.pi-kot
+      PORT: "3000"
+      HOST_PORT: ${HOST_PORT:-3333}
+      # Auth — read from .env. Both empty = auth disabled.
+      UI_PASSWORD: ${UI_PASSWORD:-}
+      API_KEY: ${API_KEY:-}
+      # Sudo permission toggle (false | true | all)
+      ENABLE_SUDO: ${ENABLE_SUDO:-false}
+      # Logging + reverse-proxy hint.
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      # Less-used server env vars (JWT_SECRET, CORS_ORIGIN, MINIMAL_UI,
+      # orchestration, rate limits, terminal tuning, sandbox, etc.)
+      # are intentionally documentation-only; add them in your own compose
+      # override when needed.
+    # Hardening. Drop all capabilities by default and add back only the
+    # minimal set required for gosu privilege demotion and sudo.
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+      - AUDIT_WRITE
+    pids_limit: 512
+    mem_limit: 2g
+    cpus: "1.0"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

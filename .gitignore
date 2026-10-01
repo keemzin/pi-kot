@@ -67,3 +67,4 @@ scripts/
 .impeccable/
 .playwright-cli/
 .playwright-mcp/
+workspace/
