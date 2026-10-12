@@ -2,6 +2,20 @@
 
 All notable changes to pi-kot, with focus on SDK upgrades and behavior that affects users.
 
+## [1.0.0] — 2026-10-12
+
+### 🎉 Major Release: 1.0.0 Stable & SDK 1.1.0 Upgrade
+
+#### Highlights & Features
+
+- **pi Coding Agent SDK 1.1.0 Upgrade**: Upgraded `@earendil-works/pi-coding-agent`, `@earendil-works/pi-ai`, and `@earendil-works/pi-agent-core` to `^1.1.0`.
+- **Full-Width Editor Diff Tabs**: Working tree, staged changes, and commit diffs now open directly in the main editor area as dedicated tabs (`git-diff://`) instead of cramped sidebar accordions.
+- **Dedicated Diff Action Toolbar**: Added `DiffEditorView` with directory breadcrumbs, status pills (`WORKING TREE`, `STAGED`, `COMMIT`), `+add / −del` statistics, and segmented Unified ↔ Split view switcher.
+- **Quick Diff Controls**: One-click "Open File" to switch into live code editor, Stage/Unstage toggle, Discard changes with 2-click confirmation safety, and Copy Path with instant feedback.
+- **Modernized Turn Diffs & Syntax Highlighting**: Tokenized Prism syntax highlighting with intraline character-level diff detection across chat turns and file cards.
+- **Modern UI Dialogs & Floating Toasts**: Replaced native browser popups (`confirm`, `alert`) with themed accessible modal dialogs and non-blocking floating notifications.
+- **Chat & Orchestration Polish**: Streamlined chat input bar with rich orchestration popovers, notification event cards, and refined tool grouping.
+
 ## [0.1.41] — 2026-10-12
 
 ### Highlights & Features
