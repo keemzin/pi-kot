@@ -7501,6 +7501,18 @@ strong {
 	background: var(--bg-glass-active, rgba(255, 255, 255, 0.15));
 }
 
+.file-tree-batch-btn.download {
+	background: var(--accent, #3b82f6);
+	color: #ffffff;
+}
+.file-tree-batch-btn.download:hover:not(:disabled) {
+	filter: brightness(1.1);
+}
+.file-tree-batch-btn.download:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 .file-tree-batch-btn.delete {
 	background: var(--accent-red, #ef4444);
 	color: #ffffff;

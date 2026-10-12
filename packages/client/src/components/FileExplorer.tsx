@@ -5,7 +5,7 @@ import { SystemPromptTab } from "./SystemPromptTab";
 import { ArtifactsPanel } from "./ArtifactsPanel";
 import { ProcessesPanel } from "./ProcessesPanel";
 import { useProcessesStore, selectRunningCount } from "../stores/processes-store";
-import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesBatchDelete, filesBatchMove, filesMove, filesSearch, filesUpload, filesDownload } from "../lib/api-client";
+import { filesTree, filesWrite, filesRename, filesMkdir, filesDelete, filesBatchDelete, filesBatchMove, filesMove, filesSearch, filesUpload, filesDownload, filesBatchDownload } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useLayoutStore } from "../stores/layout-store";
 import { getFileTypeIcon } from "./FileIcon";
@@ -147,6 +147,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
   const [selectMode, setSelectMode] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchDownloading, setBatchDownloading] = useState(false);
 
   useEffect(() => {
     setSelectedPaths(new Set());
@@ -537,6 +538,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
       setBatchDeleting(false);
     }
   };
+
+  const handleBatchDownload = useCallback(async () => {
+    if (selectedPaths.size === 0) return;
+    setBatchDownloading(true);
+    setError(undefined);
+    try {
+      await filesBatchDownload(projectId, Array.from(selectedPaths));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "batch download failed");
+    } finally {
+      setBatchDownloading(false);
+    }
+  }, [projectId, selectedPaths]);
 
   const handleMoveEntries = useCallback(async (srcPaths: string[], targetDir: string) => {
     // Filter out invalid moves
@@ -1342,7 +1356,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           </div>
 
           {/* Floating batch action bar */}
-          {selectedPaths.size > 0 && (
+          {(selectedPaths.size > 0 || selectMode) && (
             <div className="file-tree-batch-bar">
               <div className="file-tree-batch-info">
                 <span className="file-tree-batch-count">{selectedPaths.size}</span>
@@ -1353,34 +1367,55 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                   type="button"
                   className="file-tree-batch-btn select-all"
                   onClick={() => {
-                    if (selectedPaths.size === flattenedVisibleNodes.length) {
+                    if (selectedPaths.size === flattenedVisibleNodes.length && flattenedVisibleNodes.length > 0) {
                       clearSelection();
                     } else {
                       selectAllVisible();
                     }
                   }}
-                  title={selectedPaths.size === flattenedVisibleNodes.length ? "Deselect all" : "Select all"}
+                  title={selectedPaths.size === flattenedVisibleNodes.length && flattenedVisibleNodes.length > 0 ? "Deselect all" : "Select all"}
                 >
-                  {selectedPaths.size === flattenedVisibleNodes.length ? "Deselect all" : "Select all"}
+                  {selectedPaths.size === flattenedVisibleNodes.length && flattenedVisibleNodes.length > 0 ? "Deselect all" : "Select all"}
                 </button>
-                <button
-                  type="button"
-                  className="file-tree-batch-btn delete"
-                  onClick={() => setConfirmBatchDelete(true)}
-                  disabled={batchDeleting}
-                  title="Delete selected files"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                  <span>Delete ({selectedPaths.size})</span>
-                </button>
+                {selectedPaths.size > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      className="file-tree-batch-btn download"
+                      onClick={handleBatchDownload}
+                      disabled={batchDownloading}
+                      title={`Download ${selectedPaths.size} selected item${selectedPaths.size === 1 ? "" : "s"} as Zip`}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      <span>{batchDownloading ? "Zipping…" : `Zip (${selectedPaths.size})`}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="file-tree-batch-btn delete"
+                      onClick={() => setConfirmBatchDelete(true)}
+                      disabled={batchDeleting || batchDownloading}
+                      title="Delete selected files"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span>Delete ({selectedPaths.size})</span>
+                    </button>
+                  </>
+                )}
                 <button
                   type="button"
                   className="file-tree-batch-btn close"
-                  onClick={clearSelection}
-                  title="Clear selection"
+                  onClick={() => {
+                    clearSelection();
+                    setSelectMode(false);
+                  }}
+                  title="Close / Exit selection mode"
                 >
                   ✕
                 </button>
@@ -1476,7 +1511,11 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                 e.stopPropagation();
                 setContextMenu(null);
                 try {
-                  await filesDownload(projectId, contextMenu.node.path);
+                  if (selectedPaths.size > 1 && selectedPaths.has(contextMenu.node.path)) {
+                    await filesBatchDownload(projectId, Array.from(selectedPaths));
+                  } else {
+                    await filesDownload(projectId, contextMenu.node.path);
+                  }
                 } catch (err) {
                   setError(err instanceof Error ? err.message : "download failed");
                 }
@@ -1490,7 +1529,13 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               </span>
-              <span>{contextMenu.node.type === "directory" ? "Download as Zip" : "Download"}</span>
+              <span>
+                {selectedPaths.size > 1 && selectedPaths.has(contextMenu.node.path)
+                  ? `Download ${selectedPaths.size} items as Zip`
+                  : contextMenu.node.type === "directory"
+                    ? "Download as Zip"
+                    : "Download"}
+              </span>
             </div>
 
             {/* Separator */}

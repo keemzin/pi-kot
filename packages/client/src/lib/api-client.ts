@@ -504,6 +504,51 @@ export async function filesDownload(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Batch download multiple files or directories from the project as a single zip archive.
+ * Triggers a browser download via a temporary anchor element.
+ */
+export async function filesBatchDownload(
+  projectId: string,
+  paths: string[],
+): Promise<void> {
+  const token = getStoredToken();
+  const res = await fetch(`${BASE}/api/v1/files/batch-download`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token !== undefined ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ projectId, paths }),
+  });
+  if (res.status === 401) {
+    clearStoredToken();
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.message ?? data.error ?? res.statusText);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const filenameMatch =
+    disposition.match(/filename\*?=UTF-8''([^;]+)/) ||
+    disposition.match(/filename="?([^";]+)"?/);
+  const filename = filenameMatch
+    ? decodeURIComponent(filenameMatch[1])
+    : "selected-files.zip";
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export async function filesDelete(
   projectId: string,
   path: string,

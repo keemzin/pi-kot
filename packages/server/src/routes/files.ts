@@ -13,6 +13,7 @@ import {
   TargetExistsError,
   deleteEntry,
   downloadStream,
+  downloadBatchStream,
   getTree,
   listAllFiles,
   makeDirectory,
@@ -420,6 +421,58 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
         } else {
           reply.header("Content-Type", "application/zip");
         }
+        return reply.send(result.stream);
+      } catch (err) {
+        return mapError(reply, err);
+      }
+    },
+  );
+
+  fastify.post<{ Body: { projectId: string; paths: string[] } }>(
+    "/files/batch-download",
+    {
+      schema: {
+        description:
+          "Batch download multiple files and directories from the project as a single zip archive.",
+        tags: ["files"],
+        body: {
+          type: "object",
+          required: ["projectId", "paths"],
+          properties: {
+            projectId: { type: "string", minLength: 1 },
+            paths: {
+              type: "array",
+              items: { type: "string" },
+              minItems: 1,
+            },
+          },
+        },
+        response: {
+          200: { type: "string", format: "binary" },
+          400: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const project = await resolveProject(req.body.projectId, reply);
+      if (project === undefined) return reply;
+      try {
+        const projectName = basename(project.path) || "files";
+        const result = await downloadBatchStream(
+          req.body.paths,
+          project.path,
+          `${projectName}-selected`,
+        );
+        const asciiName = result.filename.replace(/[^\x20-\x7e]/g, "_");
+        const utfName = encodeURIComponent(result.filename);
+        reply.header(
+          "Content-Disposition",
+          `attachment; filename="${asciiName}"; filename*=UTF-8''${utfName}`,
+        );
+        reply.header("Content-Type", "application/zip");
         return reply.send(result.stream);
       } catch (err) {
         return mapError(reply, err);

@@ -350,6 +350,61 @@ export async function downloadStream(
   throw new NotFoundError(resolved);
 }
 
+export async function downloadBatchStream(
+  paths: string[],
+  root: string,
+  archiveName?: string,
+): Promise<{ filename: string; stream: Readable }> {
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new NotFoundError("no paths provided");
+  }
+  const validRelativePaths: string[] = [];
+  for (const relPath of paths) {
+    if (typeof relPath !== "string" || relPath.trim().length === 0) continue;
+    const resolved = await verifyPathSafe(join(root, relPath), root);
+    const st = await stat(resolved).catch(() => undefined);
+    if (st !== undefined) {
+      const rel = relative(root, resolved);
+      validRelativePaths.push(rel.length > 0 ? rel : ".");
+    }
+  }
+  if (validRelativePaths.length === 0) {
+    throw new NotFoundError("none of the specified paths exist");
+  }
+
+  const baseZipName =
+    archiveName && archiveName.trim().length > 0
+      ? archiveName.trim()
+      : "selected-files";
+  const tmpZip = join(tmpdir(), `${baseZipName}-${randomUUID()}.zip`);
+  const excludeArgs = Array.from(TREE_SKIP_DIRS)
+    .map((d) => `-x "${d}/*" "${d}"`)
+    .join(" ");
+
+  execSync(`cd "${root}" && zip -r -@ "${tmpZip}" ${excludeArgs}`, {
+    input: validRelativePaths.join("\n"),
+    stdio: ["pipe", "pipe", "pipe"],
+    timeout: 300_000,
+  });
+
+  const stream = createReadStream(tmpZip);
+  stream.on("end", () => {
+    try {
+      unlinkSync(tmpZip);
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
+  stream.on("error", () => {
+    try {
+      unlinkSync(tmpZip);
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
+  return { filename: `${baseZipName}.zip`, stream };
+}
+
 export async function writeFileBytes(
   parentAbsPath: string,
   name: string,
