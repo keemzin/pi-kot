@@ -728,14 +728,18 @@ export const ToolCallEntry = memo(function ToolCallEntry({
 					)}
 					{!isRunning && !detailsOpen && outputPreview.length > 0 && (
 						<span 
-							className="tool-timeline-output-preview" 
+							className={`tool-timeline-output-preview ${isError ? "error" : "success"}`} 
 							title={outputPreview}
 						>
-							— {isError ? "✖ " : "✓ "} {outputPreview}
+							<span className="tool-timeline-status-icon">
+								{isError ? "✕" : "✓"}
+							</span>
+							<span className="tool-timeline-output-text">{outputPreview}</span>
 						</span>
 					)}
 					{isRunning && (
 						<span className="tool-timeline-running" aria-label="running">
+							<span className="tool-timeline-pulse-dot" />
 							{t("chat.running")}
 						</span>
 					)}
@@ -807,10 +811,12 @@ function JustificationRow({
 	text,
 	open,
 	onToggle,
+	toolCount = 0,
 }: {
 	text: string;
 	open: boolean;
 	onToggle: () => void;
+	toolCount?: number;
 }) {
 	const { t } = useI18n();
 	const stripped = text
@@ -870,19 +876,26 @@ function JustificationRow({
 						</span>
 					)}
 				</div>
-				<span className="trail-justification-chevron">
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						strokeWidth="2"
-						strokeLinecap="round"
-						strokeLinejoin="round"
-					>
-						<path d="m6 9 6 6 6-6" />
-					</svg>
-				</span>
+				<div className="trail-justification-actions">
+					{!open && toolCount > 0 && (
+						<span className="trail-justification-badge">
+							{toolCount} {toolCount === 1 ? "tool" : "tools"}
+						</span>
+					)}
+					<span className="trail-justification-chevron">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeLinejoin="round"
+						>
+							<path d="m6 9 6 6 6-6" />
+						</svg>
+					</span>
+				</div>
 			</div>
 		</div>
 	);
@@ -1016,6 +1029,18 @@ function ConsecutiveToolGroup({
 	const isRunning = anyRunning;
 	const isError = anyError;
 
+	const targetsPreview = useMemo(() => {
+		const previews: string[] = [];
+		for (const e of entries) {
+			if (e.kind === "tool") {
+				const desc = getToolDescription(name, (e.block.arguments ?? {}) as Record<string, unknown>);
+				if (desc && !previews.includes(desc)) previews.push(desc);
+			}
+		}
+		if (previews.length === 0) return "";
+		return previews.slice(0, 3).join(", ") + (previews.length > 3 ? "…" : "");
+	}, [entries, name]);
+
 	return (
 		<div className="consecutive-tools-group" style={{ marginBottom: "2px" }}>
 			<div
@@ -1037,12 +1062,13 @@ function ConsecutiveToolGroup({
 						<span className="tool-timeline-name" style={{ fontWeight: 600 }}>
 							{count} × {displayName}
 						</span>
-						{!expanded && (
+						{!expanded && targetsPreview && (
 						<div className="tool-timeline-summary">
-							<span className="tool-timeline-arg">{t("chat.groupedTools")}</span>
+							<span className="tool-timeline-arg" title={targetsPreview}>{targetsPreview}</span>
 						</div>)}
 						{isRunning && (
 							<span className="tool-timeline-running" aria-label="running">
+								<span className="tool-timeline-pulse-dot" />
 								{t("chat.running")}
 							</span>
 						)}
@@ -1215,12 +1241,14 @@ export const ToolGroupCard = memo(function ToolGroupCard({
 	) => {
 		const isOpen = view === "full" || openChunks.has(chunkIdx);
 		const isLast = chunkIdx === chunks.length - 1;
+		const toolCount = chunk.tools.filter((t) => t.kind === "tool").length;
 		return (
 			<div key={keyPrefix} className={`trail-chunk${isOpen ? " open" : ""}${visibleIdx === 0 && !collapseActive ? " connects-to-header" : ""}`}>
 				<JustificationRow
 					text={(chunk.just as { text: string }).text}
 					open={isOpen}
 					onToggle={() => toggleChunk(chunkIdx)}
+					toolCount={toolCount}
 				/>
 				{/* Always mounted: the 0fr↔1fr grid animation (see themes.css)
 				    animates the body in and out, so a closed step's collapse

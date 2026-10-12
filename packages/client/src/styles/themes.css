@@ -7192,23 +7192,74 @@ strong {
 	flex: 1;
 	min-width: 0;
 }
-/* "running…" inline status */
+/* "running…" inline status with glowing radar pulse dot */
 .tool-timeline-running {
-	font-size: 10px;
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11px;
+	font-weight: 500;
 	color: var(--accent);
-	animation: toolPulse 1.4s ease-in-out infinite;
+}
+.tool-timeline-pulse-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--accent);
+	display: inline-block;
+	animation: toolPulseDot 1.2s ease-in-out infinite;
+}
+@keyframes toolPulseDot {
+	0% {
+		transform: scale(0.85);
+		opacity: 0.5;
+	}
+	50% {
+		transform: scale(1.3);
+		opacity: 1;
+		box-shadow: 0 0 6px var(--accent);
+	}
+	100% {
+		transform: scale(0.85);
+		opacity: 0.5;
+	}
 }
 
-/* Smart-disclosure: first line of output shown inline */
+/* Smart-disclosure: status icon + output preview */
 .tool-timeline-output-preview {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	font-size: 11px;
 	color: var(--text-secondary);
-	font-style: italic;
 	margin-top: 1px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	max-width: 100%;
+}
+.tool-timeline-output-preview .tool-timeline-status-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 9.5px;
+	font-weight: 700;
+	line-height: 1;
+	opacity: 0.9;
+}
+.tool-timeline-output-preview.success .tool-timeline-status-icon {
+	color: var(--success, #10b981);
+}
+.tool-timeline-output-preview.error .tool-timeline-status-icon {
+	color: var(--error, #ef4444);
+}
+.tool-timeline-output-text {
+	font-family: var(--font-mono);
+	font-size: 11px;
+	opacity: 0.85;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 /* tool colors are on the circle icon only */
 
@@ -7405,6 +7456,24 @@ strong {
 	flex: 1;
 	min-width: 0;
 	text-align: left;
+}
+.trail-justification-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+	margin-left: auto;
+}
+.trail-justification-badge {
+	font-size: 10px;
+	font-weight: 500;
+	padding: 1px 7px;
+	border-radius: 10px;
+	background: var(--bg-glass-strong);
+	border: 1px solid var(--border);
+	color: var(--text-dim);
+	letter-spacing: 0.1px;
+	line-height: 1.4;
 }
 .trail-justification-chevron {
 	width: 16px;
@@ -7642,7 +7711,32 @@ strong {
 	width: 100%;
 }
 .thinking-block.in-trail {
-	margin: 2px 0 4px;
+	margin: 1px 0 3px;
+}
+.thinking-block.in-trail .thinking-header {
+	padding: 2px 6px 2px 0;
+}
+.thinking-block.in-trail .thinking-icon-box {
+	width: 16px;
+	height: 16px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+.thinking-block.in-trail .thinking-label {
+	font-size: 11px;
+	opacity: 0.85;
+}
+.thinking-block.in-trail .thinking-badge {
+	font-size: 9.5px;
+	padding: 0 5px;
+}
+.thinking-icon-box {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
 }
 .thinking-header {
 	display: flex;

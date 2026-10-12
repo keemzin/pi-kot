@@ -62,14 +62,16 @@ export function ThinkingBlock({
         }}
       >
         <div className="thinking-header-left">
-          <ChevronRight size={13} className={`thinking-chevron ${open ? "rotated" : ""}`} />
-          <Brain size={13} className="thinking-icon" />
+          <span className="thinking-icon-box">
+            <Brain size={13} className="thinking-icon" />
+          </span>
           <span className="thinking-label">{t("chat.thinking") || "Thinking"}</span>
           {wordCount > 0 && (
             <span className="thinking-badge">
               {wordCount} {wordCount === 1 ? "word" : "words"}
             </span>
           )}
+          <ChevronRight size={12} className={`thinking-chevron ${open ? "rotated" : ""}`} />
         </div>
 
         {open && (
