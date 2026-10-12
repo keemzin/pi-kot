@@ -8,6 +8,8 @@ import { useSelectionBridge } from "../stores/selection-bridge";
 import { ConfirmDialog } from "./Modal";
 import { isImagePath, isAudioPath, isDocumentPath } from "../lib/file-types";
 import { getFileTypeIcon } from "./FileIcon";
+import { DiffEditorView } from "./DiffEditorView";
+import { FileDiff } from "lucide-react";
 
 export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: string; onClose?: () => void; fullWidth?: boolean }) {
   const viewerTabs = useLayoutStore((s) => s.viewerTabs);
@@ -18,6 +20,7 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const closeFileViewerTab = useLayoutStore((s) => s.closeFileViewerTab);
   const closeAllViewerTabs = useLayoutStore((s) => s.closeAllViewerTabs);
   const setViewerWidth = useLayoutStore((s) => s.setViewerWidth);
+  const openFileViewer = useLayoutStore((s) => s.openFileViewer);
 
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
@@ -38,8 +41,8 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
   const [isResizing, setIsResizing] = useState(false);
 
   const activeFile = viewerTabs.find((t) => t.path === viewerActivePath);
-  const isDirty = content !== savedContent;
-  const isBinaryFile = activeFile !== undefined && (isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path));
+  const isDirty = activeFile?.isDiff ? false : content !== savedContent;
+  const isBinaryFile = activeFile !== undefined && !activeFile.isDiff && (isImagePath(activeFile.path) || isAudioPath(activeFile.path) || isDocumentPath(activeFile.path));
 
   // External disk changes (agent writes/edits, git, bash) bump `fileRev[path]`.
   // We do NOT auto-reload — that would interrupt manual editing and flash on
@@ -64,6 +67,17 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
     lastPathRef.current = activeFile.path;
     lastRevRef.current = fileRev ?? 0;
     setExternalChange(false);
+    // Diff tabs render their own view — no filesRead needed.
+    if (activeFile.isDiff) {
+      setContent("");
+      setSavedContent("");
+      setLanguage(undefined);
+      setFileName(activeFile.name);
+      setFileSize(undefined);
+      setSavedAt(undefined);
+      setLoading(false);
+      return;
+    }
     // Binary files (images, audio, PDF) are streamed directly by FileViewer
     // — no need to fetch JSON content for them.
     if (isBinaryFile) {
@@ -313,7 +327,11 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                   title={tab.path}
                 >
                   {/* File type badge / icon */}
-                  {getFileTypeIcon(tab.name)}
+                  {tab.isDiff ? (
+                    <FileDiff size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                  ) : (
+                    getFileTypeIcon(tab.name)
+                  )}
 
                   {/* Dirty dot indicator — only for the active tab */}
                   {isActive && isDirty && (
@@ -335,10 +353,10 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
                     style={{
                       overflow: "hidden",
                       textOverflow: "ellipsis",
-                      maxWidth: "180px",
+                      maxWidth: "220px",
                     }}
                   >
-                    {tab.name}
+                    {tab.diffTitle ?? tab.name}
                   </span>
 
                   <button
@@ -436,8 +454,14 @@ export function FileViewerPanel({ projectId, onClose, fullWidth }: { projectId: 
               </div>
             ) : activeFile ? (
               <>
-                {/* Binary files: use unified FileViewer (images, audio, PDF) */}
-                {isBinaryFile ? (
+                {/* Diff tabs: use dedicated DiffEditorView */}
+                {activeFile.isDiff ? (
+                  <DiffEditorView
+                    tab={activeFile}
+                    projectId={projectId}
+                    onOpenFile={(p, n) => openFileViewer(p, n)}
+                  />
+                ) : isBinaryFile ? (
                   <FileViewer
                     projectId={projectId}
                     filePath={activeFile.path}

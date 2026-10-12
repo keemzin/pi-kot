@@ -15,6 +15,12 @@ export type PanelName = "settings" | "mcp" | "terminal" | "tree" | "orch";
 export interface ViewerTab {
   path: string;
   name: string;
+  isDiff?: boolean;
+  diff?: string;
+  diffTitle?: string;
+  staged?: boolean;
+  commitHash?: string;
+  originalPath?: string;
 }
 
 export interface ArtifactItem {
@@ -97,6 +103,15 @@ interface LayoutState {
 
   /* ── File viewer actions ── */
   openFileViewer: (path: string, name: string) => void;
+  openDiffViewer: (tab: {
+    path: string;
+    name: string;
+    diff: string;
+    diffTitle?: string;
+    staged?: boolean;
+    commitHash?: string;
+    originalPath?: string;
+  }) => void;
   closeFileViewerTab: (path: string) => void;
   closeAllViewerTabs: () => void;
   setViewerActivePath: (path: string | undefined) => void;
@@ -247,6 +262,34 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       set({
         viewerTabs: [...viewerTabs, { path, name }],
         viewerActivePath: path,
+      });
+    }
+  },
+
+  openDiffViewer: (tab) => {
+    const { viewerTabs } = get();
+    const diffPath = tab.commitHash
+      ? `git-diff://${tab.commitHash}/${tab.path}`
+      : tab.staged
+      ? `git-diff://staged/${tab.path}`
+      : `git-diff://unstaged/${tab.path}`;
+
+    const newTab: ViewerTab = {
+      ...tab,
+      path: diffPath,
+      originalPath: tab.originalPath ?? tab.path,
+      isDiff: true,
+    };
+
+    const idx = viewerTabs.findIndex((t) => t.path === diffPath);
+    if (idx !== -1) {
+      const updated = [...viewerTabs];
+      updated[idx] = newTab;
+      set({ viewerTabs: updated, viewerActivePath: diffPath });
+    } else {
+      set({
+        viewerTabs: [...viewerTabs, newTab],
+        viewerActivePath: diffPath,
       });
     }
   },

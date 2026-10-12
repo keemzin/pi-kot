@@ -6,6 +6,8 @@ import {
   Minus,
   RotateCcw,
   FileText,
+  FileDiff,
+  RefreshCw,
   X,
   ChevronDown,
   ChevronRight,
@@ -106,7 +108,10 @@ export function GitPanel({ projectId }: Props) {
   // Per-file diff cache
   const [openDiffs, setOpenDiffs] = useState<Record<string, string | "loading" | "error">>({});
   const [diffStats, setDiffStats] = useState<Record<string, { additions: number; deletions: number }>>({});
+  const [loadingDiffPath, setLoadingDiffPath] = useState<string | undefined>();
   const openFileViewer = useLayoutStore((s) => s.openFileViewer);
+  const openDiffViewer = useLayoutStore((s) => s.openDiffViewer);
+  const viewerActivePath = useLayoutStore((s) => s.viewerActivePath);
   // Revert confirm state (click-twice)
   const [pendingRevert, setPendingRevert] = useState<string | undefined>();
   const revertTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -235,22 +240,28 @@ export function GitPanel({ projectId }: Props) {
     }
   }, [showWorktrees, projectId]);
 
-  const toggleDiff = async (file: GitFileStatus, staged: boolean) => {
-    const key = `${file.path}|${staged ? "staged" : "unstaged"}`;
-    if (openDiffs[key] !== undefined) {
-      setOpenDiffs((s) => { const n = { ...s }; delete n[key]; return n; });
-      return;
-    }
-    setOpenDiffs((s) => ({ ...s, [key]: "loading" }));
+  const openFileDiff = async (file: GitFileStatus, staged: boolean) => {
+    const fileName = file.path.split(/[\\/]/).pop() ?? file.path;
+    const diffKey = `${file.path}|${staged ? "staged" : "unstaged"}`;
+    setLoadingDiffPath(diffKey);
     try {
       const qs = new URLSearchParams({ projectId, path: file.path });
       if (staged) qs.set("staged", "1");
       const res = await authFetch(`/api/v1/git/diff/file?${qs}`);
       if (!res.ok) throw new Error("diff failed");
       const data = (await res.json()) as { diff: string };
-      setOpenDiffs((s) => ({ ...s, [key]: data.diff }));
+      openDiffViewer({
+        path: file.path,
+        name: fileName,
+        diff: data.diff,
+        staged,
+        originalPath: file.path,
+        diffTitle: `${fileName} (${staged ? "Staged" : "Working Tree"})`,
+      });
     } catch {
-      setOpenDiffs((s) => ({ ...s, [key]: "error" }));
+      setOpError("Failed to load diff for " + file.path);
+    } finally {
+      setLoadingDiffPath(undefined);
     }
   };
 
@@ -475,37 +486,32 @@ export function GitPanel({ projectId }: Props) {
     }
   }, [projectId, commitFilesCache]);
 
-  const toggleCommitDiff = useCallback(async (hash: string, path: string) => {
-    const key = `${hash}|${path}`;
-    const cached = commitDiffs[key];
-
-    // Toggle: if open, close it
-    if (cached !== undefined && cached.state === "loaded") {
-      setCommitDiffs((s) => {
-        const n = { ...s };
-        delete n[key];
-        return n;
-      });
-      return;
-    }
-
-    setCommitDiffs((s) => ({ ...s, [key]: { state: "loading" } }));
-    try {
-      const qs = new URLSearchParams({ projectId, hash, path });
-      const res = await authFetch(`/api/v1/git/commit/diff?${qs}`);
-      if (!res.ok) throw new Error("commit diff fetch failed");
-      const data = (await res.json()) as { diff: string };
-      setCommitDiffs((s) => ({
-        ...s,
-        [key]: { state: "loaded", value: data.diff },
-      }));
-    } catch (err) {
-      setCommitDiffs((s) => ({
-        ...s,
-        [key]: { state: "error", message: err instanceof Error ? err.message : "unknown error" },
-      }));
-    }
-  }, [projectId, commitDiffs]);
+  const openCommitDiff = useCallback(
+    async (hash: string, path: string) => {
+      const diffKey = `${hash}|${path}`;
+      const fileName = path.split(/[\\/]/).pop() ?? path;
+      setLoadingDiffPath(diffKey);
+      try {
+        const qs = new URLSearchParams({ projectId, hash, path });
+        const res = await authFetch(`/api/v1/git/commit/diff?${qs}`);
+        if (!res.ok) throw new Error("commit diff fetch failed");
+        const data = (await res.json()) as { diff: string };
+        openDiffViewer({
+          path,
+          name: fileName,
+          diff: data.diff,
+          commitHash: hash,
+          originalPath: path,
+          diffTitle: `${fileName} (${hash.slice(0, 7)})`,
+        });
+      } catch {
+        setOpError("Failed to load commit diff for " + path);
+      } finally {
+        setLoadingDiffPath(undefined);
+      }
+    },
+    [projectId, openDiffViewer],
+  );
 
   const toggleCommitExpanded = useCallback((hash: string) => {
     setExpandedCommits((prev) => {
@@ -652,13 +658,12 @@ export function GitPanel({ projectId }: Props) {
             fileActionLabel="Unstage"
             groupActionLabel="Unstage all"
             onGroupAction={() => unstage(stagedFiles.map((f) => f.path))}
-            onClickFile={(f) => toggleDiff(f, true)}
-            openDiffs={openDiffs}
+            onClickFile={(f) => openFileDiff(f, true)}
             staged
-            viewType={gitViewType}
             diffStats={diffStats}
+            activeDiffPath={viewerActivePath}
+            loadingDiffPath={loadingDiffPath}
             onOpenFile={openFileViewer}
-            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -671,15 +676,14 @@ export function GitPanel({ projectId }: Props) {
             fileActionLabel="Stage"
             groupActionLabel="Stage all"
             onGroupAction={() => stage(trackedUnstaged.map((f) => f.path))}
-            onClickFile={(f) => toggleDiff(f, false)}
+            onClickFile={(f) => openFileDiff(f, false)}
             onRevert={(f) => handleRevert(f.path)}
             pendingRevert={pendingRevert}
-            openDiffs={openDiffs}
             staged={false}
-            viewType={gitViewType}
             diffStats={diffStats}
+            activeDiffPath={viewerActivePath}
+            loadingDiffPath={loadingDiffPath}
             onOpenFile={openFileViewer}
-            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -692,13 +696,12 @@ export function GitPanel({ projectId }: Props) {
             fileActionLabel="Stage"
             groupActionLabel="Stage all"
             onGroupAction={() => stage(untrackedFiles.map((f) => f.path))}
-            onClickFile={(f) => toggleDiff(f, false)}
-            openDiffs={openDiffs}
+            onClickFile={(f) => openFileDiff(f, false)}
             staged={false}
-            viewType={gitViewType}
             diffStats={diffStats}
+            activeDiffPath={viewerActivePath}
+            loadingDiffPath={loadingDiffPath}
             onOpenFile={openFileViewer}
-            onToggleViewType={toggleGitViewType}
           />
         )}
 
@@ -794,64 +797,57 @@ export function GitPanel({ projectId }: Props) {
                             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                               {filesEntry.value.map((f) => {
                                 const diffKey = `${c.hash}|${f.path}`;
-                                const diffEntry = commitDiffs[diffKey];
+                                const isCommitDiffActive = viewerActivePath === `git-diff://${c.hash}/${f.path}`;
+                                const isLoadingThis = loadingDiffPath === diffKey;
                                 return (
                                   <li key={f.path} style={{ borderTop: "1px solid var(--border)" }}>
                                     {/* File row */}
                                     <div
-                                      onClick={() => toggleCommitDiff(c.hash, f.path)}
+                                      onClick={() => openCommitDiff(c.hash, f.path)}
                                       style={{
-                                        display: "flex", alignItems: "center", gap: "4px",
-                                        padding: "3px 4px", cursor: "pointer",
-                                        fontSize: "10px", fontFamily: "monospace",
-                                        background: diffEntry !== undefined && diffEntry.state === "loaded"
-                                          ? "var(--accent-subtle)" : "transparent",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        padding: "4px 8px",
+                                        cursor: "pointer",
+                                        fontSize: "10.5px",
+                                        fontFamily: "var(--font-mono, monospace)",
+                                        background: isCommitDiffActive ? "var(--accent-subtle)" : "transparent",
+                                        borderLeft: isCommitDiffActive ? "2px solid var(--accent)" : "2px solid transparent",
+                                        transition: "background 0.15s ease",
                                       }}
+                                      title={`View diff in editor: ${f.path}`}
                                     >
-                                      <span style={{
-                                        width: "14px", flexShrink: 0, textAlign: "center",
-                                        fontWeight: 700, fontSize: "10px",
-                                        color: commitKindColor(f.changeType),
-                                      }}>
+                                      <span
+                                        style={{
+                                          width: "14px",
+                                          flexShrink: 0,
+                                          textAlign: "center",
+                                          fontWeight: 700,
+                                          fontSize: "10px",
+                                          color: commitKindColor(f.changeType),
+                                        }}
+                                      >
                                         {commitKindBadge(f.changeType)}
                                       </span>
-                                      <span style={{
-                                        flex: 1, overflow: "hidden", textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap", color: "var(--text-primary)",
-                                      }}>
+                                      <span
+                                        style={{
+                                          flex: 1,
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                          color: isCommitDiffActive ? "var(--text-primary)" : "var(--text-secondary)",
+                                          fontWeight: isCommitDiffActive ? 600 : 400,
+                                        }}
+                                      >
                                         {f.path}
                                       </span>
-                                      <span style={{ fontSize: "8px", color: "var(--text-dim)" }}>
-                                        {diffEntry !== undefined && diffEntry.state === "loaded" ? "▾" : "▸"}
-                                      </span>
+                                      {isLoadingThis ? (
+                                        <RefreshCw size={10} style={{ animation: "spin 1s linear infinite", color: "var(--text-dim)", flexShrink: 0 }} />
+                                      ) : (
+                                        <FileDiff size={11} style={{ color: isCommitDiffActive ? "var(--accent)" : "var(--text-dim)", opacity: isCommitDiffActive ? 1 : 0.6, flexShrink: 0 }} />
+                                      )}
                                     </div>
-                                    {/* Inline diff */}
-                                    {diffEntry !== undefined && diffEntry.state === "loaded" && (
-                                      <div style={{
-                                        borderTop: "1px solid var(--border)",
-                                        background: "var(--bg-glass)",
-                                        padding: "4px 8px",
-                                        overflow: "hidden",
-                                      }}>
-                                        <DiffBlock diff={diffEntry.value} viewType={gitViewType} />
-                                      </div>
-                                    )}
-                                    {diffEntry !== undefined && diffEntry.state === "loading" && (
-                                      <div style={{
-                                        fontSize: "9px", color: "var(--text-dim)",
-                                        fontStyle: "italic", padding: "2px 8px",
-                                      }}>
-                                        Loading diff…
-                                      </div>
-                                    )}
-                                    {diffEntry !== undefined && diffEntry.state === "error" && (
-                                      <div style={{
-                                        fontSize: "9px", color: "var(--error)",
-                                        padding: "2px 8px",
-                                      }}>
-                                        {diffEntry.message}
-                                      </div>
-                                    )}
                                   </li>
                                 );
                               })}
@@ -1089,25 +1085,37 @@ interface FileGroupProps {
   groupActionLabel: string;
   onGroupAction: () => void;
   onClickFile: (f: GitFileStatus) => void;
-  openDiffs: Record<string, string | "loading" | "error">;
   staged: boolean;
   onRevert?: (f: GitFileStatus) => void;
   pendingRevert?: string;
-  viewType?: "unified" | "split";
   diffStats?: Record<string, { additions: number; deletions: number }>;
   onOpenFile?: (path: string, name: string) => void;
-  onToggleViewType?: () => void;
+  activeDiffPath?: string;
+  loadingDiffPath?: string;
 }
 
 function FileGroup(props: FileGroupProps) {
   return (
     <div>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 14px", borderBottom: "1px solid var(--border)",
-        background: "var(--accent-subtle)",
-      }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", color: "var(--text-secondary)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 14px",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--accent-subtle)",
+        }}
+      >
+        <span
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            color: "var(--text-secondary)",
+          }}
+        >
           {props.label}
         </span>
         <button
@@ -1120,22 +1128,24 @@ function FileGroup(props: FileGroupProps) {
       </div>
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {props.files.map((f) => {
-          const key = `${f.path}|${props.staged ? "staged" : "unstaged"}`;
-          const diffState = props.openDiffs[key];
-          const isDiffOpen = diffState !== undefined;
           const { fileName, dirPath } = splitPath(f.path);
-          const stats = getStatsForFile(f, props.staged, props.diffStats, props.openDiffs);
+          const stats = getStatsForFile(f, props.staged, props.diffStats);
+          const diffVirtualPath = `git-diff://${props.staged ? "staged" : "unstaged"}/${f.path}`;
+          const isFileActive = props.activeDiffPath === diffVirtualPath;
+          const isLoadingThis = props.loadingDiffPath === `${f.path}|${props.staged ? "staged" : "unstaged"}`;
 
           return (
             <li key={f.path} style={{ borderBottom: "1px solid var(--border)" }}>
               <div
-                className={`git-file-row${isDiffOpen ? " diff-open" : ""}`}
+                className={`git-file-row${isFileActive ? " active" : ""}`}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
                   padding: "6px 12px",
-                  background: isDiffOpen ? "var(--bg-glass-active)" : undefined,
+                  background: isFileActive ? "var(--accent-subtle)" : undefined,
+                  borderLeft: isFileActive ? "3px solid var(--accent)" : "3px solid transparent",
+                  transition: "background 0.15s ease",
                 }}
               >
                 {/* Badge */}
@@ -1159,7 +1169,7 @@ function FileGroup(props: FileGroupProps) {
                   {kindBadge(f.kind)}
                 </span>
 
-                {/* File info (click to toggle diff) */}
+                {/* File info (click to open diff in editor) */}
                 <div
                   onClick={() => props.onClickFile(f)}
                   style={{
@@ -1173,6 +1183,7 @@ function FileGroup(props: FileGroupProps) {
                   }}
                   role="button"
                   tabIndex={0}
+                  title={`View diff in editor: ${f.path}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
@@ -1183,9 +1194,9 @@ function FileGroup(props: FileGroupProps) {
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
                     <span
                       style={{
-                        fontWeight: 600,
+                        fontWeight: isFileActive ? 700 : 600,
                         fontSize: "12px",
-                        color: "var(--text-primary)",
+                        color: isFileActive ? "var(--accent-text)" : "var(--text-primary)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -1237,7 +1248,7 @@ function FileGroup(props: FileGroupProps) {
 
                 {/* Hover icon actions */}
                 <div className={`git-file-actions${props.pendingRevert === f.path ? " has-pending" : ""}`}>
-                  {/* Open in Editor button */}
+                  {/* Open working file in Editor button */}
                   {props.onOpenFile && (
                     <button
                       onClick={(e) => {
@@ -1245,7 +1256,7 @@ function FileGroup(props: FileGroupProps) {
                         props.onOpenFile!(f.path, fileName);
                       }}
                       className="git-icon-btn"
-                      title="Open in editor"
+                      title="Open working file in editor"
                       type="button"
                     >
                       <FileText size={12} />
@@ -1276,11 +1287,7 @@ function FileGroup(props: FileGroupProps) {
                       }
                       type="button"
                     >
-                      {props.pendingRevert === f.path ? (
-                        "Confirm?"
-                      ) : (
-                        <RotateCcw size={12} />
-                      )}
+                      {props.pendingRevert === f.path ? "Confirm?" : <RotateCcw size={12} />}
                     </button>
                   )}
 
@@ -1297,135 +1304,24 @@ function FileGroup(props: FileGroupProps) {
                     {props.staged ? <Minus size={13} /> : <Plus size={13} />}
                   </button>
 
-                  {/* Diff toggle chevron */}
+                  {/* Open Diff in Editor button */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       props.onClickFile(f);
                     }}
                     className="git-icon-btn"
-                    title={isDiffOpen ? "Collapse diff" : "Show diff"}
+                    title="Open diff in editor"
                     type="button"
                   >
-                    {isDiffOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    {isLoadingThis ? (
+                      <RefreshCw size={12} style={{ animation: "spin 1s linear infinite" }} />
+                    ) : (
+                      <FileDiff size={13} style={{ color: isFileActive ? "var(--accent)" : undefined }} />
+                    )}
                   </button>
                 </div>
               </div>
-
-              {/* Inline diff with header toolbar */}
-              {isDiffOpen && (
-                <div>
-                  <div
-                    className="git-diff-header"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "4px 10px",
-                      background: "var(--bg-glass-active, rgba(255, 255, 255, 0.05))",
-                      borderTop: "1px solid var(--border)",
-                      borderBottom: "1px solid var(--border)",
-                      fontSize: "11px",
-                      minWidth: 0,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, overflow: "hidden" }}>
-                      <span style={{ fontWeight: 600, color: "var(--text-secondary)", fontSize: "11px" }}>Diff</span>
-                      <span style={{ color: "var(--text-dim)", fontSize: "10px" }}>•</span>
-                      <span
-                        style={{
-                          color: "var(--text-primary)",
-                          fontFamily: "monospace",
-                          fontWeight: 600,
-                          fontSize: "11px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={f.path}
-                      >
-                        {fileName}
-                      </span>
-                      {stats && (stats.additions > 0 || stats.deletions > 0) && (
-                        <span style={{ fontSize: "10px", fontFamily: "monospace", flexShrink: 0 }}>
-                          {stats.additions > 0 && <span style={{ color: "var(--accent-text, #4ade80)" }}>+{stats.additions}</span>}{" "}
-                          {stats.deletions > 0 && <span style={{ color: "var(--error, #f87171)" }}>-{stats.deletions}</span>}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "2px", flexShrink: 0 }}>
-                      {/* View mode toggle */}
-                      {props.onToggleViewType && (
-                        <button
-                          type="button"
-                          onClick={props.onToggleViewType}
-                          className="fe-toolbar-btn"
-                          title={props.viewType === "split" ? "Unified view" : "Side-by-side view"}
-                          style={{ padding: "3px 6px" }}
-                        >
-                          {props.viewType === "split" ? <Rows2 size={12} /> : <Columns2 size={12} />}
-                        </button>
-                      )}
-
-                      {/* Open file in editor */}
-                      {props.onOpenFile && (
-                        <button
-                          type="button"
-                          onClick={() => props.onOpenFile!(f.path, fileName)}
-                          className="fe-toolbar-btn"
-                          title="Open file in editor"
-                          style={{ padding: "3px 6px" }}
-                        >
-                          <FileText size={12} />
-                        </button>
-                      )}
-
-                      {/* Quick Stage / Unstage in diff header */}
-                      <button
-                        type="button"
-                        onClick={() => props.onFileAction(f)}
-                        className="fe-toolbar-btn"
-                        title={props.staged ? "Unstage this file" : "Stage this file"}
-                        style={{
-                          padding: "2px 7px",
-                          fontSize: "10px",
-                          fontWeight: 600,
-                          borderRadius: "var(--radius-xs, 3px)",
-                          border: "1px solid var(--border-bright)",
-                          background: "var(--accent-subtle)",
-                          color: "var(--accent-text)",
-                        }}
-                      >
-                        {props.staged ? "Unstage" : "Stage"}
-                      </button>
-
-                      {/* Close diff preview */}
-                      <button
-                        type="button"
-                        onClick={() => props.onClickFile(f)}
-                        className="fe-toolbar-btn"
-                        title="Close diff preview"
-                        style={{ padding: "3px 5px", color: "var(--text-dim)" }}
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ background: "var(--bg-glass)", padding: "4px 8px", overflow: "hidden" }}>
-                    {diffState === "loading" ? (
-                      <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic", padding: "8px" }}>Loading diff…</div>
-                    ) : diffState === "error" ? (
-                      <div style={{ fontSize: "10px", color: "var(--error)", padding: "8px" }}>Failed to load diff.</div>
-                    ) : diffState.length === 0 ? (
-                      <div style={{ fontSize: "10px", color: "var(--text-dim)", fontStyle: "italic", padding: "8px" }}>(no diff)</div>
-                    ) : (
-                      <DiffBlock diff={diffState} viewType={props.viewType} />
-                    )}
-                  </div>
-                </div>
-              )}
             </li>
           );
         })}

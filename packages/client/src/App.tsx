@@ -149,12 +149,13 @@ export function App() {
   const [viewerMinimized, setViewerMinimized] = useState(false);
   const viewerActive = viewerTabs.length > 0 && !viewerMinimized;
 
-  // Opening a file (viewerTabs adds a tab) un-minimizes the viewer.
+  const viewerActivePath = useLayoutStore((s) => s.viewerActivePath);
+  // Opening a file (viewerTabs adds a tab or active path changes) un-minimizes the viewer.
   // This applies on every device — on desktop the viewer is a side panel,
   // on mobile CSS makes it full-width.
   useEffect(() => {
-    if (viewerTabs.length > 0) setViewerMinimized(false);
-  }, [viewerTabs.length]);
+    if (viewerTabs.length > 0 && viewerActivePath !== undefined) setViewerMinimized(false);
+  }, [viewerTabs.length, viewerActivePath]);
 
 
 

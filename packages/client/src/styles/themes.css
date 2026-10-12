@@ -8817,6 +8817,87 @@ strong {
 	cursor: default;
 }
 
+/* ── Diff editor toolbar action buttons ── */
+.diff-toolbar-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	height: 26px;
+	padding: 0 9px;
+	border: 1px solid var(--border);
+	background: var(--bg-surface, rgba(255, 255, 255, 0.04));
+	color: var(--text-secondary);
+	font-size: 11px;
+	font-weight: 500;
+	cursor: pointer;
+	border-radius: var(--radius-xs, 4px);
+	white-space: nowrap;
+	flex-shrink: 0;
+	box-sizing: border-box;
+	transition:
+		color var(--duration) var(--ease),
+		border-color var(--duration) var(--ease),
+		background var(--duration) var(--ease);
+}
+
+.diff-toolbar-btn:hover:not(:disabled) {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover, rgba(255, 255, 255, 0.08));
+	border-color: var(--border-bright);
+}
+
+.diff-toolbar-btn:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+
+.diff-toolbar-btn-icon-only {
+	width: 26px;
+	padding: 0;
+}
+
+.diff-toolbar-btn-stage {
+	background: var(--accent-subtle);
+	color: var(--accent-text);
+	border-color: var(--border-bright);
+	font-weight: 600;
+}
+
+.diff-toolbar-btn-stage:hover:not(:disabled) {
+	background: var(--accent);
+	color: var(--accent-contrast, #ffffff);
+	border-color: var(--accent);
+}
+
+.diff-toolbar-btn-unstage {
+	background: transparent;
+	color: var(--text-secondary);
+	border-color: var(--border);
+}
+
+.diff-toolbar-btn-unstage:hover:not(:disabled) {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover);
+}
+
+.diff-toolbar-btn-discard {
+	background: rgba(248, 113, 113, 0.12);
+	color: var(--error, #ef4444);
+	border-color: rgba(248, 113, 113, 0.35);
+}
+
+.diff-toolbar-btn-discard:hover:not(:disabled) {
+	background: rgba(248, 113, 113, 0.22);
+	border-color: rgba(248, 113, 113, 0.55);
+}
+
+.diff-toolbar-btn-discard.confirm {
+	background: var(--error, #ef4444);
+	color: #ffffff;
+	border-color: var(--error, #ef4444);
+}
+
 /* ── Git remote button group (Fetch / Pull / Push) ── */
 .git-remote-group {
 	display: flex;
