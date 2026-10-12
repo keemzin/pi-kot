@@ -31,6 +31,7 @@ import { toolRegistry } from "../lib/tool-registry";
 import { ReplSandbox } from "./ReplSandbox";
 import { SplitFlapText } from "./SplitFlapText";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { ThinkingBlock } from "./ThinkingBlock";
 import {
 	ToolCallEntry,
 	ToolGroupCard,
@@ -249,30 +250,6 @@ const ArchivedMessages = memo(function ArchivedMessages({
 });
 
 /* ── Tool Call Components ── */
-
-/** Render the thinking block content. */
-function ThinkingBlock({ text }: { text: string }) {
-	const { t } = useI18n();
-	const showThinking = usePreferencesStore((s) => s.showThinking);
-	const [open, setOpen] = useState(false);
-
-	if (!showThinking) return null;
-
-	return (
-		<details open={open} className="thinking-block">
-			<summary
-				onClick={(e) => {
-					e.preventDefault();
-					setOpen((o) => !o);
-				}}
-			>
-				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">{t("chat.thinking")}</span>
-			</summary>
-			<div className="thinking-block-content">{text}</div>
-		</details>
-	);
-}
 
 /**
  * Wrapper that keeps the standalone running card mounted during its exit

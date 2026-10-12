@@ -4,6 +4,7 @@ import { ChatEditDiff } from "./ChatEditDiff";
 import { toolPreviewFromArgs } from "../lib/tool-call-pairing";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { ThinkingIndicator } from "./ThinkingIndicator";
+import { ThinkingBlock } from "./ThinkingBlock";
 import { useI18n } from "../hooks/useI18n";
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -795,26 +796,7 @@ export const ToolCallEntry = memo(function ToolCallEntry({
 /* ── Thinking row (only rendered when showThinking is on) ───────────────── */
 
 function TrailThinkingRow({ text }: { text: string }) {
-	const { t } = useI18n();
-	const showThinking = usePreferencesStore((s) => s.showThinking);
-	const [open, setOpen] = useState(false);
-	
-	if (!showThinking) return null;
-	
-	return (
-		<details open={open} className="thinking-block">
-			<summary
-				onClick={(e) => {
-					e.preventDefault();
-					setOpen((o) => !o);
-				}}
-			>
-				<span className="thinking-block-chevron">▶</span>
-				<span className="thinking-block-label">{t("chat.thinking")}</span>
-			</summary>
-			<div className="thinking-block-content">{text}</div>
-		</details>
-	);
+	return <ThinkingBlock text={text} className="in-trail" />;
 }
 
 /* ── Justification row — collapsed preview of in-between agent text ────── */

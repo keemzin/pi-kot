@@ -7634,28 +7634,133 @@ strong {
 	color: var(--text-secondary);
 }
 
-/* Thinking block — collapsible reasoning panel */
+/* ── Thinking block — Modern Minimalist metacognitive trace ── */
 .thinking-block {
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	overflow: hidden;
-	margin: 6px 0;
+	margin: 4px 0;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
 }
+.thinking-block.in-trail {
+	margin: 2px 0 4px;
+}
+.thinking-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 8px;
+	border-radius: var(--radius-sm, 5px);
+	cursor: pointer;
+	user-select: none;
+	background: transparent;
+	transition: background 0.15s var(--ease), color 0.15s var(--ease);
+	width: 100%;
+}
+.thinking-header:hover {
+	background: var(--bg-glass-hover);
+}
+.thinking-header-left {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+.thinking-chevron {
+	color: var(--text-dim);
+	flex-shrink: 0;
+	transition: transform 0.18s var(--ease);
+}
+.thinking-chevron.rotated {
+	transform: rotate(90deg);
+}
+.thinking-icon {
+	color: var(--accent-text, #a78bfa);
+	opacity: 0.85;
+	flex-shrink: 0;
+}
+.thinking-label {
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--text-secondary);
+	letter-spacing: 0.1px;
+}
+.thinking-badge {
+	font-size: 10px;
+	font-weight: 500;
+	padding: 1px 6px;
+	border-radius: 10px;
+	background: var(--bg-glass);
+	border: 1px solid var(--border);
+	color: var(--text-dim);
+	line-height: 1.4;
+}
+.thinking-copy-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 7px;
+	font-size: 10.5px;
+	font-weight: 500;
+	color: var(--text-dim);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.15s var(--ease);
+}
+.thinking-copy-btn:hover {
+	color: var(--text-primary);
+	background: var(--bg-glass-active);
+	border-color: var(--border);
+}
+.thinking-copy-check {
+	color: var(--success, #10b981);
+}
+.thinking-body {
+	margin-top: 4px;
+	margin-left: 10px;
+	padding: 6px 12px;
+	border-left: 2px solid var(--accent, rgba(167, 139, 250, 0.4));
+	background: var(--bg-glass);
+	border-radius: 0 4px 4px 0;
+	animation: thinkingFadeIn 0.16s var(--ease);
+}
+.thinking-text {
+	font-size: 12px;
+	line-height: 1.65;
+	color: var(--text-secondary);
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-style: normal;
+}
+@keyframes thinkingFadeIn {
+	from {
+		opacity: 0;
+		transform: translateY(-2px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Fallback for native details summary if rendered */
 .thinking-block summary {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	width: 100%;
-	padding: 6px 10px;
+	padding: 4px 8px;
 	background: transparent;
 	border: none;
 	cursor: pointer;
 	user-select: none;
 	list-style: none;
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 11.5px;
 	text-align: left;
 	transition: background 0.15s;
+	border-radius: var(--radius-sm, 5px);
 }
 .thinking-block summary::-webkit-details-marker {
 	display: none;
@@ -7678,15 +7783,18 @@ strong {
 	font-weight: 500;
 }
 .thinking-block-content {
-	padding: 8px 10px;
-	font-size: 13px;
+	margin-top: 4px;
+	margin-left: 10px;
+	padding: 6px 12px;
+	font-size: 12px;
 	line-height: 1.65;
 	white-space: pre-wrap;
 	word-break: break-word;
-	color: var(--text-dim);
-	font-style: italic;
-	border-top: 1px solid var(--border);
+	color: var(--text-secondary);
+	font-style: normal;
+	border-left: 2px solid var(--accent, rgba(167, 139, 250, 0.4));
 	background: var(--bg-glass);
+	border-radius: 0 4px 4px 0;
 }
 
 /* Legacy badge kept for streaming indicator in ChatView */

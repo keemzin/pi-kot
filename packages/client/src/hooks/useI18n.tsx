@@ -69,6 +69,19 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
 export function useI18n(): I18nContextValue {
   const context = useContext(I18nContext);
-  if (!context) throw new Error("useI18n must be used inside I18nProvider");
+  if (!context) {
+    const plugin = getLocalePlugin(defaultLocale);
+    const msgs = plugin ? plugin.messages : {};
+    return {
+      locale: defaultLocale,
+      setLocale: () => {},
+      t: (key: string, params?: TranslationParams) => {
+        return translateMessage(defaultLocale, key, getMessages(), params);
+      },
+      supportedLocales: getSupportedLocales()
+        .map((id) => getLocalePlugin(id))
+        .filter((p): p is LocalePlugin => Boolean(p)),
+    };
+  }
   return context;
 }
