@@ -3,7 +3,6 @@ import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
 import { AskUserQuestionPanel } from "./components/AskUserQuestionPanel";
-import { OrchestrationPanel } from "./components/OrchestrationPanel";
 
 import { ContextInspectModal, useContextData, ContextPill } from "./components/ContextBar";
 import { MCPPanel } from "./components/MCPPanel";
@@ -1105,13 +1104,6 @@ export function App() {
               <>
                 <ErrorBoundary label="ChatView" compact>
                   <ChatView sessionId={activeSessionId} modelName={selectedModel || undefined} providerName={selectedProvider || undefined} />
-                </ErrorBoundary>
-                <ErrorBoundary label="OrchestrationPanel" compact>
-                  <OrchestrationPanel
-                    sessionId={activeSessionId}
-                    open={showOrch}
-                    onClose={() => setShowOrch(false)}
-                  />
                 </ErrorBoundary>
                 <AskUserQuestionPanel sessionId={activeSessionId} />
                 <ChatInput

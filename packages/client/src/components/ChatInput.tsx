@@ -1,5 +1,6 @@
 import { type FormEvent, useRef, useEffect, useState, useCallback, type ClipboardEvent } from "react";
-import { FileText, X, ClipboardList } from "lucide-react";
+import { FileText, X, ClipboardList, Zap } from "lucide-react";
+import { OrchestrationPanel } from "./OrchestrationPanel";
 import { useSessionStore } from "../stores/session-store";
 import { usePreferencesStore } from "../stores/preferences-store";
 import { usePlanReviewStore } from "../stores/plan-review-store";
@@ -55,11 +56,6 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
   const [availableLevels, setAvailableLevels] = useState<string[]>([]);
   const [compactMessage, setCompactMessage] = useState<string | null>(null);
   const isMobile = useLayoutStore((s) => s.isMobile);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
-
-  useEffect(() => {
-    if (planModeActive) setBannerDismissed(false);
-  }, [planModeActive]);
 
   // ── Hold-to-followUp state (streaming only) ──
   const HOLD_DURATION = 600; // ms to hold before followUp triggers
@@ -931,68 +927,29 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
           </div>
         )}
 
-        {planModeActive && !bannerDismissed && (
-          <div
-            className="chat-input-plan-banner"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: isMobile ? "2px 8px" : "3px 12px",
-              minHeight: isMobile ? "22px" : "26px",
-              height: isMobile ? "22px" : "26px",
-              background: "var(--accent-glow)",
-              borderBottom: "1px solid color-mix(in srgb, var(--accent) 25%, transparent)",
-              fontSize: isMobile ? "10px" : "11px",
-              color: "var(--accent)",
-              fontWeight: 500,
-              boxSizing: "border-box",
-              gap: "6px",
-              overflow: "hidden",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, overflow: "hidden", flex: 1 }}>
-              <ClipboardList size={isMobile ? 11 : 12} style={{ color: "var(--accent)", flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>
+        {planModeActive && (
+          <div className="chat-input-plan-banner">
+            <div className="plan-banner-left">
+              <ClipboardList size={isMobile ? 12 : 13} className="plan-banner-icon" />
+              <span className="plan-banner-title">
                 {hasPendingReview
                   ? (isMobile ? "Review Ready" : "Plan Ready for Review")
                   : (isMobile ? "Plan Mode" : "Plan Mode Active")}
               </span>
               {!isMobile && (
-                <span
-                  className="plan-banner-desc"
-                  style={{
-                    color: "var(--text-secondary)",
-                    fontSize: "10.5px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <span className="plan-banner-desc">
                   {hasPendingReview
-                    ? "— click Approve & Execute to begin"
+                    ? "— click Review Plan to inspect or approve actions"
                     : "— drafts plan before modifying code"}
                 </span>
               )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+            <div className="plan-banner-actions">
               <button
                 type="button"
-                className="plan-banner-review-btn"
+                className="plan-banner-view-btn"
                 onClick={() => usePlanReviewStore.getState().openFileReview("PLAN.md", sessionId)}
-                title={hasPendingReview ? "Review plan" : "View plan"}
-                style={{
-                  background: "var(--bg-solid)",
-                  border: "1px solid var(--accent)",
-                  color: "var(--accent)",
-                  fontSize: isMobile ? "9.5px" : "10.5px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  borderRadius: "3px",
-                  padding: isMobile ? "1px 6px" : "2px 8px",
-                  lineHeight: "13px",
-                  whiteSpace: "nowrap",
-                }}
+                title={hasPendingReview ? "Review proposed plan" : "View current PLAN.md"}
               >
                 {hasPendingReview
                   ? (isMobile ? "Review" : "Review Plan")
@@ -1000,40 +957,12 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               </button>
               <button
                 type="button"
+                className="plan-banner-exit-btn"
                 onClick={handleTogglePlanMode}
-                title="Exit Plan Mode"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-secondary)",
-                  fontSize: isMobile ? "9.5px" : "10px",
-                  cursor: "pointer",
-                  padding: "1px 4px",
-                  lineHeight: "13px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Exit
-              </button>
-              <button
-                type="button"
-                onClick={() => setBannerDismissed(true)}
-                title="Dismiss banner (Plan Mode stays active)"
-                aria-label="Dismiss banner"
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
-                  padding: "1px 2px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  lineHeight: 1,
-                  borderRadius: "2px",
-                }}
+                title="Exit Plan Mode (/code)"
               >
                 <X size={11} />
+                <span>{isMobile ? "Exit" : "Exit Plan"}</span>
               </button>
             </div>
           </div>
@@ -1104,54 +1033,39 @@ export function ChatInput({ sessionId, showOrch, setShowOrch, selectedModel, onM
               onChange={handleFileChange}
             />
 
-            <button
-              type="button"
-              className="ti-toolbar-btn"
-              onClick={() => setShowOrch?.(!showOrch)}
-              title="Subagent"
-              tabIndex={-1}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" style={{ fill: showOrch ? "currentColor" : "none" }} />
-              </svg>
-            </button>
+            <div className="orch-popover-anchor">
+              <button
+                type="button"
+                className={`ti-toolbar-btn${showOrch ? " active" : ""}`}
+                onClick={() => setShowOrch?.(!showOrch)}
+                title={showOrch ? "Close Subagents Orchestration" : "Subagents Orchestration"}
+                tabIndex={-1}
+                aria-expanded={Boolean(showOrch)}
+              >
+                <Zap size={14} fill={showOrch ? "currentColor" : "none"} />
+              </button>
+
+              {showOrch && (
+                <OrchestrationPanel
+                  sessionId={sessionId}
+                  open={showOrch}
+                  onClose={() => setShowOrch?.(false)}
+                />
+              )}
+            </div>
 
             <button
               type="button"
               className={`ti-toolbar-btn${planModeActive ? " active" : ""}`}
-              onClick={() => {
-                if (planModeActive && bannerDismissed) {
-                  setBannerDismissed(false);
-                } else {
-                  handleTogglePlanMode();
-                }
-              }}
+              onClick={handleTogglePlanMode}
               title={
                 planModeActive
-                  ? bannerDismissed
-                    ? "Plan Mode Active (click to show banner)"
-                    : "Plan Mode Active (click to exit)"
+                  ? "Plan Mode Active (click to exit)"
                   : "Toggle Plan Mode (/plan)"
               }
               tabIndex={-1}
-              style={{
-                color: planModeActive ? "var(--accent)" : undefined,
-                background: planModeActive ? "var(--accent-glow)" : undefined,
-                borderColor: planModeActive ? "var(--accent)" : "transparent",
-                boxShadow: planModeActive
-                  ? "0 0 12px var(--accent-glow), 0 0 3px var(--accent)"
-                  : undefined,
-                transition: "all 0.2s ease-in-out",
-              }}
             >
-              <ClipboardList
-                size={14}
-                style={{
-                  color: planModeActive ? "var(--accent)" : "currentColor",
-                  filter: planModeActive ? "drop-shadow(0 0 3px var(--accent))" : undefined,
-                  transition: "all 0.2s ease-in-out",
-                }}
-              />
+              <ClipboardList size={14} />
             </button>
           </div>
 

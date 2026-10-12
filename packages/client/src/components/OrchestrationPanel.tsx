@@ -1,4 +1,14 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  Zap,
+  X,
+  Play,
+  Unlink,
+  Trash2,
+  AlertCircle,
+  Inbox,
+  CheckCircle2,
+} from "lucide-react";
 import { LoadingSkeleton } from "./LoadingSkeleton";
 import type {
   OrchestrationConfig,
@@ -31,9 +41,9 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
   const [role, setRole] = useState<Role>("loading");
   const [workers, setWorkers] = useState<WorkerListItem[]>([]);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
-  const [inboxCount, setInboxCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [enabling, setEnabling] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -51,7 +61,6 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
         ]);
         setWorkers(w.workers);
         setInboxItems(i.items);
-        setInboxCount(i.count);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -64,6 +73,32 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
     const interval = setInterval(loadData, 4000);
     return () => clearInterval(interval);
   }, [open, loadData]);
+
+  // Click outside and Escape key dismissal
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest?.(".orch-popover-anchor")) return;
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const timeout = setTimeout(() => {
+      window.addEventListener("mousedown", handleClickOutside);
+    }, 0);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("mousedown", handleClickOutside);
+      clearTimeout(timeout);
+    };
+  }, [open, onClose]);
 
   const handleEnable = async () => {
     setEnabling(true);
@@ -116,263 +151,203 @@ export function OrchestrationPanel({ sessionId, open, onClose }: Props) {
 
   if (!open) return null;
 
-  if (config?.available === false) {
-    return (
-      <div
-        style={{
-          padding: "12px 16px",
-          fontSize: "12px",
-          color: "var(--text-dim)",
-          borderBottom: "1px solid var(--border-color)",
-        }}
-      >
-        🚫 Orchestration unavailable: {config.disabledReason ?? "disabled"}
-      </div>
-    );
-  }
-
   const pendingCount = inboxItems.filter((i) => !i.delivered).length;
 
   return (
     <div
-      style={{
-        padding: "10px 16px",
-        fontSize: "12px",
-        color: "var(--text-secondary)",
-        borderBottom: "1px solid var(--border-color)",
-        background: "var(--bg-secondary)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        maxWidth: 800,
-        margin: "0 auto",
-        width: "100%",
-        boxSizing: "border-box",
-      }}
+      ref={panelRef}
+      className="orchestration-popover-card"
+      role="dialog"
+      aria-label="Subagent Orchestration"
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <span style={{ fontWeight: 600, fontSize: "13px" }}>
-          ⚡ Orchestration
-        </span>
+      {/* Popover Header */}
+      <div className="orch-popover-header">
+        <div className="orch-popover-title-row">
+          <Zap size={14} className="orch-title-icon" />
+          <span className="orch-popover-title">Subagents</span>
+          <span className={`orch-role-pill ${role}`}>
+            {role === "supervisor" && "Supervisor"}
+            {role === "worker" && "Worker"}
+            {role === "standalone" && "Standalone"}
+            {role === "loading" && "Loading..."}
+          </span>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--text-dim)",
-            cursor: "pointer",
-            fontSize: "14px",
-          }}
+          className="orch-popover-close-btn"
+          title="Close (Esc)"
+          aria-label="Close"
         >
-          ✕
+          <X size={14} />
         </button>
       </div>
 
+      {config?.available === false && (
+        <div className="orch-unavailable-notice">
+          <AlertCircle size={14} className="orch-notice-icon" />
+          <span>Orchestration unavailable: {config.disabledReason ?? "disabled"}</span>
+        </div>
+      )}
+
       {role === "loading" && <LoadingSkeleton variant="list" count={2} />}
 
-      {role === "standalone" && (
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            alignItems: "center",
-          }}
-        >
-          <span>Session is standalone.</span>
+      {role === "standalone" && config?.available !== false && (
+        <div className="orch-standalone-body">
+          <div className="orch-standalone-desc">
+            <span className="orch-desc-title">Session is Standalone</span>
+            <span className="orch-desc-sub">
+              Enable supervisor mode to spawn, coordinate, and delegate tasks to background worker subagents.
+            </span>
+          </div>
           <button
             type="button"
+            className="orch-enable-btn"
             onClick={handleEnable}
             disabled={enabling}
-            style={{
-              padding: "4px 10px",
-              fontSize: "11px",
-              fontWeight: 600,
-              background: "var(--accent-bg)",
-              color: "var(--accent-text)",
-              border: "1px solid var(--accent-border)",
-              borderRadius: "var(--radius-sm)",
-              cursor: enabling ? "wait" : "pointer",
-            }}
           >
-            {enabling ? "Enabling..." : "Enable supervisor mode"}
+            <Zap size={13} fill="currentColor" />
+            <span>{enabling ? "Enabling Supervisor..." : "Enable Supervisor Mode"}</span>
           </button>
         </div>
       )}
 
       {role === "supervisor" && (
-        <>
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
-              ✅ Supervisor active
-            </span>
-            <span style={{ color: "var(--text-dim)" }}>
-              {workers.length} worker(s)
-              {pendingCount > 0 && (
-                <span style={{ color: "#e5c07b", marginLeft: "4px" }}>
-                  · {pendingCount} pending inbox
-                </span>
-              )}
-            </span>
+        <div className="orch-supervisor-body">
+          {/* Status and Action summary */}
+          <div className="orch-supervisor-summary">
+            <div className="orch-stat-col">
+              <div className="orch-supervisor-badge">
+                <CheckCircle2 size={12} style={{ color: "#98c379" }} />
+                <span>Active</span>
+              </div>
+              <span className="orch-stat-label">
+                {workers.length} {workers.length === 1 ? "worker" : "workers"}
+              </span>
+            </div>
+            {pendingCount > 0 && (
+              <div className="orch-stat-col">
+                <span className="orch-stat-num orch-stat-amber">{pendingCount}</span>
+                <span className="orch-stat-label">Pending Inbox</span>
+              </div>
+            )}
             <button
               type="button"
+              className="orch-disable-btn"
               onClick={handleDisable}
-              style={{
-                padding: "3px 8px",
-                fontSize: "11px",
-                background: "none",
-                color: "var(--text-dim)",
-                border: "1px solid var(--border-color)",
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-              }}
+              title="Disable supervisor mode for this session"
             >
               Disable
             </button>
           </div>
 
-          {workers.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              {workers.map((w) => (
-                <div
-                  key={w.workerId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    fontSize: "11px",
-                    padding: "4px 6px",
-                    background: "var(--bg-primary)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: w.isLive
-                        ? w.state === "running" || w.state === "streaming"
-                          ? "#98c379"
-                          : w.state === "awaiting_question"
-                            ? "#e5c07b"
-                            : w.state === "errored"
-                              ? "#e06c75"
-                              : "#56b6c2"
-                        : "#5c6370",
-                      display: "inline-block",
-                    }}
-                  />
-                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {w.name ?? w.workerId.slice(0, 8)}
-                  </span>
-                  <span style={{ color: "var(--text-dim)" }}>{w.state}</span>
-                  {!w.isLive && (
-                    <button
-                      type="button"
-                      onClick={() => handleResume(w.workerId)}
-                      style={{
-                        padding: "1px 5px",
-                        fontSize: "10px",
-                        background: "none",
-                        border: "1px solid var(--border-color)",
-                        borderRadius: "var(--radius-sm)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Resume
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDetach(w.workerId)}
-                    title="Detach"
-                    style={{
-                      padding: "1px 5px",
-                      fontSize: "10px",
-                      background: "none",
-                      border: "1px solid var(--border-color)",
-                      borderRadius: "var(--radius-sm)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Detach
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleKill(w.workerId)}
-                    title="Kill"
-                    style={{
-                      padding: "1px 5px",
-                      fontSize: "10px",
-                      background: "none",
-                      border: "1px solid #e06c75",
-                      color: "#e06c75",
-                      borderRadius: "var(--radius-sm)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Kill
-                  </button>
-                </div>
-              ))}
+          {/* Workers list */}
+          {workers.length > 0 ? (
+            <div className="orch-worker-list">
+              <div className="orch-section-label">WORKER SUBAGENTS</div>
+              {workers.map((w) => {
+                const isRunning = w.isLive && (w.state === "running" || w.state === "streaming");
+                const isWaiting = w.state === "awaiting_question";
+                const isErrored = w.state === "errored";
+                const dotColor = !w.isLive
+                  ? "#5c6370"
+                  : isRunning
+                    ? "#98c379"
+                    : isWaiting
+                      ? "#e5c07b"
+                      : isErrored
+                        ? "#e06c75"
+                        : "#56b6c2";
+
+                return (
+                  <div key={w.workerId} className="orch-worker-card">
+                    <div className="orch-worker-info">
+                      <span
+                        className={`orch-worker-status-dot${isRunning ? " running" : ""}`}
+                        style={{ background: dotColor }}
+                      />
+                      <span className="orch-worker-name" title={w.workerId}>
+                        {w.name ?? w.workerId.slice(0, 8)}
+                      </span>
+                      <span className="orch-worker-state-tag">{w.state}</span>
+                    </div>
+                    <div className="orch-worker-btn-group">
+                      {!w.isLive && (
+                        <button
+                          type="button"
+                          onClick={() => handleResume(w.workerId)}
+                          className="orch-worker-action-btn"
+                          title="Resume worker"
+                        >
+                          <Play size={10} style={{ marginRight: 2 }} />
+                          Resume
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDetach(w.workerId)}
+                        className="orch-worker-action-btn"
+                        title="Detach worker"
+                      >
+                        <Unlink size={10} style={{ marginRight: 2 }} />
+                        Detach
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleKill(w.workerId)}
+                        className="orch-worker-action-btn danger"
+                        title="Terminate worker"
+                      >
+                        <Trash2 size={10} style={{ marginRight: 2 }} />
+                        Kill
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="orch-empty-workers">
+              No subagent workers running. Workers will appear here when spawned by the supervisor.
             </div>
           )}
 
+          {/* Inbox items */}
           {pendingCount > 0 && (
-            <div
-              style={{
-                fontSize: "11px",
-                padding: "4px 6px",
-                background: "var(--bg-primary)",
-                borderRadius: "var(--radius-sm)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <span>{pendingCount} undelivered inbox item(s)</span>
+            <div className="orch-inbox-alert">
+              <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <Inbox size={12} style={{ color: "#e5c07b" }} />
+                <span>{pendingCount} undelivered inbox item(s)</span>
+              </div>
               <button
                 type="button"
+                className="orch-inbox-clear-btn"
                 onClick={async () => {
                   await clearInboxUI(sessionId);
                   await loadData();
                 }}
-                style={{
-                  padding: "1px 5px",
-                  fontSize: "10px",
-                  background: "none",
-                  border: "1px solid var(--border-color)",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                }}
               >
-                Clear inbox
+                Clear
               </button>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {role === "worker" && (
-        <span>This session is a worker. Orchestration is managed by the supervisor.</span>
+        <div className="orch-worker-desc">
+          <span className="orch-desc-title">Worker Subagent</span>
+          <span className="orch-desc-sub">
+            This session is operating as a worker. Orchestration is managed upstream by the supervisor.
+          </span>
+        </div>
       )}
 
       {error !== null && (
-        <div style={{ color: "#e06c75", fontSize: "11px" }}>Error: {error}</div>
+        <div className="orch-error-alert">
+          <AlertCircle size={12} style={{ flexShrink: 0 }} />
+          <span>{error}</span>
+        </div>
       )}
     </div>
   );
