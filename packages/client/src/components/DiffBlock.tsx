@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Decoration,
   Diff,
@@ -9,6 +9,7 @@ import {
   type RenderGutter,
 } from "react-diff-view";
 import "react-diff-view/style/index.css";
+import { tokenizeHunksWithSyntax } from "../lib/diff-highlight";
 
 /**
  * Optional per-hunk action handler. When supplied, DiffBlock renders
@@ -171,7 +172,7 @@ export function DiffBlock({
     viewType === "split" ? "pi-diff-split" : "pi-diff-unified"
   }`;
   return (
-    <div className={wrapperClass} style={{ overflow: "auto", padding: "0 8px 8px", fontSize: "11px" }}>
+    <div className={wrapperClass} style={{ overflow: "auto", padding: "0 0 6px", fontSize: "11px" }}>
       {files.map((file) => (
         <FileDiff
           key={`${file.oldPath ?? ""}:${file.newPath ?? ""}`}
@@ -216,12 +217,17 @@ function FileDiff({
   const visibleHunks = isLarge
     ? truncateHunksToBudget(file.hunks, LARGE_FILE_LINE_THRESHOLD)
     : file.hunks;
+  const tokens = useMemo(
+    () => tokenizeHunksWithSyntax(visibleHunks, filename),
+    [visibleHunks, filename],
+  );
   return (
     <>
       <Diff
         viewType={viewType}
         diffType={file.type}
         hunks={visibleHunks}
+        tokens={tokens}
         renderGutter={renderGutter}
       >
         {(hunks) => {
