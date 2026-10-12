@@ -43,6 +43,7 @@ import { useI18n } from "../hooks/useI18n";
 import { formatModelDisplayName } from "../lib/model-name";
 
 import { PlanSubmittedCard } from "./PlanSubmittedCard";
+import { CustomMessageCard } from "./OrchestrationNotifyCard";
 
 // Register custom tool renderers
 toolRegistry.register("javascript_repl", ({ part }) => (
@@ -1801,51 +1802,13 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					if (m.display === false) {
 						continue;
 					}
-					const customType = (m.customType as string) ?? "custom";
-					const customContent = m.content;
-					const details = m.details;
-					let renderedContent: React.ReactNode;
-					if (typeof customContent === "string") {
-						renderedContent = <ChatMarkdown text={customContent} />;
-					} else if (Array.isArray(customContent)) {
-						renderedContent = (
-							<div>
-								{customContent.map(
-									(block: Record<string, unknown>, i: number) =>
-										block.type === "text" ? (
-											<ChatMarkdown key={i} text={String(block.text ?? "")} />
-										) : block.type === "image" ? (
-											<img
-												key={i}
-												src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
-												alt="Custom message image"
-												style={{ maxWidth: "100%", height: "auto" }}
-											/>
-										) : null,
-								)}
-							</div>
-						);
-					} else {
-						renderedContent = null;
-					}
 					elements.push(
 						<div
 							key={`custom-msg-${String(m.id ?? "")}`}
 							className="message-row assistant"
 						>
-							<div className="message-bubble assistant">
-								<div className="custom-message-block">
-									{customType !== "custom" && (
-										<div className="custom-message-type">{customType}</div>
-									)}
-									{renderedContent}
-									{details != null && (
-										<details className="custom-message-details">
-											<summary>{t("chat.details")}</summary>
-											<pre>{JSON.stringify(details, null, 2)}</pre>
-										</details>
-									)}
-								</div>
+							<div className="message-bubble assistant custom-message-bubble">
+								<CustomMessageCard message={m as unknown as { role: string; [key: string]: unknown }} />
 							</div>
 						</div>,
 					);
@@ -1998,47 +1961,10 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				if (m.display === false) {
 					return null;
 				}
-				const customType = (m.customType as string) ?? "custom";
-				const customContent = m.content;
-				const details = m.details;
-				let renderedContent: React.ReactNode;
-				if (typeof customContent === "string") {
-					renderedContent = <ChatMarkdown text={customContent} />;
-				} else if (Array.isArray(customContent)) {
-					renderedContent = (
-						<div>
-							{customContent.map((block: Record<string, unknown>, i: number) =>
-								block.type === "text" ? (
-									<ChatMarkdown key={i} text={String(block.text ?? "")} />
-								) : block.type === "image" ? (
-									<img
-										key={i}
-										src={`data:${String(block.mimeType ?? "image/png")};base64,${String(block.data ?? "")}`}
-										alt="Custom message image"
-										style={{ maxWidth: "100%", height: "auto" }}
-									/>
-								) : null,
-							)}
-						</div>
-					);
-				} else {
-					renderedContent = null;
-				}
 				return (
 					<div key={key} className="message-row assistant">
-						<div className="message-bubble assistant">
-							<div className="custom-message-block">
-								{customType !== "custom" && (
-									<div className="custom-message-type">{customType}</div>
-								)}
-								{renderedContent}
-								{details != null && (
-									<details className="custom-message-details">
-										<summary>{t("chat.details")}</summary>
-										<pre>{JSON.stringify(details, null, 2)}</pre>
-									</details>
-								)}
-							</div>
+						<div className="message-bubble assistant custom-message-bubble">
+							<CustomMessageCard message={m as unknown as { role: string; [key: string]: unknown }} />
 						</div>
 					</div>
 				);
