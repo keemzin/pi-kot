@@ -2,13 +2,13 @@
 
 All notable changes to pi-kot, with focus on SDK upgrades and behavior that affects users.
 
-## [Unreleased]
+## [0.1.41] — 2026-10-12
 
-### Docker & Containerization
-- **Containerized pi-kot**: Added multi-stage Debian Bookworm container deployment in `docker/` bundling Node 22, Python 3.12, Git, Ripgrep, and native build toolchains.
-- **Configurable Sudo & Capabilities**: Added `ENABLE_SUDO` (`false` / `true` / `all`) and `EXTRA_APT_PACKAGES` to easily install packages while keeping default execution unprivileged (`1000:1000`).
-- **Defensive Path Fallbacks**: Added existence validation across session store, PTY terminal, bash operations, file explorer, and git routes to gracefully fall back to `/workspace` if a host-persisted path does not exist in the current runtime (preventing `ENOENT` crashes).
-- **Configuration Templates & Docs**: Added `docker/.env.example`, `docs/containers.md`, and updated `README.md`.
+### Highlights & Features
+
+- **Batch ZIP Download**: Added multi-item selection and one-click "Download as ZIP" in the file explorer, streaming files and directories directly without intermediate disk spikes.
+- **Responsive Toolbar Tabs**: Replaced global media queries with container queries on the file explorer panel, collapsing inactive tab labels to icons under compact widths (<500px) and locking action button flex-shrink so sync, upload, and create buttons are never clipped.
+- **Docker & Containerization**: Added multi-stage Debian Bookworm container deployment in `docker/` bundling Node 22, Python 3.12, Git, Ripgrep, and native build toolchains with configurable sudo policies and defensive path fallbacks.
 
 ## [0.1.40] — 2026-09-28
 
