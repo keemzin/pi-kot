@@ -386,6 +386,117 @@ export function getToolDescription(
 	return typeof fallback === "string" ? fallback.slice(0, 80) : "";
 }
 
+function extractJsonSummary(data: unknown): string | null {
+	if (!data || typeof data !== "object") return null;
+	const obj = data as Record<string, unknown>;
+	if (obj.summary && typeof obj.summary === "string") return obj.summary;
+	if (Array.isArray(obj.results)) return `${obj.results.length} results`;
+	if (Array.isArray(obj.items)) return `${obj.items.length} items`;
+	if (obj.total !== undefined && typeof obj.total === "number") return `${obj.total} items`;
+	if (obj.message && typeof obj.message === "string") return obj.message;
+	if (obj.error && typeof obj.error === "string") return obj.error;
+	if (obj.status !== undefined && obj.status !== 200) return `Status ${obj.status}`;
+	return null;
+}
+
+/**
+ * Clean up tool output text for inline single-line preview in the trail.
+ * Strips technical metadata blocks (e.g. `[meta] {...}`, `[Focus: ...]`),
+ * avoids dumping raw unparsed JSON into the line, and surfaces real human text
+ * or concise status tags like `[degraded]` or `3 results`.
+ */
+export function formatToolOutputPreview(outputText: string): string {
+	if (!outputText || !outputText.trim()) return "";
+
+	const lines = outputText
+		.split("\n")
+		.map((l) => l.trim())
+		.filter(Boolean);
+	if (lines.length === 0) return "";
+
+	let metaTag = "";
+	let contentLines = lines;
+
+	const firstLine = lines[0]!;
+	if (firstLine.startsWith("[meta]") || firstLine.startsWith("[metadata]")) {
+		const jsonStr = firstLine.replace(/^\[meta(?:data)?\]\s*/, "");
+		try {
+			const meta = JSON.parse(jsonStr);
+			if (meta.degraded) metaTag = "degraded";
+			else if (typeof meta.count === "number") metaTag = `${meta.count} items`;
+			else if (meta.status && meta.status !== 200) metaTag = `HTTP ${meta.status}`;
+			else if (meta.summary && typeof meta.summary === "string") metaTag = meta.summary;
+		} catch {
+			// ignore json parse error
+		}
+		contentLines = lines.slice(1);
+	}
+
+	// Filter out technical headers, fences, raw JSON objects or bracket lines
+	const humanLine = contentLines.find((l) => {
+		if (l.startsWith("[Focus:") || l.startsWith("[All fetch tiers")) return false;
+		if (l.startsWith("```") || l === "{" || l === "}" || l === "[" || l === "]") return false;
+		if (l.startsWith("{") || l.startsWith("[{") || l.startsWith("[\"")) return false;
+		return true;
+	});
+
+	let previewText = "";
+	if (humanLine) {
+		previewText = humanLine
+			.replace(/^[#*>\-+\s]+/, "") // Markdown lists / headings
+			.replace(/\[Focus:[^\]]+\]/g, "")
+			.trim();
+	}
+
+	// If no human line was found, check if output (or remaining lines) is a raw JSON payload
+	if (!previewText) {
+		const candidateJson = contentLines.length > 0 ? contentLines.join("\n") : outputText;
+		try {
+			const parsed = JSON.parse(candidateJson.trim());
+			const summary = extractJsonSummary(parsed);
+			if (summary) {
+				previewText = summary;
+			} else if (typeof parsed === "object" && parsed !== null) {
+				const keys = Object.keys(parsed);
+				if (keys.length > 0) {
+					previewText = keys.slice(0, 3).join(", ");
+				}
+			}
+		} catch {
+			// not valid JSON
+		}
+	}
+
+	// Final fallback: use the first line, but strip any [meta] {...} prefix
+	if (!previewText) {
+		previewText = (contentLines[0] ?? firstLine)
+			.replace(/^\[meta(?:data)?\]\s*\{.*?\}\s*/, "")
+			.trim();
+	}
+
+	// If previewText is still a raw JSON string like {"foo": "bar"}, extract values or keys
+	if (previewText.startsWith("{") && previewText.endsWith("}")) {
+		try {
+			const obj = JSON.parse(previewText);
+			const summary = extractJsonSummary(obj);
+			if (summary) {
+				previewText = summary;
+			} else {
+				const keys = Object.keys(obj);
+				previewText = keys.length > 0 ? keys.slice(0, 3).join(", ") : "";
+			}
+		} catch {
+			// keep as is
+		}
+	}
+
+	if (metaTag && !previewText.toLowerCase().includes(metaTag.toLowerCase())) {
+		return `[${metaTag}] ${previewText}`.slice(0, 80);
+	}
+
+	return previewText.slice(0, 80);
+}
+
 /* ── Tool icon (emoji) + filename/diff helpers ─────────────────────────── */
 
 /** Map a tool name to a descriptive emoji icon. */
@@ -566,9 +677,8 @@ export const ToolCallEntry = memo(function ToolCallEntry({
 		.map((c) => c.text)
 		.join("\n");
 
-	// Smart disclosure: first line of output shown inline
-	const outputPreview =
-		outputText.split("\n").find((l) => l.trim().length > 0) ?? "";
+	// Smart disclosure: clean human-friendly preview without raw JSON leaks
+	const outputPreview = formatToolOutputPreview(outputText);
 
 	const preview =
 		previewOverride ?? getToolDescription(name, args as Record<string, unknown>) ?? undefined;
@@ -617,9 +727,8 @@ export const ToolCallEntry = memo(function ToolCallEntry({
 					)}
 					{!isRunning && !detailsOpen && outputPreview.length > 0 && (
 						<span 
-							className="tool-timeline-arg" 
+							className="tool-timeline-output-preview" 
 							title={outputPreview}
-							style={{ color: "var(--text-ghost)", fontStyle: "italic" }}
 						>
 							— {isError ? "✖ " : "✓ "} {outputPreview}
 						</span>
@@ -733,14 +842,27 @@ function JustificationRow({
 	const preview = truncated
 		? stripped.slice(0, JUSTIFICATION_PREVIEW_LEN) + "…"
 		: stripped;
+	const handleHeaderClick = (e: React.MouseEvent) => {
+		const sel = window.getSelection();
+		if (sel && sel.toString().trim().length > 0) return;
+		if ((e.target as HTMLElement).closest("a, button, code")) return;
+		onToggle();
+	};
+
 	return (
 		<div className={`trail-justification${open ? " expanded" : " collapsed"}`}>
-			<button
-				type="button"
-				onClick={onToggle}
+			<div
 				className="trail-justification-header"
+				onClick={handleHeaderClick}
 				title={open ? "Collapse this step" : "Expand this step"}
-				aria-expanded={open}
+				role="button"
+				tabIndex={0}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" || e.key === " ") {
+						e.preventDefault();
+						onToggle();
+					}
+				}}
 			>
 				<div className="trail-justification-title-wrapper">
 					<span className="trail-justification-icon-box">
@@ -757,7 +879,9 @@ function JustificationRow({
 						</svg>
 					</span>
 					{open ? (
-						<span className="trail-justification-label">{t("chat.toolJustification")}</span>
+						<div className="trail-justification-prose">
+							<ChatMarkdown text={text.trim()} />
+						</div>
 					) : (
 						<span className="trail-justification-preview" title={preview}>
 							{preview || t("chat.toolJustification")}
@@ -777,7 +901,7 @@ function JustificationRow({
 						<path d="m6 9 6 6 6-6" />
 					</svg>
 				</span>
-			</button>
+			</div>
 		</div>
 	);
 }
@@ -1122,11 +1246,6 @@ export const ToolGroupCard = memo(function ToolGroupCard({
 				    justifications during heavy tool calling. */}
 				<div className="trail-chunk-body" aria-hidden={!isOpen}>
 					<div className="trail-chunk-content">
-						<div className="trail-full-prose">
-							<ChatMarkdown
-								text={(chunk.just as { text: string }).text.trim()}
-							/>
-						</div>
 						{(() => {
 							let globalIndex = 0;
 							return groupConsecutiveTools(chunk.tools).map((g, i) => {

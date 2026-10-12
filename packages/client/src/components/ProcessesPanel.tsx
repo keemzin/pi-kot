@@ -177,10 +177,13 @@ export function ProcessesPanel({ sessionId }: Props) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "10px 14px",
+          padding: "0 14px",
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-glass)",
           flexShrink: 0,
+          height: "36px",
+          minHeight: "36px",
+          boxSizing: "border-box",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

@@ -80,12 +80,14 @@ export const FileEditor = memo(function FileEditor({
             alignItems: "center",
             justifyContent: "space-between",
             gap: "10px",
-            padding: "4px 10px",
+            padding: "0 10px",
             fontSize: "11px",
             borderBottom: "1px solid var(--border)",
             background: "var(--bg-glass, rgba(0,0,0,0.02))",
             flexShrink: 0,
-            minHeight: "34px",
+            height: "36px",
+            minHeight: "36px",
+            boxSizing: "border-box",
           }}
         >
           {/* Left section: Path & seamless Raw/Rendered segmented toggle */}

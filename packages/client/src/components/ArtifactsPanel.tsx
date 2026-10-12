@@ -95,10 +95,13 @@ export function ArtifactsPanel() {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          padding: "8px 10px",
+          padding: "0 10px",
           borderBottom: "1px solid var(--border)",
           background: "var(--bg-glass-strong)",
           flexShrink: 0,
+          height: "36px",
+          minHeight: "36px",
+          boxSizing: "border-box",
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", flex: 1 }}>

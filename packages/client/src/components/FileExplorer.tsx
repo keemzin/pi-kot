@@ -1103,8 +1103,19 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
           )}
 
           {/* Search */}
-          <div style={{ padding: "6px 10px" }}>
-            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+          <div
+            style={{
+              padding: "0 10px",
+              height: "36px",
+              minHeight: "36px",
+              boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              borderBottom: "1px solid var(--border)",
+              background: "var(--bg-glass, rgba(0,0,0,0.02))",
+            }}
+          >
+            <div style={{ position: "relative", display: "flex", alignItems: "center", width: "100%" }}>
               <svg
                 width="12"
                 height="12"

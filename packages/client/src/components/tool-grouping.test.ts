@@ -3,6 +3,7 @@ import {
 	buildGroupedTurn,
 	getToolDisplayName,
 	getToolDescription,
+	formatToolOutputPreview,
 	nextOpenChunks,
 	type PairableMessage,
 } from "./ToolGroupCard.js";
@@ -297,3 +298,53 @@ describe("nextOpenChunks", () => {
 		expect(nextOpenChunks(cur, 0, true, "justify")).toBe(cur);
 	});
 });
+
+describe("formatToolOutputPreview", () => {
+	it("returns empty string for empty output", () => {
+		expect(formatToolOutputPreview("")).toBe("");
+		expect(formatToolOutputPreview("   \n\n  ")).toBe("");
+	});
+
+	it("cleans [meta] headers and surfaces actual content lines", () => {
+		const output = `[meta] {"degraded":true,"failed":["qwant"]}
+1. Bandar Utama stabbing LCH recall murder case
+2. Second story here`;
+		expect(formatToolOutputPreview(output)).toBe(
+			"[degraded] 1. Bandar Utama stabbing LCH recall murder case",
+		);
+	});
+
+	it("skips [Focus: ...] wrapper blocks to find real human text", () => {
+		const output = `[meta] {"changed":"new","content_length":152812}
+[Focus: 'viral news Malaysia this week top stories'; showing 1 of 4 blocks]
+Voice Note From Siti Nurhaliza Helps Malaysian Man Wake From 5-Day Coma`;
+		expect(formatToolOutputPreview(output)).toBe(
+			"Voice Note From Siti Nurhaliza Helps Malaysian Man Wake From 5-Day Coma",
+		);
+	});
+
+	it("extracts summary from raw JSON responses", () => {
+		const jsonOutput = JSON.stringify({
+			summary: "200 OK · 149.2KB markdown · http",
+			status: 200,
+		});
+		expect(formatToolOutputPreview(jsonOutput)).toBe(
+			"200 OK · 149.2KB markdown · http",
+		);
+	});
+
+	it("extracts count from results array in JSON responses", () => {
+		const jsonOutput = JSON.stringify({
+			results: [{ url: "https://a.com" }, { url: "https://b.com" }],
+			total: 2,
+		});
+		expect(formatToolOutputPreview(jsonOutput)).toBe("2 results");
+	});
+
+	it("returns standard plain text output untouched", () => {
+		expect(
+			formatToolOutputPreview("Successfully compiled 14 files in 220ms"),
+		).toBe("Successfully compiled 14 files in 220ms");
+	});
+});
+

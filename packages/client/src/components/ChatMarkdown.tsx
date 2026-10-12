@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
 import { normalizeDisplayMath, normalizeInlineLatexMath } from "../lib/markdown";
+import { parseAlert, AlertCard, MarkdownDetails, MarkdownSummary } from "./RenderedView.js";
 
 type Props = { text: string; chatStyleBreaks?: boolean };
 
@@ -209,7 +210,13 @@ const components: Components = {
   ol: ({ children }) => <ol className="md-ol">{children}</ol>,
   li: ({ children }) => <li className="md-li">{children}</li>,
 
-  blockquote: ({ children }) => <blockquote className="md-blockquote">{children}</blockquote>,
+  blockquote: ({ children }) => {
+    const alert = parseAlert(children);
+    if (alert) {
+      return <AlertCard type={alert.type}>{alert.children}</AlertCard>;
+    }
+    return <blockquote className="md-blockquote">{children}</blockquote>;
+  },
   hr: () => <hr className="md-hr" />,
   a: ({ href, children }) => (
     <a href={href} target="_blank" rel="noopener noreferrer" className="md-link">
@@ -232,6 +239,8 @@ const components: Components = {
 
   code: ThemeAwareCode,
   pre: ({ children }) => <>{children}</>,
+  details: MarkdownDetails,
+  summary: MarkdownSummary,
 };
 
 const sanitizeSchema = {

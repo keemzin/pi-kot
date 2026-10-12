@@ -220,12 +220,14 @@ export function ArtifactViewer() {
               display: "flex",
               alignItems: "center",
               gap: "2px",
-              padding: "4px 8px",
+              padding: "0 8px",
               borderBottom: "1px solid var(--border)",
               background: "var(--bg-glass)",
               flexShrink: 0,
               overflowX: "auto",
+              height: "38px",
               minHeight: "38px",
+              boxSizing: "border-box",
             }}
           >
             {artifactViewerTabs.length > 1 && (

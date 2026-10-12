@@ -1153,8 +1153,27 @@ function ModelBadge({
 
 	return (
 		<span className="assistant-msg-model" title={fullTitle}>
-			{providerName ? `${providerName} / ` : ""}
-			{displayModel}
+			<svg
+				width="11"
+				height="11"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				strokeWidth="2"
+				strokeLinecap="round"
+				strokeLinejoin="round"
+				className="assistant-msg-model-icon"
+				aria-hidden="true"
+			>
+				<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z" />
+			</svg>
+			{providerName && (
+				<>
+					<span className="assistant-msg-model-provider">{providerName}</span>
+					<span className="assistant-msg-model-sep">·</span>
+				</>
+			)}
+			<span className="assistant-msg-model-name">{displayModel}</span>
 		</span>
 	);
 }

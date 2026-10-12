@@ -577,8 +577,9 @@ export function GitPanel({ projectId }: Props) {
       {/* Header: branch + badge + view toggle + refresh */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "8px 12px", borderBottom: "1px solid var(--border)",
+        padding: "0 12px", borderBottom: "1px solid var(--border)",
         background: "var(--bg-glass)",
+        height: "36px", minHeight: "36px", boxSizing: "border-box", flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 500, color: "var(--text-primary)", fontSize: "13px" }}>
           <span style={{ fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "5px" }}>
