@@ -29,6 +29,7 @@ This project was built out of **love and curiosity**.
 | **🌐 Internationalization** | Full multi-language support (**English** & **简体中文 / Simplified Chinese**), auto-detected from browser locale or configurable in Settings |
 | **🖥️ Terminal** | Multi-tab xterm.js terminal with persistent PTY sessions, **touch gestures** (long-press+drag arrows, double-tap Tab, 3-finger paste), and a mobile quick-keys bar |
 | **📁 File Explorer** | Browse, read, edit, and manage files in your project workspace with auto-refresh on agent edits, folder drag-and-drop uploads, drag-to-move, and ZIP downloads |
+| **💻 Codemode** | Native JavaScript tool orchestration saving 30%–50% tokens via sandboxed loops, batch reads, and MCP calls |
 | **🔧 MCP Support** | Add, configure, and toggle MCP servers with a full settings UI |
 | **💾 Persistent UI Prefs** | Theme, language, sticky header, token usage toggle, image compression, trail view — saved **server-side** in `~/.pi/agent/ui-settings.json`. Survives browser cache clears and device switches |
 | **🧩 Orchestration** | Multi-agent workflows — supervise sub-agents, delegate tasks, inspect results |
@@ -351,6 +352,29 @@ Each MCP server exposes tools that the agent can use. You can enable/disable ind
 
 ---
 
+## Codemode (JS Tool Orchestration)
+
+pi-kot embeds Pi Coding Agent SDK 1.1's native **Codemode** engine (`builtin:codemode`). Instead of making sequential round trips to the LLM (burning thousands of tokens for intermediate file reads or web fetches), the model writes and executes a sandboxed JavaScript script that calls tools directly in parallel or in loops.
+
+### Features
+- **30%–50% Token Reduction**: Raw intermediate data (such as heavy web scrapes or multi-file reads) stays inside the sandbox runtime and never pollutes the LLM context history.
+- **Native MCP Fusion**: Active MCP tools are automatically exposed as async functions in the sandbox (`await tools.<server>__<tool>(...)`).
+- **Interactive UI Card**: Emits a `💻 Codemode` card showing the orchestration code, wall-clock execution time, and stdout console logs.
+
+### Guide & Tip for Small / Local Models (9B and below)
+Unlike bash commands that stream standard output automatically, JavaScript functions inside Codemode return data. Small models should be guided to explicitly print return values with `console.log()`:
+
+```javascript
+// ✅ Wrap return values in console.log() to see output
+console.log(await tools.ls({ path: "." }));
+
+// ✅ Read & parse files in one turn
+const pkg = JSON.parse(await tools.read({ path: "package.json" }));
+console.log(pkg.version);
+```
+
+---
+
 ## Orchestration
 
 pi-kot supports multi-agent workflows — a supervisor session can spawn worker sub-agents to handle tasks in parallel.
@@ -406,7 +430,7 @@ Access settings via the **⚙** icon in the header.
 | --- | --- |
 | **UI** | React, TypeScript, Vite, xterm.js, CodeMirror, Zustand |
 | **Server** | Fastify, ws (WebSocket), node-pty |
-| **SDK** | `@earendil-works/pi-coding-agent` (currently 0.87.1) |
+| **SDK** | `@earendil-works/pi-coding-agent` (currently 1.1.0) |
 | **Auth** | JWT, scrypt password hashing |
 | **State** | Zustand (client), JSONL session files (server) |
 | **i18n** | Lightweight custom registry supporting English & 简体中文 |

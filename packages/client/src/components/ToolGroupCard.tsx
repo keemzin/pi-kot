@@ -238,6 +238,7 @@ export function getToolDisplayName(toolName: string): string {
 		task: "Delegated Task",
 		javascript_repl: "Repl",
 		process: "Background Process",
+		codemode: "Codemode",
 	};
 	if (map[t]) return map[t];
 	if (t.startsWith("ctx_"))
@@ -270,6 +271,8 @@ export function getToolIconPath(toolName: string): string {
 		return "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8";
 	if (t === "bash" || t === "shell" || t === "cmd" || t === "terminal")
 		return "M4 17l6-6-6-6M12 19h8";
+	if (t === "codemode")
+		return "M16 18l6-6-6-6M8 6l-6 6 6 6";
 	if (t === "list" || t === "ls" || t === "dir" || t === "list_files")
 		return "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z";
 	if (t === "grep" || t === "search" || t === "find" || t === "ripgrep")
@@ -315,6 +318,10 @@ export function getToolDescription(
 	if (t === "bash" || t === "shell" || t === "cmd" || t === "terminal") {
 		const cmd = args.command ?? args.cmd ?? "";
 		return typeof cmd === "string" ? cmd.split("\n")[0]!.slice(0, 80) : "";
+	}
+	if (t === "codemode") {
+		const code = args.code ?? "";
+		return typeof code === "string" ? code.trim().split("\n")[0]!.slice(0, 80) : "";
 	}
 	if (
 		t === "read" ||
@@ -391,6 +398,8 @@ export function getToolIcon(name: string): string {
 		n.includes("run")
 	)
 		return "⚡";
+	if (n === "codemode")
+		return "💻";
 	if (
 		n.includes("read") ||
 		n.includes("cat") ||

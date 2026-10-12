@@ -231,6 +231,12 @@ describe("toolPreviewFromArgs", () => {
     expect(toolPreviewFromArgs("web_fetch", { url: "https://example.com" })).toBe("https://example.com");
   });
 
+  it("extracts first line of code for codemode", () => {
+    expect(
+      toolPreviewFromArgs("codemode", { code: "const res = await tools.grep({ query: 'test' });\nconsole.log(res);" }),
+    ).toBe("const res = await tools.grep({ query: 'test' });");
+  });
+
   it("returns undefined for unknown tool", () => {
     expect(toolPreviewFromArgs("unknown", { data: "x" })).toBeUndefined();
   });

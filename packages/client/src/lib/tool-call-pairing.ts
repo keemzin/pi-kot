@@ -229,6 +229,9 @@ export function toolPreviewFromArgs(
   if (name === "glob" && typeof argsObj?.pattern === "string") return argsObj.pattern;
   if (name === "web_search" && typeof argsObj?.query === "string") return argsObj.query;
   if (name === "web_fetch" && typeof argsObj?.url === "string") return argsObj.url;
+  if (name === "codemode" && typeof argsObj?.code === "string") {
+    return argsObj.code.trim().split("\n")[0]?.slice(0, 80);
+  }
 
   return undefined;
 }

@@ -483,7 +483,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // ---- Tool listing ----
-  const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+  const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls", "codemode"];
   const BUILTIN_TOOL_DESCRIPTIONS: Record<string, string> = {
     read: "Read a file from the filesystem",
     bash: "Execute a bash command",
@@ -492,6 +492,7 @@ export const configRoutes: FastifyPluginAsync = async (fastify) => {
     grep: "Search file contents",
     find: "Find files by name",
     ls: "List directory contents",
+    codemode: "Execute sandboxed JavaScript tool orchestration scripts",
   };
 
 /**

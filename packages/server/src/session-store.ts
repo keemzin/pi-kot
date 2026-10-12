@@ -1,6 +1,7 @@
 import {
   type AgentSessionEvent,
   createAgentSession,
+  createCodemodeExtension,
   DefaultResourceLoader,
   SessionManager,
   type ToolDefinition,
@@ -60,7 +61,11 @@ export async function buildResourceLoader(
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: config.piConfigDir,
-    extensionFactories: [compactionContinuationExtension, planModeExtension],
+    extensionFactories: [
+      compactionContinuationExtension,
+      planModeExtension,
+      createCodemodeExtension(),
+    ],
     appendSystemPrompt,
     skillsOverride: (base) => ({
       skills: base.skills.filter((s) => isSkillEffective(skillOverrides, projectId, s.name)),
@@ -659,7 +664,7 @@ async function resolveOrchestrationTools(
 }
 
 /** Builtin tool names known to the SDK. */
-const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"];
+const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls", "codemode"];
 
 /**
  * Build the tools allowlist for createAgentSession, respecting tool
