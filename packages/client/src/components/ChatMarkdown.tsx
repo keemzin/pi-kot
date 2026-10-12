@@ -11,6 +11,7 @@ import remarkMath from "remark-math";
 import "katex/dist/katex.min.css";
 import { normalizeDisplayMath, normalizeInlineLatexMath } from "../lib/markdown";
 import { parseAlert, AlertCard, MarkdownDetails, MarkdownSummary } from "./RenderedView.js";
+import { MermaidBlock } from "./MermaidBlock.js";
 
 type Props = { text: string; chatStyleBreaks?: boolean };
 
@@ -62,7 +63,11 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
     );
   }
 
-  const language = langMatch?.[1] ?? "text";
+  const language = (langMatch?.[1] ?? "text").toLowerCase();
+  if (language === "mermaid") {
+    return <MermaidBlock code={code} defaultMode="code" />;
+  }
+
   const prismTheme = isLight ? prismThemes.vsLight : prismThemes.vsDark;
   const codeBg = isLight ? "#f8fafc" : "#0d0d0d";
 
@@ -329,34 +334,30 @@ export const ChatMarkdown = memo(function ChatMarkdown({ text, chatStyleBreaks }
     return renderSegments(normalizedText);
   }, [text]);
 
-  // Fast path: no proposed_plan blocks — just render as plain markdown
-  if (segments.length === 1 && typeof segments[0] === "string") {
-    return (
-      <div className="md-root text-sm break-words" style={{ overflowWrap: "anywhere" }}>
-        <ReactMarkdown remarkPlugins={plugins} rehypePlugins={htmlRehypePlugins} components={components}>
-          {segments[0] as string}
+  const innerContent = segments.length === 1 && typeof segments[0] === "string" ? (
+    <ReactMarkdown remarkPlugins={plugins} rehypePlugins={htmlRehypePlugins} components={components}>
+      {segments[0] as string}
+    </ReactMarkdown>
+  ) : (
+    segments.map((seg, i) =>
+      typeof seg === "string" ? (
+        <ReactMarkdown
+          key={i}
+          remarkPlugins={plugins}
+          rehypePlugins={htmlRehypePlugins}
+          components={components}
+        >
+          {seg}
         </ReactMarkdown>
-      </div>
-    );
-  }
+      ) : (
+        seg
+      )
+    )
+  );
 
-  // Mixed: segments contain ProposedPlanCard components interspersed with markdown text
   return (
     <div className="md-root text-sm break-words" style={{ overflowWrap: "anywhere" }}>
-      {segments.map((seg, i) =>
-        typeof seg === "string" ? (
-          <ReactMarkdown
-            key={i}
-            remarkPlugins={plugins}
-            rehypePlugins={htmlRehypePlugins}
-            components={components}
-          >
-            {seg}
-          </ReactMarkdown>
-        ) : (
-          seg
-        )
-      )}
+      {innerContent}
     </div>
   );
 });

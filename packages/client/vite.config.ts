@@ -44,6 +44,7 @@ export default defineConfig({
           if (id.includes("react-markdown") || id.includes("rehype-") || id.includes("remark-")) return "vendor-markdown";
           if (id.includes("lucide-react")) return "vendor-icons";
           if (id.includes("prism-react-renderer")) return "vendor-prism";
+          if (id.includes("mermaid") || id.includes("d3-") || id.includes("dagre-d3") || id.includes("cytoscape") || id.includes("khroma")) return "vendor-mermaid";
         },
       },
     },

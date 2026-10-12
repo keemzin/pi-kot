@@ -17,6 +17,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { normalizeDisplayMath, normalizeInlineLatexMath } from "../lib/markdown.js";
 import { Highlight, themes as prismThemes } from "prism-react-renderer";
+import { MermaidBlock } from "./MermaidBlock.js";
 import {
   Info,
   Lightbulb,
@@ -305,6 +306,140 @@ function isMarkdown(fileName: string): boolean {
   return ext === "md" || ext === "mdx" || ext === "markdown";
 }
 
+function MarkdownCodeBlock({ className, children, node: _node, ...props }: any) {
+  const match = /language-([\w-]+)/.exec(className ?? "");
+  const codeStr = extractText(children).replace(/\n$/, "");
+  const lang = match ? match[1].toLowerCase() : "text";
+
+  if (lang === "mermaid") {
+    return <MermaidBlock code={codeStr} />;
+  }
+
+  if (match || codeStr.includes("\n")) {
+    return (
+      <CodeBlock
+        code={codeStr}
+        language={lang}
+        style={{ margin: "14px 0" }}
+      />
+    );
+  }
+
+  return (
+    <code
+      style={{
+        background: "var(--bg-glass-strong)",
+        padding: "2px 5px",
+        borderRadius: "3px",
+        fontSize: "0.9em",
+        color: "var(--accent-text)",
+      }}
+      {...props}
+    >
+      {children}
+    </code>
+  );
+}
+
+const MARKDOWN_COMPONENTS = {
+  details: MarkdownDetails,
+  summary: MarkdownSummary,
+  pre: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  code: MarkdownCodeBlock,
+  a: ({ href, children }: any) => (
+    <a href={href} target="_blank" rel="noreferrer" style={{ color: "var(--accent-text)" }}>
+      {children}
+    </a>
+  ),
+  img: ({ src, alt }: any) => (
+    <img
+      src={src}
+      alt={alt ?? ""}
+      style={{
+        maxWidth: "100%",
+        height: "auto",
+        borderRadius: 4,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+      }}
+    />
+  ),
+  table: ({ children }: any) => (
+    <div className="table-wrapper">
+      <table className="md-table">{children}</table>
+    </div>
+  ),
+  th: ({ children }: any) => <th className="md-th">{children}</th>,
+  td: ({ children }: any) => <td className="md-td">{children}</td>,
+  blockquote: ({ children }: any) => {
+    const alert = parseAlert(children);
+    if (alert) {
+      return <AlertCard type={alert.type}>{alert.children}</AlertCard>;
+    }
+    return (
+      <blockquote
+        style={{
+          borderLeft: "3px solid var(--accent-bg)",
+          margin: "12px 0",
+          padding: "4px 14px",
+          background: "var(--bg-glass)",
+          color: "var(--text-secondary)",
+        }}
+      >
+        {children}
+      </blockquote>
+    );
+  },
+  h1: ({ children }: any) => (
+    <h1
+      style={{
+        fontSize: "20px",
+        fontWeight: 700,
+        margin: "20px 0 10px",
+        color: "var(--text-primary)",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "6px",
+      }}
+    >
+      {children}
+    </h1>
+  ),
+  h2: ({ children }: any) => (
+    <h2
+      style={{
+        fontSize: "17px",
+        fontWeight: 600,
+        margin: "18px 0 8px",
+        color: "var(--text-primary)",
+        borderBottom: "1px solid var(--border)",
+        paddingBottom: "4px",
+      }}
+    >
+      {children}
+    </h2>
+  ),
+  h3: ({ children }: any) => (
+    <h3
+      style={{
+        fontSize: "15px",
+        fontWeight: 600,
+        margin: "14px 0 6px",
+        color: "var(--text-primary)",
+      }}
+    >
+      {children}
+    </h3>
+  ),
+  hr: () => (
+    <hr
+      style={{
+        border: "none",
+        borderTop: "1px solid var(--border)",
+        margin: "16px 0",
+      }}
+    />
+  ),
+};
+
 export function RenderedView({ content, fileName }: Props) {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
 
@@ -329,168 +464,24 @@ export function RenderedView({ content, fileName }: Props) {
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeRaw, [rehypeKatex, { throwOnError: false, strict: false }]]}
-          components={{
-            details: MarkdownDetails,
-            summary: MarkdownSummary,
-            pre({ children }) {
-              if (isValidElement(children)) {
-                const childProps = children.props as { className?: string; children?: unknown };
-                const match = /language-([\w-]+)/.exec(childProps.className ?? "");
-                const raw = extractText(childProps.children);
-                const codeStr = raw.replace(/\n$/, "");
-                const lang = match ? match[1] : "text";
-                return <CodeBlock code={codeStr} language={lang} style={{ margin: "14px 0" }} />;
-              }
-              return <pre>{children}</pre>;
-            },
-            code({ className, children, node: _node, ...props }) {
-              const match = /language-([\w-]+)/.exec(className ?? "");
-              const codeStr = extractText(children).replace(/\n$/, "");
-              if (match || codeStr.includes("\n")) {
-                return (
-                  <CodeBlock
-                    code={codeStr}
-                    language={match ? match[1] : "text"}
-                    style={{ margin: "14px 0" }}
-                  />
-                );
-              }
-              return (
-                <code
-                  style={{
-                    background: "var(--bg-glass-strong)",
-                    padding: "2px 5px",
-                    borderRadius: "3px",
-                    fontSize: "0.9em",
-                    color: "var(--accent-text)",
-                  }}
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            },
-            a({ href, children }) {
-              return (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "var(--accent-text)" }}
-                >
-                  {children}
-                </a>
-              );
-            },
-            img({ src, alt }) {
-              return (
-                <img
-                  src={src}
-                  alt={alt ?? ""}
-                  style={{
-                    maxWidth: "100%",
-                    height: "auto",
-                    borderRadius: 4,
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
-                  }}
-                />
-              );
-            },
-            table({ children }) {
-              return (
-                <div className="table-wrapper">
-                  <table className="md-table">
-                    {children}
-                  </table>
-                </div>
-              );
-            },
-            th({ children }) {
-              return <th className="md-th">{children}</th>;
-            },
-            td({ children }) {
-              return <td className="md-td">{children}</td>;
-            },
-            blockquote({ children }) {
-              const alert = parseAlert(children);
-              if (alert) {
-                return <AlertCard type={alert.type}>{alert.children}</AlertCard>;
-              }
-              return (
-                <blockquote
-                  style={{
-                    borderLeft: "3px solid var(--accent-bg)",
-                    margin: "12px 0",
-                    padding: "4px 14px",
-                    background: "var(--bg-glass)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {children}
-                </blockquote>
-              );
-            },
-            h1({ children }) {
-              return (
-                <h1
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: 700,
-                    margin: "20px 0 10px",
-                    color: "var(--text-primary)",
-                    borderBottom: "1px solid var(--border)",
-                    paddingBottom: "6px",
-                  }}
-                >
-                  {children}
-                </h1>
-              );
-            },
-            h2({ children }) {
-              return (
-                <h2
-                  style={{
-                    fontSize: "17px",
-                    fontWeight: 600,
-                    margin: "18px 0 8px",
-                    color: "var(--text-primary)",
-                    borderBottom: "1px solid var(--border)",
-                    paddingBottom: "4px",
-                  }}
-                >
-                  {children}
-                </h2>
-              );
-            },
-            h3({ children }) {
-              return (
-                <h3
-                  style={{
-                    fontSize: "15px",
-                    fontWeight: 600,
-                    margin: "14px 0 6px",
-                    color: "var(--text-primary)",
-                  }}
-                >
-                  {children}
-                </h3>
-              );
-            },
-            hr() {
-              return (
-                <hr
-                  style={{
-                    border: "none",
-                    borderTop: "1px solid var(--border)",
-                    margin: "16px 0",
-                  }}
-                />
-              );
-            },
-          }}
+          components={MARKDOWN_COMPONENTS}
         >
           {normalizedContent}
         </ReactMarkdown>
+      </div>
+    );
+  }
+
+  if (ext === "mermaid" || ext === "mmd") {
+    return (
+      <div
+        style={{
+          padding: "16px 20px",
+          overflowY: "auto",
+          height: "100%",
+        }}
+      >
+        <MermaidBlock code={content} />
       </div>
     );
   }

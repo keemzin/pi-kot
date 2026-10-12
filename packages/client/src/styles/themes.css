@@ -6700,6 +6700,163 @@ strong {
 	margin-bottom: 0;
 }
 
+/* Mermaid Diagrams */
+.mermaid-block-wrap {
+	margin: 12px 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm, 6px);
+	background: var(--bg-glass);
+	overflow: hidden;
+}
+.mermaid-block-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 12px;
+	background: var(--bg-glass-strong);
+	border-bottom: 1px solid var(--border);
+}
+.mermaid-block-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-dim);
+}
+.mermaid-block-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.mermaid-view-toggle {
+	display: flex;
+	background: var(--bg-glass);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 2px;
+	gap: 2px;
+}
+.mermaid-toggle-btn {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 7px;
+	font-size: 11px;
+	border: none;
+	background: transparent;
+	color: var(--text-dim);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all var(--duration) var(--ease);
+}
+.mermaid-toggle-btn:hover {
+	color: var(--text-primary);
+}
+.mermaid-toggle-btn.active {
+	background: var(--bg-elevated);
+	color: var(--text-primary);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+.mermaid-copy-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text-dim);
+	cursor: pointer;
+	transition: all var(--duration) var(--ease);
+}
+.mermaid-copy-btn:hover {
+	color: var(--text-primary);
+	background: var(--bg-glass-hover);
+	border-color: var(--border-hover);
+}
+.mermaid-block-content {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 16px;
+	min-height: 80px;
+	background: var(--bg-solid);
+	overflow-x: auto;
+}
+.mermaid-svg-container {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	overflow-x: auto;
+}
+.mermaid-svg-container svg {
+	max-width: 100%;
+	height: auto;
+}
+.mermaid-badge-error {
+	font-size: 10px;
+	font-weight: 500;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: rgba(239, 68, 68, 0.12);
+	color: var(--error, #ef4444);
+	border: 1px solid rgba(239, 68, 68, 0.25);
+	margin-left: 6px;
+	text-transform: none;
+	letter-spacing: normal;
+}
+.mermaid-badge-loading {
+	display: inline-flex;
+	align-items: center;
+	font-size: 10px;
+	font-weight: 500;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: var(--bg-glass-strong);
+	color: var(--text-dim);
+	border: 1px solid var(--border);
+	margin-left: 6px;
+	text-transform: none;
+	letter-spacing: normal;
+}
+.mermaid-spinner-sm {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border: 1.5px solid var(--border);
+	border-top-color: var(--accent-text);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	margin-right: 4px;
+}
+.mermaid-error-fallback {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+}
+.mermaid-error-bar {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	background: rgba(239, 68, 68, 0.08);
+	border-bottom: 1px solid rgba(239, 68, 68, 0.18);
+	color: var(--error, #ef4444);
+	font-size: 11.5px;
+	font-family: var(--font-mono);
+}
+.mermaid-error-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+}
+
 .md-hr {
 	border: none;
 	border-top: 1px solid var(--border);

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RenderedView } from "./RenderedView.js";
+import { ChatMarkdown } from "./ChatMarkdown.js";
 
 describe("RenderedView", () => {
   it("renders unlabelled fenced code blocks as multi-line code blocks, not inline code", () => {
@@ -133,5 +134,60 @@ Here is inline math $x^2 + y^2 = z^2$.
 
     // Must not remain as raw unrendered delimiter text
     expect(html).not.toContain("$$ E = mc^2 $$");
+  });
+
+  it("renders Mermaid diagrams inside MermaidBlock with Diagram and Code controls", () => {
+    const markdown = `\`\`\`mermaid
+graph TD
+    A[Start] --> B[End]
+\`\`\``;
+    const html = renderToStaticMarkup(React.createElement(RenderedView, { content: markdown, fileName: "diagram.md" }));
+
+    expect(html).toContain("mermaid-block-wrap");
+    expect(html).toContain("mermaid-view-toggle");
+    expect(html).toContain("Diagram");
+    expect(html).toContain("Code");
+    expect(html).toContain("Mermaid");
+  });
+
+  it("renders standalone .mmd and .mermaid files as interactive MermaidBlock", () => {
+    const mermaidCode = `graph LR
+    User --> Browser
+    Browser --> Server`;
+    const html = renderToStaticMarkup(React.createElement(RenderedView, { content: mermaidCode, fileName: "architecture.mmd" }));
+
+    expect(html).toContain("mermaid-block-wrap");
+    expect(html).toContain("mermaid-view-toggle");
+    expect(html).toContain("Diagram");
+    expect(html).toContain("Code");
+    expect(html).toContain("Mermaid");
+  });
+
+  it("handles invalid Mermaid syntax gracefully with formatted code fallback", () => {
+    const invalidMarkdown = `\`\`\`mermaid
+---
+classDiagram
+    class Document
+\`\`\``;
+    const html = renderToStaticMarkup(React.createElement(RenderedView, { content: invalidMarkdown, fileName: "broken.md" }));
+
+    // Container renders safely with Mermaid header and copy button
+    expect(html).toContain("mermaid-block-wrap");
+    expect(html).toContain("mermaid-block-header");
+    expect(html).toContain("Mermaid");
+    expect(html).toContain("mermaid-copy-btn");
+  });
+
+  it("renders Mermaid in ChatMarkdown with defaultMode='code' showing code directly", () => {
+    const chatMarkdown = `\`\`\`mermaid
+graph TD
+    A --> B
+\`\`\``;
+    const html = renderToStaticMarkup(React.createElement(ChatMarkdown, { text: chatMarkdown }));
+
+    expect(html).toContain("mermaid-block-wrap");
+    expect(html).toContain("mermaid-view-toggle");
+    expect(html).toContain("Code");
+    expect(html).toContain("graph TD");
   });
 });
