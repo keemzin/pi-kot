@@ -16,6 +16,8 @@ import { TerminalPanel } from "./components/TerminalPanel";
 import { ArtifactsPanel } from "./components/ArtifactsPanel";
 import { ExtensionUIInteractionModal } from "./components/ExtensionUIInteractionModal";
 import { NotificationToast } from "./components/NotificationToast";
+import { GlobalConfirmDialog } from "./components/GlobalConfirmDialog";
+import { confirmDialog } from "./stores/dialog-store";
 import { SessionList } from "./components/SessionList";
 import { AddProjectDialog } from "./components/AddProjectDialog";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -834,9 +836,16 @@ export function App() {
                               <button
                                 className="session-permanent-delete-btn"
                                 title="Permanently delete session now"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation();
-                                  if (confirm(`Permanently delete "${displayName}" now? This cannot be undone.`)) {
+                                  const ok = await confirmDialog({
+                                    title: "Delete Session",
+                                    message: `Permanently delete "${displayName}" now?`,
+                                    detail: "This action cannot be undone. All messages and data will be removed.",
+                                    confirmText: "Delete Permanently",
+                                    tone: "danger",
+                                  });
+                                  if (ok) {
                                     useSessionStore.getState().deleteArchivedSession(s.sessionId, activeProjectId);
                                   }
                                 }}
@@ -1317,6 +1326,9 @@ export function App() {
 
       {/* Extension command notifications (toast from ctx.ui.notify) */}
       <NotificationToast />
+
+      {/* Global confirm & alert dialogs */}
+      <GlobalConfirmDialog />
 
       {showAddProjectDialog && (
         <AddProjectDialog

@@ -27,6 +27,7 @@ import {
 } from "../../lib/api-client";
 import { AddProviderDialog, LOCAL_PROVIDER_PRESETS, type ProviderPreset } from "../AddProviderDialog";
 import { ConfirmDialog } from "../Modal";
+import { confirmDialog } from "../../stores/dialog-store";
 import { errorMsg } from "./shared";
 import { ModelEditor, type ModelEntry } from "./ModelEditor";
 import { useI18n } from "../../hooks/useI18n";
@@ -96,7 +97,14 @@ export function ProvidersTab({ onError }: Props) {
   };
 
   const removeKey = async (provider: string): Promise<void> => {
-    if (!confirm(`Remove the stored key for "${provider}"?`)) return;
+    const ok = await confirmDialog({
+      title: "Remove API Key",
+      message: `Remove the stored key for "${provider}"?`,
+      detail: "Any sessions relying on this provider key will require you to re-enter it.",
+      confirmText: "Remove Key",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await removeApiKey(provider);

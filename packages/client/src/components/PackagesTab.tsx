@@ -35,6 +35,7 @@ import {
   type ReasoningLevel,
 } from "../lib/api-client";
 import { useI18n } from "../hooks/useI18n";
+import { confirmDialog } from "../stores/dialog-store";
 
 // ── Styles ──────────────────────────────────────────────────────────
 
@@ -699,7 +700,14 @@ export function PackagesTab({ onError, projectPath }: Props) {
   };
 
   const handleUninstall = async (pkg: SdkPackageInfo) => {
-    if (!confirm(`${t("settings.packages.uninstallConfirm")} "${pkg.packageName || pkg.source}"?`)) return;
+    const ok = await confirmDialog({
+      title: "Uninstall Extension",
+      message: `${t("settings.packages.uninstallConfirm")} "${pkg.packageName || pkg.source}"?`,
+      detail: "This extension package will be removed from your environment.",
+      confirmText: "Uninstall",
+      tone: "danger",
+    });
+    if (!ok) return;
     setUninstalling(pkg.source);
     onError(undefined);
     try {

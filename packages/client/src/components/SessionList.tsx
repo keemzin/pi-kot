@@ -3,6 +3,7 @@ import { Star, Archive, Plus, Search, ChevronRight, ChevronDown } from "lucide-r
 import type { SessionSummary } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
 import { useFavoriteStore } from "../stores/favorite-store";
+import { confirmDialog } from "../stores/dialog-store";
 import { useI18n } from "../hooks/useI18n";
 
 const PAGE_SIZE = 8; // sessions shown before "Show more"
@@ -189,9 +190,16 @@ export function SessionList({
                   <button
                     className="session-action-btn session-archive-btn"
                     title="Archive session"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation();
-                      if (confirm(`Archive "${displayName}"?`)) {
+                      const ok = await confirmDialog({
+                        title: "Archive Session",
+                        message: `Archive "${displayName}"?`,
+                        detail: "This session will be moved to the archive list. You can restore it anytime.",
+                        confirmText: "Archive",
+                        tone: "warning",
+                      });
+                      if (ok) {
                         unfavoriteFav(supervisor.sessionId);
                         useSessionStore.getState().archiveSession(supervisor.sessionId);
                       }
