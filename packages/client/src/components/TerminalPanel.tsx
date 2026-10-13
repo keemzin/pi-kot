@@ -21,10 +21,23 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
+import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
+import { Check, ClipboardPaste, Copy, Trash2 } from "lucide-react";
 import { useTerminalStore, type TerminalTab } from "../stores/terminal-store";
 import { getStoredToken } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
+
+function pasteToTerminal(entry: Live, text: string): void {
+  if (!text) return;
+  if (typeof entry.term.paste === "function") {
+    entry.term.paste(text);
+  } else if (entry.ws.readyState === WebSocket.OPEN) {
+    entry.ws.send(JSON.stringify({ type: "input", data: text }));
+  }
+  entry.term.focus();
+}
 
 interface TerminalPanelProps {
   open: boolean;
@@ -90,6 +103,8 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [ctrlActive, setCtrlActive] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [hasSelection, setHasSelection] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 600);
@@ -109,6 +124,18 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
     vv.addEventListener("resize", update);
     return () => vv.removeEventListener("resize", update);
   }, []);
+
+  // Track selection state on the active terminal tab
+  useEffect(() => {
+    if (!activeTabId) return;
+    const entry = live.get(activeTabId);
+    if (!entry) return;
+    setHasSelection(entry.term.hasSelection());
+    const disp = entry.term.onSelectionChange(() => {
+      setHasSelection(entry.term.hasSelection());
+    });
+    return () => disp.dispose();
+  }, [activeTabId]);
 
   const projectTabs = tabs.filter((t) => t.projectId === projectId);
   const activeTab = projectTabs.find((t) => t.id === activeTabId) ?? projectTabs[0];
@@ -138,14 +165,38 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
 
   // Reads clipboard and sends text to the active terminal
   const handlePaste = useCallback(() => {
-    navigator.clipboard.readText().then((text) => {
-      if (!activeTabId) return;
-      const entry = live.get(activeTabId);
-      if (entry && entry.ws.readyState === WebSocket.OPEN) {
-        entry.ws.send(JSON.stringify({ type: "input", data: text }));
-        entry.term.focus();
-      }
-    }).catch(() => {});
+    if (!activeTabId) return;
+    const entry = live.get(activeTabId);
+    if (!entry) return;
+    navigator.clipboard
+      ?.readText()
+      .then((text) => {
+        if (text) pasteToTerminal(entry, text);
+      })
+      .catch((err) => {
+        console.warn("[Terminal] Clipboard read error:", err);
+      });
+  }, [activeTabId]);
+
+  const handleCopy = useCallback(() => {
+    if (!activeTabId) return;
+    const entry = live.get(activeTabId);
+    if (entry && entry.term.hasSelection()) {
+      const selected = entry.term.getSelection();
+      navigator.clipboard?.writeText(selected).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      }).catch(() => {});
+    }
+  }, [activeTabId]);
+
+  const handleClear = useCallback(() => {
+    if (!activeTabId) return;
+    const entry = live.get(activeTabId);
+    if (entry) {
+      entry.term.clear();
+      entry.term.focus();
+    }
   }, [activeTabId]);
 
   return (
@@ -265,21 +316,59 @@ export function TerminalPanel({ open, onClose }: TerminalPanelProps) {
             + New
           </button>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            padding: "2px 6px",
-            borderRadius: 4,
-            fontSize: 13,
-            color: "var(--text-dim, #6c7086)",
-            lineHeight: 1,
-          }}
-          title="Close terminal panel"
-        >
-          ✕
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+          {/* Quick paste button */}
+          <button
+            type="button"
+            onClick={handlePaste}
+            className="terminal-action-btn"
+            title="Paste from clipboard"
+          >
+            <ClipboardPaste size={12} />
+            <span>Paste</span>
+          </button>
+
+          {/* Quick copy button */}
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!hasSelection}
+            className="terminal-action-btn"
+            style={{ opacity: hasSelection ? 1 : 0.4 }}
+            title={copied ? "Copied!" : hasSelection ? "Copy selected text" : "Select text to copy"}
+          >
+            {copied ? <Check size={12} style={{ color: "var(--success, #22c55e)" }} /> : <Copy size={12} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+
+          {/* Clear button */}
+          <button
+            type="button"
+            onClick={handleClear}
+            className="terminal-action-btn"
+            title="Clear terminal buffer"
+          >
+            <Trash2 size={12} />
+          </button>
+
+          <div style={{ width: 1, height: 14, background: "var(--border-color, #313244)", margin: "0 3px" }} />
+
+          <button
+            onClick={onClose}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              padding: "2px 6px",
+              borderRadius: 4,
+              fontSize: 13,
+              color: "var(--text-dim, #6c7086)",
+              lineHeight: 1,
+            }}
+            title="Close terminal panel"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Terminal hosts */}
@@ -388,6 +477,12 @@ function TerminalHost({
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [showCopyBtn, setShowCopyBtn] = useState(false);
+  const [callout, setCallout] = useState<{
+    x: number;
+    y: number;
+    hasSelection: boolean;
+    selectedText: string;
+  } | null>(null);
 
   const ctrlActiveRef = useRef(ctrlActive);
   useEffect(() => {
@@ -473,12 +568,19 @@ function TerminalHost({
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       fontSize: isMobileDevice ? 12 : 13,
       cursorBlink: true,
-      scrollback: 5000,
+      cursorStyle: "block",
+      scrollback: 10000,
       allowTransparency: true,
+      allowProposedApi: true,
+      rightClickSelectsWord: true,
+      macOptionIsMeta: true,
+      smoothScrollDuration: 100,
     });
 
     const fit = new FitAddon();
     term.loadAddon(fit);
+    term.loadAddon(new WebLinksAddon());
+    term.loadAddon(new ClipboardAddon());
     term.open(host);
     disableBrowserTextAssist(host);
     fit.fit();
@@ -522,50 +624,175 @@ function TerminalHost({
     });
     observer.observe(host);
 
-    // --- Touch: 2-finger scroll only (all other gestures removed so native
-    //     xterm selection, copy/paste work on mobile) ---
+    // Helper to select word at client coordinates and display callout popover
+    const triggerWordSelection = (clientX: number, clientY: number) => {
+      const screen = host.querySelector(".xterm-screen");
+      if (screen) {
+        // Dispatch synthetic double-click to select word under tap/hold
+        const downEvt = new MouseEvent("mousedown", {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          detail: 2,
+          button: 0,
+        });
+        screen.dispatchEvent(downEvt);
+        const upEvt = new MouseEvent("mouseup", {
+          bubbles: true,
+          cancelable: true,
+          clientX,
+          clientY,
+          detail: 2,
+          button: 0,
+        });
+        screen.dispatchEvent(upEvt);
+      }
+
+      const rect = host.getBoundingClientRect();
+      const relX = Math.min(Math.max(10, clientX - rect.left - 60), Math.max(10, rect.width - 220));
+      const relY = Math.min(Math.max(10, clientY - rect.top), rect.height - 40);
+
+      const hasSel = term.hasSelection();
+      const selText = hasSel ? term.getSelection() : "";
+
+      setCallout({
+        x: relX,
+        y: relY,
+        hasSelection: hasSel,
+        selectedText: selText,
+      });
+    };
+
+    // --- Touch Handling: Single-finger smooth scroll, 2-finger scroll, Double-tap & Long-press ---
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let lastTouchY = 0;
+    let touchStartTime = 0;
+    let isScrolling = false;
+    let remainderPx = 0;
+    const lineHeightPx = 16;
+    let lastTapTime = 0;
+    let longPressTimer: ReturnType<typeof setTimeout> | null = null;
     let twoFingerTouchY: number | null = null;
     let twoFingerRemainderPx = 0;
-    const lineHeightPx = 16;
 
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        lastTouchY = touch.clientY;
+        touchStartTime = Date.now();
+        isScrolling = false;
+        remainderPx = 0;
+
+        const now = Date.now();
+        // Double-tap detected (within 320ms and within 15px)
+        if (now - lastTapTime < 320) {
+          if (longPressTimer) clearTimeout(longPressTimer);
+          longPressTimer = null;
+          lastTapTime = 0;
+          triggerWordSelection(touch.clientX, touch.clientY);
+          return;
+        }
+        lastTapTime = now;
+
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(() => {
+          if (!isScrolling) {
+            triggerWordSelection(touch.clientX, touch.clientY);
+          }
+        }, 360);
+      } else if (e.touches.length === 2) {
+        if (longPressTimer) clearTimeout(longPressTimer);
+        longPressTimer = null;
         twoFingerTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         twoFingerRemainderPx = 0;
       }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && twoFingerTouchY !== null) {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+
+        // If moved more than 8px, cancel long-press and do smooth vertical scroll
+        if (Math.hypot(dx, dy) > 8) {
+          if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+          }
+          isScrolling = true;
+          e.preventDefault(); // Stop native page bounce/pan
+          const stepY = lastTouchY - touch.clientY;
+          lastTouchY = touch.clientY;
+          if (Math.abs(stepY) >= 1) {
+            const totalPx = remainderPx + stepY;
+            const lines = Math.trunc(totalPx / lineHeightPx);
+            remainderPx = totalPx - lines * lineHeightPx;
+            if (lines !== 0) term.scrollLines(lines);
+          }
+        }
+      } else if (e.touches.length === 2 && twoFingerTouchY !== null) {
         e.preventDefault();
-        e.stopPropagation();
         const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         const stepY = twoFingerTouchY - currentY;
         twoFingerTouchY = currentY;
-        if (Math.abs(stepY) < 1) return;
-        const totalPx = twoFingerRemainderPx + stepY;
-        const lines = Math.trunc(totalPx / lineHeightPx);
-        twoFingerRemainderPx = totalPx - lines * lineHeightPx;
-        if (lines !== 0) term.scrollLines(lines);
+        if (Math.abs(stepY) >= 1) {
+          const totalPx = twoFingerRemainderPx + stepY;
+          const lines = Math.trunc(totalPx / lineHeightPx);
+          twoFingerRemainderPx = totalPx - lines * lineHeightPx;
+          if (lines !== 0) term.scrollLines(lines);
+        }
       }
     };
 
     const onTouchEnd = (_e: TouchEvent) => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
       twoFingerTouchY = null;
+      if (!isScrolling && Date.now() - touchStartTime < 250) {
+        // Quick tap: dismiss active callout
+        setCallout(null);
+        term.focus();
+      }
     };
 
-    const onTouchCancel = (): void => {
+    const onTouchCancel = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
       twoFingerTouchY = null;
+      isScrolling = false;
+    };
+
+    const onContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      const rect = host.getBoundingClientRect();
+      const relX = Math.min(Math.max(10, e.clientX - rect.left - 60), Math.max(10, rect.width - 220));
+      const relY = Math.min(Math.max(10, e.clientY - rect.top), rect.height - 40);
+
+      const hasSel = term.hasSelection();
+      const selText = hasSel ? term.getSelection() : "";
+
+      setCallout({
+        x: relX,
+        y: relY,
+        hasSelection: hasSel,
+        selectedText: selText,
+      });
     };
 
     host.addEventListener("touchstart", onTouchStart, { passive: false });
     host.addEventListener("touchmove", onTouchMove, { passive: false });
     host.addEventListener("touchend", onTouchEnd);
     host.addEventListener("touchcancel", onTouchCancel);
-
-    // Prevent context menu on long-press (browser default interferes with xterm)
-    const onContextMenu = (e: Event) => { e.preventDefault(); };
-    host.addEventListener("contextmenu", onContextMenu);
+    host.addEventListener("contextmenu", onContextMenu as EventListener);
 
     live.set(tab.id, {
       term,
@@ -589,7 +816,7 @@ function TerminalHost({
         host.removeEventListener("touchmove", onTouchMove);
         host.removeEventListener("touchend", onTouchEnd);
         host.removeEventListener("touchcancel", onTouchCancel);
-        host.removeEventListener("contextmenu", onContextMenu);
+        host.removeEventListener("contextmenu", onContextMenu as EventListener);
       } catch {
         // ignore
       }
@@ -631,8 +858,135 @@ function TerminalHost({
         touchAction: "none", // Prevent native browser pinch-zoom/pan inside the terminal area
       }}
     >
-      {/* Floating Copy button */}
-      {showCopyBtn && (
+      {/* Floating native-style Callout Popover */}
+      {callout && visible && (
+        <div
+          className="terminal-callout-popover"
+          style={{
+            left: callout.x,
+            top: Math.max(6, callout.y - 38),
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          {callout.hasSelection ? (
+            <>
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    navigator.clipboard?.writeText(callout.selectedText).catch(() => {});
+                    entry.term.clearSelection();
+                  }
+                  setCallout(null);
+                }}
+              >
+                <Copy size={11} />
+                <span>Copy</span>
+              </button>
+              <div className="terminal-callout-divider" />
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    entry.term.selectAll();
+                    setCallout({
+                      ...callout,
+                      hasSelection: true,
+                      selectedText: entry.term.getSelection(),
+                    });
+                  }
+                }}
+              >
+                <span>Select All</span>
+              </button>
+              <div className="terminal-callout-divider" />
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    navigator.clipboard?.readText().then((text) => {
+                      if (text) pasteToTerminal(entry, text);
+                    }).catch(() => {});
+                  }
+                  setCallout(null);
+                }}
+              >
+                <ClipboardPaste size={11} />
+                <span>Paste</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    navigator.clipboard?.readText().then((text) => {
+                      if (text) pasteToTerminal(entry, text);
+                    }).catch(() => {});
+                  }
+                  setCallout(null);
+                }}
+              >
+                <ClipboardPaste size={11} />
+                <span>Paste</span>
+              </button>
+              <div className="terminal-callout-divider" />
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    entry.term.selectAll();
+                    setCallout({
+                      ...callout,
+                      hasSelection: true,
+                      selectedText: entry.term.getSelection(),
+                    });
+                  }
+                }}
+              >
+                <span>Select All</span>
+              </button>
+              <div className="terminal-callout-divider" />
+              <button
+                type="button"
+                className="terminal-callout-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const entry = live.get(tab.id);
+                  if (entry) {
+                    entry.term.clear();
+                    entry.term.focus();
+                  }
+                  setCallout(null);
+                }}
+              >
+                <Trash2 size={11} />
+                <span>Clear</span>
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Floating Copy button (desktop drag-selection fallback) */}
+      {showCopyBtn && !callout && (
         <div
           style={{
             position: "absolute",
