@@ -257,6 +257,10 @@
 	}
 }
 
+.spin {
+	animation: spin 1s linear infinite;
+}
+
 /* ═══ Markdown images — constrain to container width ═══ */
 .md-root img,
 .markdown-preview img,

@@ -118,7 +118,7 @@ interface LayoutState {
   setViewerWidth: (width: number) => void;
 
   /* ── Artifact actions ── */
-  pushArtifact: (item: Omit<ArtifactItem, "id" | "createdAt">) => void;
+  pushArtifact: (item: Omit<ArtifactItem, "id" | "createdAt"> & { id?: string }) => string;
   setArtifactActiveId: (id: string | undefined) => void;
   setArtifactWidth: (width: number) => void;
   clearArtifacts: (sessionId: string) => void;
@@ -328,19 +328,24 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   /* ── Artifacts ── */
 
   pushArtifact: (item) => {
-    const id = `artifact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = item.id || `artifact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const newItem: ArtifactItem = { ...item, id, createdAt: Date.now() };
     set((s) => {
-      // Deduplicate by content — skip if identical artifact already exists
-      const exists = s.artifactItems.some(
-        (a) => a.title === item.title && a.content === item.content && a.type === item.type,
+      // Find existing by ID or identical content+title
+      const existingIdx = s.artifactItems.findIndex(
+        (a) => a.id === newItem.id || (a.title === item.title && a.content === item.content && a.type === item.type),
       );
-      if (exists) return {};
+      if (existingIdx !== -1) {
+        const updated = [...s.artifactItems];
+        updated[existingIdx] = newItem;
+        return { artifactItems: updated, artifactActiveId: newItem.id };
+      }
       return {
         artifactItems: [...s.artifactItems, newItem],
         artifactActiveId: id,
       };
     });
+    return id;
   },
 
   setArtifactActiveId: (id) => set({ artifactActiveId: id }),

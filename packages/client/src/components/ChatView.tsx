@@ -1249,6 +1249,49 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 		return map;
 	};
 
+	function extractArtifactSmartTitle(type: string, content: string, hint?: string): string {
+		if (hint && hint.trim().length > 0) {
+			const cleanHint = hint.trim().replace(/^["']|["']$/g, "");
+			if (cleanHint) return cleanHint;
+		}
+		const trimmed = content.trim();
+		if (type === "html") {
+			const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(trimmed);
+			if (titleMatch?.[1]?.trim()) return titleMatch[1].trim();
+			const h1Match = /<h1[^>]*>([^<]+)<\/h1>/i.exec(trimmed);
+			if (h1Match?.[1]?.trim()) return h1Match[1].trim();
+			return "HTML Preview";
+		}
+		if (type === "svg") {
+			const titleMatch = /<title[^>]*>([^<]+)<\/title>/i.exec(trimmed);
+			if (titleMatch?.[1]?.trim()) return titleMatch[1].trim();
+			const ariaMatch = /aria-label=["']([^"']+)["']/i.exec(trimmed);
+			if (ariaMatch?.[1]?.trim()) return ariaMatch[1].trim();
+			return "SVG Graphic";
+		}
+		if (type === "markdown") {
+			const hMatch = /^#+\s+(.+)$/m.exec(trimmed);
+			if (hMatch?.[1]?.trim()) return hMatch[1].trim();
+			return "Markdown Doc";
+		}
+		if (type === "json") {
+			try {
+				const parsed = JSON.parse(trimmed);
+				if (parsed && typeof parsed === "object") {
+					if (typeof parsed.title === "string" && parsed.title) return parsed.title;
+					if (typeof parsed.name === "string" && parsed.name) return parsed.name;
+				}
+			} catch {
+				// ignore
+			}
+			return "JSON Data";
+		}
+		if (type === "image") {
+			return "Image";
+		}
+		return "Text Document";
+	}
+
 	// Push artifacts to the Artifacts Panel
 	const pushArtifact = useLayoutStore((s) => s.pushArtifact);
 	const openFileViewer = useLayoutStore((s) => s.openFileViewer);
@@ -1284,7 +1327,6 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					const trimmed = outputText.trim();
 
 					let artType: string | undefined;
-					const artTitle = typeof c.name === "string" ? c.name : "Tool Output";
 
 					if (
 						/^\s*<!doctype\s+html/i.test(trimmed) ||
@@ -1305,8 +1347,12 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 					}
 
 					if (artType) {
+						const smartTitle = typeof c.name === "string" && c.name !== "Tool Output"
+							? `${c.name}: ${extractArtifactSmartTitle(artType, trimmed)}`
+							: extractArtifactSmartTitle(artType, trimmed);
 						pushArtifact({
-							title: artTitle,
+							id: toolCallId,
+							title: smartTitle,
 							type: artType as any,
 							content: outputText,
 							sessionId,
@@ -1316,51 +1362,40 @@ export function ChatView({ sessionId, modelName, providerName }: Props) {
 				// ── Assistant text — extract fenced code blocks ──
 				if (c.type === "text" && typeof c.text === "string") {
 					const fenceRe =
-						/```(svg|html|json|markdown|md|text|plain|txt|image)\s*\n([\s\S]*?)```/gi;
+						/```(svg|html|json|markdown|md|text|plain|txt|image)\s*([^\n]*)\n([\s\S]*?)```/gi;
 					let match: RegExpExecArray | null;
 					while ((match = fenceRe.exec(c.text)) !== null) {
 						const rawLang = match[1].toLowerCase();
-						const content = match[2].trim();
+						const fenceHint = match[2].trim();
+						const content = match[3].trim();
 						// Use message id + text position as stable artifact key
 						const artifactId = `${(m.id as string) ?? ""}-text-${match.index}`;
 						if (seenArtifactIds.current.has(artifactId)) continue;
 						seenArtifactIds.current.add(artifactId);
 
-						let type: string;
-						let title: string;
+						let type: "html" | "svg" | "json" | "markdown" | "text" | "image";
 						switch (rawLang) {
 							case "svg":
 								type = "svg";
-								title = "SVG";
 								break;
 							case "html":
 								type = "html";
-								title = "HTML";
 								break;
 							case "json":
 								type = "json";
-								title = "JSON";
 								break;
 							case "markdown":
 							case "md":
 								type = "markdown";
-								title = "Markdown";
-								break;
-							case "text":
-							case "plain":
-							case "txt":
-								type = "text";
-								title = "Text";
 								break;
 							case "image":
 								type = "image";
-								title = "Image";
 								break;
 							default:
 								type = "text";
-								title = "Text";
 						}
-						pushArtifact({ title, type: type as any, content, sessionId });
+						const title = extractArtifactSmartTitle(type, content, fenceHint);
+						pushArtifact({ id: artifactId, title, type, content, sessionId });
 					}
 				}
 			}

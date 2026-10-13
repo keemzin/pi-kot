@@ -1,7 +1,9 @@
 import { memo, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
-import { Check, Copy, ImageOff } from "lucide-react";
+import { Check, Copy, ImageOff, LayoutPanelTop } from "lucide-react";
 import { Highlight, themes as prismThemes } from "prism-react-renderer";
 import ReactMarkdown, { type Components } from "react-markdown";
+import { useLayoutStore } from "../stores/layout-store";
+import { useSessionStore } from "../stores/session-store";
 import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
@@ -70,10 +72,14 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
 
   const prismTheme = isLight ? prismThemes.vsLight : prismThemes.vsDark;
   const codeBg = isLight ? "#f8fafc" : "#0d0d0d";
+  const isPreviewable = ["html", "htm", "svg", "markdown", "md", "json"].includes(language);
 
   return (
     <div className="code-block-wrap">
-      <CodeCopyButton code={code} />
+      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", gap: 4, zIndex: 2 }}>
+        {isPreviewable && <OpenAsArtifactButton code={code} language={language} />}
+        <CodeCopyButton code={code} isGrouped />
+      </div>
       <Highlight code={code} language={language} theme={prismTheme}>
         {({ style, tokens, getLineProps, getTokenProps }) => (
           <pre className="code-block" style={{ ...style, background: codeBg }}>
@@ -95,7 +101,50 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
   );
 }
 
-function CodeCopyButton({ code }: { code: string }) {
+function OpenAsArtifactButton({ code, language }: { code: string; language: string }) {
+  const isMobile = useLayoutStore((s) => s.isMobile);
+  const openArtifactViewer = useLayoutStore((s) => s.openArtifactViewer);
+  const pushArtifact = useLayoutStore((s) => s.pushArtifact);
+  const setExplorerTab = useLayoutStore((s) => s.setExplorerTab);
+  const activeSessionId = useSessionStore((s) => s.activeSessionId);
+
+  const onClick = () => {
+    let type: "html" | "svg" | "json" | "markdown" | "text" = "text";
+    if (language === "html" || language === "htm") type = "html";
+    else if (language === "svg") type = "svg";
+    else if (language === "json") type = "json";
+    else if (language === "markdown" || language === "md") type = "markdown";
+
+    const id = `code-block-${Date.now()}`;
+    const title = `${type.toUpperCase()} Preview`;
+    pushArtifact({
+      id,
+      title,
+      type,
+      content: code,
+      sessionId: activeSessionId || "chat",
+    });
+    openArtifactViewer(id, title, type);
+    if (isMobile) {
+      setExplorerTab(undefined);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="code-copy-btn"
+      style={{ position: "static" }}
+      title="Open preview in Artifacts panel"
+      aria-label="Open preview in Artifacts panel"
+    >
+      <LayoutPanelTop size={13} />
+    </button>
+  );
+}
+
+function CodeCopyButton({ code, isGrouped }: { code: string; isGrouped?: boolean }) {
   const [copied, setCopied] = useState(false);
   const flash = () => {
     setCopied(true);
@@ -126,7 +175,14 @@ function CodeCopyButton({ code }: { code: string }) {
     }
   };
   return (
-    <button type="button" onClick={onClick} className="code-copy-btn" title="Copy code block" aria-label="Copy code block">
+    <button
+      type="button"
+      onClick={onClick}
+      className="code-copy-btn"
+      style={isGrouped ? { position: "static" } : undefined}
+      title="Copy code block"
+      aria-label="Copy code block"
+    >
       {copied ? <Check size={13} /> : <Copy size={13} />}
     </button>
   );

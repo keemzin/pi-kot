@@ -149,10 +149,11 @@ export function displayInSandbox(
   container: HTMLElement,
   html: string,
   sandboxAttr = "allow-scripts allow-modals",
+  backgroundColor = "transparent",
 ): () => void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("sandbox", sandboxAttr);
-  iframe.style.cssText = "width:100%;height:100%;border:none;border-radius:6px;background:white;";
+  iframe.style.cssText = `width:100%;height:100%;border:none;border-radius:6px;background:${backgroundColor};`;
   // For display mode, set height to content
   iframe.srcdoc = html;
   // Clear container and append
