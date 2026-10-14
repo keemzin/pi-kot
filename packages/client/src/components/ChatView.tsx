@@ -544,7 +544,7 @@ const UserMessageBubble = memo(function UserMessageBubble({
 						{
 							overflow: "hidden",
 							transition: "max-height 0.25s ease",
-							maxHeight: !expanded ? "4em" : "2000px",
+							maxHeight: !expanded ? "4em" : "4000px",
 							...(!expanded
 								? {
 										display: "-webkit-box",

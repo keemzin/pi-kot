@@ -43,6 +43,12 @@ export function applyServerUiSettings(settings: Record<string, unknown> | null |
   if (typeof settings.showThinking === "boolean") {
     setState({ showThinking: settings.showThinking });
   }
+  if (typeof settings.accentInlineCode === "boolean") {
+    setState({ accentInlineCode: settings.accentInlineCode });
+    if (typeof document !== "undefined") {
+      document.documentElement.setAttribute("data-accent-inline-code", String(settings.accentInlineCode));
+    }
+  }
 
   // Apply favorite sessions
   if (Array.isArray(settings.favoriteSessions)) {

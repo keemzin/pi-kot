@@ -40,8 +40,9 @@ export type UiSettings = {
 	userBubbleBorderColor?: string | null;
 	/** Split-flap departure board on the empty chat state (PI-KOT → PI-SDK). */
 	emptyFlapEnabled: boolean;
-	/** Phrases shown/cycled by the board when the chat is empty. */
 	emptyFlapWords: string[];
+	/** Color inline code snippets with the theme accent color. */
+	accentInlineCode: boolean;
 	/** Starred / favorited session IDs. */
 	favoriteSessions: string[];
 };
@@ -68,6 +69,7 @@ const DEFAULTS: UiSettings = {
 	userBubbleBorderColor: null,
 	emptyFlapEnabled: true,
 	emptyFlapWords: ["PI-KOT 1.0.0", "PI-SDK 1.1.0"],
+	accentInlineCode: false,
 	favoriteSessions: [],
 };
 
@@ -133,6 +135,8 @@ function normalize(value: unknown): UiSettings {
 			.map((w) => w.slice(0, 32));
 		if (words.length > 0) settings.emptyFlapWords = words;
 	}
+	if (typeof v.accentInlineCode === "boolean")
+		settings.accentInlineCode = v.accentInlineCode;
 	if (Array.isArray(v.favoriteSessions)) {
 		settings.favoriteSessions = v.favoriteSessions
 			.map((id) => (typeof id === "string" ? id.trim() : ""))

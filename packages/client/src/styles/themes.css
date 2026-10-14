@@ -4045,14 +4045,28 @@ strong {
 	display: flex;
 	justify-content: flex-start;
 	align-items: center;
-	gap: 8px;
+	gap: 6px;
 	padding: 0;
-	margin-top: 2px;
-	margin-bottom: 8px;
+	margin-top: 6px;
+	margin-bottom: 12px;
+	opacity: 0.65;
+	transition: opacity var(--duration) var(--ease);
+}
+
+.assistant-msg-footer:hover {
+	opacity: 1;
 }
 
 .assistant-msg-footer.user {
 	justify-content: flex-end;
+	opacity: 0;
+	margin-top: 4px;
+	margin-bottom: 8px;
+}
+
+.message-row.user:hover + .assistant-msg-footer.user,
+.assistant-msg-footer.user:hover {
+	opacity: 1;
 }
 
 .assistant-msg-model-header {
@@ -4127,25 +4141,22 @@ strong {
 .copy-msg-btn {
 	display: inline-flex;
 	align-items: center;
-	gap: 4px;
-	padding: 4px 10px;
-	font-size: 12px;
-	font-family: inherit;
-	font-weight: 500;
-	color: var(--text-dim);
-	background: none;
-	border: none;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
 	border-radius: var(--radius-xs);
+	color: var(--text-dim);
+	background: transparent;
+	border: 1px solid transparent;
 	cursor: pointer;
-	transition:
-		color var(--duration) var(--ease),
-		background var(--duration) var(--ease);
-	line-height: 1.5;
+	transition: all var(--duration) var(--ease);
 }
 
 .copy-msg-btn:hover {
 	color: var(--text-primary);
 	background: var(--bg-glass-hover);
+	border-color: var(--border);
 }
 
 .copy-msg-btn:active {
@@ -4797,11 +4808,15 @@ strong {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	transition: border-color var(--duration) var(--ease);
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+	-webkit-backdrop-filter: blur(20px);
+	backdrop-filter: blur(20px);
+	transition: all var(--duration) var(--ease);
 }
 
 .ti-container:focus-within {
-	border-color: var(--border-bright);
+	border-color: var(--accent);
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08), 0 0 0 2px var(--accent-subtle);
 }
 
 .ti-input {
@@ -7138,7 +7153,7 @@ strong {
 	overflow-y: auto;
 	overflow-anchor: none;
 	scroll-behavior: auto;
-	padding: 4px 16px 2px;
+	padding: 8px 16px 40px;
 	scrollbar-width: none; /* Firefox */
 	-ms-overflow-style: none; /* IE/Edge */
 	scrollbar-gutter: stable;
@@ -7223,14 +7238,20 @@ strong {
 	border-radius: var(--radius-sm);
 	font-family: var(--font-mono);
 	font-size: 0.88em;
+	color: var(--text-primary);
+	word-break: break-word;
+}
+[data-accent-inline-code="true"] .inline-code {
 	color: var(--accent-text);
 }
 .code-block-wrap {
 	position: relative;
-	border-radius: var(--radius);
+	border-radius: var(--radius-md);
 	border: 1px solid var(--border);
 	overflow: hidden;
-	margin: 8px 0;
+	margin: 12px 0;
+	background: var(--bg-surface);
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .code-block-header {
 	display: flex;
@@ -7239,38 +7260,47 @@ strong {
 	padding: 6px 12px;
 	background: var(--bg-glass-strong);
 	border-bottom: 1px solid var(--border);
+	user-select: none;
 }
 .code-block-lang {
 	font-size: 11px;
+	font-weight: 600;
 	color: var(--text-dim);
 	font-family: var(--font-mono);
 	text-transform: lowercase;
+	letter-spacing: 0.02em;
+}
+.code-block-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
 .code-copy-btn {
-	position: absolute;
-	top: 8px;
-	right: 8px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
 	background: transparent;
-	border: 1px solid var(--border);
-	border-radius: var(--radius-sm);
+	border: 1px solid transparent;
+	border-radius: var(--radius-xs);
 	color: var(--text-dim);
 	cursor: pointer;
 	font-family: inherit;
 	font-size: 11px;
-	padding: 2px 8px;
+	padding: 3px 6px;
 	transition: all var(--duration) var(--ease);
 }
 .code-copy-btn:hover {
 	background: var(--bg-glass-hover);
-	color: var(--text-secondary);
-	border-color: var(--border-hover);
+	color: var(--text-primary);
+	border-color: var(--border);
 }
 .code-block {
 	margin: 0;
-	padding: 12px 48px 12px 12px;
+	padding: 12px 14px;
 	overflow-x: auto;
 	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: 12.5px;
 	line-height: 1.55;
 	background: var(--bg-elevated);
 }

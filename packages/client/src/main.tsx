@@ -17,6 +17,11 @@ import "./styles/themes.css";
 
 // Apply saved theme + accent before first render (no flash)
 applyTheme(getSavedTheme(), getSavedAccent());
+try {
+  if (localStorage.getItem("pi-kot/accent-inline-code") === "true") {
+    document.documentElement.setAttribute("data-accent-inline-code", "true");
+  }
+} catch {}
 
 // Pre-fetch server settings and apply before/during initial render
 void fetchAndApplyUiSettings();

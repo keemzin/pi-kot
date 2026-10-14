@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from "react";
 import { Check, Copy, ImageOff, LayoutPanelTop } from "lucide-react";
-import { Highlight, themes as prismThemes } from "prism-react-renderer";
+import { Highlight, themes as prismThemes, Prism } from "prism-react-renderer";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { useLayoutStore } from "../stores/layout-store";
 import { useSessionStore } from "../stores/session-store";
@@ -14,6 +14,25 @@ import "katex/dist/katex.min.css";
 import { normalizeDisplayMath, normalizeInlineLatexMath } from "../lib/markdown";
 import { parseAlert, AlertCard, MarkdownDetails, MarkdownSummary } from "./RenderedView.js";
 import { MermaidBlock } from "./MermaidBlock.js";
+
+// Register Bash/Shell syntax highlighting in Prism
+if (!Prism.languages.bash) {
+  const bashGrammar = {
+    comment: { pattern: /(^|[\s#])#.*/, lookbehind: true },
+    string: { pattern: /"(?:\\.|[^"\\\r\n])*"|'[^']*'/, greedy: true },
+    variable: /\$(?:[a-zA-Z0-9_?#*@!$-]+|\{[^}]+\})/,
+    function: /\b(?:ls|tail|head|grep|find|sed|awk|cat|mkdir|rm|cp|mv|chmod|chown|tar|gzip|gunzip|curl|wget|git|docker|npm|npx|node|python|ssh|scp|systemctl|journalctl|sudo|apt|brew|pnpm|yarn)\b/,
+    keyword: /\b(?:if|then|else|elif|fi|for|while|until|do|done|in|case|esac|function|select|return|exit)\b/,
+    builtin: /\b(?:alias|cd|echo|export|kill|pwd|read|set|shift|source|test|trap|type|ulimit|umask|unset)\b/,
+    boolean: /\b(?:true|false)\b/,
+    operator: /&&|\|\||;;|<<<?|>>?|[!=<>]=?|&|\||\+|-|\*|\//,
+    punctuation: /[{}[\]();,]/,
+  };
+  Prism.languages.bash = bashGrammar;
+  Prism.languages.sh = bashGrammar;
+  Prism.languages.shell = bashGrammar;
+  Prism.languages.zsh = bashGrammar;
+}
 
 type Props = { text: string; chatStyleBreaks?: boolean };
 
@@ -65,7 +84,8 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
     );
   }
 
-  const language = (langMatch?.[1] ?? "text").toLowerCase();
+  const rawLang = (langMatch?.[1] ?? "text").toLowerCase();
+  const language = rawLang === "shell" || rawLang === "zsh" ? "bash" : rawLang;
   if (language === "mermaid") {
     return <MermaidBlock code={code} defaultMode="code" />;
   }
@@ -76,9 +96,12 @@ function ThemeAwareCode({ className, children, ...rest }: HTMLAttributes<HTMLEle
 
   return (
     <div className="code-block-wrap">
-      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", alignItems: "center", gap: 4, zIndex: 2 }}>
-        {isPreviewable && <OpenAsArtifactButton code={code} language={language} />}
-        <CodeCopyButton code={code} isGrouped />
+      <div className="code-block-header">
+        <span className="code-block-lang">{rawLang !== "text" ? rawLang : "code"}</span>
+        <div className="code-block-actions">
+          {isPreviewable && <OpenAsArtifactButton code={code} language={language} />}
+          <CodeCopyButton code={code} isGrouped />
+        </div>
       </div>
       <Highlight code={code} language={language} theme={prismTheme}>
         {({ style, tokens, getLineProps, getTokenProps }) => (

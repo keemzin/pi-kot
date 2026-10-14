@@ -12,8 +12,18 @@ const LS_SWIPE_TO_OPEN_SIDEBAR = "pi-kot/swipe-to-open-sidebar";
 const LS_EMPTY_FLAP_ENABLED = "pi-kot/empty-flap-enabled";
 const LS_EMPTY_FLAP_WORDS = "pi-kot/empty-flap-words";
 const LS_EMPTY_FLAP_SIZE = "pi-kot/empty-flap-size";
+const LS_ACCENT_INLINE_CODE = "pi-kot/accent-inline-code";
 
 const DEFAULT_EMPTY_FLAP_WORDS = ["PI-KOT 1.0.0", "PI-SDK 1.1.0"];
+
+function loadAccentInlineCode(): boolean {
+	if (typeof window === "undefined") return false;
+	try {
+		return localStorage.getItem(LS_ACCENT_INLINE_CODE) === "true";
+	} catch {
+		return false;
+	}
+}
 
 function loadGroupedToolDisplay(): boolean {
 	if (typeof window === "undefined") return true;
@@ -171,6 +181,9 @@ export interface PreferencesState {
 	setEmptyFlapEnabled: (enabled: boolean) => void;
 	emptyFlapWords: string[];
 	setEmptyFlapWords: (words: string[]) => void;
+	/** Color inline code snippets with the theme accent color. */
+	accentInlineCode: boolean;
+	setAccentInlineCode: (enabled: boolean) => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>((set) => ({
@@ -298,5 +311,22 @@ export const usePreferencesStore = create<PreferencesState>((set) => ({
 		set({
 			emptyFlapWords: cleaned.length > 0 ? cleaned : DEFAULT_EMPTY_FLAP_WORDS,
 		});
+	},
+
+	accentInlineCode: loadAccentInlineCode(),
+
+	setAccentInlineCode: (enabled) => {
+		try {
+			localStorage.setItem(LS_ACCENT_INLINE_CODE, String(enabled));
+		} catch {
+			// private mode
+		}
+		if (typeof document !== "undefined") {
+			document.documentElement.setAttribute(
+				"data-accent-inline-code",
+				String(enabled),
+			);
+		}
+		set({ accentInlineCode: enabled });
 	},
 }));

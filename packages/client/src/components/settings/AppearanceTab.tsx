@@ -32,6 +32,7 @@ type UiSettings = {
 	userBubbleBorderColor?: string | null;
 	emptyFlapEnabled?: boolean;
 	emptyFlapWords?: string[];
+	accentInlineCode?: boolean;
 };
 
 // ── Apply user bubble overrides to CSS :root ──
@@ -120,6 +121,8 @@ export function AppearanceTab() {
 	const zFlapWords = usePreferencesStore((s) => s.emptyFlapWords);
 	const zSetFlapEnabled = usePreferencesStore((s) => s.setEmptyFlapEnabled);
 	const zSetFlapWords = usePreferencesStore((s) => s.setEmptyFlapWords);
+	const zAccentInline = usePreferencesStore((s) => s.accentInlineCode);
+	const zSetAccentInline = usePreferencesStore((s) => s.setAccentInlineCode);
 
 	const [stickyUserHeader, setStickyUserHeader] = useState(zSticky);
 	const [flyToTop, setFlyToTop] = useState(zFly);
@@ -133,6 +136,7 @@ export function AppearanceTab() {
 	const [flapEnabled, setFlapEnabled] = useState(zFlapEnabled);
 	const [flapWords, setFlapWords] = useState(zFlapWords);
 	const [flapWordsDraft, setFlapWordsDraft] = useState(zFlapWords.join(", "));
+	const [accentInlineCode, setAccentInlineCode] = useState(zAccentInline);
 
 	// ── User bubble (use ref to avoid stale closure in updateBubbleColor) ──
 	const [bubbleBg, setBubbleBg] = useState<string | null>(() =>
@@ -238,6 +242,10 @@ export function AppearanceTab() {
 					setFlapWords(server.emptyFlapWords);
 					setFlapWordsDraft(server.emptyFlapWords.join(", "));
 					zSetFlapWords(server.emptyFlapWords);
+				}
+				if (typeof server.accentInlineCode === "boolean") {
+					setAccentInlineCode(server.accentInlineCode);
+					zSetAccentInline(server.accentInlineCode);
 				}
 
 				// Bubble overrides — use server value, or fallback to localStorage, or null
@@ -349,6 +357,12 @@ export function AppearanceTab() {
 		setFlapEnabled(val);
 		zSetFlapEnabled(val);
 		persist({ emptyFlapEnabled: val });
+	};
+
+	const toggleAccentInlineCode = (val: boolean) => {
+		setAccentInlineCode(val);
+		zSetAccentInline(val);
+		persist({ accentInlineCode: val });
 	};
 
 	const saveFlapWords = (raw: string) => {
@@ -861,6 +875,19 @@ export function AppearanceTab() {
 							</div>
 						)}
 					</div>
+				</SettingRow>
+
+				<SettingDivider />
+
+				<SettingRow
+					label="Accent-colored inline code"
+					hint="Color inline code snippets with your theme accent color"
+				>
+					<SettingToggle
+						checked={accentInlineCode}
+						onChange={toggleAccentInlineCode}
+						ariaLabel="Accent-colored inline code"
+					/>
 				</SettingRow>
 			</SettingCard>
 
