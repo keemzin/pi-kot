@@ -90,6 +90,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const cloneInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const projects = useSessionStore((s) => s.projects);
   const loadProjects = useSessionStore((s) => s.loadProjects);
@@ -138,6 +139,16 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
       dead = true;
     };
   }, [open]);
+
+  // ---- auto focus input when mode changes ----
+  useEffect(() => {
+    if (!open) return;
+    if (cloneMode) {
+      requestAnimationFrame(() => cloneInputRef.current?.focus());
+    } else {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [cloneMode, open]);
 
   // ---- global Escape dismiss ----
   useEffect(() => {
@@ -464,23 +475,18 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   if (!open) return null;
 
   return (
-    <div className="settings-overlay">
+    <div className="quick-pick-overlay" role="dialog" aria-modal="true">
       <div
-        className="settings-panel add-project-settings-panel"
+        className="quick-pick-palette add-project-settings-panel"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <header className="settings-header">
-          <span
-            style={{
-              fontSize: "14px",
-              fontWeight: 700,
-              color: "var(--accent-text)",
-            }}
-          >
-            Add Project
-          </span>
-          <button className="settings-close" onClick={onClose} title="Close">
+        <header className="quick-pick-header settings-header">
+          <div className="quick-pick-title-group">
+            <span className="quick-pick-title">Add / Open Project</span>
+            <span className="quick-pick-shortcut-badge">⌘O</span>
+          </div>
+          <button className="settings-close" onClick={onClose} title="Close (Esc)">
             <X size={16} />
           </button>
         </header>
@@ -510,6 +516,7 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             <div className="add-project-dialog-clone-row">
               <Globe size={14} className="add-project-dialog-icon" />
               <input
+                ref={cloneInputRef}
                 type="text"
                 value={cloneUrl}
                 onChange={(e) => setCloneUrl(e.target.value)}
@@ -547,9 +554,21 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               ref={inputRef}
               type="text"
               value={path}
-              onChange={(e) => setPath(e.target.value.replace(/\\/g, "/"))}
+              onChange={(e) => {
+                const val = e.target.value;
+                const trimmed = val.trim();
+                if (
+                  /^(https?:\/\/|git@).*\.git$/i.test(trimmed) ||
+                  /^(https?:\/\/(github|gitlab|bitbucket)\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+)/i.test(trimmed)
+                ) {
+                  setCloneMode(true);
+                  setCloneUrl(trimmed);
+                  return;
+                }
+                setPath(val.replace(/\\/g, "/"));
+              }}
               onKeyDown={onKeyDown}
-              placeholder="~/"
+              placeholder="Type path or paste Git repo URL…"
               className="add-project-dialog-input"
               spellCheck={false}
             />

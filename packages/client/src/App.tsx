@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { Search, X, Plus, MoreHorizontal, Trash2, Copy, Check, ChevronUp, ChevronDown } from "lucide-react";
 import { useSessionStore } from "./stores/session-store";
 import { ChatView } from "./components/ChatView";
 import { ChatInput } from "./components/ChatInput";
@@ -72,6 +73,16 @@ function projectColor(id: string): string {
   return PROJECT_COLORS[Math.abs(hash) % PROJECT_COLORS.length];
 }
 
+function getParentFolderHint(path?: string): string {
+  if (!path) return "";
+  const normalized = path.replace(/\/+$/, "");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length > 1) {
+    return parts[parts.length - 2];
+  }
+  return "";
+}
+
 export function App() {
   const { t } = useI18n();
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
@@ -107,8 +118,65 @@ export function App() {
   const [projectToDelete, setProjectToDelete] = useState<string | undefined>();
   const [inspectData, setInspectData] = useState<SessionContextResponse | undefined>(undefined);
   const [expandedWorkerGroups, setExpandedWorkerGroups] = useState<Set<string>>(new Set());
-  const [showPrompt, setShowPrompt] = useState(false);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Project search & filter omnibar
+  const [projectFilter, setProjectFilter] = useState("");
+  const projectFilterInputRef = useRef<HTMLInputElement | null>(null);
+  const [activeMenuProjectId, setActiveMenuProjectId] = useState<string | undefined>(undefined);
+  const [copiedProjectId, setCopiedProjectId] = useState<string | undefined>(undefined);
+
+  // Close project options menu on outside click or Escape
+  useEffect(() => {
+    if (!activeMenuProjectId) return;
+    const handleClick = () => setActiveMenuProjectId(undefined);
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveMenuProjectId(undefined);
+    };
+    document.addEventListener("click", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("click", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [activeMenuProjectId]);
+
+  // Pressing "/" focuses project search filter when not in an input
+  useEffect(() => {
+    const onSlashKey = (e: KeyboardEvent) => {
+      if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag !== "input" && tag !== "textarea") {
+          e.preventDefault();
+          projectFilterInputRef.current?.focus();
+        }
+      }
+    };
+    window.addEventListener("keydown", onSlashKey);
+    return () => window.removeEventListener("keydown", onSlashKey);
+  }, []);
+
+  // Compute duplicate project name counts to disambiguate identical folder names
+  const duplicateNameCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of projects) {
+      const k = p.name.trim().toLowerCase();
+      map.set(k, (map.get(k) ?? 0) + 1);
+    }
+    return map;
+  }, [projects]);
+
+  // Filter projects by name or path query
+  const filteredProjects = useMemo(() => {
+    const q = projectFilter.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter((p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.path && p.path.toLowerCase().includes(q))
+    );
+  }, [projects, projectFilter]);
+
+  const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
     if (projectToDelete === undefined && !showPrompt) return;
@@ -168,6 +236,18 @@ export function App() {
   useEffect(() => {
     if (viewerTabs.length > 0 && viewerActivePath !== undefined) setViewerMinimized(false);
   }, [viewerTabs.length, viewerActivePath]);
+
+  // Global ⌘O / Ctrl+O shortcut to open Add / Open Project command palette
+  useEffect(() => {
+    const onKeyOpenProject = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        setShowAddProjectDialog(!useLayoutStore.getState().showAddProjectDialog);
+      }
+    };
+    window.addEventListener("keydown", onKeyOpenProject);
+    return () => window.removeEventListener("keydown", onKeyOpenProject);
+  }, [setShowAddProjectDialog]);
 
 
 
@@ -555,9 +635,9 @@ export function App() {
           </span>
           <button
             onClick={() => setShowAddProjectDialog(true)}
-            title="Add project"
+            title="Add or open project (⌘O)"
             className="sidebar-add-project"
-            aria-label="Add project"
+            aria-label="Add or open project (⌘O)"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -566,14 +646,71 @@ export function App() {
           </button>
         </div>
 
+        {/* Project search / filter omnibar */}
+        {projects.length > 3 && (
+          <div className="project-filter-container">
+            <div className="project-filter-box">
+              <Search size={13} className="project-filter-icon" />
+              <input
+                ref={projectFilterInputRef}
+                type="text"
+                value={projectFilter}
+                onChange={(e) => setProjectFilter(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setProjectFilter("");
+                    e.currentTarget.blur();
+                  } else if (e.key === "Enter" && filteredProjects.length > 0) {
+                    setActiveProject(filteredProjects[0].id);
+                  }
+                }}
+                placeholder="Filter projects… (/)"
+                className="project-filter-input"
+                spellCheck={false}
+              />
+              {projectFilter ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProjectFilter("");
+                    projectFilterInputRef.current?.focus();
+                  }}
+                  className="project-filter-clear"
+                  title="Clear filter (Esc)"
+                >
+                  <X size={12} />
+                </button>
+              ) : (
+                <span className="project-filter-kbd">/</span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Project list */}
         <div className="project-list">
-          {projects.map((project: Project) => {
+          {filteredProjects.length === 0 && projectFilter && (
+            <div className="project-list-empty">
+              <span>No projects match "{projectFilter}"</span>
+              <button
+                type="button"
+                onClick={() => setProjectFilter("")}
+                className="project-list-empty-clear"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
+
+          {filteredProjects.map((project: Project) => {
             const isActive = project.id === activeProjectId;
             const isExpanded = expandedProjects.has(project.id);
             const pSessions = projectSessions[project.id] ?? [];
             const isDragging = draggingProjectId === project.id;
             const isDragOver = dragOverProjectId === project.id;
+            const isDuplicate = (duplicateNameCounts.get(project.name.trim().toLowerCase()) ?? 0) > 1;
+            const parentHint = isDuplicate ? getParentFolderHint(project.path) : "";
+            const isMenuOpen = activeMenuProjectId === project.id;
 
             return (
               <div
@@ -605,6 +742,7 @@ export function App() {
                 {/* Project header */}
                 <div
                   className={`project-row${isActive ? " active" : ""}${isDragOver ? " drag-over" : ""}`}
+                  title={project.path ? `${project.name} (${project.path})` : project.name}
                   onClick={() => {
                     if (isActive) {
                       toggleProject(project.id);
@@ -668,75 +806,107 @@ export function App() {
                     </svg>
                   </span>
 
-                  {/* Project name — lowercase, truncate */}
-                  <span className="project-name">{project.name.toLowerCase()}</span>
+                  {/* Project name with duplicate disambiguation */}
+                  <div className="project-name-wrapper">
+                    <span className="project-name">{project.name.toLowerCase()}</span>
+                    {parentHint && (
+                      <span className="project-path-tag" title={project.path}>
+                        {parentHint}
+                      </span>
+                    )}
+                  </div>
 
                   {/* Session count badge — visible when collapsed */}
-                  {!isExpanded && pSessions.length > 0 && (
+                  {!isExpanded && pSessions.length > 0 && !isMenuOpen && (
                     <span className="project-session-count">{pSessions.length}</span>
                   )}
 
-                  {/* Hover-reveal project menu (left group) */}
-                  <div className="project-actions-left">
+                  {/* Clean project actions group */}
+                  <div className="project-actions-group" onClick={(e) => e.stopPropagation()}>
                     {/* Mobile reorder buttons */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void moveProject(project.id, "up");
-                      }}
+                      type="button"
+                      onClick={() => void moveProject(project.id, "up")}
                       className="project-action-btn mobile-reorder-btn"
                       title="Move up"
                       disabled={projects.indexOf(project) === 0}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="18 15 12 9 6 15" />
-                      </svg>
+                      <ChevronUp size={13} />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void moveProject(project.id, "down");
-                      }}
+                      type="button"
+                      onClick={() => void moveProject(project.id, "down")}
                       className="project-action-btn mobile-reorder-btn"
                       title="Move down"
                       disabled={projects.indexOf(project) === projects.length - 1}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
+                      <ChevronDown size={13} />
                     </button>
-                    {project.name !== "Default" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setProjectToDelete(project.id);
-                        }}
-                        className="project-action-btn"
-                        title="Remove from sidebar"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polygon points="5 14 12 5 19 14" />
-                          <line x1="4" y1="19" x2="20" y2="19" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
 
-                  {/* Far-right new session button */}
-                  <div className="project-actions-right">
+                    {/* New session button */}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        createAndActivate(project.id);
-                      }}
+                      type="button"
+                      onClick={() => createAndActivate(project.id)}
                       className="project-action-btn"
-                      title="New draft session"
+                      title="New session"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
+                      <Plus size={14} />
                     </button>
+
+                    {/* Options / Kebab button (···) */}
+                    <button
+                      type="button"
+                      onClick={() => setActiveMenuProjectId((curr) => curr === project.id ? undefined : project.id)}
+                      className={`project-action-btn${isMenuOpen ? " active" : ""}`}
+                      title="Project options"
+                    >
+                      <MoreHorizontal size={14} />
+                    </button>
+
+                    {/* Dropdown context menu */}
+                    {isMenuOpen && (
+                      <div className="project-context-menu" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="project-context-menu-item"
+                          onClick={() => {
+                            createAndActivate(project.id);
+                            setActiveMenuProjectId(undefined);
+                          }}
+                        >
+                          <Plus size={13} />
+                          <span>New session</span>
+                        </button>
+                        {project.path && (
+                          <button
+                            type="button"
+                            className="project-context-menu-item"
+                            onClick={() => {
+                              void navigator.clipboard.writeText(project.path!);
+                              setCopiedProjectId(project.id);
+                              setTimeout(() => setCopiedProjectId(undefined), 1500);
+                              setActiveMenuProjectId(undefined);
+                            }}
+                          >
+                            {copiedProjectId === project.id ? <Check size={13} /> : <Copy size={13} />}
+                            <span>{copiedProjectId === project.id ? "Copied path" : "Copy path"}</span>
+                          </button>
+                        )}
+                        {project.name !== "Default" && (
+                          <button
+                            type="button"
+                            className="project-context-menu-item danger"
+                            onClick={() => {
+                              setActiveMenuProjectId(undefined);
+                              setProjectToDelete(project.id);
+                            }}
+                          >
+                            <Trash2 size={13} />
+                            <span>Remove from sidebar</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

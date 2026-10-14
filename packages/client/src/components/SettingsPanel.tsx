@@ -61,6 +61,7 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
     <SlidePanel
       open
       onClose={onClose}
+      side={isMobile ? "center" : "right"}
       header={
         <header className="settings-header">
           <div className="settings-tabs" style={{
@@ -95,10 +96,10 @@ export function SettingsPanel({ onClose, initialTab }: Props) {
       }
       style={{
         width: isMobile ? "100vw" : 720,
-        maxWidth: "100vw",
-        height: isMobile ? "100dvh" : "85vh",
-        maxHeight: isMobile ? "100dvh" : undefined,
-        borderRadius: isMobile ? 0 : undefined,
+        maxWidth: isMobile ? "100vw" : "min(720px, 90vw)",
+        height: isMobile ? "100dvh" : "100vh",
+        maxHeight: isMobile ? "100dvh" : "100vh",
+        borderRadius: 0,
       }}
     >
       {error !== undefined && (

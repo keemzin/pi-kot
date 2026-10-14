@@ -84,17 +84,17 @@ export function SlidePanel({
 
   if (!open) return null;
 
-  // ── Right side panel (e.g. FileExplorer) ──
+  // ── Right side panel (e.g. Settings drawer) ──
   if (side === "right") {
     return (
       <div
-        className="slide-panel-overlay"
+        className="slide-drawer-overlay slide-panel-overlay"
         onClick={closeOnBackdropClick ? onClose : undefined}
         role="dialog"
         aria-modal="true"
       >
         <div
-          className={`slide-panel slide-panel--right ${className}`}
+          className={`slide-drawer-panel slide-panel slide-panel--right ${className}`}
           style={{
             width: typeof width === "number" ? `${width}px` : width,
             maxWidth: typeof maxWidth === "number" ? `${maxWidth}px` : maxWidth,
@@ -102,7 +102,26 @@ export function SlidePanel({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {children}
+          {header !== undefined ? (
+            header
+          ) : title ? (
+            <header className="settings-header">
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                }}
+              >
+                {title}
+              </span>
+              <button type="button" className="settings-close" onClick={onClose} aria-label="Close">
+                ✕
+              </button>
+            </header>
+          ) : null}
+
+          <div className="slide-drawer-body settings-body">{children}</div>
         </div>
       </div>
     );
