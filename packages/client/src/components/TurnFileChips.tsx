@@ -133,12 +133,8 @@ export function TurnFileChips({
     try {
       const r = await getTurnDiff(sessionId, startIndex, endIndex);
       setEntries(r.entries);
-      // Auto-expand all entries when diff is opened
-      const initExpanded: Record<string, boolean> = {};
-      for (const entry of r.entries) {
-        initExpanded[entry.file] = true;
-      }
-      setExpanded(initExpanded);
+      // Start in collapsed mode by default; user can expand individual files or click "Expand all"
+      setExpanded({});
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -149,8 +145,11 @@ export function TurnFileChips({
   const toggleDiff = (): void => {
     const next = !diffOpen;
     setDiffOpen(next);
-    if (next && entries.length === 0 && error === undefined) {
-      void loadDiff();
+    if (next) {
+      setExpanded({});
+      if (entries.length === 0 && error === undefined) {
+        void loadDiff();
+      }
     }
   };
 

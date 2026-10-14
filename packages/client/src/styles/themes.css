@@ -350,6 +350,15 @@
 	position: static;
 	background: transparent;
 }
+
+/* Unified view: collapse the duplicate unused "old" gutter column */
+.pi-diff-unified colgroup col.diff-gutter-col:first-child {
+	display: none;
+}
+.pi-diff-unified .diff-line td.diff-gutter:first-child {
+	display: none;
+}
+
 .pi-diff-block .diff-gutter,
 .pi-diff-block .diff-line {
 	background: transparent;
@@ -358,7 +367,7 @@
 	color: #6b7280;
 	position: sticky;
 	left: 0;
-	z-index: 1;
+	z-index: 2;
 	background: var(--diff-gutter-bg);
 	white-space: nowrap;
 	font-variant-numeric: tabular-nums;
@@ -366,6 +375,8 @@
 	user-select: none;
 	border-right: 1px solid rgba(255, 255, 255, 0.06);
 	text-align: right;
+	line-height: 1.6;
+	vertical-align: top;
 }
 .pi-diff-block .diff-decoration {
 	background: rgba(255, 255, 255, 0.03);
