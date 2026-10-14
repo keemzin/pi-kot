@@ -377,7 +377,7 @@ export function AppearanceTab() {
 				? words
 				: flapWords.length > 0
 					? flapWords
-					: ["PI-KOT 1.0.0", "PI-SDK 1.1.0"];
+					: ["PI-KOT 1.1.0", "PI-SDK 1.1.0"];
 		setFlapWords(cleaned);
 		setFlapWordsDraft(cleaned.join(", "));
 		zSetFlapWords(cleaned);
@@ -959,7 +959,7 @@ export function AppearanceTab() {
 									if (e.key === "Enter") saveFlapWords(flapWordsDraft);
 								}}
 								className="settings-input"
-								placeholder="PI-KOT 1.0.0, PI-SDK 1.1.0"
+								placeholder="PI-KOT 1.1.0, PI-SDK 1.1.0"
 							/>
 						</div>
 

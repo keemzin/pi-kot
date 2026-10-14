@@ -2,6 +2,18 @@
 
 All notable changes to pi-kot, with focus on SDK upgrades and behavior that affects users.
 
+## [1.1.0] — 2026-10-14
+
+### Highlights & Features
+
+- **Quick-Pick Command Palette (`Cmd+O` / `Ctrl+O`)**: Redesigned the Add/Open Project flow into a top-pinned, floating command palette with smart Git repo detection, real-time filesystem directory browsing, clickable breadcrumb navigation, and inline folder creation (`mkdir`).
+- **Slide-in Settings Drawer**: Evolved the Settings dialog from a centered popup box into a modern right-side slide-in sheet on desktop, keeping active chat sessions and the code editor in view while configuring options.
+- **Backdrop Dismissal Protection**: Disabled accidental outside clicks across all dialogs and modals (`Modal`, `SlidePanel`, `AddProjectDialog`, `AddProviderDialog`, `RewindModal`, `ExtensionUIInteractionModal`, `GlobalConfirmDialog`), preventing loss of user work during interactions.
+- **Enhanced Code Blocks & Shell Highlighting**: Integrated Prism syntax grammars for `bash`, `sh`, `zsh`, and `shell` scripts. Added a dedicated code block header bar displaying language tags, artifact preview trigger, and copy actions with clean full-width code scrolling.
+- **Customizable Inline Code Chips**: Refined inline monospace chips to soft, neutral styling with an optional "Accent-colored inline code" toggle in *Settings → Appearance* that persists server-side.
+- **Compact User Prompt Bubbles**: Restored compact 2-line clamping for user messages with instant `▼ Show more` expansion, keeping the conversation stream clean during long prompts and script pastes.
+- **Chat Layout Polish**: Increased bottom scroll padding to 40px to eliminate input bar overlap, and elevated the floating prompt input container with backdrop blur and accent focus glow.
+
 ## [1.0.0] — 2026-10-12
 
 ### 🎉 Major Release: 1.0.0 Stable & SDK 1.1.0 Upgrade

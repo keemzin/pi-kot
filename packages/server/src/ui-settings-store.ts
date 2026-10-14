@@ -68,7 +68,7 @@ const DEFAULTS: UiSettings = {
 	userBubbleTextColor: null,
 	userBubbleBorderColor: null,
 	emptyFlapEnabled: true,
-	emptyFlapWords: ["PI-KOT 1.0.0", "PI-SDK 1.1.0"],
+	emptyFlapWords: ["PI-KOT 1.1.0", "PI-SDK 1.1.0"],
 	accentInlineCode: false,
 	favoriteSessions: [],
 };

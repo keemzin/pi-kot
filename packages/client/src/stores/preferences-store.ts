@@ -14,7 +14,7 @@ const LS_EMPTY_FLAP_WORDS = "pi-kot/empty-flap-words";
 const LS_EMPTY_FLAP_SIZE = "pi-kot/empty-flap-size";
 const LS_ACCENT_INLINE_CODE = "pi-kot/accent-inline-code";
 
-const DEFAULT_EMPTY_FLAP_WORDS = ["PI-KOT 1.0.0", "PI-SDK 1.1.0"];
+const DEFAULT_EMPTY_FLAP_WORDS = ["PI-KOT 1.1.0", "PI-SDK 1.1.0"];
 
 function loadAccentInlineCode(): boolean {
 	if (typeof window === "undefined") return false;
