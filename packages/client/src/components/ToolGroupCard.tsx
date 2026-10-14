@@ -1319,8 +1319,13 @@ export const ToolGroupCard = memo(function ToolGroupCard({
 						)}
 					</span>
 					<span className="trail-toggle-label">{t("chat.trail")}</span>
-					<span className="trail-toggle-view">{viewLabel}</span>
-					{anyRunning && <span className="trail-running-label">{t("chat.runningShort")}</span>}
+					<span className="trail-toggle-view trail-toggle-badge">{viewLabel}</span>
+					{anyRunning && (
+						<span className="trail-running-label">
+							<span className="trail-running-dot" />
+							{t("chat.runningShort")}
+						</span>
+					)}
 				</button>
 			</div>
 

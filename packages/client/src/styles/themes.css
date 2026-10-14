@@ -7457,9 +7457,10 @@ strong {
 
 .tool-timeline-row {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	gap: 6px;
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
+	min-width: 0;
 }
 .tool-timeline-row.clickable {
 	cursor: pointer;
@@ -7477,6 +7478,8 @@ strong {
 	font-weight: 600;
 	color: var(--text-secondary);
 	font-size: 12px;
+	flex-shrink: 0;
+	white-space: nowrap;
 }
 /* e.g. "ls -la" preview arg */
 .tool-timeline-arg {
@@ -7485,8 +7488,14 @@ strong {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	flex: 1;
+	flex: 1 1 auto;
+	min-width: 48px;
+}
+.tool-timeline-summary {
+	display: inline-flex;
 	min-width: 0;
+	flex: 1 1 auto;
+	overflow: hidden;
 }
 /* "running…" inline status with glowing radar pulse dot */
 .tool-timeline-running {
@@ -7496,6 +7505,8 @@ strong {
 	font-size: 11px;
 	font-weight: 500;
 	color: var(--accent);
+	flex-shrink: 0;
+	white-space: nowrap;
 }
 .tool-timeline-pulse-dot {
 	width: 6px;
@@ -7528,11 +7539,12 @@ strong {
 	gap: 5px;
 	font-size: 11px;
 	color: var(--text-secondary);
-	margin-top: 1px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	max-width: 100%;
+	flex: 0 1 auto;
+	max-width: 45%;
+	min-width: 0;
 }
 .tool-timeline-output-preview .tool-timeline-status-icon {
 	display: inline-flex;
@@ -7542,6 +7554,7 @@ strong {
 	font-weight: 700;
 	line-height: 1;
 	opacity: 0.9;
+	flex-shrink: 0;
 }
 .tool-timeline-output-preview.success .tool-timeline-status-icon {
 	color: var(--success, #10b981);
@@ -7565,6 +7578,7 @@ strong {
 	line-height: 1;
 	color: var(--text-dim);
 	margin-left: auto;
+	flex-shrink: 0;
 	transition: transform 0.15s;
 }
 .tool-timeline-chevron-toggle.open {
@@ -7610,16 +7624,17 @@ strong {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+	margin-bottom: 2px;
 }
 .trail-toggle {
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 7px;
 	background: transparent;
 	border: none;
 	cursor: pointer;
 	font-family: inherit;
-	padding: 2px 0;
+	padding: 3px 0;
 }
 .trail-toggle:hover .trail-toggle-label {
 	color: var(--text-secondary);
@@ -7638,18 +7653,48 @@ strong {
 	font-size: 11px;
 	font-weight: 600;
 	color: var(--text-dim);
+	letter-spacing: 0.2px;
 }
-.trail-toggle-view {
+.trail-toggle-view,
+.trail-toggle-badge {
 	font-size: 10px;
+	font-weight: 500;
 	color: var(--text-dim);
-	opacity: 0.75;
 	font-family: var(--font-mono);
+	padding: 1px 7px;
+	border-radius: 10px;
+	background: var(--bg-glass-strong);
+	border: 1px solid var(--border);
+	line-height: 1.4;
+	transition: all 0.15s var(--ease);
+}
+.trail-toggle:hover .trail-toggle-view,
+.trail-toggle:hover .trail-toggle-badge {
+	color: var(--text-secondary);
+	border-color: var(--border-hover, var(--border));
+	background: var(--bg-glass-hover);
 }
 .trail-running-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	font-size: 10px;
 	color: var(--accent);
-	animation: toolPulse 1.4s ease-in-out infinite;
 	font-family: var(--font-mono);
+	font-weight: 500;
+	padding: 1px 7px;
+	border-radius: 10px;
+	background: var(--accent-subtle, rgba(147, 51, 234, 0.08));
+	border: 1px solid rgba(147, 51, 234, 0.2);
+	line-height: 1.4;
+}
+.trail-running-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--accent);
+	display: inline-block;
+	animation: toolPulseDot 1.2s ease-in-out infinite;
 }
 .trail-show-all {
 	appearance: none;
@@ -7879,9 +7924,24 @@ strong {
 	min-height: 0;
 	overflow: hidden;
 	padding-left: 23px; /* Full indent (7px margin + 16px padding previously) */
+	position: relative;
 }
 .trail-chunk-content:empty {
 	padding: 0;
+}
+/* Nested branch connector ticks branching from the timeline rail into tools & thinking */
+.trail-chunk-content > .tool-timeline-node::before,
+.trail-chunk-content > .thinking-block.in-trail::before,
+.trail-chunk-content > .consecutive-tools-group > .tool-timeline-node::before {
+	content: "";
+	position: absolute;
+	left: -16px;
+	top: 11px;
+	width: 13px;
+	height: 1px;
+	background: var(--border);
+	opacity: 0.85;
+	pointer-events: none;
 }
 /* Base continuous line covers the entire chunk height */
 .trail-chunk {
@@ -8008,6 +8068,7 @@ strong {
 }
 .thinking-block.in-trail {
 	margin: 1px 0 3px;
+	position: relative;
 }
 .thinking-block.in-trail .thinking-header {
 	padding: 2px 6px 2px 0;
