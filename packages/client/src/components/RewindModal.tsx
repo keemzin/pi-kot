@@ -12,7 +12,7 @@
  * The ExtensionUIInteractionModal takes over from there.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { invokeExtensionCommand } from "../lib/api-client";
 
 interface Props {
@@ -23,6 +23,14 @@ interface Props {
 export function RewindModal({ sessionId, onClose }: Props) {
   const [invoking, setInvoking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const handleRewind = async () => {
     setInvoking(true);
@@ -44,7 +52,7 @@ export function RewindModal({ sessionId, onClose }: Props) {
   };
 
   return (
-    <div className="settings-overlay" onClick={onClose}>
+    <div className="settings-overlay">
       <div
         className="settings-panel rewind-panel"
         onClick={(e) => e.stopPropagation()}

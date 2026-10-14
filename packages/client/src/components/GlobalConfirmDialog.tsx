@@ -92,7 +92,6 @@ export const GlobalConfirmDialog: React.FC = () => {
     return (
       <div
         className="global-dialog-overlay"
-        onClick={() => closeConfirm(false)}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
@@ -191,7 +190,6 @@ export const GlobalConfirmDialog: React.FC = () => {
     return (
       <div
         className="global-dialog-overlay"
-        onClick={closeAlert}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="dialog-title"

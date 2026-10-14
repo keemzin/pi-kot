@@ -51,6 +51,8 @@ interface SlidePanelProps {
   className?: string;
   /** Extra inline styles forwarded to the `.settings-panel` element */
   style?: CSSProperties;
+  /** Whether clicking the backdrop closes the panel (defaults to false to prevent accidental dismissals) */
+  closeOnBackdropClick?: boolean;
 }
 
 export function SlidePanel({
@@ -64,6 +66,7 @@ export function SlidePanel({
   maxWidth,
   className = "",
   style,
+  closeOnBackdropClick = false,
 }: SlidePanelProps) {
   // Escape‑key dismiss
   const handleKeyDown = useCallback(
@@ -84,7 +87,12 @@ export function SlidePanel({
   // ── Right side panel (e.g. FileExplorer) ──
   if (side === "right") {
     return (
-      <div className="slide-panel-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <div
+        className="slide-panel-overlay"
+        onClick={closeOnBackdropClick ? onClose : undefined}
+        role="dialog"
+        aria-modal="true"
+      >
         <div
           className={`slide-panel slide-panel--right ${className}`}
           style={{
@@ -102,7 +110,12 @@ export function SlidePanel({
 
   // ── Center modal (default) ──
   return (
-    <div className="settings-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div
+      className="settings-overlay"
+      onClick={closeOnBackdropClick ? onClose : undefined}
+      role="dialog"
+      aria-modal="true"
+    >
       <div
         className={`settings-panel ${className}`}
         style={{

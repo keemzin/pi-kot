@@ -1103,6 +1103,7 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
                     name: { type: "string" },
                     path: { type: "string" },
                     isDirectory: { type: "boolean" },
+                    isGitRepo: { type: "boolean" },
                   },
                 },
               },
@@ -1138,16 +1139,30 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
         throw err;
       }
 
-      const entries: Array<{ name: string; path: string; isDirectory: boolean }> = [];
+      let entries: Array<{ name: string; path: string; isDirectory: boolean; isGitRepo: boolean }> = [];
       try {
         const dirEntries = await readdir(targetPath, { withFileTypes: true });
-        for (const entry of dirEntries) {
-          entries.push({
-            name: entry.name,
-            path: join(targetPath, entry.name),
-            isDirectory: entry.isDirectory(),
-          });
-        }
+        entries = await Promise.all(
+          dirEntries.map(async (entry) => {
+            const entryPath = join(targetPath, entry.name);
+            const isDir = entry.isDirectory();
+            let isGitRepo = false;
+            if (isDir) {
+              try {
+                const gitStat = await stat(join(entryPath, ".git"));
+                isGitRepo = gitStat.isDirectory() || gitStat.isFile();
+              } catch {
+                // Not a git repository or unreadable
+              }
+            }
+            return {
+              name: entry.name,
+              path: entryPath,
+              isDirectory: isDir,
+              isGitRepo,
+            };
+          }),
+        );
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === "EACCES" || code === "EPERM") {
@@ -1163,6 +1178,124 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return { entries };
+    },
+  );
+
+  // POST /api/v1/filesystem/mkdir — create a new directory (public, no auth)
+  fastify.post<{
+    Body: { path?: string; parentPath?: string; name?: string };
+  }>(
+    "/filesystem/mkdir",
+    {
+      config: { public: true },
+      schema: {
+        description:
+          "Creates a new directory at the specified absolute path, or in parentPath with name. " +
+          "Used by the Add Project dialog to create new folders.",
+        tags: ["filesystem"],
+        body: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            parentPath: { type: "string" },
+            name: { type: "string" },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            required: ["success", "path"],
+            properties: {
+              success: { type: "boolean" },
+              path: { type: "string" },
+            },
+          },
+          400: errorSchema,
+          403: errorSchema,
+          404: errorSchema,
+          409: errorSchema,
+          500: errorSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      const { mkdir, stat } = await import("node:fs/promises");
+      let targetPath = (req.body?.path ?? "").trim();
+      if (!targetPath && req.body?.parentPath && req.body?.name) {
+        targetPath = join(req.body.parentPath.trim(), req.body.name.trim());
+      }
+      if (!targetPath) {
+        return reply.code(400).send({
+          error: "path_required",
+          message: "A directory path or parentPath and name is required",
+        });
+      }
+
+      const folderName = basename(targetPath);
+      if (
+        !folderName ||
+        folderName === "." ||
+        folderName === ".." ||
+        folderName.includes("/") ||
+        folderName.includes("\\")
+      ) {
+        return reply.code(400).send({
+          error: "invalid_name",
+          message: "Invalid directory name",
+        });
+      }
+
+      // Check if target already exists
+      try {
+        await stat(targetPath);
+        return reply.code(409).send({
+          error: "already_exists",
+          message: "A file or folder with this name already exists",
+        });
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code !== "ENOENT") {
+          if (code === "EACCES" || code === "EPERM") {
+            return reply.code(403).send({ error: "permission_denied", message: "permission denied" });
+          }
+          throw err;
+        }
+      }
+
+      // Check if parent directory exists and is a directory
+      const parent = dirname(targetPath);
+      try {
+        const parentStat = await stat(parent);
+        if (!parentStat.isDirectory()) {
+          return reply.code(400).send({
+            error: "parent_not_directory",
+            message: "Parent path is not a directory",
+          });
+        }
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ENOENT") {
+          return reply.code(404).send({
+            error: "parent_not_found",
+            message: "Parent directory does not exist",
+          });
+        }
+        if (code === "EACCES" || code === "EPERM") {
+          return reply.code(403).send({ error: "permission_denied", message: "permission denied" });
+        }
+        throw err;
+      }
+
+      try {
+        await mkdir(targetPath, { recursive: false });
+        return { success: true, path: targetPath };
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "EACCES" || code === "EPERM") {
+          return reply.code(403).send({ error: "permission_denied", message: "permission denied" });
+        }
+        throw err;
+      }
     },
   );
 

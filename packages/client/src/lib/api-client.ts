@@ -392,6 +392,7 @@ export interface FsEntry {
   name: string;
   path: string;
   isDirectory: boolean;
+  isGitRepo?: boolean;
 }
 
 export async function fetchHomeDir(): Promise<string> {
@@ -405,6 +406,17 @@ export async function listDir(path: string): Promise<FsEntry[]> {
     `/api/v1/filesystem/list?path=${encodeURIComponent(path)}`,
   );
   return res.entries;
+}
+
+export async function createFsDir(
+  parentPath: string,
+  name: string,
+): Promise<{ success: boolean; path: string }> {
+  return request<{ success: boolean; path: string }>(
+    "POST",
+    "/api/v1/filesystem/mkdir",
+    { parentPath, name },
+  );
 }
 
 // ---- Files ----

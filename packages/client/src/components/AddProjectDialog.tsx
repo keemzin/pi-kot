@@ -8,13 +8,18 @@ import {
   EyeOff,
   GitBranch,
   Globe,
+  Home,
+  Check,
   X,
+  FolderPlus,
+  Loader2,
 } from "lucide-react";
 import {
   fetchHomeDir,
   listDir,
   createProjectAPI,
   cloneRepo,
+  createFsDir,
 } from "../lib/api-client";
 import type { FsEntry, CloneRepoRequest } from "../lib/api-client";
 import { useSessionStore } from "../stores/session-store";
@@ -80,10 +85,24 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [cloneToCustomPath, setCloneToCustomPath] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const newFolderInputRef = useRef<HTMLInputElement>(null);
+  const projects = useSessionStore((s) => s.projects);
   const loadProjects = useSessionStore((s) => s.loadProjects);
   const setActiveProject = useSessionStore((s) => s.setActiveProject);
+
+  // ---- existing projects set for already-added detection ----
+  const existingPathSet = useMemo(() => {
+    return new Set(
+      projects
+        .map((p) => (p.path ? p.path.replace(/\/+$/, "") : ""))
+        .filter(Boolean),
+    );
+  }, [projects]);
 
   // ---- reset on open ----
   useEffect(() => {
@@ -97,6 +116,9 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     setError(undefined);
     setAdding(false);
     setCloning(false);
+    setCreatingFolder(false);
+    setNewFolderName("");
+    setIsCreatingFolder(false);
 
     fetchHomeDir()
       .then((h) => {
@@ -116,6 +138,18 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
       dead = true;
     };
   }, [open]);
+
+  // ---- global Escape dismiss ----
+  useEffect(() => {
+    if (!open) return;
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !creatingFolder) {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, [open, creatingFolder, onClose]);
 
   // ---- resolved directory to browse ----
   const browseDir = useMemo(
@@ -175,6 +209,56 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     [path, homeDir],
   );
 
+  const isCurrentAdded = useMemo(() => {
+    if (!absolutePath) return false;
+    return existingPathSet.has(absolutePath.replace(/\/+$/, ""));
+  }, [absolutePath, existingPathSet]);
+
+  // ---- breadcrumbs for currently browsed directory ----
+  const breadcrumbs = useMemo(() => {
+    const browsePart = getBrowseDir(path);
+    if (!browsePart) return [];
+
+    if (browsePart.startsWith("~/") || browsePart === "~") {
+      const items: Array<{ label: string; targetPath: string; isLast: boolean }> = [
+        { label: "~", targetPath: "~/", isLast: browsePart === "~" || browsePart === "~/" },
+      ];
+      const remainder = browsePart.replace(/^~\/?/, "").replace(/\/+$/, "");
+      if (remainder) {
+        const segments = remainder.split("/").filter(Boolean);
+        let accumulated = "~";
+        for (let i = 0; i < segments.length; i++) {
+          accumulated += "/" + segments[i];
+          items.push({
+            label: segments[i],
+            targetPath: accumulated + "/",
+            isLast: i === segments.length - 1,
+          });
+        }
+      }
+      return items;
+    }
+
+    if (browsePart.startsWith("/")) {
+      const items: Array<{ label: string; targetPath: string; isLast: boolean }> = [
+        { label: "/", targetPath: "/", isLast: browsePart === "/" },
+      ];
+      const segments = browsePart.split("/").filter(Boolean);
+      let accumulated = "";
+      for (let i = 0; i < segments.length; i++) {
+        accumulated += "/" + segments[i];
+        items.push({
+          label: segments[i],
+          targetPath: accumulated + "/",
+          isLast: i === segments.length - 1,
+        });
+      }
+      return items;
+    }
+
+    return [{ label: browsePart, targetPath: browsePart, isLast: true }];
+  }, [path]);
+
   // ---- navigation ----
   const enterDir = useCallback(
     (entryPath: string) => {
@@ -200,16 +284,55 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     setPath(parent);
   }, [path, homeDir]);
 
+  // ---- folder creation ----
+  const startCreateFolder = useCallback(() => {
+    setCreatingFolder(true);
+    setNewFolderName("");
+    setError(undefined);
+    requestAnimationFrame(() => {
+      newFolderInputRef.current?.focus();
+    });
+  }, []);
+
+  const cancelCreateFolder = useCallback(() => {
+    setCreatingFolder(false);
+    setNewFolderName("");
+    inputRef.current?.focus();
+  }, []);
+
+  const handleCreateFolder = useCallback(async () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed || !browseDir || isCreatingFolder) return;
+    setIsCreatingFolder(true);
+    setError(undefined);
+    try {
+      const res = await createFsDir(browseDir, trimmed);
+      setCreatingFolder(false);
+      setNewFolderName("");
+      const updatedList = await listDir(browseDir);
+      setEntries(updatedList);
+      enterDir(res.path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create folder");
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  }, [newFolderName, browseDir, isCreatingFolder, enterDir]);
+
   // ---- quick-add project from entry ----
   const quickAdd = useCallback(
     async (entryPath: string) => {
       try {
         const name = entryPath.split("/").filter(Boolean).pop() || "unnamed";
-        await createProjectAPI(name, entryPath);
+        const newProj = await createProjectAPI(name, entryPath);
         await loadProjects();
-        const state = useSessionStore.getState();
-        const last = state.projects[state.projects.length - 1];
-        if (last) setActiveProject(last.id);
+        if (newProj?.id) {
+          setActiveProject(newProj.id);
+        } else {
+          const state = useSessionStore.getState();
+          const last = state.projects[state.projects.length - 1];
+          if (last) setActiveProject(last.id);
+        }
         onClose();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to add project");
@@ -220,23 +343,27 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
   // ---- add current path ----
   const addCurrent = useCallback(async () => {
-    if (!absolutePath || adding) return;
+    if (!absolutePath || adding || isCurrentAdded) return;
     setAdding(true);
     setError(undefined);
     try {
       const name = absolutePath.split("/").filter(Boolean).pop() || "unnamed";
-      await createProjectAPI(name, absolutePath);
+      const newProj = await createProjectAPI(name, absolutePath);
       await loadProjects();
-      const state = useSessionStore.getState();
-      const last = state.projects[state.projects.length - 1];
-      if (last) setActiveProject(last.id);
+      if (newProj?.id) {
+        setActiveProject(newProj.id);
+      } else {
+        const state = useSessionStore.getState();
+        const last = state.projects[state.projects.length - 1];
+        if (last) setActiveProject(last.id);
+      }
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add project");
     } finally {
       setAdding(false);
     }
-  }, [absolutePath, adding, loadProjects, setActiveProject, onClose]);
+  }, [absolutePath, adding, isCurrentAdded, loadProjects, setActiveProject, onClose]);
 
   // ---- clone ----
   const handleClone = useCallback(() => {
@@ -255,14 +382,23 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     if (cloneToCustomPath) {
       payload.targetPath = absolutePath.replace(/\/+$/, "") + "/" + folderName;
     }
-    cloneRepo(payload,
+    let createdProjectId: string | undefined;
+    cloneRepo(
+      payload,
       (event) => {
         switch (event.type) {
+          case "project_created":
+            createdProjectId = event.id;
+            break;
           case "done":
             loadProjects().then(() => {
-              const state = useSessionStore.getState();
-              const last = state.projects[state.projects.length - 1];
-              if (last) setActiveProject(last.id);
+              if (createdProjectId) {
+                setActiveProject(createdProjectId);
+              } else {
+                const state = useSessionStore.getState();
+                const last = state.projects[state.projects.length - 1];
+                if (last) setActiveProject(last.id);
+              }
               onClose();
             });
             setCloning(false);
@@ -282,16 +418,24 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
   // ---- keyboard ----
   const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      const input = inputRef.current;
+      const isCursorAtStart =
+        input != null && input.selectionStart === 0 && input.selectionEnd === 0;
+      const isCursorAtEnd =
+        input != null &&
+        input.selectionStart === path.length &&
+        input.selectionEnd === path.length;
+
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHoverIdx((i) => Math.min(filtered.length - 1, i + 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setHoverIdx((i) => Math.max(0, i - 1));
-      } else if (e.key === "Enter") {
-        e.preventDefault();
-        if (filtered.length > 0 && hoverIdx >= 0) {
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        if (filtered.length > 0 && hoverIdx >= 0 && hoverIdx < filtered.length) {
+          e.preventDefault();
           const entry = filtered[hoverIdx];
           if (leafFilter && !entry.name.startsWith(leafFilter)) {
             setPath(getBrowseDir(path) + entry.name + "/");
@@ -299,18 +443,28 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
             enterDir(entry.path);
           }
         }
+      } else if (e.key === "ArrowRight") {
+        if (isCursorAtEnd && filtered.length > 0 && hoverIdx >= 0 && hoverIdx < filtered.length) {
+          e.preventDefault();
+          enterDir(filtered[hoverIdx].path);
+        }
+      } else if (e.key === "ArrowLeft") {
+        if (isCursorAtStart && hasParent) {
+          e.preventDefault();
+          goUp();
+        }
       } else if (e.key === "Backspace" && !path) {
         e.preventDefault();
         onClose();
       }
     },
-    [filtered, hoverIdx, leafFilter, path, enterDir, onClose],
+    [filtered, hoverIdx, leafFilter, path, enterDir, goUp, hasParent, onClose],
   );
 
   if (!open) return null;
 
   return (
-    <div className="settings-overlay" onClick={onClose}>
+    <div className="settings-overlay">
       <div
         className="settings-panel add-project-settings-panel"
         onClick={(e) => e.stopPropagation()}
@@ -400,21 +554,29 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
               spellCheck={false}
             />
             <button
-              className="add-project-dialog-btn"
+              className={
+                "add-project-dialog-btn" +
+                (!cloneMode && isCurrentAdded ? " already-added" : "")
+              }
               disabled={
                 cloneMode
                   ? !cloneUrl.trim() || !absolutePath || cloning
-                  : !absolutePath || adding
+                  : !absolutePath || adding || isCurrentAdded
               }
               onClick={cloneMode ? handleClone : addCurrent}
             >
-              {cloneMode
-                ? cloning
-                  ? "Cloning…"
-                  : "Clone & Add"
-                : adding
-                  ? "Adding…"
-                  : "Add"}
+              {cloneMode ? (
+                cloning ? "Cloning…" : "Clone & Add"
+              ) : adding ? (
+                "Adding…"
+              ) : isCurrentAdded ? (
+                <>
+                  <Check size={12} />
+                  <span>Added</span>
+                </>
+              ) : (
+                "Add"
+              )}
             </button>
           </div>
 
@@ -422,24 +584,52 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
           <div className="add-project-dialog-tools">
             <button
               className="add-project-dialog-tool"
+              onClick={() => setPath("~/")}
+              disabled={path === "~/"}
+              title="Home directory (~)"
+            >
+              <Home size={13} />
+            </button>
+            <button
+              className="add-project-dialog-tool"
               onClick={goUp}
               disabled={!hasParent}
-              title="Go up"
+              title="Go up (..)"
             >
-              <ArrowLeft size={14} />
+              <ArrowLeft size={13} />
               <span>..</span>
+            </button>
+            <button
+              className={"add-project-dialog-tool" + (creatingFolder ? " active" : "")}
+              onClick={creatingFolder ? cancelCreateFolder : startCreateFolder}
+              title={creatingFolder ? "Cancel new folder" : "Create new folder"}
+            >
+              <FolderPlus size={13} />
+              <span>New folder</span>
             </button>
             <button
               className="add-project-dialog-tool"
               onClick={() => setShowHidden((v) => !v)}
               title={showHidden ? "Hide hidden files" : "Show hidden files"}
             >
-              {showHidden ? <EyeOff size={14} /> : <Eye size={14} />}
-              <span>{showHidden ? "Hide hidden" : "Show hidden"}</span>
+              {showHidden ? <EyeOff size={13} /> : <Eye size={13} />}
+              <span>{showHidden ? "Hide" : "Hidden"}</span>
             </button>
-            <span className="add-project-dialog-path-display">
-              {absolutePath}
-            </span>
+            <div className="add-project-dialog-breadcrumbs" title={absolutePath}>
+              {breadcrumbs.map((crumb, idx) => (
+                <span key={crumb.targetPath} className="add-project-breadcrumb-item">
+                  {idx > 0 && <span className="add-project-breadcrumb-sep">/</span>}
+                  <button
+                    type="button"
+                    className={"add-project-breadcrumb-btn" + (crumb.isLast ? " active" : "")}
+                    onClick={() => setPath(crumb.targetPath)}
+                    disabled={crumb.isLast}
+                  >
+                    {crumb.label}
+                  </button>
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* Error */}
@@ -447,15 +637,64 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
           {/* Directory list */}
           <div className="add-project-dialog-list">
+            {creatingFolder && (
+              <div className="add-project-dialog-new-folder-row">
+                <FolderPlus size={14} className="add-project-dialog-entry-folder" />
+                <input
+                  ref={newFolderInputRef}
+                  type="text"
+                  className="add-project-dialog-new-folder-input"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateFolder();
+                    } else if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelCreateFolder();
+                    }
+                  }}
+                  placeholder="Folder name…"
+                  disabled={isCreatingFolder}
+                  autoFocus
+                />
+                <div className="add-project-dialog-new-folder-actions">
+                  <button
+                    type="button"
+                    className="add-project-dialog-new-folder-btn confirm"
+                    onClick={handleCreateFolder}
+                    disabled={!newFolderName.trim() || isCreatingFolder}
+                    title="Create folder (Enter)"
+                  >
+                    {isCreatingFolder ? (
+                      <Loader2 size={12} className="spin" />
+                    ) : (
+                      <Check size={12} />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="add-project-dialog-new-folder-btn cancel"
+                    onClick={cancelCreateFolder}
+                    disabled={isCreatingFolder}
+                    title="Cancel (Esc)"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              </div>
+            )}
             {loading ? (
               <div className="add-project-dialog-empty">Loading…</div>
-            ) : filtered.length === 0 ? (
+            ) : filtered.length === 0 && !creatingFolder ? (
               <div className="add-project-dialog-empty">
                 {leafFilter ? "No matching directories" : "Empty directory"}
               </div>
             ) : (
               filtered.map((entry, i) => {
                 const hl = i === hoverIdx;
+                const isAdded = existingPathSet.has(entry.path.replace(/\/+$/, ""));
                 return (
                   <div
                     key={entry.path}
@@ -466,16 +705,32 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
                     <ChevronRight size={14} className="add-project-dialog-entry-arrow" />
                     <Folder size={14} className="add-project-dialog-entry-folder" />
                     <span className="add-project-dialog-entry-name">{entry.name}</span>
-                    <button
-                      className="add-project-dialog-entry-add"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        quickAdd(entry.path);
-                      }}
-                      title="Add as project"
-                    >
-                      <Plus size={14} />
-                    </button>
+                    {entry.isGitRepo && (
+                      <span className="add-project-dialog-git-badge" title="Git repository">
+                        <GitBranch size={10} />
+                        <span>git</span>
+                      </span>
+                    )}
+                    {isAdded ? (
+                      <span
+                        className="add-project-dialog-entry-added-pill"
+                        title="Already added as project"
+                      >
+                        <Check size={11} />
+                        <span>Added</span>
+                      </span>
+                    ) : (
+                      <button
+                        className="add-project-dialog-entry-add"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          quickAdd(entry.path);
+                        }}
+                        title="Add as project"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
                   </div>
                 );
               })
@@ -485,9 +740,10 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
         {/* Footer */}
         <div className="add-project-dialog-footer">
-          ↑↓ Navigate · Enter browse · + quick-add
+          ↑↓ Navigate · Enter / Tab / → browse · ← .. · + quick-add
         </div>
       </div>
     </div>
   );
 }
+

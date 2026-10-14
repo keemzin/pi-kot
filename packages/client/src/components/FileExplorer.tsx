@@ -1647,7 +1647,7 @@ export function FileExplorer({ projectId, open, onClose, initialTab, flexLayout 
 
       {/* ── Batch Delete Confirmation Modal ── */}
       {confirmBatchDelete && (
-        <div className="file-confirm-modal-overlay" onClick={() => !batchDeleting && setConfirmBatchDelete(false)}>
+        <div className="file-confirm-modal-overlay">
           <div className="file-confirm-modal" onClick={(e) => e.stopPropagation()}>
             <div className="file-confirm-modal-title">
               Delete {selectedPaths.size} {selectedPaths.size === 1 ? "item" : "items"}?

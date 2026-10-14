@@ -23,12 +23,14 @@ export function Modal({
   children,
   width,
   initialFocusRef,
+  closeOnBackdropClick = false,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
   width?: string;
+  closeOnBackdropClick?: boolean;
   /**
    * Optional ref to the element that should receive focus when the
    * dialog opens. When omitted, focus moves to the first focusable
@@ -129,7 +131,7 @@ export function Modal({
   return (
     <div
       className="modal-overlay"
-      onClick={onClose}
+      onClick={closeOnBackdropClick ? onClose : undefined}
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}

@@ -290,10 +290,20 @@ export function AddProviderDialog({ open, onClose, onError, onSaved, initialPres
     setConnectionTested(false);
   }, []);
 
+  // ── Escape key dismiss ──
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
-    <div className="settings-overlay" onClick={onClose}>
+    <div className="settings-overlay">
       <div
         className="settings-panel"
         onClick={(e) => e.stopPropagation()}

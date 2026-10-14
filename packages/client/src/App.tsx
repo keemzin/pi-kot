@@ -110,6 +110,18 @@ export function App() {
   const [showPrompt, setShowPrompt] = useState(false);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    if (projectToDelete === undefined && !showPrompt) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (projectToDelete !== undefined) setProjectToDelete(undefined);
+        if (showPrompt) setShowPrompt(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [projectToDelete, showPrompt]);
+
   const resetDragState = useCallback(() => {
     setDraggingProjectId(undefined);
     setDragOverProjectId(undefined);
@@ -1219,7 +1231,7 @@ export function App() {
       {/* Settings Panel overlay */}
       {/* Confirm project delete — matches settings/rewind modal animation */}
       {projectToDelete !== undefined && (
-        <div className="settings-overlay" onClick={() => setProjectToDelete(undefined)}>
+        <div className="settings-overlay">
           <div
             className="settings-panel rewind-panel"
             onClick={(e) => e.stopPropagation()}
@@ -1275,10 +1287,7 @@ export function App() {
 
       {/* System Prompt popup — anchored to header ✦ button */}
       {showPrompt && activeProjectId !== undefined && (
-        <div
-          className="prompt-popup-overlay"
-          onClick={() => setShowPrompt(false)}
-        >
+        <div className="prompt-popup-overlay">
           <div
             className="prompt-popup"
             onClick={(e) => e.stopPropagation()}

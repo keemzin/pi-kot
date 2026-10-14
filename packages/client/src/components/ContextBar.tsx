@@ -102,7 +102,7 @@ export function ContextInspectModal({ data, sessionId, onClose }: { data: Sessio
   };
 
   return (
-    <div className="settings-overlay" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="settings-overlay" role="dialog" aria-modal="true">
       <div
         ref={dialogRef}
         className="settings-panel"

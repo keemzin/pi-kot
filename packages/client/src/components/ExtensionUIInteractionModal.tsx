@@ -43,6 +43,16 @@ export function ExtensionUIInteractionModal({ sessionId }: Props) {
     setSelectedIndex(0);
   }, [activeInteraction?.type]);
 
+  // Escape key dismiss
+  useEffect(() => {
+    if (activeInteraction === undefined && !commandRunning) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [activeInteraction, commandRunning, handleCancel]);
+
   if (activeInteraction === undefined && !commandRunning) return null;
 
   // ── Not running + no interaction = stale state, don't show ──
@@ -54,7 +64,7 @@ export function ExtensionUIInteractionModal({ sessionId }: Props) {
   if (evType === "extension_ui_select") { 
     const ev = activeInteraction as ExtensionUIEvent & { type: string; requestId: string; title: string; options: string[] };
     return (
-      <div className="settings-overlay" onClick={handleCancel}>
+      <div className="settings-overlay">
         <div
           className="settings-panel rewind-panel"
           onClick={(e) => e.stopPropagation()}
@@ -176,7 +186,7 @@ export function ExtensionUIInteractionModal({ sessionId }: Props) {
   if (evType === "extension_ui_confirm") {
     const ev = activeInteraction as ExtensionUIEvent & { type: string; requestId: string; title: string; message: string };
     return (
-      <div className="settings-overlay" onClick={handleCancel}>
+      <div className="settings-overlay">
         <div
           className="settings-panel rewind-panel"
           onClick={(e) => e.stopPropagation()}
@@ -225,7 +235,7 @@ export function ExtensionUIInteractionModal({ sessionId }: Props) {
   if (evType === "extension_ui_input") {
     const ev = activeInteraction as ExtensionUIEvent & { type: string; requestId: string; title: string; placeholder: string };
     return (
-      <div className="settings-overlay" onClick={handleCancel}>
+      <div className="settings-overlay">
         <div
           className="settings-panel rewind-panel"
           onClick={(e) => e.stopPropagation()}
