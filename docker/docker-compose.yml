@@ -25,9 +25,14 @@ services:
     # to ENABLE_SUDO and drop privileges to user pi via gosu before launching the server.
     user: "0:0"
     ports:
-      # Loopback only by default — drop the `127.0.0.1:` prefix to expose
-      # to the LAN (and set UI_PASSWORD or API_KEY first; see SECURITY.md).
+      # pi-kot Web UI (container 3000 -> host $HOST_PORT)
       - "${HOST_PORT:-3333}:3000"
+      # Dev server port forwards (apps run inside container accessible on host)
+      - "${DEV_PORT_VITE:-5173}:5173"   # Vite / SvelteKit / Astro
+      - "${DEV_PORT_NODE:-3001}:3001"   # Next.js / Express (container 3000 is pi-kot)
+      - "${DEV_PORT_API:-8001}:8000"    # Python FastAPI / Uvicorn (mapped to host 8001 to avoid host 8000 clash)
+      - "${DEV_PORT_WEB:-8081}:8080"    # Web / Vue / Spring (mapped to host 8081 to avoid host 8080 clash)
+      - "${DEV_PORT_FLASK:-5000}:5000"  # Flask / general backend
     volumes:
       - ${WORKSPACE_HOST_PATH:-./workspace}:/workspace
       - ${PI_CONFIG_HOST_PATH:-~/.pi/agent}:/home/pi/.pi/agent

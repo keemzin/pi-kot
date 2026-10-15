@@ -103,17 +103,51 @@ npm run start
 
 ### Docker
 
-Run pi-kot in an isolated container:
+#### Quick Start (Prebuilt Image)
+
+Run pi-kot immediately without cloning or building:
+
+```bash
+docker run -d \
+  --name pi-kot \
+  --restart unless-stopped \
+  -p 3399:3000 \
+  -p 5173:5173 \
+  -p 3001:3001 \
+  -p 8001:8000 \
+  -p 5000:5000 \
+  -v $(pwd)/workspace:/workspace \
+  -v ~/.pi-kot-docker:/home/pi/.pi-kot \
+  -v ~/.pi/agent:/home/pi/.pi/agent \
+  -e UI_PASSWORD=vbn \
+  -e ENABLE_SUDO=all \
+  -e PUID=$(id -u) \
+  -e PGID=$(id -g) \
+  johnsdoes/pi-kot:1.1.0
+
+# Open http://localhost:3399 (password: vbn)
+```
+
+> [!NOTE]
+> **Batteries Included**: The prebuilt image comes with `hound-mcp[all]` ([Master-Fetch](https://github.com/dondai1234/master-fetch) for web scraping, deep crawling, keyless search, PDF parsing, OCR, and neural rerank) and Playwright Chromium pre-installed (~3GB total size).
+>
+> **Want a lean image?** If you don't need `hound-mcp` or Chromium (~1.3GB slim build), simply comment out the `hound-mcp` and `playwright` lines in `docker/Dockerfile` and rebuild locally using Docker Compose below.
+
+#### Build & Run with Docker Compose
+
+Run pi-kot in an isolated container with custom configuration:
 
 ```bash
 cd docker
-cp .env.example .env    # optional: configure port, password, or sudo
+cp .env.example .env    # optional: configure port, dev server forwarding, password, or sudo
 docker compose up -d --build
 
 # Open http://localhost:3333 (or HOST_PORT configured in .env)
 ```
 
-See [docs/containers.md](./docs/containers.md) for full container documentation, sandbox mode, and permission settings.
+Dev servers run by the agent inside the container (Vite `:5173`, Next.js `:3001`, FastAPI `:8000` → host `:8001`, Flask `:5000`) are automatically forwarded to host ports for instant preview. The agent is container-aware and automatically knows which ports to use.
+
+See [docs/containers.md](./docs/containers.md) for full container documentation, dev port forwarding, sandbox mode, and permission settings.
 
 All flags also work as environment variables (`PORT`, `HOST`, `UI_PASSWORD`, `API_KEY`, `WORKSPACE_PATH`, `LOG_LEVEL`, `MINIMAL_UI`, ...) — full reference in [Configuration](#configuration).
 

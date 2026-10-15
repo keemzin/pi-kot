@@ -139,8 +139,18 @@ RUN apt-get update \
     fi \
  && echo "Set disable_coredump false" >> /etc/sudo.conf \
  && rm -rf /var/lib/apt/lists/* \
- && ldconfig \
- && (userdel node 2>/dev/null || true) \
+ && ldconfig
+
+# Global Playwright browser directory so all users (pi, pi-tools) can run Chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# Bake in hound-mcp (Master-Fetch: fetch, crawl, search, PDF, OCR) and Playwright Chromium
+RUN pip3 install --no-cache-dir --break-system-packages "hound-mcp[all]" \
+ && playwright install --with-deps chromium \
+ && chmod -R 777 /ms-playwright \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN (userdel node 2>/dev/null || true) \
  && (groupdel node 2>/dev/null || true) \
  && groupadd -g $PGID pi \
  && useradd -m -u $PUID -g $PGID -s /bin/bash pi \
@@ -275,9 +285,11 @@ ENV NODE_ENV=production \
     FORGE_DATA_DIR=/home/pi/.pi-kot \
     PYTHONUSERBASE=/home/pi/.local \
     SHELL=/bin/bash \
-    TERM=xterm-256color
+    TERM=xterm-256color \
+    PI_KOT_CONTAINER=true
 
-EXPOSE 3000
+# Port 3000 (pi-kot web UI) + popular dev server ports for projects built inside
+EXPOSE 3000 5173 3001 8000 8080 5000
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/pi-kot-entrypoint"]
 CMD ["node", "packages/server/dist/index.js"]

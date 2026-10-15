@@ -36,6 +36,11 @@ const webUiContextFile = join(
   "contexts",
   "web-ui.md",
 );
+const containerContextFile = join(
+  new URL("./", import.meta.url).pathname,
+  "contexts",
+  "container.md",
+);
 
 export async function buildResourceLoader(
   cwd: string,
@@ -53,6 +58,17 @@ export async function buildResourceLoader(
     const webUiContext = readFileSync(webUiContextFile, "utf-8");
     if (webUiContext.length > 0) {
       appendSystemPrompt.push(webUiContext);
+    }
+  }
+  // Inject container context if running inside Docker
+  const isContainer =
+    process.env.PI_KOT_CONTAINER === "true" ||
+    process.env.CONTAINER === "docker" ||
+    existsSync("/.dockerenv");
+  if (isContainer && existsSync(containerContextFile)) {
+    const containerContext = readFileSync(containerContextFile, "utf-8");
+    if (containerContext.length > 0) {
+      appendSystemPrompt.push(containerContext);
     }
   }
 

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsgo && node -e \"const fs=require('fs');if(!fs.existsSync('dist/contexts'))fs.cpSync('src/contexts','dist/contexts',{recursive:true})\"",
+    "build": "tsgo && node -e \"const fs=require('fs');fs.cpSync('src/contexts','dist/contexts',{recursive:true})\"",
     "check": "tsgo --noEmit",
     "test": "vitest run"
   },
