@@ -128,6 +128,11 @@ docker run -d \
 # Open http://localhost:3399 (password: vbn)
 ```
 
+> [!TIP]
+> **Workspace & Persistence**: In Docker, the "Add / Open Project" file browser automatically opens `/workspace/` directly (where your host directory is mounted), ensuring newly created or cloned projects persist to your host machine.
+>
+> **Optional `/opt` mount**: `/opt` is pre-permissioned for user `pi`. If you install tools or SDKs into `/opt` and want them persisted across container removals, you can optionally add `-v ~/.pi-kot-docker/opt:/opt`.
+
 > [!NOTE]
 > **Batteries Included**: The prebuilt image comes with `hound-mcp[all]` ([Master-Fetch](https://github.com/dondai1234/master-fetch) for web scraping, deep crawling, keyless search, PDF parsing, OCR, and neural rerank) and Playwright Chromium pre-installed (~3GB total size).
 >

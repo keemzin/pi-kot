@@ -38,6 +38,8 @@ services:
       - ${PI_CONFIG_HOST_PATH:-~/.pi/agent}:/home/pi/.pi/agent
       # Separate default from host so the container manages its own project list
       - ${KOT_DATA_HOST_PATH:-~/.pi-kot-docker}:/home/pi/.pi-kot
+      # Optional: persist /opt if third-party tools or SDKs are installed there
+      # - ${OPT_HOST_PATH:-~/.pi-kot-docker/opt}:/opt
     environment:
       # Container-internal paths — fixed.
       WORKSPACE_PATH: /workspace

@@ -74,6 +74,8 @@ function deriveNameFromUrl(url: string): string {
 
 export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
   const [homeDir, setHomeDir] = useState("");
+  const [workspaceDir, setWorkspaceDir] = useState("");
+  const [isContainer, setIsContainer] = useState(false);
   const [path, setPath] = useState("~/");
   const [entries, setEntries] = useState<FsEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -122,9 +124,17 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
     setIsCreatingFolder(false);
 
     fetchHomeDir()
-      .then((h) => {
+      .then((res) => {
         if (!dead) {
-          setHomeDir(h);
+          setHomeDir(res.home);
+          if (res.workspace) {
+            setWorkspaceDir(res.workspace);
+          }
+          if (res.isContainer) {
+            setIsContainer(true);
+            const wsPath = (res.workspace || "/workspace").replace(/\/+$/, "") + "/";
+            setPath(wsPath);
+          }
           requestAnimationFrame(() => inputRef.current?.focus());
         }
       })
@@ -601,6 +611,17 @@ export function AddProjectDialog({ open, onClose }: AddProjectDialogProps) {
 
           {/* Toolbar */}
           <div className="add-project-dialog-tools">
+            {workspaceDir && (
+              <button
+                className="add-project-dialog-tool"
+                onClick={() => setPath(workspaceDir.replace(/\/+$/, "") + "/")}
+                disabled={path === workspaceDir.replace(/\/+$/, "") + "/"}
+                title={`Workspace (${workspaceDir})`}
+              >
+                <Folder size={13} />
+                <span>Workspace</span>
+              </button>
+            )}
             <button
               className="add-project-dialog-tool"
               onClick={() => setPath("~/")}

@@ -395,9 +395,14 @@ export interface FsEntry {
   isGitRepo?: boolean;
 }
 
-export async function fetchHomeDir(): Promise<string> {
-  const res = await request<{ home: string }>("GET", "/api/v1/filesystem/home");
-  return res.home;
+export interface HomeDirResponse {
+  home: string;
+  workspace?: string;
+  isContainer?: boolean;
+}
+
+export async function fetchHomeDir(): Promise<HomeDirResponse> {
+  return request<HomeDirResponse>("GET", "/api/v1/filesystem/home");
 }
 
 export async function listDir(path: string): Promise<FsEntry[]> {

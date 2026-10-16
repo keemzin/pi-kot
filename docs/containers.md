@@ -19,10 +19,11 @@ server as root so it can spawn model/user tool children as a restricted
 
 ## What gets isolated
 
-- **Filesystem** — only three host paths are bind-mounted:
-  - `/workspace` ← the checked-out repo root
+- **Filesystem** — standard host paths are bind-mounted:
+  - `/workspace` ← the checked-out repo root (projects created here persist to the host)
   - `/home/pi/.pi/agent` ← pi config (`~/.pi/agent`: `ui-settings.json`, session overrides, keys)
   - `/home/pi/.pi-kot` ← runtime data (`~/.pi-kot-docker`: container projects, session trees, overrides)
+  - `/opt` ← owned by `pi:pi` inside the image; optionally mountable to persist third-party tool installations
 - Everything else the agent touches lives inside the image.
 - **Network** — loopback only by default (`127.0.0.1:3333:3000`). Drop the
   `127.0.0.1:` prefix to expose to the LAN (only after setting auth).
@@ -66,12 +67,15 @@ When the agent runs development servers or tests web applications inside the con
 | `5000` | `5000` | Flask / Python API servers |
 
 ## Baked-in tools & Agent awareness
-
+ 
 - **`hound-mcp[all]` & Playwright Chromium**: The prebuilt image includes [hound-mcp](https://github.com/dondai1234/master-fetch) for web scraping, deep crawling, keyless search, PDF parsing, OCR, and neural rerank, alongside Chromium in `/ms-playwright`.
+- **User & Permissions**: The container runs as user `pi`. `/opt` is owned by `pi:pi` (0775). With `ENABLE_SUDO=all` (or `scoped`), passwordless `sudo` is enabled for system packages.
+- **Auto `/workspace` Navigation**: In Docker, the "Add / Open Project" dialog automatically defaults to `/workspace/` so created projects always persist to the host. A **Workspace** toolbar shortcut allows instant 1-click switching.
 - **Container Awareness**: The container sets `PI_KOT_CONTAINER=true`. pi-kot automatically detects container execution and injects runtime context into the agent's system prompt:
   - Reminding the agent that dev servers must bind to `0.0.0.0` (not `127.0.0.1` or `localhost`).
   - Instructing it that port `3000` is reserved for pi-kot itself.
-  - Informing it of the available forwarded ports and pre-installed tools.
+  - Informing it of the available forwarded ports, pre-installed tools, and `sudo` availability.
+  - Directing it to always create projects and files inside `/workspace/`.
 - **Want a lean custom image?** If you don't need `hound-mcp` and Playwright Chromium (which add ~1.8GB to the layer), comment out lines 145–151 in `docker/Dockerfile` and rebuild with `docker compose up -d --build` for a ~1.3GB image.
 
 ## Build & run with Compose

@@ -1053,21 +1053,34 @@ export const fileRoutes: FastifyPluginAsync = async (fastify) => {
       config: { public: true },
       schema: {
         description:
-          "Returns the user's home directory path. Used by the Add Project " +
-          "dialog to initialise the path input to ~/.",
+          "Returns the user's home directory path, configured workspace path, " +
+          "and container flag. Used by the Add Project dialog to initialise navigation.",
         tags: ["filesystem"],
         response: {
           200: {
             type: "object",
             required: ["home"],
-            properties: { home: { type: "string" } },
+            properties: {
+              home: { type: "string" },
+              workspace: { type: "string" },
+              isContainer: { type: "boolean" },
+            },
           },
         },
       },
     },
     async () => {
       const { homedir } = await import("node:os");
-      return { home: homedir() };
+      const isContainer = Boolean(
+        process.env.PI_KOT_CONTAINER ||
+        process.env.CONTAINER === "docker" ||
+        existsSync("/.dockerenv"),
+      );
+      return {
+        home: homedir(),
+        workspace: config.workspacePath,
+        isContainer,
+      };
     },
   );
 

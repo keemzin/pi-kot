@@ -180,12 +180,12 @@ COPY --from=builder --chown=pi:pi /app/packages/client/dist ./packages/client/di
 # the server runs as `pi`, and pi-owned config/data dirs are writable by it.
 # Sandbox deployments must explicitly permission their mounts; see
 # docs/containers.md.
-RUN mkdir -p /workspace /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm /home/pi-tools/.config \
- && chown -R pi:pi /workspace /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm \
+RUN mkdir -p /workspace /opt /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm /home/pi-tools/.config \
+ && chown -R pi:pi /workspace /opt /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm \
  && chown -R pi-tools:pi-tools /home/pi-tools \
  && chown pi:pi /home/pi \
  && chown pi:pi /home/pi/.pi \
- && chmod 0775 /workspace \
+ && chmod 0775 /workspace /opt \
  && chmod 0755 /home/pi /home/pi/.pi \
  && chmod 0700 /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm /home/pi-tools
 
@@ -209,7 +209,7 @@ case "$(printf '%s' "${AGENT_TOOL_SANDBOX_ENABLED:-false}" | tr '[:upper:]' '[:l
     pi_config_dir="${PI_CONFIG_DIR:-/home/pi/.pi/agent}"
     tool_home="${AGENT_TOOL_HOME:-/home/pi-tools}"
 
-    mkdir -p "$workspace_path" "$kot_data_dir" "$pi_config_dir" "$tool_home"
+    mkdir -p "$workspace_path" "$kot_data_dir" "$pi_config_dir" "$tool_home" /opt
 
     chown root:root "$kot_data_dir"
     chmod u+rwx "$kot_data_dir"
@@ -231,6 +231,9 @@ case "$(printf '%s' "${AGENT_TOOL_SANDBOX_ENABLED:-false}" | tr '[:upper:]' '[:l
     chmod -R u+rwX,go-rwx "$tool_home"
     chown -R "$tool_uid:$tool_gid" "$tool_home"
 
+    chown -R "$tool_uid:0" /opt 2>/dev/null || true
+    chmod 0775 /opt 2>/dev/null || true
+
     exec "$@"
     ;;
   *)
@@ -251,6 +254,10 @@ case "$(printf '%s' "${AGENT_TOOL_SANDBOX_ENABLED:-false}" | tr '[:upper:]' '[:l
           rm -f /etc/sudoers.d/pi
           ;;
       esac
+      if [ -d /opt ]; then
+        chown -R pi:pi /opt 2>/dev/null || true
+        chmod 0775 /opt 2>/dev/null || true
+      fi
       exec gosu pi "$@"
     fi
     exec "$@"
