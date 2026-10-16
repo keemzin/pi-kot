@@ -11,6 +11,9 @@ ARG BASE_IMAGE=pi-kot-base:latest
 # ---------- builder ----------
 FROM ${BASE_IMAGE} AS builder
 
+# Force development mode during build so devDependencies (tsgo, vite, typescript) install
+ENV NODE_ENV=development
+
 WORKDIR /app
 
 # Copy lockfiles and workspace manifests first for Docker layer caching
@@ -20,7 +23,7 @@ COPY packages/client/package.json packages/client/
 COPY patch-branch-summary.mjs ./
 
 # `npm ci --workspaces` honours root lockfile across all packages
-RUN npm ci --workspaces --include-workspace-root
+RUN npm ci --workspaces --include-workspace-root --include=dev
 
 # Copy application source and compile
 COPY . .
@@ -28,6 +31,8 @@ RUN npm run build
 
 # ---------- runtime ----------
 FROM ${BASE_IMAGE} AS runtime
+
+ENV NODE_ENV=production
 
 WORKDIR /app
 
