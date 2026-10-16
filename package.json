@@ -18,7 +18,10 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run check --workspaces --if-present",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "docker:base": "docker compose -f docker/docker-compose.yml --profile base build pi-kot-base",
+    "docker:build": "bash docker/build.sh",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d"
   },
   "devDependencies": {
     "@typescript/native-preview": "^7.0.0-dev.20260627.2",

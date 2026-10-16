@@ -76,14 +76,21 @@ When the agent runs development servers or tests web applications inside the con
   - Instructing it that port `3000` is reserved for pi-kot itself.
   - Informing it of the available forwarded ports, pre-installed tools, and `sudo` availability.
   - Directing it to always create projects and files inside `/workspace/`.
-- **Want a lean custom image?** If you don't need `hound-mcp` and Playwright Chromium (which add ~1.8GB to the layer), comment out lines 145–151 in `docker/Dockerfile` and rebuild with `docker compose up -d --build` for a ~1.3GB image.
+- **Want a lean custom image?** If you don't need `hound-mcp` and Playwright Chromium (which add ~1.8GB to the layer), comment out the Playwright and hound-mcp section in `docker/Dockerfile.base` and rebuild with `./build.sh --base` for a ~1.3GB image.
 
 ## Build & run with Compose
+
+The setup uses a two-tier image strategy:
+- `pi-kot-base:latest`: Heavy platform layer (Python 3.12, Node 22, Playwright Chromium, hound-mcp). Built once or when base system deps change.
+- `pi-kot:latest`: Application child layer. Rebuilds in ~15–20 seconds on TypeScript code changes.
 
 ```bash
 cd docker
 
-# Default: server runs as `pi`, all capabilities dropped.
+# First time (or when rebuilding base image):
+./build.sh --base
+
+# Day-to-day iterative development:
 docker compose up -d --build
 
 # Sandbox: server runs as root, tool children drop to `pi-tools`.

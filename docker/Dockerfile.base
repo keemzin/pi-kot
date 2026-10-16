@@ -1,0 +1,111 @@
+# syntax=docker/dockerfile:1.6
+#
+# Base image for pi-kot (pi-kot-base:latest).
+#
+# Contains:
+#   - Node 22 (bookworm-slim glibc runtime)
+#   - Python 3.12 + pip
+#   - System utilities: tini, gosu, sudo, git, ripgrep, bash, curl, vim, procps, make, g++
+#   - hound-mcp[all] + Playwright Chromium (/ms-playwright)
+#   - Default user identities (pi:1000, pi-tools:1001)
+#
+# Rebuild this image only when system libraries, Python/Node runtimes,
+# or Playwright/hound-mcp change. Daily application development builds
+# inherit from this image via docker/Dockerfile.
+
+# ---------- official Python 3.12 base ----------
+FROM python:3.12-slim-bookworm AS python-base
+
+# ---------- base system runtime ----------
+FROM node:22-bookworm-slim AS base
+
+ARG PUID=1000
+ARG PGID=1000
+ARG PTOOLS_UID=1001
+ARG PTOOLS_GID=1001
+ARG EXTRA_APT_PACKAGES=""
+
+# 1. Install Debian libraries for Python C extensions & system tools
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      libbz2-1.0 \
+      libexpat1 \
+      libffi8 \
+      libgdbm-compat4 \
+      liblzma5 \
+      libncursesw6 \
+      libreadline8 \
+      libsqlite3-0 \
+      libssl3 \
+      libuuid1 \
+      zlib1g \
+      tini \
+      gosu \
+      sudo \
+      git \
+      ripgrep \
+      bash \
+      curl \
+      less \
+      procps \
+      vim \
+      make \
+      g++ \
+ && if [ -n "$EXTRA_APT_PACKAGES" ]; then \
+      apt-get install -y --no-install-recommends $EXTRA_APT_PACKAGES; \
+    fi \
+ && echo "Set disable_coredump false" >> /etc/sudo.conf \
+ && rm -rf /var/lib/apt/lists/*
+
+# 2. Merge official Python 3.12 runtime into /usr/local
+COPY --from=python-base /usr/local/ /usr/local/
+RUN ln -sf /usr/local/bin/python3 /usr/local/bin/python \
+ && ln -sf /usr/local/bin/python3 /usr/local/bin/py \
+ && ldconfig \
+ && node --version \
+ && npm --version \
+ && python3 --version \
+ && pip3 --version
+
+# 3. Bake in hound-mcp and Playwright Chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN pip3 install --no-cache-dir --break-system-packages "hound-mcp[all]" \
+ && playwright install --with-deps chromium \
+ && chmod -R 777 /ms-playwright \
+ && rm -rf /var/lib/apt/lists/*
+
+# 4. User accounts (pi & pi-tools)
+RUN (userdel node 2>/dev/null || true) \
+ && (groupdel node 2>/dev/null || true) \
+ && groupadd -g $PGID pi \
+ && useradd -m -u $PUID -g $PGID -s /bin/bash pi \
+ && groupadd -g $PTOOLS_GID pi-tools \
+ && useradd -m -d /home/pi-tools -u $PTOOLS_UID -g $PTOOLS_GID -s /usr/sbin/nologin pi-tools \
+ && usermod -aG pi-tools pi
+
+# 5. Default directory layout & base permissions
+RUN mkdir -p /workspace /opt /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm /home/pi-tools/.config \
+ && chown -R pi:pi /workspace /opt /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm \
+ && chown -R pi-tools:pi-tools /home/pi-tools \
+ && chown pi:pi /home/pi \
+ && chown pi:pi /home/pi/.pi \
+ && chmod 0775 /workspace /opt \
+ && chmod 0755 /home/pi /home/pi/.pi \
+ && chmod 0700 /home/pi/.pi/agent /home/pi/.pi-kot /home/pi/.local /home/pi/.npm /home/pi-tools
+
+# 6. Global runtime environment
+ENV NODE_ENV=production \
+    HOST=0.0.0.0 \
+    PORT=3000 \
+    HOME=/home/pi \
+    USER=pi \
+    LOGNAME=pi \
+    PATH=/home/pi/.local/bin:/app/node_modules/.bin:$PATH \
+    WORKSPACE_PATH=/workspace \
+    PI_CONFIG_DIR=/home/pi/.pi/agent \
+    FORGE_DATA_DIR=/home/pi/.pi-kot \
+    PYTHONUSERBASE=/home/pi/.local \
+    SHELL=/bin/bash \
+    TERM=xterm-256color \
+    PI_KOT_CONTAINER=true

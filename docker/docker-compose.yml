@@ -5,24 +5,36 @@
 # see ../docs/containers.md.
 
 services:
-  pi-kot:
+  # Base image build target (Python 3.12, Node 22, Playwright, hound-mcp).
+  # Run `docker compose --profile base build pi-kot-base` or `./build.sh --base`
+  # only when updating heavy base system dependencies.
+  pi-kot-base:
+    image: pi-kot-base:latest
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.base
       args:
-        # Override in .env to match `id -u` / `id -g` for writable bind mounts.
         PUID: ${PUID:-1000}
         PGID: ${PGID:-1000}
-        # Advanced: set when using docker-compose.sandbox.yml with
-        # non-default pi-tools IDs (see ../docs/agent-tool-sandbox.md).
         PTOOLS_UID: ${AGENT_TOOL_UID:-1001}
         PTOOLS_GID: ${AGENT_TOOL_GID:-1001}
         EXTRA_APT_PACKAGES: ${EXTRA_APT_PACKAGES:-}
+    profiles:
+      - base
+
+  # Application runtime image.
+  # Builds in ~15-20 seconds on daily code edits.
+  pi-kot:
     image: pi-kot:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: ${CONTAINER_NAME:-pi-kot}
     restart: unless-stopped
-    # Start container entrypoint as root so it can configure sudoers according
-    # to ENABLE_SUDO and drop privileges to user pi via gosu before launching the server.
+    # 1GB shared memory for Playwright Chromium stability (prevents crash on heavy pages)
+    shm_size: 1gb
+    # Start container entrypoint as root so it can dynamically align PUID/PGID,
+    # configure sudoers, or drop privileges via gosu / sandbox.
     user: "0:0"
     ports:
       # pi-kot Web UI (container 3000 -> host $HOST_PORT)
@@ -41,6 +53,11 @@ services:
       # Optional: persist /opt if third-party tools or SDKs are installed there
       # - ${OPT_HOST_PATH:-~/.pi-kot-docker/opt}:/opt
     environment:
+      # Dynamic UID/GID alignment (LinuxServer.io pattern: adjusts at boot without rebuilding images)
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      PTOOLS_UID: ${AGENT_TOOL_UID:-1001}
+      PTOOLS_GID: ${AGENT_TOOL_GID:-1001}
       # Container-internal paths — fixed.
       WORKSPACE_PATH: /workspace
       PI_CONFIG_DIR: /home/pi/.pi/agent
@@ -55,12 +72,8 @@ services:
       # Logging + reverse-proxy hint.
       LOG_LEVEL: ${LOG_LEVEL:-info}
       TRUST_PROXY: ${TRUST_PROXY:-false}
-      # Less-used server env vars (JWT_SECRET, CORS_ORIGIN, MINIMAL_UI,
-      # orchestration, rate limits, terminal tuning, sandbox, etc.)
-      # are intentionally documentation-only; add them in your own compose
-      # override when needed.
     # Hardening. Drop all capabilities by default and add back only the
-    # minimal set required for gosu privilege demotion and sudo.
+    # minimal set required for gosu privilege demotion, sudo, and usermod.
     cap_drop:
       - ALL
     cap_add:
